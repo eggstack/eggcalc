@@ -173,7 +173,7 @@ pip install eggcalc
 Or install CLI directly:
 
 ```bash
-git clone https://github.com/eggcalc/eggcalc.git
+git clone https://github.com/eggstack/eggcalc.git
 cd eggcalc
 python install.py --install
 ```

@@ -77,7 +77,7 @@ from .units import (
 )
 
 __version__ = "1.1.1"
-__author__ = "eggcalc Contributors"
+__author__ = "David Bowman"
 
 __all__ = [
     # Core evaluation

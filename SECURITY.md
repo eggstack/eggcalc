@@ -39,12 +39,12 @@ The following Python operations are blocked:
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in clicalc, please report it responsibly:
+If you discover a security vulnerability in eggcalc, please report it responsibly:
 
 ### How to Report
 
 1. **Do not** open a public issue
-2. Email security reports to: `clicalc@example.com`
+2. Email security reports to: `dbowman91@proton.me`
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce
@@ -72,7 +72,7 @@ If you discover a security vulnerability in clicalc, please report it responsibl
 
 ### For Web Applications
 
-When using clicalc in a web application:
+When using eggcalc in a web application:
 
 ```python
 from eggcalc import evaluate_with_timeout, TimeoutError, EvaluationError
@@ -112,7 +112,7 @@ register_function("safe_double", my_safe_function)
 
 ## General
 
-clicalc has been designed with these security principles:
+eggcalc has been designed with these security principles:
 
 1. **Principle of Least Privilege**: Only necessary operations are allowed
 2. **Defense in Depth**: Multiple layers of protection

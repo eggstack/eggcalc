@@ -265,7 +265,7 @@ eggcalc follows these security principles:
 
 ## Reporting Vulnerabilities
 
-See [SECURITY.md](https://github.com/dbowman91/eggcalc/blob/main/SECURITY.md) for:
+See [SECURITY.md](https://github.com/eggstack/eggcalc/blob/main/SECURITY.md) for:
 
 - How to report vulnerabilities
 - Response timeline

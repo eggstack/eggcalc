@@ -2608,7 +2608,7 @@ def get_default_evaluator() -> Evaluator:
 
 
 class PyCalcApp:
-    """Thread-safe wrapper for clicalc, optimized for webapp usage.
+    """Thread-safe wrapper for eggcalc, optimized for webapp usage.
 
     Provides caching, instance isolation, and async support for
     long-running applications like web servers.

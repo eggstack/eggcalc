@@ -14,7 +14,7 @@ pip install eggcalc
 ## Install from Source
 
 ```bash
-git clone https://github.com/dbowman91/eggcalc.git
+git clone https://github.com/eggstack/eggcalc.git
 cd eggcalc
 pip install -e .
 ```
@@ -24,7 +24,7 @@ pip install -e .
 For contributing or development:
 
 ```bash
-git clone https://github.com/dbowman91/eggcalc.git
+git clone https://github.com/eggstack/eggcalc.git
 cd eggcalc
 pip install -e ".[dev]"
 pre-commit install
@@ -35,7 +35,7 @@ pre-commit install
 For portable CLI installation using the install script:
 
 ```bash
-git clone https://github.com/dbowman91/eggcalc.git
+git clone https://github.com/eggstack/eggcalc.git
 cd eggcalc
 python install.py --install
 ```

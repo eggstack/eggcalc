@@ -9,7 +9,7 @@ description = "Natural language math expression calculator"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "eggcalc Contributors", email = "dbowman91@proton.me"}
+    {name = "David Bowman", email = "dbowman91@proton.me"}
 ]
 requires-python = ">=3.10"
 classifiers = [
@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
 ]
@@ -50,8 +51,10 @@ docs = [
 calc = "eggcalc.normalize:main"
 
 [project.urls]
-Homepage = "https://github.com/eggcalc/eggcalc"
-Repository = "https://github.com/eggcalc/eggcalc"
+Homepage = "https://github.com/eggstack/eggcalc"
+Repository = "https://github.com/eggstack/eggcalc"
+"Bug Tracker" = "https://github.com/eggstack/eggcalc/issues"
+Changelog = "https://github.com/eggstack/eggcalc/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["."]

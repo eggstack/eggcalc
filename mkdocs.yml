@@ -1,9 +1,9 @@
-site_name: clicalc
+site_name: eggcalc
 site_description: Natural language math expression calculator
-site_url: https://clicalc.readthedocs.io
-repo_url: https://github.com/dbowman91/eggcalc
-repo_name: eggcalc/eggcalc
-author: NlCliCalc Contributors
+site_url: https://eggcalc.readthedocs.io
+repo_url: https://github.com/eggstack/eggcalc
+repo_name: eggstack/eggcalc
+author: David Bowman
 
 theme:
   name: material
@@ -79,4 +79,4 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/clicalc/clicalc
+      link: https://github.com/eggstack/eggcalc
