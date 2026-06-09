@@ -34,16 +34,21 @@ eggcalc converts natural language math expressions into numerical results. Key c
 
 ## Installation
 
-with pypi:
+### From PyPI (recommended)
+
 ```bash
 pip install eggcalc
 ```
 
+### From source
+
 ```bash
+git clone https://github.com/eggstack/eggcalc.git
+cd eggcalc
 pip install -e .
 ```
 
-Or run directly:
+### Run directly without installing
 
 ```bash
 python -m eggcalc "five plus two"
