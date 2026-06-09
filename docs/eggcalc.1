@@ -1,4 +1,4 @@
-.TH CALC 1 "2025-05-07" "1.1.0" "eggcalc Manual"
+.TH CALC 1 "2026-06-09" "1.1.1" "eggcalc Manual"
 .ad l
 .nh
 
@@ -596,11 +596,11 @@ All trig functions handle complex arguments.
 .SH ENVIRONMENT VARIABLES
 
 .TP
-\fBCLICALC_MAX_INPUT_LENGTH\fR
+\fBEGGCALC_MAX_INPUT_LENGTH\fR
 Override maximum input length (default: 10000 characters).
 
 .TP
-\fBCLICALC_CACHE_SIZE\fR
+\fBEGGCALC_CACHE_SIZE\fR
 Set default LRU cache size (default: 1024).
 
 .SH EXIT STATUS
@@ -620,11 +620,11 @@ Input too long - exceeded maximum input length.
 .SH FILES
 
 .TP
-\fB~/.clicalc_config.py\fR (or \fB./clicalc_config.py\fR)
+\fB~/.eggcalc_config.py\fR (or \fB./eggcalc_config.py\fR)
 Optional user configuration file for custom constants and functions.
 .PP
 .nf
-  # Example clicalc_config.py
+  # Example eggcalc_config.py
   CUSTOM_CONSTANTS = {
       "earth_radius": 6371,  # km
   }
@@ -667,8 +667,8 @@ For untrusted input, use \fBevaluate_with_timeout()\fR from the Python API to pr
   result = evaluate_cached("five plus three")
 
   # Thread-safe webapp wrapper
-  from eggcalc import PyCalcApp
-  app = PyCalcApp(cache_size=1000)
+  from eggcalc import EggCalcApp
+  app = EggCalcApp(cache_size=1000)
   result = app.calculate("five plus three")
 .fi
 
@@ -676,10 +676,10 @@ For untrusted input, use \fBevaluate_with_timeout()\fR from the Python API to pr
 \fBpython\fR(1), \fBbc\fR(1), \fBexpr\fR(1)
 
 .SH BUGS
-Report bugs at https://github.com/dbowman91/eggcalc/issues
+Report bugs at https://github.com/eggstack/eggcalc/issues
 
 .SH AUTHOR
-CliCalc Contributors
+David Bowman
 
 .SH LICENSE
 MIT License

@@ -1,6 +1,6 @@
-# Bash completion for clicalc
+# Bash completion for calc
 
-_clicalc_completion() {
+_calc_completion() {
     local cur prev words cword
     _init_completion || return
 
@@ -35,5 +35,4 @@ _clicalc_completion() {
     esac
 }
 
-complete -F _clicalc_completion clicalc
-complete -F _clicalc_completion calc
+complete -F _calc_completion calc

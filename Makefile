@@ -1,7 +1,7 @@
 .PHONY: help install dev test lint format check clean build publish docs
 
 help:
-	@echo "clicalc - Development Commands"
+	@echo "eggcalc - Development Commands"
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
@@ -32,19 +32,19 @@ test:
 	pytest tests/ -v
 
 test-cov:
-	pytest tests/ --cov=clicalc --cov-report=term-missing --cov-report=html
+	pytest tests/ --cov=eggcalc --cov-report=term-missing --cov-report=html
 
 lint:
-	ruff check clicalc tests
+	ruff check eggcalc tests
 
 format:
-	black clicalc tests
+	black eggcalc tests
 
 format-check:
-	black --check clicalc tests
+	black --check eggcalc tests
 
 typecheck:
-	mypy clicalc --ignore-missing-imports
+	mypy eggcalc --ignore-missing-imports
 
 check: lint format-check typecheck test
 	@echo "All checks passed!"

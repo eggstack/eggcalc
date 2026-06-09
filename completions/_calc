@@ -1,6 +1,6 @@
-#compdef clicalc calc
+#compdef calc
 
-_clicalc() {
+_calc() {
     local -a options
     options=(
         '(-h --help)'{-h,--help}'[Show help message]'
@@ -68,4 +68,4 @@ _clicalc() {
     _describe 'constant' constants
 }
 
-_clicalc
+_calc

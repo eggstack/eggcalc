@@ -2,7 +2,7 @@
 #
 # calc - Natural language calculator
 #
-# This script runs clicalc from the command line.
+# This script runs eggcalc from the command line.
 # Usage: calc "five plus two"
 #        calc "30m + 100ft"
 #
