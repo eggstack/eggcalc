@@ -293,8 +293,8 @@ class TestPhysicalConstants:
         assert abs(result - 6.62607015e-34) < 1e-40
 
 
-class TestPyCalcApp:
-    """Tests for PyCalcApp class."""
+class TestEggCalcApp:
+    """Tests for EggCalcApp class."""
 
     def _get_value(self, result):
         """Extract numeric value from result."""
@@ -304,22 +304,22 @@ class TestPyCalcApp:
 
     def test_basic_calculate(self):
         """Test basic calculation."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp()
+        from eggcalc import EggCalcApp
+        app = EggCalcApp()
         result = app.calculate("5 + 3")
         assert self._get_value(result) == 8
 
     def test_natural_language(self):
         """Test natural language input."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp()
+        from eggcalc import EggCalcApp
+        app = EggCalcApp()
         result = app.calculate("five plus three")
         assert self._get_value(result) == 8
 
     def test_caching(self):
         """Test that caching works."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp(cache_size=10)
+        from eggcalc import EggCalcApp
+        app = EggCalcApp(cache_size=10)
 
         # First call
         result1 = app.calculate("5 + 3")
@@ -332,8 +332,8 @@ class TestPyCalcApp:
 
     def test_cache_clear(self):
         """Test cache clearing."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp()
+        from eggcalc import EggCalcApp
+        app = EggCalcApp()
         app.calculate("5 + 3")
         assert app.cache_size == 1
         app.clear_cache()
@@ -341,32 +341,32 @@ class TestPyCalcApp:
 
     def test_cache_disabled(self):
         """Test with caching disabled."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp(enable_cache=False)
+        from eggcalc import EggCalcApp
+        app = EggCalcApp(enable_cache=False)
         app.calculate("5 + 3")
         assert app.cache_size == 0
 
     def test_register_constant(self):
         """Test registering custom constant."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp()
+        from eggcalc import EggCalcApp
+        app = EggCalcApp()
         app.register_constant("myconst", 42)
         result = app.calculate("myconst")
         assert self._get_value(result) == 42
 
     def test_register_function(self):
         """Test registering custom function."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp()
+        from eggcalc import EggCalcApp
+        app = EggCalcApp()
         app.register_function("double", lambda x: x * 2)
         result = app.calculate("double(5)")
         assert self._get_value(result) == 10
 
     def test_instance_isolation_constants(self):
         """Test that instances have isolated constants."""
-        from eggcalc import PyCalcApp
-        app1 = PyCalcApp()
-        app2 = PyCalcApp()
+        from eggcalc import EggCalcApp
+        app1 = EggCalcApp()
+        app2 = EggCalcApp()
 
         app1.register_constant("myconst", 42)
         app2.register_constant("myconst", 100)
@@ -379,9 +379,9 @@ class TestPyCalcApp:
 
     def test_instance_isolation_functions(self):
         """Test that instances have isolated functions."""
-        from eggcalc import PyCalcApp
-        app1 = PyCalcApp()
-        app2 = PyCalcApp()
+        from eggcalc import EggCalcApp
+        app1 = EggCalcApp()
+        app2 = EggCalcApp()
 
         app1.register_function("myfunc", lambda x: x * 2)
         app2.register_function("myfunc", lambda x: x * 3)
@@ -393,9 +393,9 @@ class TestPyCalcApp:
         assert self._get_value(result2) == 15
 
     def test_unit_calculations(self):
-        """Test unit calculations in PyCalcApp."""
-        from eggcalc import PyCalcApp
-        app = PyCalcApp()
+        """Test unit calculations in EggCalcApp."""
+        from eggcalc import EggCalcApp
+        app = EggCalcApp()
         result = app.calculate("30m + 100ft")
         assert hasattr(result, 'unit')
         assert result.unit == "m"
@@ -425,12 +425,12 @@ class TestAsyncFunctions:
         assert self._get_value(result) == 8
 
     def test_eggcalc_app_async(self):
-        """Test PyCalcApp async calculation."""
+        """Test EggCalcApp async calculation."""
         import asyncio
 
-        from eggcalc import PyCalcApp
+        from eggcalc import EggCalcApp
 
-        app = PyCalcApp()
+        app = EggCalcApp()
 
         async def run_test():
             result = await app.calculate_async("5 + 3")

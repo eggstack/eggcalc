@@ -5,9 +5,9 @@ eggcalc is optimized for web applications with thread-safety, caching, and async
 ## Basic Setup
 
 ```python
-from eggcalc import PyCalcApp, EvaluationError
+from eggcalc import EggCalcApp, EvaluationError
 
-app = PyCalcApp(cache_size=1000)
+app = EggCalcApp(cache_size=1000)
 
 def calculate(expression: str):
     try:
@@ -22,10 +22,10 @@ def calculate(expression: str):
 ```python
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from eggcalc import PyCalcApp, EvaluationError, TimeoutError
+from eggcalc import EggCalcApp, EvaluationError, TimeoutError
 
 app = FastAPI()
-calc = PyCalcApp(cache_size=1000)
+calc = EggCalcApp(cache_size=1000)
 
 class CalculateRequest(BaseModel):
     expression: str
@@ -53,10 +53,10 @@ async def calculate(req: CalculateRequest):
 
 ```python
 from flask import Flask, request, jsonify
-from eggcalc import PyCalcApp, EvaluationError
+from eggcalc import EggCalcApp, EvaluationError
 
 app = Flask(__name__)
-calc = PyCalcApp(cache_size=1000)
+calc = EggCalcApp(cache_size=1000)
 
 @app.route("/calculate", methods=["POST"])
 def calculate():
@@ -77,9 +77,9 @@ def calculate():
 from django.http import JsonResponse
 from django.views import View
 import json
-from eggcalc import PyCalcApp, EvaluationError
+from eggcalc import EggCalcApp, EvaluationError
 
-calc = PyCalcApp(cache_size=1000)
+calc = EggCalcApp(cache_size=1000)
 
 class CalculateView(View):
     def post(self, request):
@@ -95,18 +95,18 @@ class CalculateView(View):
 
 ## Thread Safety
 
-`PyCalcApp` is thread-safe:
+`EggCalcApp` is thread-safe:
 
 - Constants and functions are isolated per instance
 - Internal state uses thread-safe locks
 - Safe for concurrent requests
 
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
 # Each instance has isolated state
-app1 = PyCalcApp()
-app2 = PyCalcApp()
+app1 = EggCalcApp()
+app2 = EggCalcApp()
 
 app1.register_constant("x", 10)
 app2.register_constant("x", 20)
@@ -120,10 +120,10 @@ print(app2.calculate("x"))  # 20
 Enable caching for repeated expressions:
 
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
 # LRU cache with 1000 entries
-app = PyCalcApp(cache_size=1000)
+app = EggCalcApp(cache_size=1000)
 
 # First call computes
 result = app.calculate("complex expression")
@@ -158,9 +158,9 @@ def safe_calculate(expr: str, timeout: float = 1.0):
 from functools import wraps
 from time import time
 from collections import defaultdict
-from eggcalc import PyCalcApp, EvaluationError
+from eggcalc import EggCalcApp, EvaluationError
 
-calc = PyCalcApp()
+calc = EggCalcApp()
 request_times = defaultdict(list)
 
 def rate_limit(max_per_minute: int):
@@ -196,18 +196,18 @@ def calculate(ip: str, expression: str):
 | `evaluate()` | Pre-normalized | ~29 μs |
 | `evaluate_raw()` | Raw input | ~50 μs |
 | `evaluate_cached()` | With cache | O(1) after first |
-| `PyCalcApp.calculate()` | With cache | O(1) after first |
+| `EggCalcApp.calculate()` | With cache | O(1) after first |
 
 ## Error Handling
 
 ```python
 from eggcalc import (
-    PyCalcApp,
+    EggCalcApp,
     EvaluationError,
     TimeoutError,
 )
 
-app = PyCalcApp()
+app = EggCalcApp()
 
 def safe_evaluate(expr: str):
     try:

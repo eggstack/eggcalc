@@ -90,18 +90,18 @@ def _eval() -> float:
 
 ---
 
-### D6: `PyCalcApp` Import Location
+### D6: `EggCalcApp` Import Location
 
 **Location:** `architecture/evaluator.md:281-285` vs `evaluator.py`
 
 **Issue:** The example shows:
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 ```
 
-But `PyCalcApp` is defined in `eggcalc/evaluator.py`, not `eggcalc/__init__.py`. Users would need:
+But `EggCalcApp` is defined in `eggcalc/evaluator.py`, not `eggcalc/__init__.py`. Users would need:
 ```python
-from eggcalc.evaluator import PyCalcApp
+from eggcalc.evaluator import EggCalcApp
 ```
 
 **Severity:** Medium (incorrect example would cause ImportError)
@@ -270,7 +270,7 @@ The following items were verified as correctly documented and implemented:
 - `evaluate_with_timeout()` - ThreadPoolExecutor with timeout ✓
 - `EvaluationError` - Custom exception class ✓
 - `TimeoutError` - Custom exception for timeouts ✓
-- `PyCalcApp` - Thread-safe with caching ✓
+- `EggCalcApp` - Thread-safe with caching ✓
 - `register_constant()` / `register_function()` - Thread-safe global registration ✓
 - Memory functions: `memory_store`, `memory_recall`, `memory_add`, `memory_subtract`, `memory_clear` ✓
 - Variable functions: `setvar`, `delvar`, `listvars`, `clearvars` ✓
@@ -316,7 +316,7 @@ The Key Exports section shows imports but doesn't mention `Evaluator` (the main 
 
 ## Recommendations
 
-1. **Fix `PyCalcApp` import example** - Change to `from eggcalc.evaluator import PyCalcApp` or ensure it's re-exported from `eggcalc/__init__.py`
+1. **Fix `EggCalcApp` import example** - Change to `from eggcalc.evaluator import EggCalcApp` or ensure it's re-exported from `eggcalc/__init__.py`
 
 2. **Update function aliases documentation** - Add `lshift`/`rshift` aliases and all snake_case variants (`is_prime`, `prime_factors`, etc.)
 

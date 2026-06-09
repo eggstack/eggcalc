@@ -1,7 +1,7 @@
 """Tests for unit/constant namespace isolation and edge cases.
 
 Covers:
-- Group A: Per-instance state isolation in Evaluator/PyCalcApp
+- Group A: Per-instance state isolation in Evaluator/EggCalcApp
 - C1:     Unit-before-constant lookup (units shadow 1-letter constants)
 - C2:     "in" canonical renamed to "inch" (Python keyword avoidance)
 - C3:     Custom unit categories (factor, category) tuple form
@@ -20,7 +20,7 @@ import pytest
 
 from eggcalc import (
     EvaluationError,
-    PyCalcApp,
+    EggCalcApp,
     UnitValue,
     evaluate,
     evaluate_raw,
@@ -43,9 +43,9 @@ from eggcalc.units import (
 class TestInstanceStateIsolation:
     """Group A: variables and memory are isolated per Evaluator instance."""
 
-    def test_setvar_isolated_between_pycalcapp_instances(self):
-        app_a = PyCalcApp()
-        app_b = PyCalcApp()
+    def test_setvar_isolated_between_eggcalcapp_instances(self):
+        app_a = EggCalcApp()
+        app_b = EggCalcApp()
         app_a.calculate('setvar("secret", 42)')
         with pytest.raises(EvaluationError) as exc_info:
             app_b.calculate("secret + 1")
@@ -54,13 +54,13 @@ class TestInstanceStateIsolation:
     def test_setvar_isolated_from_default_evaluator(self):
         from eggcalc import clearvars, getvar
         clearvars()
-        app = PyCalcApp()
+        app = EggCalcApp()
         app.calculate('setvar("appsecret", 99)')
         assert getvar("appsecret") == 0
 
-    def test_memory_isolated_between_pycalcapp_instances(self):
-        app_a = PyCalcApp()
-        app_b = PyCalcApp()
+    def test_memory_isolated_between_eggcalcapp_instances(self):
+        app_a = EggCalcApp()
+        app_b = EggCalcApp()
         app_a.calculate("Mplus(10)")
         app_a.calculate("Mplus(5)")
         result_a = app_a.calculate("MR()")
@@ -71,7 +71,7 @@ class TestInstanceStateIsolation:
     def test_memory_isolated_from_default_evaluator(self):
         from eggcalc import memory_clear, memory_recall
         memory_clear()
-        app = PyCalcApp()
+        app = EggCalcApp()
         app.calculate("store(123)")
         assert memory_recall() == 0
 

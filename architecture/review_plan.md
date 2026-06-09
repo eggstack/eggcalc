@@ -159,7 +159,7 @@ After all subagent reviews complete, the orchestrator will:
 
 Each subagent receives this instruction pattern:
 
-> Review the architecture document at `architecture/<module>.md` and the corresponding code. Verify all claims in the document against the actual implementation. Identify any discrepancies, bugs, or improvement opportunities. Write a structured review to `plans/<module>_review.md` following the format specified in the parent plan. Work only within the repository at `/Users/davidbowman/projects/github/nl-clicalc/nl-clicalc`. Do not execute any code changes.
+> Review the architecture document at `architecture/<module>.md` and the corresponding code. Verify all claims in the document against the actual implementation. Identify any discrepancies, bugs, or improvement opportunities. Write a structured review to `plans/<module>_review.md` following the format specified in the parent plan. Work only within the repository at `/Users/davidbowman/projects/github/eggstack/eggcalc`. Do not execute any code changes.
 
 ## Verification
 

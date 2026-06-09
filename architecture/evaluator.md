@@ -21,7 +21,7 @@ from eggcalc.evaluator import (
     evaluate_with_timeout,
     EvaluationError,    # Exception class
     TimeoutError,       # Timeout exception
-    PyCalcApp,          # Webapp class with caching
+    EggCalcApp,          # Webapp class with caching
     get_default_evaluator,
     register_constant,  # Add user constants
     register_function,  # Add user functions
@@ -284,7 +284,7 @@ result = await evaluate_async("5 + 3")           # Awaitable result
 result = await evaluate_async("five plus three")  # NL also supported
 ```
 
-Used by `PyCalcApp` for concurrent request handling.
+Used by `EggCalcApp` for concurrent request handling.
 
 ### `evaluate_with_timeout(expression: str, timeout: float) -> Any`
 Evaluation with timeout in seconds. Raises `TimeoutError` on timeout.
@@ -303,14 +303,14 @@ Functions automatically use `cmath` when:
 - Input is negative (with `use_complex_for_negative=True`)
 - Input has magnitude > 1 (with `use_complex_for_abs_gt_one=True`)
 
-## PyCalcApp
+## EggCalcApp
 
 Webapp wrapper with caching:
 
 ```python
-from eggcalc.evaluator import PyCalcApp
+from eggcalc.evaluator import EggCalcApp
 
-app = PyCalcApp(cache_size=1024, enable_cache=True)
+app = EggCalcApp(cache_size=1024, enable_cache=True)
 result = app.calculate("five plus two")
 ```
 

@@ -45,7 +45,7 @@ __all__ = [
     "register_constant",
     "register_function",
     "load_user_config",
-    "PyCalcApp",
+    "EggCalcApp",
     "TimeoutError",
     "memory_store",
     "memory_recall",
@@ -1233,7 +1233,7 @@ def _get_current_evaluator() -> Evaluator:
 
 # Per-instance wrappers for FUNCTIONS dict entries. They consult the
 # _current_evaluator ContextVar so behavior is correctly scoped to the
-# active Evaluator (e.g. inside a PyCalcApp instance).
+# active Evaluator (e.g. inside a EggCalcApp instance).
 
 
 def _fn_store(value: float, register: str = "M") -> float:
@@ -1796,7 +1796,7 @@ class Evaluator(ast.NodeVisitor):
 
         Each Evaluator instance has its own copy of constants, functions,
         user variables, and memory registers. This enables true instance
-        isolation in PyCalcApp: variables set on one instance are not
+        isolation in EggCalcApp: variables set on one instance are not
         visible to other instances or the module-level default evaluator.
 
         Args:
@@ -2607,18 +2607,18 @@ def get_default_evaluator() -> Evaluator:
     return _default_evaluator
 
 
-class PyCalcApp:
+class EggCalcApp:
     """Thread-safe wrapper for eggcalc, optimized for webapp usage.
 
     Provides caching, instance isolation, and async support for
     long-running applications like web servers.
 
-    Each PyCalcApp instance has its own isolated evaluator with its own
+    Each EggCalcApp instance has its own isolated evaluator with its own
     constants and functions. Registering constants/functions on one instance
     does not affect other instances.
 
     Usage:
-        app = PyCalcApp()
+        app = EggCalcApp()
         result = app.calculate("5 + 3")
         result = app.calculate("30m + 100ft")  # with units
     """
@@ -2628,7 +2628,7 @@ class PyCalcApp:
         cache_size: int = DEFAULT_CACHE_SIZE,
         enable_cache: bool = True,
     ) -> None:
-        """Initialize PyCalcApp.
+        """Initialize EggCalcApp.
 
         Args:
             cache_size: LRU cache size (default 1000)
@@ -2701,7 +2701,7 @@ class PyCalcApp:
         """Register a custom constant on this instance (thread-safe).
 
         Unlike the global register_constant function, this only affects
-        this PyCalcApp instance.
+        this EggCalcApp instance.
         """
         with self._lock:
             self._evaluator.CONSTANTS[name] = value
@@ -2710,7 +2710,7 @@ class PyCalcApp:
         """Register a custom function on this instance (thread-safe).
 
         Unlike the global register_function function, this only affects
-        this PyCalcApp instance.
+        this EggCalcApp instance.
         """
         with self._lock:
             self._evaluator.FUNCTIONS[name] = func

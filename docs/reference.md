@@ -10,9 +10,9 @@ Complete API reference for eggcalc.
 ::: eggcalc.evaluate_async
 ::: eggcalc.evaluate_with_timeout
 
-## PyCalcApp Class
+## EggCalcApp Class
 
-::: eggcalc.PyCalcApp
+::: eggcalc.EggCalcApp
 
 ## Configuration
 

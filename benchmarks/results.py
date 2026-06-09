@@ -49,7 +49,7 @@ BASELINE: dict[str, BenchmarkResult] = {
         "stddev_seconds": 0.03e-6,
         "samples": 10000,
         "unit": "seconds per evaluation (after first call)",
-        "description": "NL expression via PyCalcApp.calculate() with instance caching",
+        "description": "NL expression via EggCalcApp.calculate() with instance caching",
     },
 }
 

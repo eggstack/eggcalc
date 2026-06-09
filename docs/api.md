@@ -88,14 +88,14 @@ async def calculate(expr: str):
 result = asyncio.run(calculate("5 + 3"))  # 8
 ```
 
-## PyCalcApp Class
+## EggCalcApp Class
 
 Thread-safe wrapper optimized for web applications. Each instance has isolated constants/functions and optional caching.
 
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
-app = PyCalcApp(cache_size=1000, enable_cache=True)
+app = EggCalcApp(cache_size=1000, enable_cache=True)
 
 # Basic usage - natural language works
 result = app.calculate("five plus three")  # 8
@@ -117,7 +117,7 @@ print(app.cache_size)  # Number of cached entries
 app.clear_cache()      # Clear all cache entries
 ```
 
-**Why PyCalcApp instead of module-level functions?**
+**Why EggCalcApp instead of module-level functions?**
 
 1. **Instance isolation**: Constants/functions registered on one instance don't affect others
 2. **Caching**: Repeated queries use cache (O(1) lookup)
@@ -330,7 +330,7 @@ print(f"Max nesting depth: {MAX_NESTING_DEPTH}")
 | `evaluate()` | ~10 μs/eval | Fastest, requires pre-normalized input |
 | `evaluate_raw()` | ~155 μs/eval | Full pipeline, natural language support |
 | `evaluate_cached()` | ~0.1 μs/eval (cached) | First call same as evaluate_raw |
-| `PyCalcApp.calculate()` | ~0.3 μs/eval (cached) | Instance-level caching |
+| `EggCalcApp.calculate()` | ~0.3 μs/eval (cached) | Instance-level caching |
 | `evaluate_async()` | Same as evaluate_raw | Runs in thread pool |
 
-**For maximum performance with user input**: Cache parsed results using `evaluate_cached()` or `PyCalcApp`.
+**For maximum performance with user input**: Cache parsed results using `evaluate_cached()` or `EggCalcApp`.

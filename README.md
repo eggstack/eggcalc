@@ -163,10 +163,10 @@ print(result)  # 8
 ### Webapp Usage (Optimized for Long-Running Applications)
 
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
 # Create app instance with caching (recommended for webapps)
-app = PyCalcApp(cache_size=1000)
+app = EggCalcApp(cache_size=1000)
 
 # Calculate (uses cache automatically)
 result = app.calculate("5 + 3")           # 8
@@ -201,7 +201,7 @@ from eggcalc import (
     load_user_config,    # Load config from eggcalc_config.py
     
     # Webapp wrapper
-    PyCalcApp,            # Thread-safe wrapper with caching
+    EggCalcApp,            # Thread-safe wrapper with caching
     
     # Types
     EvaluationError,      # Exception type
@@ -235,7 +235,7 @@ result = evaluate_raw("mysquare(3, 4)")  # 25
 | `evaluate()` | Pre-normalized (e.g., `5+3`) | ~9 μs/eval |
 | `evaluate_raw()` | Natural language (e.g., `"five plus three"`) | ~155 μs/eval |
 | `evaluate_cached()` | Repeated NL expressions | ~0.1 μs/eval (after first call) |
-| `PyCalcApp.calculate()` | NL with instance caching | ~0.3 μs/eval (after first call) |
+| `EggCalcApp.calculate()` | NL with instance caching | ~0.3 μs/eval (after first call) |
 | `evaluate_async()` | Async frameworks | Same as evaluate_raw in thread pool |
 
 **Key insight**: `evaluate()` is ~17x faster than `evaluate_raw()` because it skips the normalization pipeline. Use `evaluate()` when you control input format, `evaluate_raw()` for user input.
@@ -298,14 +298,14 @@ except TimeoutError:
     print("Evaluation timed out")
 ```
 
-### PyCalcApp Class
+### EggCalcApp Class
 
 Thread-safe wrapper optimized for webapps with caching and instance isolation.
 
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
-app = PyCalcApp(cache_size=1000)  # LRU cache with 1000 entries
+app = EggCalcApp(cache_size=1000)  # LRU cache with 1000 entries
 
 # Evaluate expressions
 result = app.calculate("5 + 3")
@@ -829,7 +829,7 @@ MAX_EXPONENT = 100000
 
 **Safe for untrusted input:**
 - `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`
-- `PyCalcApp.calculate()`, `PyCalcApp.calculate_async()`
+- `EggCalcApp.calculate()`, `EggCalcApp.calculate_async()`
 
 **Register with caution:**
 - `register_function()` - Only register during initialization, never from user input
@@ -843,9 +843,9 @@ MAX_EXPONENT = 100000
 ### Example: Secure Webapp Usage
 
 ```python
-from eggcalc import PyCalcApp, EvaluationError
+from eggcalc import EggCalcApp, EvaluationError
 
-app = PyCalcApp(cache_size=1000)
+app = EggCalcApp(cache_size=1000)
 
 def handle_user_input(expression: str) -> dict:
     """Safely evaluate user-provided expression."""

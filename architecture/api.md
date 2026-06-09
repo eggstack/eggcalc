@@ -54,12 +54,12 @@ result = evaluate_with_timeout("2 ** 1000000", timeout=1.0)
 
 ## Webapp Wrapper
 
-### `PyCalcApp`
+### `EggCalcApp`
 
 Thread-safe wrapper with caching, optimized for long-running applications.
 
 ```python
-app = PyCalcApp(cache_size=1000)
+app = EggCalcApp(cache_size=1000)
 result = app.calculate("5 + 3")
 result = await app.calculate_async("five plus two")
 ```
@@ -211,4 +211,4 @@ Memory register class (returned by `memory_*` functions return floats, but `Memo
 | `evaluate()` | Pre-normalized | ~10 μs/eval |
 | `evaluate_raw()` | Natural language | ~155 μs/eval |
 | `evaluate_cached()` | Repeated NL | ~0.1 μs/eval (after first) |
-| `PyCalcApp.calculate()` | NL with caching | ~0.3 μs/eval (after first) |
+| `EggCalcApp.calculate()` | NL with caching | ~0.3 μs/eval (after first) |

@@ -102,7 +102,7 @@ Safely evaluates mathematical expressions using Python's AST module — **not `e
 | Variables | `setvar`, `getvar`, `delvar`, `listvars` |
 | Physical Constants | `pi`, `e`, `c`, `h`, `avogadro`, `k`, `G`, etc. |
 
-**Key exports:** `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `PyCalcApp`, `Evaluator`
+**Key exports:** `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `EggCalcApp`, `Evaluator`
 
 **Detailed documentation:** [evaluator.md](evaluator.md)
 

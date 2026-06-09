@@ -35,11 +35,11 @@ normalized, exit_code = normalize_expression("five plus three")
 
 ---
 
-### D2: `PyCalcApp` Default Cache Size Example
+### D2: `EggCalcApp` Default Cache Size Example
 
 **Location:** `architecture/api.md:62` vs `evaluator.py:1413`
 
-**Issue:** The documentation shows `app = PyCalcApp(cache_size=1000)` but the actual default is `DEFAULT_CACHE_SIZE` which equals `1024`.
+**Issue:** The documentation shows `app = EggCalcApp(cache_size=1000)` but the actual default is `DEFAULT_CACHE_SIZE` which equals `1024`.
 
 **Severity:** Low (example uses non-default value without noting it)
 
@@ -68,12 +68,12 @@ self.CONSTANTS = self.__class__.CONSTANTS.copy()
 self.FUNCTIONS = self.__class__.FUNCTIONS.copy()
 ```
 
-**Issue:** PyCalcApp advertises "Instance-isolated constants/functions" but uses shallow copies. Nested mutable objects (e.g., lists used as values) would be shared across instances.
+**Issue:** EggCalcApp advertises "Instance-isolated constants/functions" but uses shallow copies. Nested mutable objects (e.g., lists used as values) would be shared across instances.
 
 **Example:**
 ```python
-app1 = PyCalcApp()
-app2 = PyCalcApp()
+app1 = EggCalcApp()
+app2 = EggCalcApp()
 # If CONSTANTS contained a list value, both apps would share it
 ```
 
@@ -166,7 +166,7 @@ The following items were verified as correctly documented and implemented:
 - `evaluate_cached()` - LRU caching with 1024 entries ✓
 - `evaluate_async()` - Async wrapper using thread pool ✓
 - `evaluate_with_timeout()` - ThreadPoolExecutor with timeout ✓
-- `PyCalcApp` - Thread-safe with caching and async support ✓
+- `EggCalcApp` - Thread-safe with caching and async support ✓
 - `register_constant()` / `register_function()` - Thread-safe global registration ✓
 - All memory functions: `memory_store`, `memory_recall`, etc. ✓
 - All variable functions: `setvar`, `getvar`, `delvar`, etc. ✓
@@ -208,7 +208,7 @@ This appears to be a stray example that doesn't match the preceding `get_default
 
 1. **Update `normalize_expression` examples** to show tuple return type
 2. **Clarify or correct** the `Evaluator.visit()` usage example
-3. **Consider** using `deepcopy` in PyCalcApp if true instance isolation is required
+3. **Consider** using `deepcopy` in EggCalcApp if true instance isolation is required
 4. **Add timeout units** to documentation
 5. **Remove or relocate** the stray `register_function` example at line 109-111
 

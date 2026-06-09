@@ -1,6 +1,6 @@
 # MCP Exposure Profiles and Codegg Reference Implementation Plan
 
-This plan is for the next implementation pass on `nl-clicalc` / `eggcalc` as the Python reference implementation for deterministic MCP tooling. The Rust implementation already exists separately, so this repo should focus on defining and validating the reference behavior: stable tool contracts, exposure profiles, metadata, composite workflow tools, and documentation/tests that downstream implementations can mirror.
+This plan is for the next implementation pass on `eggcalc` as the Python reference implementation for deterministic MCP tooling. The Rust implementation already exists separately, so this repo should focus on defining and validating the reference behavior: stable tool contracts, exposure profiles, metadata, composite workflow tools, and documentation/tests that downstream implementations can mirror.
 
 The goal is not to remove the broad tool inventory. The goal is to make the inventory usable by coding agents through stable profiles, machine-readable metadata, compact tool exposure, composite workflow tools, and a clear split between harness-level automatic checks and model-invoked MCP tools.
 

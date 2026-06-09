@@ -47,7 +47,7 @@ All notable changes to eggcalc are documented here.
 - JSON output
 - Python API with caching
 - Async support for web applications
-- Thread-safe PyCalcApp class
+- Thread-safe EggCalcApp class
 - Custom configuration via eggcalc_config.py
 
 ### Security

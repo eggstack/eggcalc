@@ -15,8 +15,8 @@ Library usage:
     result = evaluate("5 + 3")
 
     # For webapps with caching:
-    from eggcalc import PyCalcApp
-    app = PyCalcApp(cache_size=1024)
+    from eggcalc import EggCalcApp
+    app = EggCalcApp(cache_size=1024)
     result = app.calculate("five plus two")
 
 Note: load_user_config_extended() is not exported as custom number/operator
@@ -31,7 +31,7 @@ from .evaluator import (
     MAX_RESULT_VALUE,
     EvaluationError,
     Memory,
-    PyCalcApp,
+    EggCalcApp,
     TimeoutError,
     clearvars,
     delvar,
@@ -121,7 +121,7 @@ __all__ = [
     "register_constant",
     "register_function",
     # Webapp
-    "PyCalcApp",
+    "EggCalcApp",
     # Memory functions
     "memory_store",
     "memory_recall",

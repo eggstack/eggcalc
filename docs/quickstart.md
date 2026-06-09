@@ -150,12 +150,12 @@ if isinstance(result, UnitValue):
     # Value: 60.48, Unit: m
 ```
 
-### Webapps with PyCalcApp
+### Webapps with EggCalcApp
 
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
-app = PyCalcApp(cache_size=1000)
+app = EggCalcApp(cache_size=1000)
 
 # Natural language works
 result = app.calculate("five plus three")  # 8

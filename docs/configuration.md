@@ -126,7 +126,7 @@ calc "long expression..."
 from eggcalc import (
     register_constant,
     register_function,
-    PyCalcApp,
+    EggCalcApp,
 )
 
 # Global registration
@@ -138,7 +138,7 @@ def my_func(x):
 register_function("mysquare", my_func)
 
 # Per-instance (recommended for webapps)
-app = PyCalcApp()
+app = EggCalcApp()
 app.register_constant("my_const", 42)
 app.register_function("mysquare", my_func)
 ```

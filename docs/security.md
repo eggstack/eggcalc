@@ -102,15 +102,15 @@ x[0]                       # Blocked
 | `evaluate_with_timeout()` | Untrusted input | **Recommended** - has timeout |
 | `evaluate_raw()` | User input, controlled environment | Safe but no timeout |
 | `evaluate()` | Pre-normalized, trusted input | Fastest, no normalization |
-| `PyCalcApp.calculate()` | Webapps with caching | Safe, per-instance isolation |
+| `EggCalcApp.calculate()` | Webapps with caching | Safe, per-instance isolation |
 | `evaluate_async()` | Async frameworks | Safe in thread pool |
 
 ### Example: Secure Endpoint
 
 ```python
-from eggcalc import PyCalcApp, EvaluationError, TimeoutError
+from eggcalc import EggCalcApp, EvaluationError, TimeoutError
 
-app = PyCalcApp()
+app = EggCalcApp()
 
 def handle_user_input(expression: str):
     """Safely evaluate user-provided expression."""
@@ -160,9 +160,9 @@ In high-security environments, avoid config loading:
 
 ```python
 # Don't call load_user_config()
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
-app = PyCalcApp()
+app = EggCalcApp()
 # Manually configure instead
 app.register_constant("safe_const", 42)
 ```
@@ -191,10 +191,10 @@ def validate_input(expr: str) -> str:
 ### 3. Use Instance Isolation
 
 ```python
-from eggcalc import PyCalcApp
+from eggcalc import EggCalcApp
 
 # Each user/tenant gets isolated instance
-app = PyCalcApp()
+app = EggCalcApp()
 ```
 
 ### 4. Rate Limit

@@ -9,7 +9,7 @@
 | evaluator.py line count: 1515 | VERIFIED | `wc -l` confirms 1515 lines |
 | units.py line count: 1284 | VERIFIED | `wc -l` confirms 1284 lines |
 | evaluator.py: Safe AST-based evaluation (not eval()) | VERIFIED | Uses `ast.NodeVisitor` pattern at line 823 |
-| Key exports from evaluator.py | VERIFIED | `__all__` at line 30-55 contains: evaluate, evaluate_raw, evaluate_cached, evaluate_async, evaluate_with_timeout, PyCalcApp, Evaluator |
+| Key exports from evaluator.py | VERIFIED | `__all__` at line 30-55 contains: evaluate, evaluate_raw, evaluate_cached, evaluate_async, evaluate_with_timeout, EggCalcApp, Evaluator |
 | Key exports from units.py | VERIFIED | UnitValue (line 24), get_conversion_factor (1089), is_unit (1104), get_unit_category (1252), are_units_compatible (1258), convert_temperature (1068) |
 | normalize.py imports evaluator.evaluate() | VERIFIED | Line 25: `from .evaluator import EvaluationError, evaluate` |
 | normalize.py imports units | VERIFIED | Line 37: `from .units import UNIT_ALIASES, UNIT_CATEGORIES, UnitValue, is_unit` |
