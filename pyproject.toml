@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "eggcalc"
 version = "1.1.2"
-description = "Natural language math expression calculator"
+description = "CLI calculator accepting natural language and unit conversion. Can be used as a CLI, python library, or MCP server for AI agents."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
 ]
-keywords = ["calculator", "math", "natural-language", "cli", "expression-evaluator", "unit-converter", "mathematical-parser"]
+keywords = ["calculator", "math", "natural-language", "cli", "expression-evaluator", "unit-converter", "mathematical-parser", "mcp", "agent"]
 dependencies = []
 
 [project.optional-dependencies]
