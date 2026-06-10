@@ -2,6 +2,43 @@
 
 All notable changes to eggcalc are documented here.
 
+## [1.1.2] - 2026-06-10
+
+### Added
+- MCP server expanded to 64 tools (from 59)
+- Additional text analysis tools: edit_preflight, command_preflight, config_preflight, structured_data_compare, text_security_inspect, prompt_input_inspect
+- Production review tests
+- Unit namespace tests
+- REPL and CLI integration tests
+- Build script tests
+- Math edge case tests
+- Normalization tests
+
+### Changed
+- evaluator.py expanded to 2734 lines (from 1515)
+- normalize.py expanded to 3066 lines (from 1807)
+- units.py expanded to 2086 lines (from 1284)
+- Test suite grew to 2070 tests
+
+## [1.1.1] - 2026-05-29
+
+### Added
+- Architecture review completed across all 15 modules
+- All 35 identified issues fixed
+- Unicode policy checks and canonicalization profiles
+- Prompt injection detection tools
+- Cargo.toml inspection
+- Version constraint checking
+- Identifier table inspection
+- Additional exact/ modules: shell.py, config.py, markdown.py, path_tools.py, position.py, transform.py, glob.py, identifier.py, identifier_inspect.py, inspect_prompt.py, cargo.py, version.py, unicode_policy.py, patch.py
+
+### Fixed
+- Float regex pipe bug in normalize.py
+- Temperature conversion crash with ValueError
+- Duplicate _VALID_TRANSFORM_OPERATIONS in mcp/tools.py
+- Int regex patterns in normalize.py
+- UnitValue __eq__ returning NotImplemented for different units
+
 ## [1.1.0] - 2026-02-20
 
 ### Added

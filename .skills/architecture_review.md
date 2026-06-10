@@ -75,7 +75,7 @@ For each module, examine:
 - Data structure field mismatches (verify against actual code)
 - Parameter name alignment (docs sometimes use different names than code)
 
-**Note:** The architecture review plan has been completed. `architecture/review_plan.md` is now in INCOMPLETE status for iterative improvement. All 15 module review outputs are in `plans/*_review.md`. See `plans/improvements.md` for improvement recommendations.
+**Note:** The architecture review has been completed. All 15 module reviews were performed and findings incorporated into the documentation.
 
 ## Architecture Review Findings (2026-05-28 through 2026-05-29)
 
@@ -97,35 +97,18 @@ The architecture review identified issues across all modules. **All 35 actionabl
 
 ### Review Process Notes
 - All modules reviewed with improvement plans generated
-- Complete findings consolidated in `plans/plan.md`
+- Complete findings consolidated in architecture documentation
 - 35 actionable items across 5 waves implemented and verified
-- 8 items deferred for design review (see plan.md)
+- All items resolved
 
-### Current Review Cycle Findings (No Code Changes Made)
-These findings are documented but not fixed as the plan specifies review-only scope:
-
-1. **CLI Output Format** (`plans/cli_review.md`)
-   - Docs describe `expression -> result` format
-   - Code only outputs `result`
-   - This is a documentation issue, not a code bug
-
-2. **validate.py `list_sort` stable parameter** (`plans/validate_review.md`)
-   - `stable` parameter has no effect (Python's `sorted()` is always stable)
-   - Parameter is harmless but meaningless
-
-3. **API `normalize_expression` docs** (`plans/api_review.md`)
-   - Documentation shows string return, actual is `tuple[str, int]`
-   - Examples need updating to show tuple unpacking
-
-### Stale Item Detection (2026-05-29)
-- No stale architecture files detected
-- No stale review files detected
-- All 1231 tests pass
+### Known Documentation Discrepancies (2026-05-29)
+- CLI output format: docs describe `expression -> result`, code only outputs `result`
+- `validate.py` `list_sort` `stable` parameter has no effect (Python's `sorted()` is always stable)
+- `normalize_expression()` documented as returning `str` but actually returns `tuple[str, int]`
 
 ## Architecture Files Location
 - `architecture/` - Module-level documentation
 - `docs/exact.md` - exact/ module documentation
-- `plans/` - Implementation plans and reviews
 
 ## Documentation Maintenance
 When updating code:

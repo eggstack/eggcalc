@@ -1,6 +1,6 @@
 # units.py — Unit Definitions and Conversions
 
-Provides comprehensive unit conversion support for the calculator.
+2086 lines. Provides comprehensive unit conversion support for the calculator.
 
 ## Overview
 

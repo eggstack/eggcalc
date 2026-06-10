@@ -20,7 +20,7 @@ evaluate_raw("what is pi times two")  # 6.283...
 
 ### `evaluate()` - Pre-Normalized Math Only
 
-Use this when you control the input format and want maximum performance (~17x faster):
+Use this when you control the input format and want maximum performance (~15x faster):
 
 ```python
 from eggcalc import evaluate
@@ -124,7 +124,7 @@ AI agent integration via Model Context Protocol:
 
 ```bash
 calc --mcp
-# Exposes 59 deterministic tools to AI agents
+# Exposes 64 deterministic tools to AI agents
 ```
 
 See [MCP Server](mcp.md) for detailed tool documentation.

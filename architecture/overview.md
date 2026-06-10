@@ -2,7 +2,7 @@
 
 A natural language math expression calculator that parses expressions in English (like "five plus three") and converts them to numeric results, with support for unit conversions. The system also includes a comprehensive suite of Unicode text analysis tools exposed via an MCP (Model Context Protocol) server.
 
-**All 1192 tests pass.**
+**All 2070 tests pass.**
 
 ---
 
@@ -61,7 +61,7 @@ eggcalc is a dual-purpose tool:
 
 ### [normalize.py](normalize.md) — Natural Language Processing Pipeline
 
-**Location:** `eggcalc/normalize.py` (1807 lines)
+**Location:** `eggcalc/normalize.py` (3066 lines)
 
 Converts natural language expressions into Python syntax through a multi-stage pipeline:
 
@@ -82,7 +82,7 @@ Converts natural language expressions into Python syntax through a multi-stage p
 
 ### [evaluator.py](evaluator.md) — Safe AST-Based Expression Evaluation
 
-**Location:** `eggcalc/evaluator.py` (1515 lines)
+**Location:** `eggcalc/evaluator.py` (2734 lines)
 
 Safely evaluates mathematical expressions using Python's AST module — **not `eval()`**. Provides full protection against code injection.
 
@@ -110,7 +110,7 @@ Safely evaluates mathematical expressions using Python's AST module — **not `e
 
 ### [units.py](units.md) — Unit Definitions and Conversions
 
-**Location:** `eggcalc/units.py` (1284 lines)
+**Location:** `eggcalc/units.py` (2086 lines)
 
 Comprehensive unit conversion system with 20+ unit categories and proper temperature offset handling.
 
@@ -159,7 +159,7 @@ Combines all modules into a single `eggcalc.py` file (~394KB) for portability.
 
 **Module Groups:**
 - `MODULES_CALC`: units, evaluator, normalize (core calculator)
-- `MODULES_EXACT`: 17 exact/ submodules (text analysis tools)
+- `MODULES_EXACT`: 21 exact/ submodules (text analysis tools)
 - `MODULES_MCP`: schemas, tools, server (MCP protocol)
 
 **Output:** Self-contained executable with CLI and MCP modes.
@@ -290,10 +290,10 @@ Each module has a dedicated architecture document for focused review:
 
 | Module | Document | Lines | Purpose |
 |--------|----------|-------|---------|
-| normalize.py | [normalize.md](normalize.md) | 1807 | NL → Python expression pipeline |
-| evaluator.py | [evaluator.md](evaluator.md) | 1515 | Safe AST-based evaluation |
-| units.py | [units.md](units.md) | 1284 | Unit definitions & conversions |
-| CLI | [cli.md](cli.md) | ~300 | Command-line interface |
+| normalize.py | [normalize.md](normalize.md) | 3066 | NL → Python expression pipeline |
+| evaluator.py | [evaluator.md](evaluator.md) | 2734 | Safe AST-based evaluation |
+| units.py | [units.md](units.md) | 2086 | Unit definitions & conversions |
+| CLI | [cli.md](cli.md) | 19 | Command-line interface |
 
 ### exact/ — Unicode Text Primitives
 

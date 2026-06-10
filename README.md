@@ -139,7 +139,7 @@ eggcalc can run as an MCP server, exposing deterministic text, JSON, validation,
 calc --mcp
 ```
 
-**59 tools** across 15 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode). All results are deterministic - same input always produces the same output.
+**64 tools** across 15 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode). All results are deterministic - same input always produces the same output.
 
 For the full tool catalog with arguments, return values, and tiers, see [docs/mcp.md](docs/mcp.md).
 

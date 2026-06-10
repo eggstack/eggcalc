@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-06-10
+
+### Added
+- MCP server expanded to 64 tools (from 59)
+- Additional text analysis tools: edit_preflight, command_preflight, config_preflight, structured_data_compare, text_security_inspect, prompt_input_inspect
+- Production review tests, unit namespace tests, REPL and CLI integration tests
+- Build script tests, math edge case tests, normalization tests
+
+### Changed
+- evaluator.py expanded to 2734 lines (from 1515)
+- normalize.py expanded to 3066 lines (from 1807)
+- units.py expanded to 2086 lines (from 1284)
+- Test suite grew to 2070 tests
+
+## [1.1.1] - 2026-05-29
+
+### Added
+- Architecture review completed across all 15 modules
+- Unicode policy checks and canonicalization profiles
+- Prompt injection detection tools
+- Cargo.toml inspection, version constraint checking
+- Identifier table inspection
+- 14 new exact/ modules for text analysis
+
+### Fixed
+- Float regex pipe bug in normalize.py
+- Temperature conversion crash with ValueError
+- Duplicate _VALID_TRANSFORM_OPERATIONS in mcp/tools.py
+- Int regex patterns in normalize.py
+- UnitValue __eq__ returning NotImplemented for different units
+
 ## [1.1.0] - 2026-02-20
 
 ### Added

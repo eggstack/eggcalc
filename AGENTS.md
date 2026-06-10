@@ -129,7 +129,7 @@ Located in `eggcalc/mcp/` - Model Context Protocol server for AI agent tool acce
 - New tests must use the correct API:
   - For NL/unit functionality → use `run()` or test through CLI
   - For pure math expressions → use `evaluate()`
-- 1735 tests currently pass, 32 skipped (as of 2026-07-05)
+- 2070 tests currently pass (as of 2026-06-10)
 
 ### Code Style
 - Follow existing patterns in the codebase
@@ -142,28 +142,34 @@ Located in `eggcalc/mcp/` - Model Context Protocol server for AI agent tool acce
 ```
 tests/
 ├── conftest.py              # Shared fixtures
+├── test_build_single.py     # Build script tests
+├── test_cargo_inspect.py    # Cargo.toml inspection tests
+├── test_cli_text.py         # CLI text tools tests
 ├── test_clicalc.py          # Core functional tests
-├── test_security_fuzz.py    # Security/fuzz tests
-├── test_tokenization.py     # Tokenization edge cases
+├── test_config_validation.py # dotenv/INI validation tests
+├── test_exact.py            # Exact module tests
+├── test_golden_fixtures.py  # Golden fixture tests
+├── test_identifier_table.py # Identifier table inspection tests
+├── test_line_range.py       # Line range extract/compare tests
+├── test_markdown_tools.py   # Markdown structure tests
+├── test_math_edge_cases.py  # Math edge case tests
 ├── test_math_identities.py  # Mathematical laws verification
 ├── test_mcp_server.py       # MCP server integration tests
 ├── test_mcp_tools_new.py    # MCP integration tests for new tools
-├── test_exact.py            # Exact module tests
+├── test_normalize.py        # Normalization tests
 ├── test_patch_tools.py      # Patch apply/summary tools tests
-├── test_cli_text.py         # CLI text tools tests
-├── test_text_replace_check.py # Text replacement check tests
-├── test_line_range.py       # Line range extract/compare tests
 ├── test_path_compare.py     # Path comparison tests
 ├── test_path_scope.py       # Path scope check tests
-├── test_shell_tools.py      # Shell split/quote/compare tests
-├── test_markdown_tools.py   # Markdown structure tests
-├── test_config_validation.py # dotenv/INI validation tests
-├── test_unicode_policy.py   # Unicode policy/canonicalization tests
-├── test_tool_inventory.py   # Tool registry consistency tests
-├── test_golden_fixtures.py  # Golden fixture tests
-├── test_cargo_inspect.py    # Cargo.toml inspection tests
+├── test_production_review_2026_07_b.py # Production review tests
 ├── test_prompt_inspect.py   # Prompt injection detection tests
-├── test_identifier_table.py # Identifier table inspection tests
+├── test_repl_and_cli.py     # REPL and CLI integration tests
+├── test_security_fuzz.py    # Security/fuzz tests
+├── test_shell_tools.py      # Shell split/quote/compare tests
+├── test_text_replace_check.py # Text replacement check tests
+├── test_tokenization.py     # Tokenization edge cases
+├── test_tool_inventory.py   # Tool registry consistency tests
+├── test_unicode_policy.py   # Unicode policy/canonicalization tests
+├── test_unit_namespace.py   # Unit namespace tests
 ├── test_version_constraint.py # Version constraint tests
 └── fixtures/                # Test fixtures directory
 ```
@@ -216,14 +222,13 @@ def val(expr):
 ## File Locations
 
 - **CLI entry**: `eggcalc/__main__.py`
-- **Normalize functions**: `eggcalc/normalize.py` (1807 lines)
-- **Evaluator functions**: `eggcalc/evaluator.py` (1515 lines)
-- **Unit definitions**: `eggcalc/units.py` (lines 157-589, 1284 lines total)
+- **Normalize functions**: `eggcalc/normalize.py` (3066 lines)
+- **Evaluator functions**: `eggcalc/evaluator.py` (2734 lines)
+- **Unit definitions**: `eggcalc/units.py` (2086 lines total)
 - **Tests**: `tests/`
 - **Build script**: `build_single.py`
 - **Install script**: `install.py`
-- **Active plan**: `plans/plan.md`
-- **Improvement plan**: `plans/improvements.md`
+
 
 ## Debugging Tips
 
@@ -301,6 +306,6 @@ print(f"km to m factor: {factor}")  # Should be 1000.0
 
 ## Deferred Items
 
-The implementation plan at `plans/plan.md` has been pruned. All 35 original items are complete. Deferred items for design review remain in plan.md.
+All implementation plan items are complete. No outstanding deferred items.
 
 (End of file)

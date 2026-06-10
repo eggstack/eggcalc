@@ -391,7 +391,7 @@ eggcalc can run as an MCP server, exposing deterministic math, text analysis, an
 calc --mcp
 ```
 
-See [MCP Server](mcp.md) for full documentation on all 59 available tools.
+See [MCP Server](mcp.md) for full documentation on all 64 available tools.
 
 ### Quick Reference
 

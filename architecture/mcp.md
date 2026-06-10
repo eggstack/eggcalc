@@ -53,7 +53,7 @@ class ErrorEnvelope(TypedDict):
 
 ### TOOL_SCHEMAS
 
-Registry of all available tools (56 total). Tools are organized by tier for selective exposure:
+Registry of all available tools (64 total). Tools are organized by tier for selective exposure:
 
 #### Tier 0 — Ultra-common (minimal schema)
 

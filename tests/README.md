@@ -20,22 +20,36 @@ python -m pytest tests/test_tokenization.py::TestMultiDigitSubtraction -v
 
 | File | Purpose |
 |------|---------|
-| `test_clicalc.py` | Core functional tests (87 tests) |
-| `test_security_fuzz.py` | Security and fuzz tests (22 tests) |
-| `test_tokenization.py` | Tokenization edge cases (54 tests) |
-| `test_math_identities.py` | Mathematical laws (28 tests) |
-| `test_exact.py` | Unicode text primitives (98 tests) |
-| `test_cli_text.py` | CLI text tools (19 tests) |
-| `test_mcp_server.py` | MCP server integration (16 tests) |
+| `test_clicalc.py` | Core functional tests |
+| `test_security_fuzz.py` | Security and fuzz tests |
+| `test_tokenization.py` | Tokenization edge cases |
+| `test_math_identities.py` | Mathematical laws |
+| `test_math_edge_cases.py` | Math edge case tests |
+| `test_normalize.py` | Normalization tests |
+| `test_exact.py` | Unicode text primitives |
+| `test_cli_text.py` | CLI text tools |
+| `test_mcp_server.py` | MCP server integration |
+| `test_mcp_tools_new.py` | MCP integration tests for new tools |
+| `test_build_single.py` | Build script tests |
+| `test_repl_and_cli.py` | REPL and CLI integration tests |
+| `test_production_review_2026_07_b.py` | Production review tests |
+| `test_unit_namespace.py` | Unit namespace tests |
+| `test_patch_tools.py` | Patch apply/summary tools tests |
+| `test_text_replace_check.py` | Text replacement check tests |
+| `test_line_range.py` | Line range extract/compare tests |
+| `test_path_compare.py` | Path comparison tests |
+| `test_path_scope.py` | Path scope check tests |
+| `test_shell_tools.py` | Shell split/quote/compare tests |
+| `test_markdown_tools.py` | Markdown structure tests |
+| `test_config_validation.py` | dotenv/INI validation tests |
+| `test_unicode_policy.py` | Unicode policy/canonicalization tests |
+| `test_tool_inventory.py` | Tool registry consistency tests |
+| `test_golden_fixtures.py` | Golden fixture tests |
+| `test_cargo_inspect.py` | Cargo.toml inspection tests |
+| `test_prompt_inspect.py` | Prompt injection detection tests |
+| `test_identifier_table.py` | Identifier table inspection tests |
+| `test_version_constraint.py` | Version constraint tests |
 | `conftest.py` | Shared fixtures |
-
-## New Test Classes (Wave 6)
-
-| Class | File | Tests |
-|-------|------|-------|
-| `TestPrefixedUnitConversions` | test_clicalc.py | 6 tests for prefixed units (kN, mV, mA, kW, MB, km) |
-| `TestTemperatureConversions` | test_clicalc.py | 4 tests for exact temperature offsets (32F=0C, etc.) |
-| `TestUnicodeScriptOther` | test_clicalc.py | 4 tests for unicode_script() returning "Other" |
 
 ## API Usage
 

@@ -35,7 +35,7 @@ The variation selector check (0xfe00-0xfe0f) comes BEFORE the combining mark che
 
 ### Known Bugs - All Fixed (2026-05-29)
 
-All bugs from plans/plan.md have been verified as fixed:
+All identified bugs have been verified as fixed:
 
 1. **normalize.py:762-763** - Double minus bug - FIXED (bounds check added)
 2. **mcp/tools.py:324** - `unit_info()` calls non-existent `list_units()` - FIXED (uses `get_all_units()`)
@@ -87,30 +87,29 @@ The following items were claimed as bugs but are actually working correctly:
 
 ### Plan Reference
 
-All items in `plans/plan.md` and `plans/improvements.md` have been verified as completed and pruned.
-The plan files now contain only design decisions (D3 - not exported by design) and summary information.
+All implementation items have been verified as completed. The plan files have been archived.
 
-### Architecture Review Findings (review_plan.md - 2026-05-29)
+### Architecture Review Findings (2026-05-29)
 
-All 15 architecture modules reviewed via `architecture/review_plan.md`. Review outputs available in `plans/*_review.md`. Key findings:
+All 15 architecture modules reviewed. Key findings:
 
-**CLI Output Format Issue** (`plans/cli_review.md`):
+**CLI Output Format Issue:**
 - Documentation describes `expression -> result` output format
-- Code only outputs `result` (just the number/value)
+- Code only outputs `result`
 - No code changes made - documentation discrepancy only
 
-**validate.py `list_sort` Parameter** (`plans/validate_review.md`):
+**validate.py `list_sort` Parameter:**
 - `stable` parameter has no effect - Python's `sorted()` is always stable
 - No code changes made - parameter is harmless but meaningless
 
-**API `normalize_expression` Return Type** (`plans/api_review.md`):
+**API `normalize_expression` Return Type:**
 - Documentation shows string return, actual is `tuple[str, int]`
 - Examples in docs should show tuple unpacking
 
 ### All Tests Pass
 
 ```
-1231 passed, 32 skipped, 1 warning in 35.88s
+2070 tests pass
 ```
 
 (End of file)

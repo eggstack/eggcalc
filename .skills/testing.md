@@ -103,34 +103,40 @@ python -m pytest tests/ -v
 ```
 tests/
 ├── conftest.py              # Shared fixtures
+├── test_build_single.py     # Build script tests
+├── test_cargo_inspect.py    # Cargo.toml inspection tests
+├── test_cli_text.py         # CLI text tools tests
 ├── test_clicalc.py          # Core functional tests
-├── test_security_fuzz.py    # Security/fuzz tests
-├── test_tokenization.py     # Tokenization edge cases
+├── test_config_validation.py # dotenv/INI validation tests
+├── test_exact.py            # Exact module tests
+├── test_golden_fixtures.py  # Golden fixture tests
+├── test_identifier_table.py # Identifier table inspection tests
+├── test_line_range.py       # Line range extract/compare tests
+├── test_markdown_tools.py   # Markdown structure tests
+├── test_math_edge_cases.py  # Math edge case tests
 ├── test_math_identities.py  # Mathematical laws verification
 ├── test_mcp_server.py       # MCP server integration tests
 ├── test_mcp_tools_new.py    # MCP integration tests for new tools
-├── test_exact.py            # Exact module tests
+├── test_normalize.py        # Normalization tests
 ├── test_patch_tools.py      # Patch apply/summary tools tests
-├── test_cli_text.py         # CLI text tools tests
-├── test_text_replace_check.py # Text replacement check tests
-├── test_line_range.py       # Line range extract/compare tests
 ├── test_path_compare.py     # Path comparison tests
 ├── test_path_scope.py       # Path scope check tests
-├── test_shell_tools.py      # Shell split/quote/compare tests
-├── test_markdown_tools.py   # Markdown structure tests
-├── test_config_validation.py # dotenv/INI validation tests
-├── test_unicode_policy.py   # Unicode policy/canonicalization tests
-├── test_tool_inventory.py   # Tool registry consistency tests
-├── test_golden_fixtures.py  # Golden fixture tests
-├── test_cargo_inspect.py    # Cargo.toml inspection tests
+├── test_production_review_2026_07_b.py # Production review tests
 ├── test_prompt_inspect.py   # Prompt injection detection tests
-├── test_identifier_table.py # Identifier table inspection tests
+├── test_repl_and_cli.py     # REPL and CLI integration tests
+├── test_security_fuzz.py    # Security/fuzz tests
+├── test_shell_tools.py      # Shell split/quote/compare tests
+├── test_text_replace_check.py # Text replacement check tests
+├── test_tokenization.py     # Tokenization edge cases
+├── test_tool_inventory.py   # Tool registry consistency tests
+├── test_unicode_policy.py   # Unicode policy/canonicalization tests
+├── test_unit_namespace.py   # Unit namespace tests
 ├── test_version_constraint.py # Version constraint tests
 └── fixtures/                # Test fixtures directory
 ```
 
 ## Current Test Count
-- 1231 tests pass (as of 2026-05-29)
+- 2070 tests pass (as of 2026-06-10)
 - All must continue to pass
 
 ## Common Issues When Testing

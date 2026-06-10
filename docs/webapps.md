@@ -229,17 +229,7 @@ For AI agent workflows, eggcalc includes an MCP (Model Context Protocol) server 
 calc --mcp
 ```
 
-The MCP server provides 10 tools for AI agent use:
-- `math_eval` - Math expressions with natural language and units
-- `text_measure` - Text metrics (bytes, codepoints, words, lines)
-- `text_equal` - String comparison with normalization
-- `text_diff_explain` - Detailed diff with security findings
-- `text_inspect` - Hidden characters, confusables, mixed scripts
-- `text_count` - Character counting and frequency
-- `validate_brackets` - Bracket balance checking
-- `validate_json` - JSON validation
-- `validate_regex` - Regex pattern testing
-- `list_compare` - List comparison
+The MCP server provides 64 tools for AI agent use across text analysis, validation, unit conversion, and more.
 
 See [MCP Server](mcp.md) for full documentation.
 
