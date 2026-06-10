@@ -118,10 +118,18 @@ class TestUnitShadowsConstant:
         assert isinstance(result, UnitValue)
         assert result.unit == "g"
 
-    def test_R_resolves_to_rankine(self):
+    def test_R_resolves_to_gas_constant(self):
         result = evaluate("R")
+        assert abs(result - 8.314462618) < 1e-6
+
+    def test_r_resolves_to_gas_constant(self):
+        result = evaluate("r")
+        assert abs(result - 8.314462618) < 1e-6
+
+    def test_Ra_resolves_to_rankine(self):
+        result = evaluate("Ra")
         assert isinstance(result, UnitValue)
-        assert result.unit == "R"
+        assert result.unit == "Ra"
 
     def test_c_still_resolves_to_speed_of_light(self):
         assert evaluate("c") == 299792458

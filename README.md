@@ -549,9 +549,10 @@ Full support for bitwise operations:
 from eggcalc import evaluate_raw
 
 # Bitwise operators
-evaluate_raw("5 AND 3")     # 1 (0b101 & 0b011)
-evaluate_raw("5 OR 3")      # 7 (0b101 | 0b011)
-evaluate_raw("5 XOR 3")     # 6 (0b101 ^ 0b011)
+evaluate_raw("5 bitand 3")   # 1 (0b101 & 0b011)
+evaluate_raw("5 & 3")        # 1 (same, symbol form)
+evaluate_raw("5 OR 3")       # 7 (0b101 | 0b011)
+evaluate_raw("5 XOR 3")      # 6 (0b101 ^ 0b011)
 evaluate_raw("~5")          # -6 (bitwise NOT)
 evaluate_raw("5 << 2")      # 20 (left shift)
 evaluate_raw("5 >> 1")      # 2 (right shift)

@@ -6683,15 +6683,15 @@ except Exception as e:
         assert ev.MAX_USER_VARIABLES == 1000
 
     def test_temperature_offset_rounding(self):
-        """H-5: convert_temperature(100, 'C', 'R') must equal 671.67 (no float drift)."""
+        """H-5: convert_temperature(100, 'C', 'Ra') must equal 671.67 (no float drift)."""
         import subprocess
         result = subprocess.run(
             ["python3", "-c", """
 import os
 os.environ['EGGCALC_NO_CONFIG'] = '1'
 from eggcalc.units import convert_temperature
-direct = convert_temperature(100.0, 'C', 'R')
-via_k = convert_temperature(convert_temperature(100.0, 'C', 'K'), 'K', 'R')
+direct = convert_temperature(100.0, 'C', 'Ra')
+via_k = convert_temperature(convert_temperature(100.0, 'C', 'K'), 'K', 'Ra')
 print(f'direct={direct!r} via_k={via_k!r}')
 assert direct == via_k, f'direct != via_k: {direct} vs {via_k}'
 assert direct == 671.67, f'unexpected: {direct}'

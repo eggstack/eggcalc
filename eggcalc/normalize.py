@@ -62,7 +62,7 @@ _UNITS_BY_LENGTH: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
 _UNIT_NAMES_ALTERNATION: str = "|".join(re.escape(u) for u in sorted(UNIT_ALIASES.keys(), key=len, reverse=True))
 
 # Lowercase temperature abbreviations that should map to canonical uppercase forms
-_LOWERCASE_TEMP_UNITS: dict[str, str] = {"f": "F", "c": "C", "k": "K", "r": "R"}
+_LOWERCASE_TEMP_UNITS: dict[str, str] = {"f": "F", "c": "C", "k": "K"}
 
 # Common unit prefixes for faster lookup (most frequently used units first)
 _COMMON_UNITS: list[str] = [
@@ -318,7 +318,7 @@ NUMBER_WORDS: dict[str, list[str]] = {
 STRIPPED_PHRASES: list[str] = [
     "what's",
     "what is",
-    "a ",
+    r"\ba\b",
     "?",
     "calculate",
     "compute",
@@ -437,7 +437,7 @@ def _build_config() -> tuple[dict, dict]:
         "parenthesis": re.compile(r"\(|\)"),
         "operators": re.compile(f"^({'|'.join([re.escape(s) for s in symbols])}){{1}}$"),
         # Handle stripped_chars: literals get escaped, but regex patterns like \bof\b are preserved
-        "stripped_chars": re.compile(f"({'|'.join([re.escape(p) if not (p.startswith(r'\\b') or r'\\b' in p) else p for p in sorted(STRIPPED_PHRASES, key=len, reverse=True)])})"),
+        "stripped_chars": re.compile(f"({'|'.join([re.escape(p) if not (p.startswith(r'\b') or r'\b' in p) else p for p in sorted(STRIPPED_PHRASES, key=len, reverse=True)])})"),
         "int": re.compile(r"^[-+]?[0-9]\d*$"),
         # Float regex accepts a trailing decimal point ("5." -> 5.0) so
         # users can write Python-style shorthand. Both ".5" and "5." are
@@ -1639,9 +1639,9 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # Temperature units are skipped so "100 degrees in fahrenheit" is handled
     # by the unit conversion system, not the angle conversion.
     _TEMP_UNITS = frozenset({
-        "f", "c", "k", "r",
+        "f", "c", "k",
         "fahrenheit", "celsius", "kelvin", "rankine",
-        "degf", "degc", "degk", "degr",
+        "degf", "degc", "degk", "degr", "ra",
     })
     # Use a placeholder to prevent subsequent regexes from re-matching temperature expressions.
     _DEG_PLACEHOLDER = "\x00DEG_TEMP\x00"
@@ -2002,80 +2002,75 @@ def _preprocess_units(expression: str) -> str:
                 i += 1
 
             if i < len(expression):
-                # Quick check: does the remaining start with a potential unit prefix?
                 remaining = expression[i:]
-                if remaining and remaining[0] not in prefixes and remaining[0].lower() not in _LOWERCASE_TEMP_UNITS:
-                    # No unit possible, skip unit search
-                    result.append(num)
-                else:
-                    # Check for unit using pre-computed sorted list
-                    found_unit = False
-                    for unit in units:
-                        if remaining.startswith(unit):
-                            # Word boundary check: next char after unit must not be alphanumeric
-                            end_pos = len(unit)
-                            if end_pos < len(remaining) and remaining[end_pos].isalnum():
-                                continue
-                            # Emit the canonical form (e.g., "in" -> "inch") so
-                            # the evaluator doesn't depend on the alias ordering.
-                            canonical = UNIT_ALIASES.get(unit, unit)
-                            # If the next non-whitespace token is "**", the unit
-                            # is being exponentiated. Wrap "<num>*<unit>" in
-                            # parens so the unit participates in the exponent,
-                            # not the base: "5m ** 2" -> "(5*m)**2" = 25 m**2.
-                            # Without the parens, "5*m**2" parses as
-                            # "5*(m**2)" and the unit's own value (1) makes
-                            # the multiplication a no-op.
-                            k = i + len(unit)
+                # Check for unit using pre-computed sorted list
+                found_unit = False
+                for unit in units:
+                    if remaining.startswith(unit):
+                        # Word boundary check: next char after unit must not be alphanumeric
+                        end_pos = len(unit)
+                        if end_pos < len(remaining) and remaining[end_pos].isalnum():
+                            continue
+                        # Emit the canonical form (e.g., "in" -> "inch") so
+                        # the evaluator doesn't depend on the alias ordering.
+                        canonical = UNIT_ALIASES.get(unit, unit)
+                        # If the next non-whitespace token is "**", the unit
+                        # is being exponentiated. Wrap "<num>*<unit>" in
+                        # parens so the unit participates in the exponent,
+                        # not the base: "5m ** 2" -> "(5*m)**2" = 25 m**2.
+                        # Without the parens, "5*m**2" parses as
+                        # "5*(m**2)" and the unit's own value (1) makes
+                        # the multiplication a no-op.
+                        k = i + len(unit)
+                        while k < len(expression) and expression[k].isspace():
+                            k += 1
+                        if k + 1 < len(expression) and expression[k] == "*" and expression[k + 1] == "*":
+                            result.append("(")
+                            result.append(num)
+                            result.append("*")
+                            result.append(canonical)
+                            result.append(")")
+                        else:
+                            result.append(num)
+                            result.append("*")
+                            result.append(canonical)
+                        i += len(unit)
+                        found_unit = True
+                        break
+                # Handle lowercase temperature units (f, c, k)
+                if not found_unit and remaining:
+                    first_char = remaining[0]
+                    if first_char.lower() in _LOWERCASE_TEMP_UNITS:
+                        # Skip if this looks like a hex literal (0x...) —
+                        # the 'f'/'c'/'k' suffix is part of the hex digits,
+                        # not a temperature unit.
+                        is_hex = (
+                            len(result) >= 2
+                            and result[-1] in ("x", "X")
+                            and result[-2] == "0"
+                        )
+                        if not is_hex:
+                            temp_canonical = _LOWERCASE_TEMP_UNITS[first_char.lower()]
+                            # If followed by "**", wrap "<num>*<unit>" in
+                            # parens so the unit participates in the
+                            # exponent: "5c ** 2" -> "(5*C)**2" = 25 C**2.
+                            k = i + 1
                             while k < len(expression) and expression[k].isspace():
                                 k += 1
                             if k + 1 < len(expression) and expression[k] == "*" and expression[k + 1] == "*":
                                 result.append("(")
                                 result.append(num)
                                 result.append("*")
-                                result.append(canonical)
+                                result.append(temp_canonical)
                                 result.append(")")
                             else:
                                 result.append(num)
                                 result.append("*")
-                                result.append(canonical)
-                            i += len(unit)
+                                result.append(temp_canonical)
+                            i += 1
                             found_unit = True
-                            break
-                    # Handle lowercase temperature units (f, c, k)
-                    if not found_unit and remaining:
-                        first_char = remaining[0]
-                        if first_char.lower() in _LOWERCASE_TEMP_UNITS:
-                            # Skip if this looks like a hex literal (0x...) —
-                            # the 'f'/'c'/'k' suffix is part of the hex digits,
-                            # not a temperature unit.
-                            is_hex = (
-                                len(result) >= 2
-                                and result[-1] in ("x", "X")
-                                and result[-2] == "0"
-                            )
-                            if not is_hex:
-                                temp_canonical = _LOWERCASE_TEMP_UNITS[first_char.lower()]
-                                # If followed by "**", wrap "<num>*<unit>" in
-                                # parens so the unit participates in the
-                                # exponent: "5c ** 2" -> "(5*C)**2" = 25 C**2.
-                                k = i + 1
-                                while k < len(expression) and expression[k].isspace():
-                                    k += 1
-                                if k + 1 < len(expression) and expression[k] == "*" and expression[k + 1] == "*":
-                                    result.append("(")
-                                    result.append(num)
-                                    result.append("*")
-                                    result.append(temp_canonical)
-                                    result.append(")")
-                                else:
-                                    result.append(num)
-                                    result.append("*")
-                                    result.append(temp_canonical)
-                                i += 1
-                                found_unit = True
-                    if not found_unit:
-                        result.append(num)
+                if not found_unit:
+                    result.append(num)
             else:
                 result.append(num)
         elif char == "*" and result and (result[-1][-1:].isdigit() or result[-1][-1:] == ")") and i + 1 < len(expression):
@@ -2386,12 +2381,17 @@ def run(
 
     try:
         result = evaluate(joined)
+        from .units import _display_value, UnitValue
+        if isinstance(result, UnitValue):
+            display = str(result)
+        else:
+            display = _display_value(result)
         if output_format == "json":
             import json
 
-            print(json.dumps({"expression": original, "result": str(result)}))
+            print(json.dumps({"expression": original, "result": display}))
         else:
-            print(result)
+            print(display)
         return result, 0
     except ZeroDivisionError as e:
         error_message(original, e)
@@ -2459,8 +2459,12 @@ def _run_repl(show_expression: bool = True) -> int:
             continue
 
         if line.lower() == "history":
+            from .units import _display_value, UnitValue
             for expr, result in history:
-                print(f"{expr} = {result}")
+                if isinstance(result, UnitValue):
+                    print(f"{expr} = {result}")
+                else:
+                    print(f"{expr} = {_display_value(result)}")
             continue
 
         if line.lower() == "clear":

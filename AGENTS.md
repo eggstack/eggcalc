@@ -292,6 +292,7 @@ print(f"km to m factor: {factor}")  # Should be 1000.0
 - Temperature conversions use offset math, not multiplicative factors
 - `mps` (meters per second) is in `UNIT_CATEGORIES` as "speed"
 - `UNIT_CATEGORIES` is auto-derived from `UNIT_BASE` (multiplicative categories like length, mass) plus manual entries for temperature. British spellings (`metre`/`metres`, `litre`/`litres`, `kilometre`/...) are included in `UNIT_ALIASES` and therefore in the derived category map.
+- Gas constant is accessible as `r` and `R` (standard physics symbol). Rankine temperature unit is accessible as `Ra`, `rankine`, `degr`, and `°R`. The `r`/`R` identifiers are NOT Rankine — they are the gas constant (8.314462618 J/(mol·K)).
 
 ### Unit Power and Division Semantics
 - `5m ** 2` evaluates to `25.0 m**2` (power binds the unit, not the base). The preprocessor wraps `<num>*<unit>` in parens when followed by `**` to preserve correct precedence.

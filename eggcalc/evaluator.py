@@ -135,13 +135,16 @@ _orphaned_eval_lock: threading.Lock = threading.Lock()
 def _check_constant_unit_collisions() -> None:
     """Warn at import time if any CONSTANTS entry collides with a UNIT_ALIASES.
 
-    With the new visit_Name order (units first, then constants), one-letter
+    With the visit_Name order (units first, then constants), one-letter
     constant names like 'h' (Planck), 'g' (gravity), 'k' (Boltzmann), 'c'
-    (speed of light), 'G' (gravitational), 'f' (Faraday), 'R' (gas
-    constant) are unreachable as constants because they collide with
-    common unit names (hour, gram, kelvin, etc.). Long forms
-    ('planck', 'gravity', 'boltzmann', 'speedoflight', 'gravitationalconstant',
-    'faraday', 'gasconstant', 'r') remain accessible.
+    (speed of light), 'G' (gravitational), 'f' (Faraday) are unreachable as
+    constants because they collide with common unit names (hour, gram, kelvin,
+    etc.). Long forms ('planck', 'gravity', 'boltzmann', 'speedoflight',
+    'gravitationalconstant', 'faraday') remain accessible.
+
+    The gas constant is accessible as both 'r' and 'R' (no collision with
+    Rankine, which uses the 'Ra' alias). Rankine is accessible as 'Ra',
+    'rankine', 'degr', and '°R'.
 
     The warning is emitted at most once per process. A process-wide sentinel
     is stashed on the ``warnings`` module (a singleton) so the package and
@@ -1564,6 +1567,7 @@ class Evaluator(ast.NodeVisitor):
         "avogadro": 6.02214076e23,
         "avogadros": 6.02214076e23,
         "r": 8.314462618,
+        "R": 8.314462618,
         "gasconstant": 8.314462618,
         "idealgasconstant": 8.314462618,
         "planck": 6.62607015e-34,
@@ -1933,7 +1937,7 @@ class Evaluator(ast.NodeVisitor):
 
         Lookup order:
         1. UNIT_ALIASES (unit names; common short names like 'g', 'h', 'k')
-        2. CONSTANTS (physical constants; long names like 'gravity', 'planck')
+        2. CONSTANTS (physical constants; 'r'/'R' for gas constant, long names like 'planck')
         3. FUNCTIONS (rejected as used-without-args)
         4. Per-instance user variables
         """

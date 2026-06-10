@@ -25,6 +25,13 @@ FLOAT_EPSILON = 1e-10
 MAX_RESULT_VALUE = 1e308
 
 
+def _display_value(v: float | int | complex) -> str:
+    """Format a value for display, showing whole-number floats as integers."""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
+
 class UnitValue:
     """Represents a numeric value with optional units.
 
@@ -58,8 +65,8 @@ class UnitValue:
 
     def __repr__(self) -> str:
         if self.unit:
-            return f"{self.value} {self.unit}"
-        return str(self.value)
+            return f"{_display_value(self.value)} {self.unit}"
+        return _display_value(self.value)
 
     def __str__(self) -> str:
         return self.__repr__()
@@ -1354,18 +1361,16 @@ UNIT_ALIASES: dict[str, str] = {
     "centigrade": "C",
     "F": "F",
     "fahrenheit": "F",
-    "R": "R",
-    "r": "R",
-    "Ra": "R",
-    "rankine": "R",
+    "Ra": "Ra",
+    "rankine": "Ra",
     "degf": "F",
     "degc": "C",
     "degk": "K",
-    "degr": "R",
+    "degr": "Ra",
     "\u00b0F": "F",
     "\u00b0C": "C",
     "\u00b0K": "K",
-    "\u00b0R": "R",
+    "\u00b0R": "Ra",
     # Speed
     "m/s": "m/s",
     "mps": "m/s",
@@ -1520,12 +1525,12 @@ TEMPERATURE_CONVERSIONS: dict[tuple[str, str], tuple[float, float]] = {
     ("F", "K"): (1.0 / 1.8, 459.67 / 1.8),
     ("C", "F"): (1.8, 32.0),
     ("F", "C"): (1.0 / 1.8, -32.0 / 1.8),
-    ("K", "R"): (1.8, 0.0),
-    ("R", "K"): (1.0 / 1.8, 0.0),
-    ("C", "R"): (1.8, 273.15 * 1.8),
-    ("R", "C"): (1.0 / 1.8, -273.15),
-    ("F", "R"): (1.0, 459.67),
-    ("R", "F"): (1.0, -459.67),
+    ("K", "Ra"): (1.8, 0.0),
+    ("Ra", "K"): (1.0 / 1.8, 0.0),
+    ("C", "Ra"): (1.8, 273.15 * 1.8),
+    ("Ra", "C"): (1.0 / 1.8, -273.15),
+    ("F", "Ra"): (1.0, 459.67),
+    ("Ra", "F"): (1.0, -459.67),
 }
 
 
@@ -1722,7 +1727,7 @@ UNIT_CATEGORIES_EXTRA: dict[str, str] = {
     "K": "temperature",
     "C": "temperature",
     "F": "temperature",
-    "R": "temperature",
+    "Ra": "temperature",
 }
 UNIT_CATEGORIES.update(UNIT_CATEGORIES_EXTRA)
 

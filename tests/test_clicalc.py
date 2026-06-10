@@ -862,26 +862,26 @@ class TestTemperatureConversions:
         assert abs(val - 273.15) < 1e-6
 
     def test_rankine_to_kelvin(self):
-        """0 R = 0 K"""
-        result, _ = run("0R in K", NORMALIZE, PATTERNS)
+        """0 Ra = 0 K"""
+        result, _ = run("0Ra in K", NORMALIZE, PATTERNS)
         val = result.value if isinstance(result, UnitValue) else result
         assert abs(val - 0.0) < 1e-6
 
     def test_kelvin_to_rankine(self):
-        """273.15 K = 491.67 R"""
+        """273.15 K = 491.67 Ra"""
         from eggcalc.units import convert_temperature
-        result = convert_temperature(273.15, "K", "R")
+        result = convert_temperature(273.15, "K", "Ra")
         assert abs(result - 491.67) < 1e-6
 
     def test_celsius_to_rankine(self):
-        """0 C = 491.67 R"""
-        result, _ = run("0C in R", NORMALIZE, PATTERNS)
+        """0 C = 491.67 Ra"""
+        result, _ = run("0C in Ra", NORMALIZE, PATTERNS)
         val = result.value if isinstance(result, UnitValue) else result
         assert abs(val - 491.67) < 1e-6
 
     def test_fahrenheit_to_rankine(self):
-        """0 F = 459.67 R"""
-        result, _ = run("0F in R", NORMALIZE, PATTERNS)
+        """0 F = 459.67 Ra"""
+        result, _ = run("0F in Ra", NORMALIZE, PATTERNS)
         val = result.value if isinstance(result, UnitValue) else result
         assert abs(val - 459.67) < 1e-6
 
