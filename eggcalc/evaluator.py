@@ -15,11 +15,10 @@ import logging
 import math
 import multiprocessing
 import os
-import queue
 import random
-from queue import Empty as _QueueEmpty
 import threading
 from collections import OrderedDict
+from queue import Empty as _QueueEmpty
 from typing import Any
 
 from .units import (
@@ -67,6 +66,28 @@ _mcp_mode = False
 _MAX_CONCURRENT_EVAL_SPAWNS = 4
 _EVAL_SPAWN_SEMAPHORE = multiprocessing.BoundedSemaphore(_MAX_CONCURRENT_EVAL_SPAWNS)
 _EVAL_SPAWN_ACQUIRE_TIMEOUT = 10  # seconds to wait for a spawn slot before failing
+
+
+class _EvalSpawnPermit:
+    """RAII permit for an acquired eval spawn slot.
+
+    The underlying semaphore count is released when the permit exits
+    (including on exception or early return). This mirrors the
+    _SpawnPermit pattern used by the MCP tools and the Rust
+    WorkerPermit/ToolPermit guards.
+    """
+
+    def __init__(self, sem: Any) -> None:
+        self._sem = sem
+
+    def __enter__(self) -> _EvalSpawnPermit:
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        try:
+            self._sem.release()
+        except Exception:
+            pass
 
 MAX_EXPONENT = 10000
 MAX_FACTORIAL = 1000
@@ -1260,7 +1281,7 @@ def _fn_clear(register: str | None = None) -> None:
     return None
 
 
-def _set_user_variable(ev: "Evaluator", name: Any, value: Any) -> Any:
+def _set_user_variable(ev: Evaluator, name: Any, value: Any) -> Any:
     """Validate and store a user variable on the given evaluator.
 
     Used by both the expression-level ``setvar()`` (``_fn_setvar``) and
@@ -2510,66 +2531,76 @@ def evaluate_with_timeout(
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
     proc: multiprocessing.Process | None = None
+    # RAII permit for the eval spawn semaphore. Acquire (with timeout) or raise.
+    # The permit's __exit__ guarantees release even if the worker is cancelled,
+    # panics, or returns early before we reach the end of the block.
+    # This replaces the previous manual acquire + scattered release calls
+    # (including the unconditional release inside the finally after child cleanup).
     if not _EVAL_SPAWN_SEMAPHORE.acquire(timeout=_EVAL_SPAWN_ACQUIRE_TIMEOUT):
         raise EvaluationError(
             f"Could not acquire spawn slot after {_EVAL_SPAWN_ACQUIRE_TIMEOUT}s "
             f"(all {_MAX_CONCURRENT_EVAL_SPAWNS} slots busy)"
         )
-    try:
-        proc = ctx.Process(
-            target=_evaluate_with_timeout_worker,
-            args=(expression, queue, allow_random, allow_side_effects),
-        )
-        proc.start()
-    except Exception:
-        _EVAL_SPAWN_SEMAPHORE.release()
-        raise
+    permit = _EvalSpawnPermit(_EVAL_SPAWN_SEMAPHORE)
+    with permit:
+        try:
+            proc = ctx.Process(
+                target=_evaluate_with_timeout_worker,
+                args=(expression, queue, allow_random, allow_side_effects),
+            )
+            proc.start()
+        except Exception:
+            # Permit will release on this raise path.
+            raise
 
-    try:
-        status, value = queue.get(timeout=timeout)
-    except _QueueEmpty:
-        raise TimeoutError(f"Evaluation timed out after {timeout} seconds")
-    except Exception as exc:
-        logging.warning(
-            "Unexpected exception reading evaluation result: %s",
-            type(exc).__name__,
-            exc_info=True,
-        )
-        raise TimeoutError(f"Evaluation timed out after {timeout} seconds")
-    finally:
         try:
-            queue.close()
-        except Exception:
-            pass
-        try:
-            queue.join_thread()
-        except Exception:
-            pass
-        if proc is not None:
-            if proc.is_alive():
-                proc.terminate()
-                proc.join(timeout=2)
-            if proc.is_alive():
-                proc.kill()
-                proc.join(timeout=1)
-            # If the process survived terminate+kill, register it for
-            # defensive cleanup by the MCP server's orphan tracker.
-            if proc.is_alive() and _mcp_mode:
-                with _orphaned_eval_lock:
-                    _orphaned_eval_processes.add(proc)
-                    _orphaned_eval_order.append(proc)
-                    while len(_orphaned_eval_order) > MAX_ORPHANED_PROCESSES:
-                        oldest = _orphaned_eval_order.pop(0)
-                        _orphaned_eval_processes.discard(oldest)
+            status, value = queue.get(timeout=timeout)
+        except _QueueEmpty:
+            raise TimeoutError(f"Evaluation timed out after {timeout} seconds")
+        except Exception as exc:
+            logging.warning(
+                "Unexpected exception reading evaluation result: %s",
+                type(exc).__name__,
+                exc_info=True,
+            )
+            raise TimeoutError(f"Evaluation timed out after {timeout} seconds")
+        finally:
             try:
-                proc.close()
+                queue.close()
             except Exception:
                 pass
-        _EVAL_SPAWN_SEMAPHORE.release()
+            try:
+                queue.join_thread()
+            except Exception:
+                pass
+            if proc is not None:
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join(timeout=2)
+                if proc.is_alive():
+                    proc.kill()
+                    proc.join(timeout=1)
+                # If the process survived terminate+kill, register it for
+                # defensive cleanup by the MCP server's orphan tracker.
+                if proc.is_alive() and _mcp_mode:
+                    with _orphaned_eval_lock:
+                        _orphaned_eval_processes.add(proc)
+                        _orphaned_eval_order.append(proc)
+                        while len(_orphaned_eval_order) > MAX_ORPHANED_PROCESSES:
+                            oldest = _orphaned_eval_order.pop(0)
+                            _orphaned_eval_processes.discard(oldest)
+                try:
+                    proc.close()
+                except Exception:
+                    pass
 
-    if status == "error":
-        raise EvaluationError(value)
-    return value
+        if status == "error":
+            raise EvaluationError(value)
+        return value
+    # Permit released on exit of the `with` (normal return, exception during
+    # spawn/queue.get, or cancellation). The guard owns the slot accounting;
+    # there are no remaining manual release() calls for this semaphore in this
+    # function.
 
 
 _default_evaluator = Evaluator(

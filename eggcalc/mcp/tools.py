@@ -25,9 +25,6 @@ from ..exact import (
     glob_match as _glob_match,
 )
 from ..exact import (
-    prompt_input_inspect as _prompt_input_inspect,
-)
-from ..exact import (
     identifier_inspect as _identifier_inspect,
 )
 from ..exact import (
@@ -47,6 +44,9 @@ from ..exact import (
 )
 from ..exact import (
     list_sort as _list_sort,
+)
+from ..exact import (
+    prompt_input_inspect as _prompt_input_inspect,
 )
 from ..exact import (
     regex_finditer as _regex_finditer,
@@ -74,6 +74,9 @@ from ..exact import (
 )
 from ..exact import (
     version_compare as _version_compare,
+)
+from ..exact.cargo import (
+    cargo_toml_inspect as _cargo_toml_inspect,
 )
 from ..exact.config import (
     dotenv_validate as _dotenv_validate,
@@ -168,17 +171,14 @@ from ..exact.unicode_policy import (
 from ..exact.unicode_policy import (
     unicode_policy_check as _unicode_policy_check,
 )
-from ..exact.cargo import (
-    cargo_toml_inspect as _cargo_toml_inspect,
-)
-from ..exact.version import (
-    check_version_constraint as _check_version_constraint,
-)
 from ..exact.validate import (
     json_canonicalize as _json_canonicalize,
 )
 from ..exact.validate import (
     json_query as _json_query,
+)
+from ..exact.version import (
+    check_version_constraint as _check_version_constraint,
 )
 from .schemas import TOOL_SCHEMAS, ErrorEnvelope
 
@@ -199,6 +199,58 @@ MAX_CONCURRENT_SPAWNED = 4
 # Process() is created in validate_regex and math_eval (via evaluate_with_timeout).
 _SPAWN_SEMAPHORE = multiprocessing.BoundedSemaphore(MAX_CONCURRENT_SPAWNED)
 _SPAWN_ACQUIRE_TIMEOUT = 10  # seconds to wait for a spawn slot before failing
+
+
+class _SpawnPermit:
+    """RAII permit for an acquired spawn slot.
+
+    The underlying semaphore count is released when the permit is dropped
+    (including on exception or early return). Callers should prefer this
+    over manual acquire/release so that cancellation or panic paths cannot
+    leak a slot. This mirrors the Rust WorkerPermit/ToolPermit pattern.
+    """
+
+    def __init__(self, sem: Any) -> None:
+        self._sem = sem
+
+    def __enter__(self) -> _SpawnPermit:
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        try:
+            self._sem.release()
+        except Exception:
+            pass
+
+
+def _acquire_spawn_permit() -> _SpawnPermit:
+    """Acquire a spawn slot (with timeout) and return an RAII permit.
+
+    The permit's __exit__ (and destructor) guarantees release even if the
+    surrounding code raises or is cancelled. This eliminates the need for
+    caller-provided on_stall_start/on_stall_end closures or manual
+    acquire/release pairs around the (potentially blocking) spawn.
+    """
+    if not _SPAWN_SEMAPHORE.acquire(timeout=_SPAWN_ACQUIRE_TIMEOUT):
+        raise RuntimeError(
+            f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s "
+            f"(all {MAX_CONCURRENT_SPAWNED} slots busy)"
+        )
+    return _SpawnPermit(_SPAWN_SEMAPHORE)
+
+
+def _try_acquire_spawn_permit() -> _SpawnPermit | None:
+    """Try to acquire a spawn slot (with timeout) and return an RAII permit, or None on timeout.
+
+    Returns None if the acquire times out without consuming a slot. On success,
+    the returned permit's __exit__ guarantees release even on exception or
+    cancellation. This is the non-raising sibling of _acquire_spawn_permit,
+    convenient for call sites that must return error envelopes instead of
+    propagating exceptions (e.g., MCP tool handlers).
+    """
+    if not _SPAWN_SEMAPHORE.acquire(timeout=_SPAWN_ACQUIRE_TIMEOUT):
+        return None
+    return _SpawnPermit(_SPAWN_SEMAPHORE)
 
 
 def _close_spawn_semaphore() -> None:
@@ -1422,47 +1474,47 @@ def validate_regex(
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
     proc: multiprocessing.Process | None = None
-    acquired = False
-    released = False
+    # RAII permit for the spawn slot. Acquire (with timeout) returns a guard
+    # whose __exit__ guarantees release even on exception, cancellation, or
+    # early return. This replaces manual acquired/released flags and paired
+    # release calls. If the acquire itself is interrupted before returning,
+    # no slot is consumed (the count is only incremented on successful acquire).
+    permit = _try_acquire_spawn_permit()
+    if permit is None:
+        return _error_response(
+            "timeout",
+            f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s (all {MAX_CONCURRENT_SPAWNED} slots busy)",
+            tool="validate_regex",
+        )
     try:
-        if not _SPAWN_SEMAPHORE.acquire(timeout=_SPAWN_ACQUIRE_TIMEOUT):
-            return _error_response(
-                "timeout",
-                f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s (all {MAX_CONCURRENT_SPAWNED} slots busy)",
-                tool="validate_regex",
-            )
-        acquired = True
-        try:
-            proc = ctx.Process(
-                target=_regex_test_worker,
-                args=(pattern, samples, flags, ignore_case, multiline, dotall, ascii, queue),
-            )
-            proc.start()
-        except Exception:
-            released = True
-            _SPAWN_SEMAPHORE.release()
-            raise
+        with permit:
+            try:
+                proc = ctx.Process(
+                    target=_regex_test_worker,
+                    args=(pattern, samples, flags, ignore_case, multiline, dotall, ascii, queue),
+                )
+                proc.start()
+            except Exception:
+                # Permit will be released by the `with` on this raise path.
+                raise
 
-        try:
-            status, value = queue.get(timeout=REGEX_TIMEOUT_SECONDS)
-        except Exception:
-            return _error_response(
-                "timeout",
-                f"Regex evaluation timed out after {REGEX_TIMEOUT_SECONDS} seconds",
-                ["Try a simpler pattern or fewer samples"],
-                tool="validate_regex",
-            )
-        finally:
-            _cleanup_child_process(proc, queue)
+            try:
+                status, value = queue.get(timeout=REGEX_TIMEOUT_SECONDS)
+            except Exception:
+                return _error_response(
+                    "timeout",
+                    f"Regex evaluation timed out after {REGEX_TIMEOUT_SECONDS} seconds",
+                    ["Try a simpler pattern or fewer samples"],
+                    tool="validate_regex",
+                )
+            finally:
+                _cleanup_child_process(proc, queue)
 
-        if status == "error":
-            return _error_response("internal_error", value, tool="validate_regex")
-        return _success_response(value, tool="validate_regex")
+            if status == "error":
+                return _error_response("internal_error", value, tool="validate_regex")
+            return _success_response(value, tool="validate_regex")
     except Exception as e:
         return _error_response("internal_error", str(e), tool="validate_regex")
-    finally:
-        if acquired and not released:
-            _SPAWN_SEMAPHORE.release()
 
 
 def json_extract(
@@ -1713,47 +1765,44 @@ def regex_finditer(
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
     proc: multiprocessing.Process | None = None
-    acquired = False
-    released = False
+    # RAII permit: use _try_acquire_spawn_permit + context manager so that
+    # cancellation or exceptions during the (blocking) spawn path or queue.get
+    # cannot leak a semaphore count. The permit owns release.
+    permit = _try_acquire_spawn_permit()
+    if permit is None:
+        return _error_response(
+            "timeout",
+            f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s (all {MAX_CONCURRENT_SPAWNED} slots busy)",
+            tool="regex_finditer",
+        )
     try:
-        if not _SPAWN_SEMAPHORE.acquire(timeout=_SPAWN_ACQUIRE_TIMEOUT):
-            return _error_response(
-                "timeout",
-                f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s (all {MAX_CONCURRENT_SPAWNED} slots busy)",
-                tool="regex_finditer",
-            )
-        acquired = True
-        try:
-            proc = ctx.Process(
-                target=_regex_finditer_worker,
-                args=(pattern, text, flags, max_matches, include_line_column, include_groups, queue),
-            )
-            proc.start()
-        except Exception:
-            released = True
-            _SPAWN_SEMAPHORE.release()
-            raise
+        with permit:
+            try:
+                proc = ctx.Process(
+                    target=_regex_finditer_worker,
+                    args=(pattern, text, flags, max_matches, include_line_column, include_groups, queue),
+                )
+                proc.start()
+            except Exception:
+                raise
 
-        try:
-            status, value = queue.get(timeout=REGEX_TIMEOUT_SECONDS)
-        except Exception:
-            return _error_response(
-                "timeout",
-                f"Regex evaluation timed out after {REGEX_TIMEOUT_SECONDS} seconds",
-                ["Try a simpler pattern or reduce input size"],
-                tool="regex_finditer",
-            )
-        finally:
-            _cleanup_child_process(proc, queue)
+            try:
+                status, value = queue.get(timeout=REGEX_TIMEOUT_SECONDS)
+            except Exception:
+                return _error_response(
+                    "timeout",
+                    f"Regex evaluation timed out after {REGEX_TIMEOUT_SECONDS} seconds",
+                    ["Try a simpler pattern or reduce input size"],
+                    tool="regex_finditer",
+                )
+            finally:
+                _cleanup_child_process(proc, queue)
 
-        if status == "error":
-            return _error_response("internal_error", value, tool="regex_finditer")
-        return _success_response(value, tool="regex_finditer")
+            if status == "error":
+                return _error_response("internal_error", value, tool="regex_finditer")
+            return _success_response(value, tool="regex_finditer")
     except Exception as e:
         return _error_response("internal_error", str(e), tool="regex_finditer")
-    finally:
-        if acquired and not released:
-            _SPAWN_SEMAPHORE.release()
 
 
 def regex_safety_check(pattern: str) -> dict:
@@ -3836,47 +3885,43 @@ def dotenv_validate_mcp(
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
     proc: multiprocessing.Process | None = None
-    acquired = False
-    released = False
+    # RAII permit for the spawn slot. Use the non-raising try variant so we
+    # can return a clean error envelope on timeout without having taken a slot.
+    permit = _try_acquire_spawn_permit()
+    if permit is None:
+        return _error_response(
+            "timeout",
+            f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s (all {MAX_CONCURRENT_SPAWNED} slots busy)",
+            tool="dotenv_validate",
+        )
     try:
-        if not _SPAWN_SEMAPHORE.acquire(timeout=_SPAWN_ACQUIRE_TIMEOUT):
-            return _error_response(
-                "timeout",
-                f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s (all {MAX_CONCURRENT_SPAWNED} slots busy)",
-                tool="dotenv_validate",
-            )
-        acquired = True
-        try:
-            proc = ctx.Process(
-                target=_dotenv_validate_worker,
-                args=(text, allow_export, key_pattern, duplicate_policy, queue),
-            )
-            proc.start()
-        except Exception:
-            released = True
-            _SPAWN_SEMAPHORE.release()
-            raise
+        with permit:
+            try:
+                proc = ctx.Process(
+                    target=_dotenv_validate_worker,
+                    args=(text, allow_export, key_pattern, duplicate_policy, queue),
+                )
+                proc.start()
+            except Exception:
+                raise
 
-        try:
-            status, value = queue.get(timeout=REGEX_TIMEOUT_SECONDS)
-        except Exception:
-            return _error_response(
-                "timeout",
-                f"dotenv validation timed out after {REGEX_TIMEOUT_SECONDS} seconds",
-                ["Try a simpler key_pattern or shorter text"],
-                tool="dotenv_validate",
-            )
-        finally:
-            _cleanup_child_process(proc, queue)
+            try:
+                status, value = queue.get(timeout=REGEX_TIMEOUT_SECONDS)
+            except Exception:
+                return _error_response(
+                    "timeout",
+                    f"dotenv validation timed out after {REGEX_TIMEOUT_SECONDS} seconds",
+                    ["Try a simpler key_pattern or shorter text"],
+                    tool="dotenv_validate",
+                )
+            finally:
+                _cleanup_child_process(proc, queue)
 
-        if status == "error":
-            return _error_response("internal_error", value, tool="dotenv_validate")
-        return _success_response(value, tool="dotenv_validate")
+            if status == "error":
+                return _error_response("internal_error", value, tool="dotenv_validate")
+            return _success_response(value, tool="dotenv_validate")
     except Exception as e:
         return _error_response("internal_error", str(e), tool="dotenv_validate")
-    finally:
-        if acquired and not released:
-            _SPAWN_SEMAPHORE.release()
 
 
 def ini_validate_mcp(
