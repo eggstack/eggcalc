@@ -150,6 +150,8 @@ normalized, exit_code = normalize_expression("five plus three")
 # normalized = "5+3", exit_code = 0
 normalized, exit_code = normalize_expression("30m + 100ft")
 # normalized = "30 m+100 ft", exit_code = 0
+normalized, exit_code = normalize_expression("30 km / h in mph")
+# normalized = "convert(30*km/h,mph)", exit_code = 0
 ```
 
 ## Utility Functions

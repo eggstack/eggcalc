@@ -1532,6 +1532,16 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # Use word boundaries to avoid replacing parts of words
     word_to_all = operators.get("word_to_all", {})
     _binary_word_check(expression)
+    # Disambiguate inch conversion before the generic word replacement. In
+    # "5 in in cm", the first "in" is the inch unit and the second "in" is
+    # the conversion operator; a global preservation of "in" would merge the
+    # whole tail into the invalid identifier "inincm".
+    expression = re.sub(
+        rf"((?:\d|\))\s+)in(\s+in\s+(?:{_UNIT_NAMES_ALTERNATION})\b)",
+        r"\1inch\2",
+        expression,
+        flags=re.IGNORECASE,
+    )
     for word, replacement in sorted(word_to_all.items(), key=lambda x: len(x[0]), reverse=True):
         # Special case: don't convert "in"/"into" when it appears to be a unit suffix
         # (preceded by a digit, no following unit, or followed by something that
@@ -1539,9 +1549,9 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
         if word.lower() in ("in", "into"):
             # Preserve "in" as a unit (not keyword) when:
             # 1. At end of expression ("5 in" = 5 inches), OR
-            # 2. Followed by a conversion keyword ("to"/"as") - e.g., "5 in to cm"
+            # 2. Followed by a conversion keyword ("in"/"to"/"as") - e.g., "5 in in cm"
             if re.search(
-                r"(?:\d|\))\s+" + re.escape(word) + r"(?:\s*$|\s+(?:to|as)\b)",
+                r"(?:\d|\))\s+" + re.escape(word) + r"(?:\s*$|\s+(?:in|to|as)\b)",
                 expression,
                 flags=re.IGNORECASE,
             ):
@@ -1574,10 +1584,18 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     _COMPOUND_UNITS = ["km/h", "mi/h", "m/s", "km/s", "mi/s"]
     # Also allow single units as targets (e.g., "30 km/h in mph")
     _SINGLE_UNITS_FOR_CONVERSION = ["mph", "kph", "knot", "ft/s", "ft/min"]
+
+    def _compound_unit_pattern(unit: str) -> str:
+        """Match a compound unit while ignoring spaces around slash separators."""
+        return r"\s*/\s*".join(re.escape(part) for part in unit.split("/"))
+
     for from_unit in _COMPOUND_UNITS:
         for to_unit in _COMPOUND_UNITS + _SINGLE_UNITS_FOR_CONVERSION:
             if from_unit != to_unit:
-                pattern = rf"(\d+(?:\.\d+)?)\s*\*?\s*{re.escape(from_unit)}\s*(?:in|to|IN|TO)\s*{re.escape(to_unit)}"
+                pattern = (
+                    rf"(\d+(?:\.\d+)?)\s*\*?\s*{_compound_unit_pattern(from_unit)}"
+                    rf"\s*(?:in|to|IN|TO)\s*{_compound_unit_pattern(to_unit)}"
+                )
                 replacement_fn = lambda m, fu=from_unit, tu=to_unit: f"convert({m.group(1)}*{fu},{tu})"
                 expression = re.sub(pattern, replacement_fn, expression, flags=re.IGNORECASE)
 
@@ -1588,7 +1606,10 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     for from_unit in _SINGLE_UNITS_FOR_CONVERSION:
         for to_unit in _COMPOUND_UNITS:
             if from_unit != to_unit:
-                pattern = rf"(\d+(?:\.\d+)?)\s*\*?\s*{re.escape(from_unit)}\s*(?:in|to|IN|TO)\s*{re.escape(to_unit)}"
+                pattern = (
+                    rf"(\d+(?:\.\d+)?)\s*\*?\s*{_compound_unit_pattern(from_unit)}"
+                    rf"\s*(?:in|to|IN|TO)\s*{_compound_unit_pattern(to_unit)}"
+                )
                 replacement_fn = lambda m, fu=from_unit, tu=to_unit: f"convert({m.group(1)}*{fu},{tu})"
                 expression = re.sub(pattern, replacement_fn, expression, flags=re.IGNORECASE)
 

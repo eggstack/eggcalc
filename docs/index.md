@@ -59,8 +59,14 @@ calc "30m + 100ft"
 calc "60mi / h"
 # 60 mi/h (compound units)
 
+calc "30 km / h in mph"
+# 18.641 mph (spaces around compound units are ignored)
+
 calc "5km in miles"
 # 3.107 mi
+
+calc "5 in in cm"
+# 12.7 cm (inch conversion remains unambiguous)
 ```
 
 See [Units](units.md) for all supported units and conversion patterns.

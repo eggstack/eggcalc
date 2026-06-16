@@ -170,6 +170,7 @@ calc "convert 100 meters to feet"   # 328.084 ft
 - **Bitwise operators** (`&`, `|`, `^`, `~`, `<<`, `>>`) work on integer bit patterns.
 - **`^` has dual meaning:** `^` as a word maps to XOR, while `^` as a symbol maps to exponentiation (`**`). The parser disambiguates by context.
 - **Unit conversion operators** (`in`/`into`, `to`/`as`) are not regular math operators—they trigger unit conversion between compatible measurements (e.g., "5 kilometers in meters").
+- **Spacing is normalized inside unit expressions** so forms like `30 km / h in mph` and `2 ft / s in m / s` parse the same as their compact equivalents. Inch conversions stay unambiguous, so `5 in in cm` is treated as `5 inch in cm`.
 
 ## Functions
 

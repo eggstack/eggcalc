@@ -74,6 +74,8 @@ Converts natural language expressions into Python syntax through a multi-stage p
 | Phrase Stripping | Remove filler | `"what's"` → `""` |
 | Unit Parsing | Number + unit detection | `"30m"` → `30*m` |
 
+Unit parsing is spacing-tolerant, including compound units with spaces around `/` and unit conversions like `30 km / h in mph` or `5 in in cm`.
+
 **Key exports:** `run()`, `normalize()`, `normalize_expression()`, `NORMALIZE`, `PATTERNS`
 
 **Detailed documentation:** [normalize.md](normalize.md)
@@ -205,6 +207,8 @@ UnitValue.convert_to(): Apply conversion factor
     ↓
 Output: UnitValue(60.48, "m")
 ```
+
+Spacing around unit symbols is normalized here as well, so `30 km / h in mph` and `2 ft / s in m / s` follow the same pipeline.
 
 ### Direct AST Evaluation (`evaluate()`)
 

@@ -49,6 +49,7 @@ result = evaluate("10")       # 10
 Full pipeline evaluation. Handles natural language, spaces, units, and mixed input. **Main function for user-facing applications.**
 
 Internally calls `normalize_expression()` to convert natural language before evaluation.
+Unit parsing is also spacing-tolerant, so expressions like `30 km / h in mph` and `5 in in cm` are handled the same as their compact forms.
 
 ```python
 from eggcalc import evaluate_raw

@@ -544,6 +544,98 @@ class TestOperatorSpacing:
         assert result.unit in ("m2", "m**2")
 
 
+class TestUnitSpacingProbes:
+    """Whitespace around unit suffixes and conversions must not affect parsing."""
+
+    @pytest.mark.parametrize("expr", ["5m", "5 m", "5   m", "5\tm"])
+    def test_simple_unit_suffix_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit == "m"
+
+    @pytest.mark.parametrize("expr", ["5m+2m", "5 m + 2 m", "5 m+2m", "5m +2 m"])
+    def test_unit_addition_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m+2*m"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(7)
+        assert result.unit == "m"
+
+    @pytest.mark.parametrize("expr", ["5m/2s", "5 m / 2 s", "5 m/ 2 s", "5m /2s"])
+    def test_unit_division_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m/(2*s)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(2.5)
+        assert result.unit == "m/s"
+
+    @pytest.mark.parametrize("expr", ["1kg in g", "1 kg in g", "1 kg  in   g"])
+    def test_simple_unit_conversion_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "convert(1*kg,g)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(1000)
+        assert result.unit == "g"
+
+    @pytest.mark.parametrize("expr", ["5in in cm", "5 in in cm", "5 in to cm", "5  in   in   cm"])
+    def test_inch_conversion_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "convert(5*inch,cm)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(12.7)
+        assert result.unit == "cm"
+
+    @pytest.mark.parametrize("expr", ["30km/h in mph", "30 km/h in mph", "30 km / h in mph", "30km / h in mph"])
+    def test_compound_speed_conversion_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "convert(30*km/h,mph)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(18.641135767120023)
+        assert result.unit == "mph"
+
+    @pytest.mark.parametrize("expr", ["30 km / h to m / s", "30km/h to m/s", "30 km/h to m / s"])
+    def test_compound_speed_target_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "convert(30*km/h,m/s)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(8.333333333333334)
+        assert result.unit == "m/s"
+
+    @pytest.mark.parametrize("expr", ["2 ft/s in m/s", "2 ft / s in m / s", "2ft/s in m / s"])
+    def test_foot_per_second_conversion_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "convert(2*ft/s,m/s)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(0.6096)
+        assert result.unit == "m/s"
+
+
 class TestNumberWordSubstringBoundary:
     """Regression tests for the substring-vs-word-boundary bug in
     ``convert_from_human_handler``. Words like "one" must not be replaced
