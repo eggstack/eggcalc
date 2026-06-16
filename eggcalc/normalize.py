@@ -2481,11 +2481,7 @@ def run(
 
     try:
         result = evaluate(joined)
-        from .units import _display_value, UnitValue
-        if isinstance(result, UnitValue):
-            display = str(result)
-        else:
-            display = _display_value(result)
+        display = str(result)
         if output_format == "json":
             import json
 
@@ -2559,12 +2555,8 @@ def _run_repl(show_expression: bool = True) -> int:
             continue
 
         if line.lower() == "history":
-            from .units import _display_value, UnitValue
             for expr, result in history:
-                if isinstance(result, UnitValue):
-                    print(f"{expr} = {result}")
-                else:
-                    print(f"{expr} = {_display_value(result)}")
+                print(f"{expr} = {result}")
             continue
 
         if line.lower() == "clear":

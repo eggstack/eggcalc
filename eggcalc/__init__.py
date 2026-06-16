@@ -76,7 +76,7 @@ from .units import (
     normalize_unit,
 )
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 __author__ = "David Bowman"
 
 __all__ = [
