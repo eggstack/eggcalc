@@ -1244,6 +1244,48 @@ def _normalize_lowercase_temperature_conversion(expression: str) -> str:
     )
 
 
+def _normalize_spelled_unit_conversions(expression: str) -> str:
+    """Canonicalize unit conversion phrases before operator words are replaced.
+
+    This catches spaced word forms like ``30 kilometers per hour in miles per
+    hour``. If left until the generic word replacement pass, ``per`` becomes
+    ``/`` and ``in`` becomes ``IN``, then whitespace stripping can glue the
+    target into invalid identifiers such as ``hourINmiles``.
+    """
+    unit_alt = _UNIT_NAMES_ALTERNATION
+
+    def _canon_unit(unit: str) -> str:
+        lower = unit.lower()
+        if lower in _LOWERCASE_TEMP_UNITS:
+            return _LOWERCASE_TEMP_UNITS[lower]
+        return UNIT_ALIASES.get(unit, UNIT_ALIASES.get(lower, unit))
+
+    def _canon_unit_expr(numerator: str, denominator: str | None) -> str:
+        num = _canon_unit(numerator)
+        if denominator is None:
+            return num
+        den = _canon_unit(denominator)
+        compound = f"{num}/{den}"
+        return UNIT_ALIASES.get(compound, UNIT_ALIASES.get(compound.lower(), compound))
+
+    def _replace(m: re.Match[str]) -> str:
+        from_unit = _canon_unit_expr(m.group("from_num_unit"), m.group("from_den_unit"))
+        to_unit = _canon_unit_expr(m.group("to_num_unit"), m.group("to_den_unit"))
+        return f"convert({m.group('number')}*{from_unit},{to_unit})"
+
+    return re.sub(
+        rf"(?<![A-Za-z0-9_.+\-])(?P<number>[+-]?\d+(?:\.\d+)?)\s*"
+        rf"(?P<from_num_unit>{unit_alt})(?![A-Za-z0-9_])"
+        rf"(?:\s*(?:/|per)\s*(?P<from_den_unit>{unit_alt})(?![A-Za-z0-9_]))?"
+        rf"\s+(in|to|as|into)\s+"
+        rf"(?P<to_num_unit>{unit_alt})(?![A-Za-z0-9_])"
+        rf"(?:\s*(?:/|per)\s*(?P<to_den_unit>{unit_alt})(?![A-Za-z0-9_]))?",
+        _replace,
+        expression,
+        flags=re.IGNORECASE,
+    )
+
+
 def _normalize_spaced_unit_caret_exponents(expression: str) -> str:
     """Normalize unit exponent shorthand while preserving ``^`` as XOR.
 
@@ -1652,6 +1694,8 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
         expression,
         flags=re.IGNORECASE,
     )
+
+    expression = _normalize_spelled_unit_conversions(expression)
 
     # Strip longer filler phrases before word-to-operator conversion so that
     # "the value of pi" → "pi" (not "value * pi" after "of" → "*").

@@ -668,6 +668,29 @@ class TestUnitSpacingProbes:
         assert result.value == pytest.approx(8.333333333333334)
         assert result.unit == "m/s"
 
+    @pytest.mark.parametrize(
+        ("expr", "expected_unit", "expected_value"),
+        [
+            ("30 kilometers per hour in miles per hour", "mph", 18.641135767120023),
+            ("30 miles per hour in kilometers per hour", "km/h", 48.28032),
+            ("30 miles/hour in km/hour", "km/h", 48.28032),
+            ("30 mph in kilometers per hour", "km/h", 48.28032),
+            ("30 meters per second in feet per second", "ft/s", 98.42519685039369),
+            ("30 feet per second in meters per second", "m/s", 9.144),
+            ("-1 kelvin in celsius", "C", -274.15),
+        ],
+    )
+    def test_unit_conversion_word_forms(self, expr, expected_unit, expected_value):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert "IN" not in normalized
+        assert normalized.startswith("convert(")
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(expected_value)
+        assert result.unit == expected_unit
+
     @pytest.mark.parametrize("expr", ["2 ft/s in m/s", "2 ft / s in m / s", "2ft/s in m / s"])
     def test_foot_per_second_conversion_spacing(self, expr):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
