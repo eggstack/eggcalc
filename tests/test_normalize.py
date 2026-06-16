@@ -570,6 +570,38 @@ class TestOperatorSpacing:
         assert result.value == pytest.approx(5)
         assert result.unit in ("m2", "m**2")
 
+    @pytest.mark.parametrize("expr", ["5 m squared", "5 meters squared"])
+    def test_postfix_unit_squared_word_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m2"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit in ("m2", "m**2")
+
+    def test_postfix_unit_power_word_conversion(self):
+        normalized, code = normalize_expression("2 m squared in cm squared", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "convert(2*m2,cm2)"
+        result, code, _out, _err = _run("2 m squared in cm squared")
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(20000)
+        assert result.unit in ("cm2", "cm**2")
+
+    @pytest.mark.parametrize("expr", ["2 sec", "2 secs", "2 seconds"])
+    def test_second_abbreviation_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "2*s"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(2)
+        assert result.unit == "s"
+
 
 class TestUnitSpacingProbes:
     """Whitespace around unit suffixes and conversions must not affect parsing."""

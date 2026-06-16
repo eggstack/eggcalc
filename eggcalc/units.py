@@ -1034,6 +1034,8 @@ UNIT_ALIASES: dict[str, str] = {
     "smoots": "smoot",
     # Time
     "s": "s",
+    "sec": "s",
+    "secs": "s",
     "second": "s",
     "seconds": "s",
     "ms": "ms",

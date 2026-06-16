@@ -1286,6 +1286,39 @@ def _normalize_spelled_unit_conversions(expression: str) -> str:
     )
 
 
+def _canonical_power_unit(unit: str, exponent: str) -> str:
+    canonical = UNIT_ALIASES.get(unit, UNIT_ALIASES.get(unit.lower(), unit))
+    return (
+        UNIT_ALIASES.get(f"{canonical}^{exponent}")
+        or UNIT_ALIASES.get(f"{unit}^{exponent}")
+        or UNIT_ALIASES.get(f"{unit.lower()}^{exponent}")
+        or UNIT_ALIASES.get(f"{canonical}{exponent}")
+        or f"{canonical}**{exponent}"
+    )
+
+
+def _normalize_postfix_unit_power_words(expression: str) -> str:
+    """Normalize postfix unit power words like ``m squared`` and ``cm cubed``.
+
+    Prefix forms such as ``square meters`` are already handled by UNIT_ALIASES
+    after whitespace removal. This covers the common postfix phrasing while
+    preserving the established shorthand meaning: ``5 m squared`` is ``5*m2``.
+    """
+    unit_alt = _UNIT_NAMES_ALTERNATION
+
+    def _replace(m: re.Match[str]) -> str:
+        exponent = "2" if m.group("power").lower() == "squared" else "3"
+        return _canonical_power_unit(m.group("unit"), exponent)
+
+    return re.sub(
+        rf"(?<![A-Za-z0-9_])(?P<unit>{unit_alt})(?![A-Za-z0-9_])\s+"
+        rf"(?P<power>squared|cubed)\b",
+        _replace,
+        expression,
+        flags=re.IGNORECASE,
+    )
+
+
 def _normalize_spaced_unit_caret_exponents(expression: str) -> str:
     """Normalize unit exponent shorthand while preserving ``^`` as XOR.
 
@@ -1297,17 +1330,8 @@ def _normalize_spaced_unit_caret_exponents(expression: str) -> str:
     """
     unit_alt = _UNIT_NAMES_ALTERNATION
 
-    def _canon_power_unit(unit: str, exponent: str) -> str:
-        canonical = UNIT_ALIASES.get(unit, UNIT_ALIASES.get(unit.lower(), unit))
-        return (
-            UNIT_ALIASES.get(f"{canonical}^{exponent}")
-            or UNIT_ALIASES.get(f"{unit}^{exponent}")
-            or UNIT_ALIASES.get(f"{unit.lower()}^{exponent}")
-            or f"{canonical}**{exponent}"
-        )
-
     def _replace_attached_quantity(m: re.Match[str]) -> str:
-        return f"{m.group(1)} {_canon_power_unit(m.group(2), m.group(3))}"
+        return f"{m.group(1)} {_canonical_power_unit(m.group(2), m.group(3))}"
 
     expression = re.sub(
         rf"(\d+(?:\.\d+)?)\s+({unit_alt})\s*\^\s*([23])\b",
@@ -1695,6 +1719,7 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
         flags=re.IGNORECASE,
     )
 
+    expression = _normalize_postfix_unit_power_words(expression)
     expression = _normalize_spelled_unit_conversions(expression)
 
     # Strip longer filler phrases before word-to-operator conversion so that
