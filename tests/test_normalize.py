@@ -451,6 +451,99 @@ class TestShouldSplitNumberSequence:
         assert _should_split_number_sequence("1 abc 3") is False
 
 
+class TestOperatorSpacing:
+    """Whitespace around symbolic operators must not affect parsing."""
+
+    @pytest.mark.parametrize("expr", ["20*20", "20 * 20", "20 *20", "20* 20"])
+    def test_multiplication_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "20*20"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(400)
+
+    @pytest.mark.parametrize("expr", ["20/20", "20 / 20", "20 /20", "20/ 20"])
+    def test_division_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "20/20"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(1)
+
+    @pytest.mark.parametrize("expr", ["2**3", "2 ** 3", "2 **3", "2** 3"])
+    def test_power_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "2**3"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(8)
+
+    @pytest.mark.parametrize("expr", ["8<<2", "8 << 2", "8 <<2", "8<< 2", "8 < < 2"])
+    def test_left_shift_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "8<<2"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == 32
+
+    @pytest.mark.parametrize("expr", ["8>>2", "8 >> 2", "8 >>2", "8>> 2", "8 > > 2"])
+    def test_right_shift_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "8>>2"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == 2
+
+    @pytest.mark.parametrize("expr", ["sqrt(144)", "sqrt (144)", "sqrt( 144)", "sqrt ( 144 )"])
+    def test_function_parenthesis_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "sqrt(144)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(12)
+
+    @pytest.mark.parametrize("expr", ["3(4+5)", "3 (4+5)", "3 ( 4 + 5 )"])
+    def test_implicit_parenthesis_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "3*(4+5)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(27)
+
+    @pytest.mark.parametrize("expr", ["3+(4*5)", "3 +(4*5)", "3+ (4*5)", "3 + ( 4 * 5 )"])
+    def test_operator_before_parenthesis_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "3+(4*5)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(23)
+
+    @pytest.mark.parametrize("expr", ["5!", "5 !"])
+    def test_factorial_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "factorial(5)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(120)
+
+    @pytest.mark.parametrize("expr", ["5 m2 + 100 cm**2", "5 m2+ 100 cm ** 2"])
+    def test_unit_exponent_spacing(self, expr):
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5.01)
+        assert result.unit in ("m2", "m**2")
+
+
 class TestNumberWordSubstringBoundary:
     """Regression tests for the substring-vs-word-boundary bug in
     ``convert_from_human_handler``. Words like "one" must not be replaced

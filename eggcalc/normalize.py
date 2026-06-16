@@ -1712,6 +1712,14 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
             if result and result[-1] == ")":
                 # Implicit multiplication: ")(" -> ")*("
                 result.append("*")
+            elif result and result[-1].isdigit():
+                # Implicit multiplication: "<digit>(" -> "<digit>*(".
+                # This branch handles cases where earlier whitespace-aware
+                # token joining preserved a structural "(" token, such as
+                # "3 ( 4 + 5 )".
+                prev_alnum_token = _peek_alnum_token_back(result)
+                if prev_alnum_token not in operators["functions"]:
+                    result.append("*")
             depth += 1
             if depth > MAX_NESTING_DEPTH:
                 raise ValueError(f"Expression nesting too deep (max {MAX_NESTING_DEPTH})")
@@ -1870,9 +1878,77 @@ def _join_number_parts(expression: str) -> str:
     if len(tokens) <= 1:
         return expression
 
+    # When users space only one side of an operator ("20 *20", "20/ 20"),
+    # shell-style whitespace splitting leaves tokens like "*20" or "20/".
+    # Treat those as operator+number, not opaque text that triggers implicit
+    # multiplication. Keep compact expressions ("20*20") untouched because the
+    # later split_at_operators pass already handles them.
+    expanded_tokens: list[str] = []
+    operator_split_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^])")
+    boundary_operator_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^])")
+
+    def _split_boundary_operators(token: str) -> list[str]:
+        """Split operators attached at token edges without tokenizing internals.
+
+        This handles whitespace-derived tokens such as "+(4*5)", "m2+", and
+        "m**" while preserving compact expressions like "100cm**2" for the
+        later unit preprocessor.
+        """
+        parts: list[str] = []
+        rest = token
+        while rest:
+            match = boundary_operator_re.match(rest)
+            if match and match.end() < len(rest):
+                parts.append(match.group(1))
+                rest = rest[match.end():]
+                continue
+            break
+
+        suffixes: list[str] = []
+        while rest:
+            match = None
+            for op in ("**", "//", "<<", ">>", "+", "-", "*", "/", "%", "&", "|", "^"):
+                if rest.endswith(op) and len(rest) > len(op):
+                    match = op
+                    break
+            if match is None:
+                break
+            suffixes.append(match)
+            rest = rest[:-len(match)]
+
+        if rest:
+            parts.append(rest)
+        parts.extend(reversed(suffixes))
+        return parts
+
+    for token in tokens:
+        if not re.search(r"[A-Za-z_()]", token) and operator_split_re.search(token):
+            expanded_tokens.extend(part for part in operator_split_re.split(token) if part)
+        elif re.search(r"[A-Za-z_()]", token) and boundary_operator_re.search(token):
+            expanded_tokens.extend(_split_boundary_operators(token))
+        else:
+            expanded_tokens.append(token)
+    tokens = expanded_tokens
+
+    # Be tolerant of spaces within two-character symbolic operators, matching
+    # existing behavior for "* *" and "/ /" while adding "<<"/">>".
+    merged_ops: list[str] = []
+    mi = 0
+    while mi < len(tokens):
+        if mi + 1 < len(tokens) and tokens[mi] == "<" and tokens[mi + 1] == "<":
+            merged_ops.append("<<")
+            mi += 2
+        elif mi + 1 < len(tokens) and tokens[mi] == ">" and tokens[mi + 1] == ">":
+            merged_ops.append(">>")
+            mi += 2
+        else:
+            merged_ops.append(tokens[mi])
+            mi += 1
+    tokens = merged_ops
+
     _OPERATOR_TOKENS: set[str] = {
         "+", "-", "*", "/", "//", "**", "%", "&", "|", "^", "<<", ">>", "~",
-        "IN", "TO", "MOD",
+        "(", ")", "!", "IN", "TO", "MOD",
     }
 
     def _is_digit_token(tok: str) -> bool:

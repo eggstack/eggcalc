@@ -3301,6 +3301,12 @@ def _compact_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
         # Keep items for arrays
         if "items" in prop_def:
             cp["items"] = prop_def["items"]
+        # Keep constraints
+        for key in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+                    "minLength", "maxLength", "pattern", "minItems", "maxItems",
+                    "multipleOf"):
+            if key in prop_def:
+                cp[key] = prop_def[key]
         # Truncated description
         desc = prop_def.get("description", "")
         if desc:

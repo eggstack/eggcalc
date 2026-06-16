@@ -1028,7 +1028,7 @@ def text_inspect(
                 "severity": "warn",
                 "message": f"Confusable character at index {conf.get('index', '?')}",
                 "span": {"char_start": conf.get("index", 0), "char_end": conf.get("index", 0) + 1},
-                "details": {"original": conf.get("original"), "confusable": conf.get("confusable")},
+                "details": {"original": conf.get("char"), "confusable": conf.get("confusable_with")},
             })
         for bidi in result.get("bidi_controls", []):
             findings.append({
@@ -1336,6 +1336,7 @@ def json_compare(
                 "equal": result["equal"],
                 "valid_json_a": result["valid_json_a"],
                 "valid_json_b": result["valid_json_b"],
+                "same_type": result["same_type"],
                 "diff_count": result["diff_count"],
                 "summary": result["summary"],
             }

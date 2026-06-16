@@ -2,7 +2,7 @@
 
 CLI calculator accepting natural language and unit conversion. Standard library only.
 
-For install as a CLI tool, clone the repo, cd into it, and run `python install.py --install`. It will combine everything into one file and add it to your $path. Then you can run it like `calc 2 meters plus 2ft`. It ignores spacing and relies on spliting the input by operator. 
+For install as a CLI tool, clone the repo, cd into it, and run `python install.py --install`. It will combine everything into one file and add it to your $path. Then you can run it like `calc 2 meters plus 2ft`. It is spacing-tolerant and normalizes operator-adjacent spacing before parsing.
 
 Written in pure Python with no external dependencies, it can be used as a CLI tool, a Python library, or an MCP server for AI agents.
 

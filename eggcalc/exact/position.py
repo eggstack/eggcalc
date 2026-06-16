@@ -291,7 +291,7 @@ def text_position(
                 summary="Invalid byte offset: inside multibyte character",
             )
         lines, line_num, col = _get_line_col(text, byte_offset=byte_offset)
-        effective_codepoint_index = len(text[:byte_offset].encode("utf-8").decode("utf-8", errors="ignore"))
+        effective_codepoint_index = len(text.encode("utf-8")[:byte_offset].decode("utf-8", errors="ignore"))
 
     elif codepoint_index is not None:
         if codepoint_index < 0 or codepoint_index > len(text):

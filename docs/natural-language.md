@@ -4,7 +4,7 @@ eggcalc converts natural language expressions into mathematical operations. Unde
 
 ## How Parsing Works
 
-The parser splits input by operator boundaries, then converts each segment:
+The parser splits input by operator boundaries, normalizes operator-adjacent spacing, then converts each segment:
 
 1. **Split by operators** (`+`, `-`, `*`, `/`, `**`, `^`, `%`, `&`, `|`, `~`, `<<`, `>>`, `(`, `)`, spaces) into tokens
 2. **Convert compound number phrases** to digits ("twenty five" → "25", "one hundred forty four" → "144")

@@ -599,7 +599,7 @@ class TestTextPosition:
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["valid"] is True
-        assert content["result"]["codepoint_index"] == 3
+        assert content["result"]["codepoint_index"] == 2
 
     def test_invalid_byte_offset_inside_multibyte(self):
         text = "\u00e9"
