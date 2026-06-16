@@ -105,8 +105,11 @@ class TestNFuncPatterns:
         ("5 cos", 0.2836621854632263),   # cos(5)
         ("5 log", 1.6094379124341003),   # ln(5)
         ("2 sqrt 9", 6.0),               # 2 * sqrt(9)
+        ("2sqrt9", 6.0),                 # compact form of 2 * sqrt(9)
         ("sqrt 144", 12.0),             # sqrt(144) - existing behavior preserved
+        ("sqrt144", 12.0),              # compact form of sqrt(144)
         ("sin 0", 0.0),                 # sin(0) - existing behavior preserved
+        ("sin0", 0.0),                  # compact form of sin(0)
     ])
     def test_n_func(self, expr, expected):
         result, code, _out, _err = _run(expr)
@@ -121,6 +124,19 @@ class TestNFuncPatterns:
         ("expm1(1)", "expm1(1)", 1.718281828459045),
     ])
     def test_function_names_ending_in_digits_before_paren(self, expr, expected_normalized, expected):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == expected_normalized
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert _val(result) == pytest.approx(expected)
+
+    @pytest.mark.parametrize("expr,expected_normalized,expected", [
+        ("sin30", "sin(30)", -0.9880316240928618),
+        ("sqrt9", "sqrt(9)", 3.0),
+        ("2sqrt9", "2*sqrt(9)", 6.0),
+    ])
+    def test_compact_function_number_spacing(self, expr, expected_normalized, expected):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
         assert normalized == expected_normalized
@@ -557,6 +573,23 @@ class TestUnitSpacingProbes:
         assert isinstance(result, UnitValue)
         assert result.value == pytest.approx(5)
         assert result.unit == "m"
+
+    @pytest.mark.parametrize("expr,expected_normalized,expected_unit", [
+        ("2min", "2*min", "min"),
+        ("2 min", "2*min", "min"),
+        ("2   min", "2*min", "min"),
+        ("2radians", "2*rad", "rad"),
+        ("2 radians", "2*rad", "rad"),
+    ])
+    def test_unit_suffix_function_name_collision_spacing(self, expr, expected_normalized, expected_unit):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == expected_normalized
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(2)
+        assert result.unit == expected_unit
 
     @pytest.mark.parametrize("expr", ["5m+2m", "5 m + 2 m", "5 m+2m", "5m +2 m"])
     def test_unit_addition_spacing(self, expr):

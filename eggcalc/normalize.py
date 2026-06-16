@@ -746,6 +746,23 @@ def apply_math_functions(
         stripped = tok.strip("+-")
         return stripped.isdigit() and not any(c.isalpha() for c in stripped)
 
+    def _is_unit_suffix_context(output_tokens: list, input_tokens: list, index: int) -> bool:
+        """Return True when a function/unit collision is acting as a unit suffix."""
+        token = input_tokens[index]
+        if token not in UNIT_ALIASES and token.lower() not in UNIT_ALIASES:
+            return False
+        if index + 1 < len(input_tokens) and input_tokens[index + 1] == "(":
+            return False
+        if len(output_tokens) < 2 or output_tokens[-1] != "*":
+            return False
+        prev = output_tokens[-2]
+        return (
+            prev == ")"
+            or check_if_number(prev)["bool"]
+            or prev in UNIT_ALIASES
+            or prev.lower() in UNIT_ALIASES
+        )
+
     output_tokens = []
     i = 0
     while i < len(tokens):
@@ -753,6 +770,11 @@ def apply_math_functions(
 
         if token in operators["functions"]:
             func_name = operators["functions"][token]
+
+            if _is_unit_suffix_context(output_tokens, tokens, i):
+                output_tokens.append(token)
+                i += 1
+                continue
 
             # Check if this token is actually a unit being used in a conversion
             # context (e.g., "min" in "10 min in seconds"). Skip function conversion
@@ -1436,6 +1458,33 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # e.g., "square root" -> "sqrt", "cube root" -> "cbrt"
     for phrase, replacement in sorted(_MULTI_WORD_FUNCTIONS.items(), key=lambda x: len(x[0]), reverse=True):
         expression = re.sub(r"\b" + re.escape(phrase) + r"\b", replacement, expression, flags=re.IGNORECASE)
+
+    # Accept compact single-argument function forms promised by the parser
+    # comments, e.g. "sin30" -> "sin 30" and "2sqrt9" -> "2sqrt 9".
+    # Guard names that already end in digits so "log10" and "log2" remain
+    # function identifiers instead of being split as "log 10" / "log 2".
+    digit_ending_functions = {
+        name.lower() for name in operators["functions"] if name[-1:].isdigit()
+    }
+    compact_arg_functions = [
+        name for name in operators["functions"]
+        if name in _SINGLE_ARG_IMPLICIT_MUL and not name[-1:].isdigit()
+    ]
+    if compact_arg_functions:
+        compact_arg_pattern = re.compile(
+            r"(?<![A-Za-z_])("
+            + "|".join(re.escape(name) for name in sorted(compact_arg_functions, key=len, reverse=True))
+            + r")([+-]?\d+(?:\.\d+)?)(?![A-Za-z_])",
+            flags=re.IGNORECASE,
+        )
+
+        def _split_compact_function_arg(m: re.Match[str]) -> str:
+            compact = (m.group(1) + m.group(2)).lower()
+            if any(compact.startswith(name) for name in digit_ending_functions):
+                return m.group(0)
+            return f"{m.group(1)} {m.group(2)}"
+
+        expression = compact_arg_pattern.sub(_split_compact_function_arg, expression)
 
     # Convert hyphens between number words to spaces
     # e.g., "twenty-one" -> "twenty one" (prevents hyphen being treated as minus)
