@@ -129,7 +129,7 @@ Located in `eggcalc/mcp/` - Model Context Protocol server for AI agent tool acce
 - New tests must use the correct API:
   - For NL/unit functionality → use `run()` or test through CLI
   - For pure math expressions → use `evaluate()`
-- 2070 tests currently pass (as of 2026-06-10)
+- 2163 tests currently pass (as of 2026-06-16)
 
 ### Code Style
 - Follow existing patterns in the codebase
@@ -203,6 +203,29 @@ def val(expr):
     return result
 ```
 
+## Architecture Documentation Index
+
+The `architecture/` directory contains module-level developer documentation:
+
+| Document | Module | Purpose |
+|----------|--------|---------|
+| [overview.md](architecture/overview.md) | — | High-level architecture, data flow, module dependencies |
+| [api.md](architecture/api.md) | — | Public API reference |
+| [cli.md](architecture/cli.md) | `__main__.py` | CLI entry point |
+| [normalize.md](architecture/normalize.md) | `normalize.py` | NL normalization pipeline |
+| [evaluator.md](architecture/evaluator.md) | `evaluator.py` | AST-based expression evaluation |
+| [units.md](architecture/units.md) | `units.py` | Unit definitions & conversions |
+| [exact.md](architecture/exact.md) | `exact/` | Package overview for text analysis tools |
+| [primitives.md](architecture/primitives.md) | `exact/primitives.py` | UTF-8, codepoints, normalization |
+| [unicode_tools.md](architecture/unicode_tools.md) | `exact/unicode_tools.py` | Script detection, confusables |
+| [confusables.md](architecture/confusables.md) | `exact/confusables.py` | Homoglyph identification data |
+| [diff.md](architecture/diff.md) | `exact/diff.py` | String diffing algorithms |
+| [measure.md](architecture/measure.md) | `exact/measure.py` | Text metrics |
+| [synthesis.md](architecture/synthesis.md) | `exact/synthesis.py` | Higher-level text analysis |
+| [validate.md](architecture/validate.md) | `exact/validate.py` | JSON/bracket/regex validation |
+| [mcp.md](architecture/mcp.md) | `mcp/` | MCP server architecture |
+| [review_plan.md](architecture/review_plan.md) | — | Architecture review orchestration |
+
 ## Common Patterns
 
 ### Adding a New Math Function
@@ -221,11 +244,11 @@ def val(expr):
 
 ## File Locations
 
-- **CLI entry**: `eggcalc/__main__.py`
-- **Normalize functions**: `eggcalc/normalize.py` (3066 lines)
-- **Evaluator functions**: `eggcalc/evaluator.py` (2734 lines)
+- **CLI entry**: `eggcalc/__main__.py` (18 lines)
+- **Normalize functions**: `eggcalc/normalize.py` (3291 lines)
+- **Evaluator functions**: `eggcalc/evaluator.py` (2765 lines)
 - **Unit definitions**: `eggcalc/units.py` (2086 lines total)
-- **Tests**: `tests/`
+- **Tests**: `tests/` (29 test files, 2163 tests)
 - **Build script**: `build_single.py`
 - **Install script**: `install.py`
 
