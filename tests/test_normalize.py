@@ -635,6 +635,49 @@ class TestUnitSpacingProbes:
         assert result.value == pytest.approx(0.6096)
         assert result.unit == "m/s"
 
+    @pytest.mark.parametrize("expr", ["5 N m", "5 N   m", "5\tN\tm"])
+    def test_spaced_unit_product_not_collapsed_to_prefixed_unit(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*N*m"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit == "N*m"
+
+    @pytest.mark.parametrize("expr", ["5 m s", "5 m   s", "5\tm\ts"])
+    def test_spaced_meter_second_not_collapsed_to_millisecond(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m*s"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit == "m*s"
+
+    @pytest.mark.parametrize("expr", ["5 kg m / s ** 2", "5 kg   m / s**2"])
+    def test_spaced_compound_unit_product_with_denominator(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*kg*m/s**2"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit == "kg*m/s**2"
+
+    def test_spaced_pascal_second_not_collapsed_identifier(self):
+        normalized, code = normalize_expression("5 Pa s", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*Pa*s"
+        result, code, _out, _err = _run("5 Pa s")
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit == "Pa*s"
+
 
 class TestNumberWordSubstringBoundary:
     """Regression tests for the substring-vs-word-boundary bug in

@@ -130,6 +130,20 @@ def test_kilonewton_to_newton(self):
     assert result == 1000.0
 ```
 
+### Testing Spacing-Sensitive Parsing
+When unit parsing is involved, use parametrized probe cases that vary whitespace
+with single spaces, repeated spaces, and tabs. Assert both the normalized text
+and the evaluated `UnitValue` so spacing regressions cannot silently collapse
+distinct unit products into prefixed units.
+
+```python
+@pytest.mark.parametrize("expr", ["5 N m", "5 N   m", "5\tN\tm"])
+def test_spaced_unit_product(self, expr):
+    normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+    assert code == 0
+    assert normalized == "5*N*m"
+```
+
 ### Testing Unicode Script Detection
 ```python
 def test_digits_return_other(self):

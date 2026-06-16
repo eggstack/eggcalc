@@ -2,7 +2,7 @@
 
 CLI calculator accepting natural language and unit conversion. Standard library only.
 
-For install as a CLI tool, clone the repo, cd into it, and run `python install.py --install`. It will combine everything into one file and add it to your $path. Then you can run it like `calc 2 meters plus 2ft`. It is spacing-tolerant and normalizes operator-adjacent spacing before parsing, including unit forms like `30 km / h in mph` and `5 in in cm`.
+For install as a CLI tool, clone the repo, cd into it, and run `python install.py --install`. It will combine everything into one file and add it to your $path. Then you can run it like `calc 2 meters plus 2ft`. It is spacing-tolerant and normalizes operator-adjacent spacing before parsing, including unit forms like `30 km / h in mph`, `5 in in cm`, and spaced unit products like `5 N m` or `5 m s`.
 
 Written in pure Python with no external dependencies, it can be used as a CLI tool, a Python library, or an MCP server for AI agents.
 
@@ -18,6 +18,7 @@ eggcalc converts natural language math expressions into numerical results. Key c
 - **Unit Conversions**: Mix metric and imperial units seamlessly
   - `"30m + 100ft"` → `60.48 m` (auto-converts feet to meters)
   - `"30 km / h in mph"` → `18.641 mph` (spaces around compound units are ignored)
+  - `"5 N m"` → `5 N*m` (spaced unit products do not collapse into prefixed units)
   - `"60mph"` → `60 mph` (speed units with conversions)
   - `"60km/h in m/s"` → `16.667 m/s` (compound unit conversions)
   - `"5 in in cm"` → `12.7 cm` (inch conversion remains unambiguous)

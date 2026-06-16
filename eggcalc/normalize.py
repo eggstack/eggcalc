@@ -2032,10 +2032,13 @@ def _join_number_parts(expression: str) -> str:
             prev_kind = "num"
         else:
             _flush_number_seq()
+            is_unit = _is_unit_token(token)
             if prev_kind == "num":
                 result.append("*")
+            elif prev_kind == "unit" and is_unit:
+                result.append("*")
             result.append(token)
-            prev_kind = "other"
+            prev_kind = "unit" if is_unit else "other"
 
     _flush_number_seq()
     return ''.join(result)
