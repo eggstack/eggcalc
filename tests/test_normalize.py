@@ -559,6 +559,17 @@ class TestOperatorSpacing:
         assert result.value == pytest.approx(5.01)
         assert result.unit in ("m2", "m**2")
 
+    @pytest.mark.parametrize("expr", ["5m^2", "5 m ^ 2", "5 meters ^ 2"])
+    def test_unit_caret_exponent_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m2"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit in ("m2", "m**2")
+
 
 class TestUnitSpacingProbes:
     """Whitespace around unit suffixes and conversions must not affect parsing."""
@@ -700,6 +711,28 @@ class TestUnitSpacingProbes:
         assert isinstance(result, UnitValue)
         assert result.value == pytest.approx(5)
         assert result.unit == "kg*m/s**2"
+
+    @pytest.mark.parametrize("expr", ["5 m/s^2", "5 m / s ^ 2"])
+    def test_compound_unit_denominator_caret_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized in ("5*m/s**2", "(5*m)/(s)**2")
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(5)
+        assert result.unit == "m/s**2"
+
+    @pytest.mark.parametrize("expr", ["100 c in f", "100 c to fahrenheit"])
+    def test_lowercase_temperature_conversion_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "convert(100*C,F)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(212)
+        assert result.unit == "F"
 
     def test_spaced_pascal_second_not_collapsed_identifier(self):
         normalized, code = normalize_expression("5 Pa s", NORMALIZE, PATTERNS)

@@ -1215,6 +1215,88 @@ def _binary_word_check(expr: str) -> bool:
     return True
 
 
+def _normalize_lowercase_temperature_conversion(expression: str) -> str:
+    """Canonicalize compact lowercase temperature conversion phrases.
+
+    Lowercase ``c``/``f``/``k`` are accepted as temperature units by the unit
+    preprocessor, but conversion words are replaced before token handling. A
+    phrase like ``100 c in f`` otherwise collapses into ``100cINf`` and the
+    conversion detector never sees separate source/target unit tokens.
+    """
+    temp_unit = r"(?:[cfk]|celsius|fahrenheit|kelvin|rankine|degc|degf|degk|degr|ra)"
+
+    def _canon_temp_unit(unit: str) -> str:
+        lower = unit.lower()
+        if lower in _LOWERCASE_TEMP_UNITS:
+            return _LOWERCASE_TEMP_UNITS[lower]
+        return UNIT_ALIASES.get(unit, UNIT_ALIASES.get(lower, unit))
+
+    def _replace(m: re.Match[str]) -> str:
+        from_unit = _canon_temp_unit(m.group(2))
+        to_unit = _canon_temp_unit(m.group(4))
+        return f"{m.group(1)} {from_unit} {m.group(3)} {to_unit}"
+
+    return re.sub(
+        rf"(\d+(?:\.\d+)?)\s+({temp_unit})\s+(in|to|as|into)\s+({temp_unit})\b",
+        _replace,
+        expression,
+        flags=re.IGNORECASE,
+    )
+
+
+def _normalize_spaced_unit_caret_exponents(expression: str) -> str:
+    """Normalize unit exponent shorthand while preserving ``^`` as XOR.
+
+    Numeric ``^`` remains bitwise XOR by design, but users reasonably write
+    unit shorthands such as ``5 m ^ 2`` or ``5 m/s^2``. Compact ``5m^2`` was
+    already accepted because ``m^2`` is a unit alias; this makes spaced forms
+    follow the same path before generic operator splitting turns ``^`` into
+    XOR.
+    """
+    unit_alt = _UNIT_NAMES_ALTERNATION
+
+    def _canon_power_unit(unit: str, exponent: str) -> str:
+        canonical = UNIT_ALIASES.get(unit, UNIT_ALIASES.get(unit.lower(), unit))
+        return (
+            UNIT_ALIASES.get(f"{canonical}^{exponent}")
+            or UNIT_ALIASES.get(f"{unit}^{exponent}")
+            or UNIT_ALIASES.get(f"{unit.lower()}^{exponent}")
+            or f"{canonical}**{exponent}"
+        )
+
+    def _replace_attached_quantity(m: re.Match[str]) -> str:
+        return f"{m.group(1)} {_canon_power_unit(m.group(2), m.group(3))}"
+
+    expression = re.sub(
+        rf"(\d+(?:\.\d+)?)\s+({unit_alt})\s*\^\s*([23])\b",
+        _replace_attached_quantity,
+        expression,
+        flags=re.IGNORECASE,
+    )
+
+    def _replace_denominator(m: re.Match[str]) -> str:
+        canonical = UNIT_ALIASES.get(m.group(1), UNIT_ALIASES.get(m.group(1).lower(), m.group(1)))
+        return f"/{canonical}**{m.group(2)}"
+
+    expression = re.sub(
+        rf"/\s*({unit_alt})\s*\^\s*(\d+)\b",
+        _replace_denominator,
+        expression,
+        flags=re.IGNORECASE,
+    )
+
+    def _replace_parenthesized_denominator(m: re.Match[str]) -> str:
+        canonical = UNIT_ALIASES.get(m.group(1), UNIT_ALIASES.get(m.group(1).lower(), m.group(1)))
+        return f"/({canonical})**{m.group(2)}"
+
+    return re.sub(
+        rf"/\(\s*({unit_alt})\s*\)\s*\^\s*(\d+)\b",
+        _replace_parenthesized_denominator,
+        expression,
+        flags=re.IGNORECASE,
+    )
+
+
 # Module-level multi-word function name mappings (constant, no need to recreate each call)
 _MULTI_WORD_FUNCTIONS: dict[str, str] = {
     "square root": "sqrt",
@@ -1530,6 +1612,7 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # by running a second pass after word replacement (see below)
 
     _binary_word_check(expression)
+    expression = _normalize_lowercase_temperature_conversion(expression)
 
     for scale_word, scale_val in _DIGIT_SCALES.items():
         # Convert "N thousand" to the evaluated product (e.g., "5 thousand" -> "5000").
@@ -1751,6 +1834,7 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     )
     # Restore temperature expressions from placeholder (strip "degrees", keep unit)
     expression = expression.replace(_DEG_PLACEHOLDER, "")
+    expression = _normalize_spaced_unit_caret_exponents(expression)
 
     # Handle "N percent" -> "N/100" BEFORE _join_number_parts so compound
     # numbers like "twenty five percent" → "20 5 percent" → "(20+5)/100" = 0.25
