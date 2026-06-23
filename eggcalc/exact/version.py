@@ -13,6 +13,7 @@ from typing import TypedDict
 
 class ParsedVersion(TypedDict):
     """Parsed version components."""
+
     major: int
     minor: int
     patch: int
@@ -23,12 +24,14 @@ class ParsedVersion(TypedDict):
 
 class ParsedConstraintComponent(TypedDict):
     """A single parsed constraint component."""
+
     operator: str
     version: ParsedVersion
 
 
 class ParsedConstraint(TypedDict):
     """Parsed constraint components."""
+
     raw: str
     scheme: str
     components: list[ParsedConstraintComponent]
@@ -37,6 +40,7 @@ class ParsedConstraint(TypedDict):
 
 class VersionConstraintResult(TypedDict, total=False):
     """Result of a version constraint check."""
+
     satisfies: bool
     parsed_version: ParsedVersion | None
     parsed_constraint: ParsedConstraint | None
@@ -59,15 +63,11 @@ _PRE_RELEASE_ORDER: dict[str, int] = {
 }
 
 _SEMVER_RE = re.compile(
-    r'^(\d+)\.(\d+)\.(\d+)'
-    r'(?:-([0-9A-Za-z\.\-]+))?'
-    r'(?:\+([0-9A-Za-z\.\-]+))?$'
+    r'^(\d+)\.(\d+)\.(\d+)' r'(?:-([0-9A-Za-z\.\-]+))?' r'(?:\+([0-9A-Za-z\.\-]+))?$'
 )
 
 _SEMVER_LAX_RE = re.compile(
-    r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?'
-    r'(?:-([0-9A-Za-z\.\-]+))?'
-    r'(?:\+([0-9A-Za-z\.\-]+))?$'
+    r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?' r'(?:-([0-9A-Za-z\.\-]+))?' r'(?:\+([0-9A-Za-z\.\-]+))?$'
 )
 
 
@@ -217,7 +217,7 @@ def _parse_comparison_constraint(constraint: str) -> tuple[str, str]:
     constraint = constraint.strip()
     for op in (">=", "<=", "!=", ">", "<", "==", "="):
         if constraint.startswith(op):
-            ver = constraint[len(op):].strip()
+            ver = constraint[len(op) :].strip()
             actual_op = "==" if op in ("=", "==") else op
             return actual_op, ver
     return "=", constraint
@@ -339,30 +339,44 @@ def _cargo_wildcard_range(constraint: str) -> tuple[ParsedVersion | None, Parsed
     nums = [int(p) for p in parts if p]
     if len(nums) == 1:
         lower = ParsedVersion(
-            major=nums[0], minor=0, patch=0,
-            pre_release=[], build="", raw=constraint,
+            major=nums[0],
+            minor=0,
+            patch=0,
+            pre_release=[],
+            build="",
+            raw=constraint,
         )
         upper = ParsedVersion(
-            major=nums[0] + 1, minor=0, patch=0,
-            pre_release=[], build="", raw="",
+            major=nums[0] + 1,
+            minor=0,
+            patch=0,
+            pre_release=[],
+            build="",
+            raw="",
         )
     elif len(nums) == 2:
         lower = ParsedVersion(
-            major=nums[0], minor=nums[1], patch=0,
-            pre_release=[], build="", raw=constraint,
+            major=nums[0],
+            minor=nums[1],
+            patch=0,
+            pre_release=[],
+            build="",
+            raw=constraint,
         )
         upper = ParsedVersion(
-            major=nums[0], minor=nums[1] + 1, patch=0,
-            pre_release=[], build="", raw="",
+            major=nums[0],
+            minor=nums[1] + 1,
+            patch=0,
+            pre_release=[],
+            build="",
+            raw="",
         )
     else:
         return None, None
     return lower, upper
 
 
-def _evaluate_component(
-    ver: ParsedVersion, op: str, bound: ParsedVersion
-) -> bool:
+def _evaluate_component(ver: ParsedVersion, op: str, bound: ParsedVersion) -> bool:
     """Evaluate a single constraint component against a version."""
     if op == ">=":
         return version_gte(ver, bound)
@@ -449,7 +463,11 @@ def check_version_constraint(
                 parsed_version=parsed_ver,
                 parsed_constraint=pc,
                 scheme=scheme,
-                explanation=f"{version} satisfies {constraint}" if satisfies else f"{version} does not satisfy {constraint}",
+                explanation=(
+                    f"{version} satisfies {constraint}"
+                    if satisfies
+                    else f"{version} does not satisfy {constraint}"
+                ),
                 findings=findings,
             )
         lower, upper = _cargo_wildcard_range(constraint)
@@ -477,7 +495,11 @@ def check_version_constraint(
             parsed_version=parsed_ver,
             parsed_constraint=pc,
             scheme=scheme,
-            explanation=f"{version} satisfies {constraint}" if satisfies else f"{version} does not satisfy {constraint}",
+            explanation=(
+                f"{version} satisfies {constraint}"
+                if satisfies
+                else f"{version} does not satisfy {constraint}"
+            ),
             findings=findings,
         )
 
@@ -512,7 +534,11 @@ def check_version_constraint(
             parsed_version=parsed_ver,
             parsed_constraint=pc,
             scheme="cargo",
-            explanation=f"{version} satisfies {constraint}" if satisfies else f"{version} does not satisfy {constraint}",
+            explanation=(
+                f"{version} satisfies {constraint}"
+                if satisfies
+                else f"{version} does not satisfy {constraint}"
+            ),
             findings=findings,
         )
 
@@ -545,7 +571,11 @@ def check_version_constraint(
             parsed_version=parsed_ver,
             parsed_constraint=pc,
             scheme="cargo",
-            explanation=f"{version} satisfies {constraint}" if satisfies else f"{version} does not satisfy {constraint}",
+            explanation=(
+                f"{version} satisfies {constraint}"
+                if satisfies
+                else f"{version} does not satisfy {constraint}"
+            ),
             findings=findings,
         )
 
@@ -583,7 +613,11 @@ def check_version_constraint(
             parsed_version=parsed_ver,
             parsed_constraint=pc,
             scheme=scheme,
-            explanation=f"{version} satisfies {constraint}" if all_satisfy else f"{version} does not satisfy {constraint}",
+            explanation=(
+                f"{version} satisfies {constraint}"
+                if all_satisfy
+                else f"{version} does not satisfy {constraint}"
+            ),
             findings=findings,
         )
 
@@ -614,6 +648,10 @@ def check_version_constraint(
         parsed_version=parsed_ver,
         parsed_constraint=pc,
         scheme=scheme,
-        explanation=f"{version} satisfies {constraint}" if satisfies else f"{version} does not satisfy {constraint}",
+        explanation=(
+            f"{version} satisfies {constraint}"
+            if satisfies
+            else f"{version} does not satisfy {constraint}"
+        ),
         findings=findings,
     )

@@ -14,6 +14,7 @@ from typing import TypedDict
 
 class GlobMatchResult(TypedDict):
     """Result of glob pattern matching."""
+
     matches: bool
     normalized_pattern: str
     normalized_path: str
@@ -120,7 +121,7 @@ def _fnmatch_to_regex(pattern: str) -> str:
                 regex_parts.append(re.escape("["))
                 i += 1
             else:
-                char_class = pattern[i:j+1]
+                char_class = pattern[i : j + 1]
                 char_class = char_class.replace("!", "^", 1)
                 regex_parts.append("[" + char_class[1:-1] + "]")
                 i = j + 1
@@ -166,9 +167,7 @@ def _match_double_star(
         remaining_path = path_parts[path_idx:] if path_idx < len(path_parts) else []
 
         matched, consumed_p, consumed_path = _match_segments(
-            remaining_pattern,
-            remaining_path,
-            case_sensitive=True
+            remaining_pattern, remaining_path, case_sensitive=True
         )
 
         if matched:
@@ -199,9 +198,7 @@ def _match_segments(
         pattern_seg = pattern_parts[p_idx]
 
         if pattern_seg == "**":
-            matched, new_p_idx, new_path_idx = _match_double_star(
-                pattern_parts, path_parts, p_idx
-            )
+            matched, new_p_idx, new_path_idx = _match_double_star(pattern_parts, path_parts, p_idx)
             if not matched:
                 return False, p_idx, path_idx
             p_idx = new_p_idx
@@ -271,8 +268,8 @@ def glob_match(
     n = len(pattern)
 
     while i < n:
-        if i + 1 < n and pattern[i:i+2] == "**":
-            if i + 2 < n and pattern[i+2] == "/":
+        if i + 1 < n and pattern[i : i + 2] == "**":
+            if i + 2 < n and pattern[i + 2] == "/":
                 pattern_parts.append("**")
                 i += 3
             elif i + 2 == n:
@@ -287,7 +284,7 @@ def glob_match(
 
         else:
             j = i
-            while j < n and pattern[j] != "/" and not (j + 1 < n and pattern[j:j+2] == "**"):
+            while j < n and pattern[j] != "/" and not (j + 1 < n and pattern[j : j + 2] == "**"):
                 j += 1
             pattern_parts.append(pattern[i:j])
             i = j

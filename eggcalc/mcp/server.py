@@ -202,6 +202,7 @@ _profile_lock = threading.Lock()
 # Validate startup profile eagerly
 if _active_profile not in TOOL_PROFILES and _active_profile != "full":
     import sys as _sys
+
     _available = ", ".join(sorted(TOOL_PROFILES))
     print(
         f"Error: Invalid EGGCALC_MCP_PROFILE: {_active_profile!r}. "
@@ -219,8 +220,7 @@ def set_active_profile(name: str) -> None:
     """Set the active MCP profile.  Raises ValueError for unknown profiles."""
     if name not in TOOL_PROFILES and name != "full":
         raise ValueError(
-            f"Unknown profile: {name!r}. "
-            f"Available profiles: {', '.join(sorted(TOOL_PROFILES))}"
+            f"Unknown profile: {name!r}. " f"Available profiles: {', '.join(sorted(TOOL_PROFILES))}"
         )
     global _active_profile
     with _profile_lock:
@@ -259,15 +259,13 @@ def get_profile_tools(profile: str | None = None) -> list[str]:
         profile = get_active_profile()
     if profile == "full":
         return sorted(
-            name for name, meta in TOOL_METADATA.items()
-            if meta.get("llm_exposure") != "hidden"
+            name for name, meta in TOOL_METADATA.items() if meta.get("llm_exposure") != "hidden"
         )
     if profile not in TOOL_PROFILES:
         available = ", ".join(sorted(TOOL_PROFILES))
-        raise ValueError(
-            f"Unknown MCP profile: {profile!r}. Available profiles: {available}"
-        )
+        raise ValueError(f"Unknown MCP profile: {profile!r}. Available profiles: {available}")
     return list(TOOL_PROFILES[profile])
+
 
 # Bounded thread pool for tool invocations. Prevents unbounded thread
 # accumulation when tools time out. Tasks submitted to a full pool queue
@@ -289,6 +287,7 @@ def _get_tool_executor() -> ThreadPoolExecutor:
                 )
     return _tool_executor
 
+
 # Track orphaned child processes for defensive cleanup. When a tool times out,
 # its handler may have spawned a child process (via evaluate_with_timeout or
 # validate_regex). The handler's finally block normally terminates these, but
@@ -308,6 +307,7 @@ def _cleanup_orphaned_processes() -> None:
                 _orphaned_eval_order,
                 _orphaned_eval_processes,
             )
+
             with _orphaned_eval_lock:
                 _orphaned_processes.update(_orphaned_eval_processes)
                 _orphaned_eval_processes.clear()
@@ -320,6 +320,7 @@ def _cleanup_orphaned_processes() -> None:
                 _orphaned_regex_order,
                 _orphaned_regex_processes,
             )
+
             with _orphaned_regex_lock:
                 _orphaned_processes.update(_orphaned_regex_processes)
                 _orphaned_regex_processes.clear()
@@ -443,9 +444,7 @@ def _validate_arguments(handler: Any, arguments: dict[str, Any]) -> str | None:
         return None
 
     params = sig.parameters
-    has_var_keyword = any(
-        p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
-    )
+    has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
 
     # Check for unexpected keyword arguments (skip if handler accepts **kwargs)
     if not has_var_keyword:
@@ -564,18 +563,26 @@ def _validate_value_against_schema(
         if pattern is not None:
             try:
                 import re as _re
+
                 if _re.search(pattern, value) is None:
                     return f"Argument '{path}' does not match pattern {pattern!r}"
             except _re.error as e:
                 return f"Argument '{path}' has invalid pattern: {e}"
 
     # Numeric range constraints
-    if any(t in ("number", "integer") for t in type_options) and isinstance(value, (int, float)) and not isinstance(value, bool):
+    if (
+        any(t in ("number", "integer") for t in type_options)
+        and isinstance(value, (int, float))
+        and not isinstance(value, bool)
+    ):
         import math as _math
+
         if _math.isnan(value):
             return f"Argument '{path}' must be a finite number, got NaN"
         if _math.isinf(value):
-            return f"Argument '{path}' must be a finite number, got {'+inf' if value > 0 else '-inf'}"
+            return (
+                f"Argument '{path}' must be a finite number, got {'+inf' if value > 0 else '-inf'}"
+            )
         minimum = prop.get("minimum")
         if minimum is not None and value < minimum:
             return f"Argument '{path}' value {value} is less than minimum {minimum}"
@@ -777,14 +784,16 @@ def _handle_call_tool(request: dict) -> dict:
                     "content": [
                         {
                             "type": "text",
-                            "text": json.dumps({
-                                "ok": False,
-                                "error": f"Tool '{name}' request was cancelled",
-                                "error_type": "cancelled",
-                                "hints": [],
-                                "tool": name,
-                                "warnings": [],
-                            }),
+                            "text": json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": f"Tool '{name}' request was cancelled",
+                                    "error_type": "cancelled",
+                                    "hints": [],
+                                    "tool": name,
+                                    "warnings": [],
+                                }
+                            ),
                         }
                     ],
                     "isError": True,
@@ -815,7 +824,8 @@ def _handle_call_tool(request: dict) -> dict:
                 logging.warning(
                     "MCP tool '%s' timed out after %ds; "
                     "worker already running and cannot be cancelled",
-                    name, MAX_TOOL_TIMEOUT_SECONDS,
+                    name,
+                    MAX_TOOL_TIMEOUT_SECONDS,
                 )
             else:
                 logging.info(
@@ -933,7 +943,9 @@ def _handle_list_tools(request: dict) -> dict:
     if profile_filter is not None and not isinstance(profile_filter, str):
         return _invalid_request(request_id, "Invalid 'profile' parameter: expected string")
     if schema_detail_param is not None and schema_detail_param not in ("compact", "normal", "full"):
-        return _invalid_request(request_id, "Invalid 'schema_detail' parameter: expected compact, normal, or full")
+        return _invalid_request(
+            request_id, "Invalid 'schema_detail' parameter: expected compact, normal, or full"
+        )
 
     # Schema detail: per-request override or global default
     detail = schema_detail_param or get_schema_detail()

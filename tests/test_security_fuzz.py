@@ -28,7 +28,9 @@ class TestSecurityFuzz:
         for _ in range(100):
             # Random alphanumeric strings of varying lengths
             length = random.randint(1, 100)
-            test_input = ''.join(random.choices(string.ascii_letters + string.digits + " ", k=length))
+            test_input = ''.join(
+                random.choices(string.ascii_letters + string.digits + " ", k=length)
+            )
 
             # Should either return a result or raise EvaluationError
             try:
@@ -40,7 +42,9 @@ class TestSecurityFuzz:
                 pass
             except Exception as e:
                 # No other exceptions should occur
-                pytest.fail(f"Unexpected exception for input '{test_input[:50]}...': {type(e).__name__}: {e}")
+                pytest.fail(
+                    f"Unexpected exception for input '{test_input[:50]}...': {type(e).__name__}: {e}"
+                )
 
     def test_special_character_inputs(self):
         """Test inputs with special characters don't cause crashes."""
@@ -86,7 +90,9 @@ class TestSecurityFuzz:
             except (EvaluationError, SyntaxError):
                 pass  # Expected
             except Exception as e:
-                pytest.fail(f"Unexpected exception for input '{test_input}': {type(e).__name__}: {e}")
+                pytest.fail(
+                    f"Unexpected exception for input '{test_input}': {type(e).__name__}: {e}"
+                )
 
     def test_very_long_inputs(self):
         """Test that very long inputs are rejected quickly."""
@@ -191,28 +197,22 @@ class TestSecurityFuzz:
             "import sys",
             "from os import system",
             "__import__('os')",
-
             # Code execution
             "eval('1+1')",
             "exec('1+1')",
-
             # Attribute access
             "().__class__",
             "().__class__.__bases__",
             "object.__subclasses__",
-
             # File operations
             "open('/etc/passwd')",
-
             # System calls
             "os.system('ls')",
             "subprocess.call(['ls'])",
-
             # Variable access
             "globals()",
             "locals()",
             "vars()",
-
             # Other dangerous
             "breakpoint()",
             "help(1)",
@@ -251,7 +251,10 @@ class TestSecurityFuzz:
         for test_input in attr_attempts:
             with pytest.raises(EvaluationError) as exc_info:
                 evaluate(test_input)
-            assert "not allowed" in str(exc_info.value).lower() or "unsupported" in str(exc_info.value).lower()
+            assert (
+                "not allowed" in str(exc_info.value).lower()
+                or "unsupported" in str(exc_info.value).lower()
+            )
 
     def test_comprehensions_blocked(self):
         """Test that list/dict comprehensions are blocked."""
@@ -357,20 +360,20 @@ class TestUnicodeFuzzing:
 
         confusable_inputs = [
             # Cyrillic 'а' (U+0430) mixed with Latin 'a' (U+0061)
-            "5 \u0430+ 3",       # 5 Cyrillic-a + 3
-            "1\u04300",          # 1 Cyrillic-a 0
-            "\u0430\u0430",      # just two Cyrillic-a's
+            "5 \u0430+ 3",  # 5 Cyrillic-a + 3
+            "1\u04300",  # 1 Cyrillic-a 0
+            "\u0430\u0430",  # just two Cyrillic-a's
             # Mathematical italic characters that look like ASCII
-            "\U0001D44E + 3",    # mathematical italic a
-            "\U0001D452 + 3",    # mathematical italic e
-            "\U0001D45F + 1",    # mathematical italic z
+            "\U0001d44e + 3",  # mathematical italic a
+            "\U0001d452 + 3",  # mathematical italic e
+            "\U0001d45f + 1",  # mathematical italic z
             # Mathematical bold characters
-            "\U0001D7D8 + 1",    # mathematical bold digit 1
-            "\U0001D7E2 + 5",    # mathematical bold digit 5
+            "\U0001d7d8 + 1",  # mathematical bold digit 1
+            "\U0001d7e2 + 5",  # mathematical bold digit 5
             # Mixed confusable and ASCII
-            "s\u0456n(0)",       # 'sin' with Cyrillic і
-            "s\u0456n(0)",       # 'sin' with Cyrillic і
-            "ma\u0452h.pi",      # 'math' with Cyrillic ђ
+            "s\u0456n(0)",  # 'sin' with Cyrillic і
+            "s\u0456n(0)",  # 'sin' with Cyrillic і
+            "ma\u0452h.pi",  # 'math' with Cyrillic ђ
         ]
 
         for test_input in confusable_inputs:
@@ -381,8 +384,7 @@ class TestUnicodeFuzzing:
                 pass  # Expected - confusable characters should be rejected
             except Exception as e:
                 pytest.fail(
-                    f"Unexpected exception for input {test_input!r}: "
-                    f"{type(e).__name__}: {e}"
+                    f"Unexpected exception for input {test_input!r}: " f"{type(e).__name__}: {e}"
                 )
 
     def test_unicode_control_chars(self):
@@ -391,28 +393,28 @@ class TestUnicodeFuzzing:
 
         control_inputs = [
             # Zero-width spaces
-            "5\u200B+\u200B3",
-            "5\u200C+\u200C3",   # Zero-width non-joiner
-            "5\u200D+\u200D3",   # Zero-width joiner
+            "5\u200b+\u200b3",
+            "5\u200c+\u200c3",  # Zero-width non-joiner
+            "5\u200d+\u200d3",  # Zero-width joiner
             # RTL override
-            "5\u202E+3",
+            "5\u202e+3",
             # Bidirectional controls
             "5\u2066+\u20673\u2069",  # LRI, RLI, FSI, PDI
-            "\u202A5+3\u202C",        # LRE, PDF
-            "\u202B5+3\u202C",        # RLE, PDF
-            "\u202D5+3\u202C",        # LRO, PDF
-            "\u202F5+3\u202C",        # LRM
-            "\u200F5+3\u200E",        # RLM
+            "\u202a5+3\u202c",  # LRE, PDF
+            "\u202b5+3\u202c",  # RLE, PDF
+            "\u202d5+3\u202c",  # LRO, PDF
+            "\u202f5+3\u202c",  # LRM
+            "\u200f5+3\u200e",  # RLM
             # Combining characters
-            "5\u0300+\u03013",   # combining accent grave, acute
-            "5\u0327+\u03283",   # combining cedilla, ogonek
+            "5\u0300+\u03013",  # combining accent grave, acute
+            "5\u0327+\u03283",  # combining cedilla, ogonek
             # Other format characters
-            "5\u00AD+3",         # soft hyphen
-            "5\u034F+3",         # combining grapheme joiner
-            "5\u2060+3",         # word joiner
-            "5\uFEFF+3",         # BOM / zero-width no-break space
+            "5\u00ad+3",  # soft hyphen
+            "5\u034f+3",  # combining grapheme joiner
+            "5\u2060+3",  # word joiner
+            "5\ufeff+3",  # BOM / zero-width no-break space
             # Long sequence of control characters
-            "5" + "\u200B" * 50 + "+3",
+            "5" + "\u200b" * 50 + "+3",
         ]
 
         for test_input in control_inputs:
@@ -423,8 +425,7 @@ class TestUnicodeFuzzing:
                 pass  # Expected - control chars should be rejected
             except Exception as e:
                 pytest.fail(
-                    f"Unexpected exception for input {test_input!r}: "
-                    f"{type(e).__name__}: {e}"
+                    f"Unexpected exception for input {test_input!r}: " f"{type(e).__name__}: {e}"
                 )
 
     def test_unicode_in_expressions(self):
@@ -433,27 +434,27 @@ class TestUnicodeFuzzing:
 
         unicode_expr_inputs = [
             # Superscript numbers
-            "5\u00B2 + 1",       # 5² + 1
-            "\u00B2 + \u00B2",   # ² + ²
-            "5\u00B9",           # 5¹
-            "\u2070 + 1",        # ⁰ + 1
+            "5\u00b2 + 1",  # 5² + 1
+            "\u00b2 + \u00b2",  # ² + ²
+            "5\u00b9",  # 5¹
+            "\u2070 + 1",  # ⁰ + 1
             # Subscript numbers
-            "5\u2080 + 1",       # 5₀ + 1
-            "\u2081 + \u2082",   # ₁ + ₂
+            "5\u2080 + 1",  # 5₀ + 1
+            "\u2081 + \u2082",  # ₁ + ₂
             # Mathematical italic letters as variables
-            "\U0001D44E = 5",    # 𝑎 = 5
-            "\U0001D44E + \U0001D44F",  # 𝑎 + 𝑏
+            "\U0001d44e = 5",  # 𝑎 = 5
+            "\U0001d44e + \U0001d44f",  # 𝑎 + 𝑏
             # Mathematical operators
-            "5\u221A 25",        # 5√25 (radical)
-            "5\u00D7 3",         # 5×3 (multiplication sign)
-            "5\u00F7 3",         # 5÷3 (division sign)
-            "5\u2211 3",         # 5∑3 (summation)
+            "5\u221a 25",  # 5√25 (radical)
+            "5\u00d7 3",  # 5×3 (multiplication sign)
+            "5\u00f7 3",  # 5÷3 (division sign)
+            "5\u2211 3",  # 5∑3 (summation)
             # Fullwidth digits
-            "\uFF15 + \uFF13",   # ５ + ３
+            "\uff15 + \uff13",  # ５ + ３
             # Mixed Unicode and ASCII
-            "5\u00B2 + 3",       # 5² + 3
-            "\u221A(144)",       # √(144)
-            "\U0001D452 + 1",    # 𝑒 + 1
+            "5\u00b2 + 3",  # 5² + 3
+            "\u221a(144)",  # √(144)
+            "\U0001d452 + 1",  # 𝑒 + 1
         ]
 
         for test_input in unicode_expr_inputs:
@@ -466,8 +467,7 @@ class TestUnicodeFuzzing:
                 pass  # Expected - invalid Python syntax
             except Exception as e:
                 pytest.fail(
-                    f"Unexpected exception for input {test_input!r}: "
-                    f"{type(e).__name__}: {e}"
+                    f"Unexpected exception for input {test_input!r}: " f"{type(e).__name__}: {e}"
                 )
 
     def test_unicode_random_mix(self):
@@ -478,13 +478,27 @@ class TestUnicodeFuzzing:
 
         random.seed(2024)
         unicode_chars = [
-            "\u0410", "\u0411", "\u0412",  # Cyrillic А, Б, В
-            "\u0391", "\u0392", "\u0393",  # Greek Α, Β, Γ
-            "\u00C0", "\u00C1", "\u00C2",  # À, Á, Â
-            "\u2660", "\u2663", "\u2665",  # ♠, ♣, ♥
-            "\u20AC", "\u00A3", "\u00A5",  # €, £, ¥
-            "\u2190", "\u2191", "\u2192",  # ←, ↑, →
-            "\u2588", "\u2591", "\u2592",  # █, ░, ▒
+            "\u0410",
+            "\u0411",
+            "\u0412",  # Cyrillic А, Б, В
+            "\u0391",
+            "\u0392",
+            "\u0393",  # Greek Α, Β, Γ
+            "\u00c0",
+            "\u00c1",
+            "\u00c2",  # À, Á, Â
+            "\u2660",
+            "\u2663",
+            "\u2665",  # ♠, ♣, ♥
+            "\u20ac",
+            "\u00a3",
+            "\u00a5",  # €, £, ¥
+            "\u2190",
+            "\u2191",
+            "\u2192",  # ←, ↑, →
+            "\u2588",
+            "\u2591",
+            "\u2592",  # █, ░, ▒
         ]
 
         for _ in range(50):
@@ -505,8 +519,7 @@ class TestUnicodeFuzzing:
                 pass  # Expected
             except Exception as e:
                 pytest.fail(
-                    f"Unexpected exception for input {test_input!r}: "
-                    f"{type(e).__name__}: {e}"
+                    f"Unexpected exception for input {test_input!r}: " f"{type(e).__name__}: {e}"
                 )
 
 
@@ -597,7 +610,9 @@ class TestMemorySafety:
         # What we care about is whether memory grows with MORE calls
         # With 1000 calls using the same expression, if there were a leak we'd see growth
         # Since UNIT_CONVERSIONS and caches are bounded, memory should be stable
-        assert peak < 10_000_000, f"Peak memory too high: {peak} bytes (baseline ~3MB from confusables)"
+        assert (
+            peak < 10_000_000
+        ), f"Peak memory too high: {peak} bytes (baseline ~3MB from confusables)"
 
     def test_recursion_limit_protection(self):
         """Test expression evaluation respects recursion limits."""
@@ -682,6 +697,7 @@ class TestASTAllowlist:
         node = ast.MatchValue(value=ast.Constant(value=1))
         with pytest.raises(EE):
             from eggcalc.evaluator import Evaluator
+
             Evaluator()._validate_node(node)
 
     def test_all_expr_subclasses_rejected_except_allowed(self):
@@ -705,13 +721,9 @@ class TestASTAllowlist:
                 elif cls is ast.Name:
                     node = ast.Name(id="x")
                 elif cls is ast.Attribute:
-                    node = ast.Attribute(
-                        value=ast.Name(id="math"), attr="x", ctx=ast.Load()
-                    )
+                    node = ast.Attribute(value=ast.Name(id="math"), attr="x", ctx=ast.Load())
                 elif cls is ast.Call:
-                    node = ast.Call(
-                        func=ast.Name(id="f"), args=[], keywords=[]
-                    )
+                    node = ast.Call(func=ast.Name(id="f"), args=[], keywords=[])
                 elif cls is ast.UnaryOp:
                     node = ast.UnaryOp(op=ast.UAdd(), operand=ast.Constant(value=1))
                 elif cls is ast.BinOp:
@@ -752,8 +764,11 @@ class TestASTAllowlist:
                 elif cls is ast.Lambda:
                     node = ast.Lambda(
                         args=ast.arguments(
-                            posonlyargs=[], args=[], kwonlyargs=[],
-                            kw_defaults=[], defaults=[],
+                            posonlyargs=[],
+                            args=[],
+                            kwonlyargs=[],
+                            kw_defaults=[],
+                            defaults=[],
                         ),
                         body=ast.Constant(value=1),
                     )
@@ -804,19 +819,16 @@ class TestASTAllowlist:
                 continue
 
             from eggcalc.evaluator import Evaluator
+
             if cls in _ALLOWED_AST_TYPES:
                 try:
                     Evaluator()._validate_node(node)
                 except EE as e:
-                    pytest.fail(
-                        f"Expected {cls.__name__} to be allowed, but got: {e}"
-                    )
+                    pytest.fail(f"Expected {cls.__name__} to be allowed, but got: {e}")
             else:
                 try:
                     Evaluator()._validate_node(node)
-                    pytest.fail(
-                        f"Expected {cls.__name__} to be rejected (not in allow-list)"
-                    )
+                    pytest.fail(f"Expected {cls.__name__} to be rejected (not in allow-list)")
                 except EE:
                     pass  # expected
 

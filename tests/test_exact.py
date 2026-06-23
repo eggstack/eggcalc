@@ -189,6 +189,7 @@ class TestPrimitives:
 
     def test_is_extended_pictographic_cjk_not_emoji(self):
         from eggcalc.exact.primitives import _is_extended_pictographic
+
         assert not _is_extended_pictographic('\u4e00')  # CJK character '一'
         assert not _is_extended_pictographic('\u4e2d')  # CJK character '中'
         assert not _is_extended_pictographic('\u0410')  # Cyrillic 'А'
@@ -196,6 +197,7 @@ class TestPrimitives:
 
     def test_is_extend_char_zwsp(self):
         from eggcalc.exact.primitives import _is_extend_char
+
         assert not _is_extend_char('\u200b')  # ZWSP (Grapheme_Break=Control per UAX #29)
         assert _is_extend_char('\u200c')  # ZWNJ
         assert not _is_extend_char('\u200d')  # ZWJ (not included)
@@ -203,6 +205,7 @@ class TestPrimitives:
 
     def test_is_extend_char_combining(self):
         from eggcalc.exact.primitives import _is_extend_char
+
         assert _is_extend_char('\u0301')  # combining acute accent (Mn)
         assert _is_extend_char('\u0302')  # combining circumflex (Mn)
         assert _is_extend_char('\ufe00')  # variation selector 1
@@ -687,7 +690,13 @@ class TestSynthesis:
         assert result["same_unordered"] is True
 
     def test_list_compare_near_matches(self):
-        result = list_compare(["Hello"], ["hello"], ignore_order=True, include_near_matches=True, near_match_threshold=2)
+        result = list_compare(
+            ["Hello"],
+            ["hello"],
+            ignore_order=True,
+            include_near_matches=True,
+            near_match_threshold=2,
+        )
         assert len(result["near_matches"]) == 1
         assert result["near_matches"][0]["classification"] == "fuzzy"
 

@@ -11,7 +11,6 @@ Tests for:
 - MCP wrapper integration
 """
 
-
 from eggcalc.exact.version import (
     check_version_constraint,
     parse_version,
@@ -385,66 +384,77 @@ class TestMcpWrapper:
 
     def test_basic_satisfies(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.2.3", ">=1.0.0")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is True
 
     def test_basic_fails(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("0.9.0", ">=1.0.0")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is False
 
     def test_cargo_scheme(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.5.0", "^1.2.3", scheme="cargo")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is True
 
     def test_cargo_prerelease_constraint(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.2.3-alpha.1", "^1.2.3-alpha.1", scheme="cargo")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is True
 
     def test_invalid_scheme(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.2.3", ">=1.0", scheme="bad")
         assert resp["ok"] is False
         assert resp["error_type"] == "invalid_arguments"
 
     def test_empty_version(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("", ">=1.0")
         assert resp["ok"] is False
         assert resp["error_type"] == "invalid_arguments"
 
     def test_empty_constraint(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.2.3", "")
         assert resp["ok"] is False
         assert resp["error_type"] == "invalid_arguments"
 
     def test_prerelease(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.0.0-alpha.1", "<1.0.0")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is True
 
     def test_findings_on_prerelease(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.0.0-alpha.1", "<1.0.0")
         assert resp["ok"] is True
         assert resp["result"]["findings"] == []
 
     def test_machine_code_not_satisfied(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("0.5.0", ">=1.0.0")
         assert resp["ok"] is True
         assert resp["machine_code"] == "CONSTRAINT_NOT_SATISFIED"
 
     def test_comma_range(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.5.0", ">=1.2,<2.0")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is True
@@ -452,6 +462,7 @@ class TestMcpWrapper:
 
     def test_invalid_version_in_mcp(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("not-a-version", ">=1.0")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is False
@@ -459,6 +470,7 @@ class TestMcpWrapper:
 
     def test_invalid_constraint_in_mcp(self):
         from eggcalc.mcp.tools import version_constraint_check_mcp
+
         resp = version_constraint_check_mcp("1.2.3", ">=not-a-version")
         assert resp["ok"] is True
         assert resp["result"]["satisfies"] is False
@@ -469,6 +481,7 @@ class TestToolInventory:
 
     def test_tool_in_schemas(self):
         from eggcalc.mcp.schemas import TOOL_SCHEMAS
+
         assert "version_constraint_check" in TOOL_SCHEMAS
         schema = TOOL_SCHEMAS["version_constraint_check"]
         assert schema["tier"] == 3
@@ -477,4 +490,5 @@ class TestToolInventory:
 
     def test_tool_in_handlers(self):
         from eggcalc.mcp.server import TOOL_HANDLERS
+
         assert "version_constraint_check" in TOOL_HANDLERS

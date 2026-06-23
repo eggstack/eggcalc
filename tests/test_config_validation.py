@@ -1,6 +1,5 @@
 """Tests for .env and INI config validation tools."""
 
-
 from eggcalc.exact.config import dotenv_validate, ini_validate
 from eggcalc.mcp.tools import dotenv_validate_mcp, ini_validate_mcp
 

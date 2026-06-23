@@ -26,13 +26,12 @@ _SUSPICIOUS_NAME_PATTERNS = [
     re.compile(r"[A-Z]"),
 ]
 
-_CARGO_TOML_PATH_RE = re.compile(
-    r"^[a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)*\.toml$"
-)
+_CARGO_TOML_PATH_RE = re.compile(r"^[a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)*\.toml$")
 
 
 class CargoPackageInfo(TypedDict, total=False):
     """Extracted package metadata."""
+
     name: str | None
     version: str | None
     edition: str | None
@@ -43,6 +42,7 @@ class CargoPackageInfo(TypedDict, total=False):
 
 class CargoWorkspaceInfo(TypedDict):
     """Workspace section information."""
+
     present: bool
     members: list[str]
     exclude: list[str]
@@ -50,6 +50,7 @@ class CargoWorkspaceInfo(TypedDict):
 
 class CargoDependencyForm(TypedDict, total=False):
     """Form of a single dependency."""
+
     version: str | None
     path: str | None
     git: str | None
@@ -65,6 +66,7 @@ class CargoDependencyForm(TypedDict, total=False):
 
 class CargoDepSection(TypedDict):
     """Dependencies within a specific section."""
+
     dependencies: dict[str, CargoDependencyForm]
     dev_dependencies: dict[str, CargoDependencyForm]
     build_dependencies: dict[str, CargoDependencyForm]
@@ -73,6 +75,7 @@ class CargoDepSection(TypedDict):
 
 class CargoInspectResult(TypedDict):
     """Result of cargo_toml_inspect."""
+
     parse_ok: bool
     package: CargoPackageInfo
     workspace: CargoWorkspaceInfo
@@ -180,8 +183,10 @@ def cargo_toml_inspect(
             package=CargoPackageInfo(),
             workspace=CargoWorkspaceInfo(present=False, members=[], exclude=[]),
             dependencies=CargoDepSection(
-                dependencies={}, dev_dependencies={},
-                build_dependencies={}, target_specific={},
+                dependencies={},
+                dev_dependencies={},
+                build_dependencies={},
+                target_specific={},
             ),
             path_dependencies=[],
             suspicious_dependency_names=[],
@@ -197,8 +202,10 @@ def cargo_toml_inspect(
             package=CargoPackageInfo(),
             workspace=CargoWorkspaceInfo(present=False, members=[], exclude=[]),
             dependencies=CargoDepSection(
-                dependencies={}, dev_dependencies={},
-                build_dependencies={}, target_specific={},
+                dependencies={},
+                dev_dependencies={},
+                build_dependencies={},
+                target_specific={},
             ),
             path_dependencies=[],
             suspicious_dependency_names=[],
@@ -214,8 +221,10 @@ def cargo_toml_inspect(
             package=CargoPackageInfo(),
             workspace=CargoWorkspaceInfo(present=False, members=[], exclude=[]),
             dependencies=CargoDepSection(
-                dependencies={}, dev_dependencies={},
-                build_dependencies={}, target_specific={},
+                dependencies={},
+                dev_dependencies={},
+                build_dependencies={},
+                target_specific={},
             ),
             path_dependencies=[],
             suspicious_dependency_names=[],
@@ -245,8 +254,7 @@ def cargo_toml_inspect(
     raw_edition = pkg_raw.get("edition")
     if edition is None:
         findings.append(
-            "Missing 'edition' in [package] "
-            "(inherits workspace edition or defaults to 2015)"
+            "Missing 'edition' in [package] " "(inherits workspace edition or defaults to 2015)"
         )
     elif isinstance(raw_edition, dict) and raw_edition.get("workspace") is True:
         pass
@@ -305,9 +313,7 @@ def cargo_toml_inspect(
                 if path:
                     path_deps.append(path)
                 if form.get("git") and _detect_suspicious_name(str(dep_name)):
-                    findings.append(
-                        f"Git dependency '{dep_name}' has suspicious name pattern"
-                    )
+                    findings.append(f"Git dependency '{dep_name}' has suspicious name pattern")
 
             dep_section[section_key] = parsed_deps  # type: ignore[assignment]
 
@@ -331,16 +337,12 @@ def cargo_toml_inspect(
                         dep_section["target_specific"][target_key] = target_deps
 
     # --- Suspicious names ---
-    suspicious = sorted({
-        name for name in all_dep_names if _detect_suspicious_name(name)
-    })
+    suspicious = sorted({name for name in all_dep_names if _detect_suspicious_name(name)})
 
     # --- Duplicate/confusable names ---
     dupes = _detect_duplicates(all_dep_names)
     if dupes:
-        findings.append(
-            f"Confusable dependency names detected: {', '.join(dupes)}"
-        )
+        findings.append(f"Confusable dependency names detected: {', '.join(dupes)}")
 
     return CargoInspectResult(
         parse_ok=True,

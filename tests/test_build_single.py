@@ -111,6 +111,6 @@ class TestBuildSingleFile:
         for expr in test_exprs:
             pkg_result = _run_eggcalc_module(expr)
             single_result = _run_single_file(single_file_path, expr)
-            assert pkg_result == single_result, (
-                f"Mismatch for '{expr}': package={pkg_result!r}, single={single_result!r}"
-            )
+            assert (
+                pkg_result == single_result
+            ), f"Mismatch for '{expr}': package={pkg_result!r}, single={single_result!r}"

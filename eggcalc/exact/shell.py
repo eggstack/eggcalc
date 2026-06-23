@@ -15,6 +15,7 @@ from typing import TypedDict
 
 class ShellFeatures(TypedDict, total=False):
     """Risk features detected in a shell command string."""
+
     has_pipe: bool
     has_redirection: bool
     has_command_substitution: bool
@@ -26,6 +27,7 @@ class ShellFeatures(TypedDict, total=False):
 
 class ShellSplitResult(TypedDict):
     """Result of parsing a shell command string into argv."""
+
     parse_ok: bool
     argv: list[str]
     argc: int
@@ -35,6 +37,7 @@ class ShellSplitResult(TypedDict):
 
 class ShellQuoteJoinResult(TypedDict):
     """Result of safely quoting an argv list into a shell string."""
+
     command: str
     roundtrip_ok: bool
     findings: list[str]
@@ -42,6 +45,7 @@ class ShellQuoteJoinResult(TypedDict):
 
 class ArgvCompareResult(TypedDict):
     """Result of comparing two argv lists or command strings."""
+
     argv_equal: bool
     left_argv: list[str]
     right_argv: list[str]
@@ -70,10 +74,7 @@ def _detect_features(argv: list[str], raw: str) -> ShellFeatures:
     has_command_substitution = bool(_COMMAND_SUB_PATTERN.search(raw))
     has_variable_expansion = bool(_VARIABLE_PATTERN.search(raw))
 
-    has_glob_pattern = any(
-        any(c in _GLOB_CHARS for c in token)
-        for token in argv
-    )
+    has_glob_pattern = any(any(c in _GLOB_CHARS for c in token) for token in argv)
 
     has_control_operator = False
     for op in _CONTROL_OPERATORS:
@@ -114,9 +115,7 @@ def shell_split(
         ValueError: If command exceeds MAX_INPUT_LENGTH.
     """
     if len(command) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Command length {len(command)} exceeds maximum {MAX_INPUT_LENGTH}"
-        )
+        raise ValueError(f"Command length {len(command)} exceeds maximum {MAX_INPUT_LENGTH}")
     findings: list[str] = []
 
     if shell != "posix":
@@ -206,9 +205,7 @@ def shell_quote_join(
         ValueError: If argv list is too large.
     """
     if len(argv) > MAX_LIST_ITEMS:
-        raise ValueError(
-            f"argv count {len(argv)} exceeds maximum {MAX_LIST_ITEMS}"
-        )
+        raise ValueError(f"argv count {len(argv)} exceeds maximum {MAX_LIST_ITEMS}")
     findings: list[str] = []
 
     if shell != "posix":
@@ -228,9 +225,7 @@ def shell_quote_join(
         if result["parse_ok"] and result["argv"] == argv:
             roundtrip_ok = True
         elif result["parse_ok"]:
-            findings.append(
-                f"Round-trip mismatch: expected {argv!r}, got {result['argv']!r}"
-            )
+            findings.append(f"Round-trip mismatch: expected {argv!r}, got {result['argv']!r}")
         else:
             findings.append("Round-trip parse failed")
     except Exception as e:
@@ -282,13 +277,9 @@ def argv_compare(
             f"right_command length {len(right_command)} exceeds maximum {MAX_INPUT_LENGTH}"
         )
     if left_argv is not None and len(left_argv) > MAX_LIST_ITEMS:
-        raise ValueError(
-            f"left_argv count {len(left_argv)} exceeds maximum {MAX_LIST_ITEMS}"
-        )
+        raise ValueError(f"left_argv count {len(left_argv)} exceeds maximum {MAX_LIST_ITEMS}")
     if right_argv is not None and len(right_argv) > MAX_LIST_ITEMS:
-        raise ValueError(
-            f"right_argv count {len(right_argv)} exceeds maximum {MAX_LIST_ITEMS}"
-        )
+        raise ValueError(f"right_argv count {len(right_argv)} exceeds maximum {MAX_LIST_ITEMS}")
 
     # Resolve left argv
     resolved_left: list[str] | None = left_argv
@@ -304,9 +295,7 @@ def argv_compare(
             )
         resolved_left = split_left["argv"]
         if left_argv is not None and split_left["argv"] != left_argv:
-            findings.append(
-                "Left command parse differs from provided left_argv"
-            )
+            findings.append("Left command parse differs from provided left_argv")
 
     # Resolve right argv
     resolved_right: list[str] | None = right_argv
@@ -322,9 +311,7 @@ def argv_compare(
             )
         resolved_right = split_right["argv"]
         if right_argv is not None and split_right["argv"] != right_argv:
-            findings.append(
-                "Right command parse differs from provided right_argv"
-            )
+            findings.append("Right command parse differs from provided right_argv")
 
     if resolved_left is None:
         resolved_left = []
@@ -346,9 +333,7 @@ def argv_compare(
         else:
             first_diff = min(len(resolved_left), len(resolved_right))
             if len(resolved_left) > len(resolved_right):
-                findings.append(
-                    f"Left has {len(resolved_left) - len(resolved_right)} extra tokens"
-                )
+                findings.append(f"Left has {len(resolved_left) - len(resolved_right)} extra tokens")
             else:
                 findings.append(
                     f"Right has {len(resolved_right) - len(resolved_left)} extra tokens"

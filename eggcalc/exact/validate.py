@@ -23,6 +23,7 @@ MAX_SCHEMA_ELEMENTS = 100_000
 
 class BracketError(TypedDict):
     """Information about an unmatched bracket."""
+
     char: str
     index: int
     line: int
@@ -31,6 +32,7 @@ class BracketError(TypedDict):
 
 class CheckBracketsResult(TypedDict):
     """Result of bracket checking."""
+
     balanced: bool
     unmatched_openers: list[BracketError]
     unmatched_closers: list[BracketError]
@@ -38,6 +40,7 @@ class CheckBracketsResult(TypedDict):
 
 class ValidateJsonResult(TypedDict):
     """Result of JSON validation."""
+
     valid: bool
     error: str | None
     line: int | None
@@ -49,6 +52,7 @@ class ValidateJsonResult(TypedDict):
 
 class ValidateTomlResult(TypedDict):
     """Result of TOML validation."""
+
     valid: bool
     error: str | None
     line: int | None
@@ -61,6 +65,7 @@ class ValidateTomlResult(TypedDict):
 
 class RegexMatchPreview(TypedDict):
     """Preview of a regex replacement."""
+
     sample: str
     original: str
     replacement: str
@@ -69,6 +74,7 @@ class RegexMatchPreview(TypedDict):
 
 class RegexFlags(TypedDict):
     """Structured regex flags."""
+
     ignore_case: bool
     multiline: bool
     dotall: bool
@@ -77,6 +83,7 @@ class RegexFlags(TypedDict):
 
 class RegexMatch(TypedDict):
     """Result of a single regex match."""
+
     sample: str
     matches: bool
     fullmatch: bool
@@ -87,6 +94,7 @@ class RegexMatch(TypedDict):
 
 class RegexTestResult(TypedDict):
     """Result of regex testing."""
+
     valid_pattern: bool
     results: list[RegexMatch]
     error: str | None
@@ -95,6 +103,7 @@ class RegexTestResult(TypedDict):
 
 class JsonCompareDiff(TypedDict):
     """A single difference between two JSON documents."""
+
     path: str
     kind: str
     a_type: str | None
@@ -105,6 +114,7 @@ class JsonCompareDiff(TypedDict):
 
 class JsonCompareResult(TypedDict):
     """Result of JSON comparison."""
+
     valid_json_a: bool
     valid_json_b: bool
     equal: bool
@@ -147,6 +157,7 @@ def _get_line_column_from_index(newlines: list[int], index: int) -> tuple[int, i
         Tuple of (line, column), both 1-based.
     """
     import bisect
+
     line = bisect.bisect_right(newlines, index) + 1
     if line == 1:
         column = index + 1
@@ -232,38 +243,46 @@ def check_brackets(
                 if opener_to_closer.get(opener) != char:
                     # Mismatch - treat as both unmatched
                     line, column = _lc(opener_index)
-                    unmatched_openers.append(BracketError(
-                        char=opener,
-                        index=opener_index,
-                        line=line,
-                        column=column,
-                    ))
+                    unmatched_openers.append(
+                        BracketError(
+                            char=opener,
+                            index=opener_index,
+                            line=line,
+                            column=column,
+                        )
+                    )
                     line, column = _lc(index)
-                    unmatched_closers.append(BracketError(
+                    unmatched_closers.append(
+                        BracketError(
+                            char=char,
+                            index=index,
+                            line=line,
+                            column=column,
+                        )
+                    )
+            else:
+                # No matching opener
+                line, column = _lc(index)
+                unmatched_closers.append(
+                    BracketError(
                         char=char,
                         index=index,
                         line=line,
                         column=column,
-                    ))
-            else:
-                # No matching opener
-                line, column = _lc(index)
-                unmatched_closers.append(BracketError(
-                    char=char,
-                    index=index,
-                    line=line,
-                    column=column,
-                ))
+                    )
+                )
 
     # Remaining openers are unmatched
     for opener, opener_index in stack:
         line, column = _lc(opener_index)
-        unmatched_openers.append(BracketError(
-            char=opener,
-            index=opener_index,
-            line=line,
-            column=column,
-        ))
+        unmatched_openers.append(
+            BracketError(
+                char=opener,
+                index=opener_index,
+                line=line,
+                column=column,
+            )
+        )
 
     return CheckBracketsResult(
         balanced=len(unmatched_openers) == 0 and len(unmatched_closers) == 0,
@@ -405,6 +424,7 @@ def validate_toml_text(text: str) -> ValidateTomlResult:
 
 class TomlShapeResult(TypedDict):
     """Result of TOML shape analysis."""
+
     valid: bool
     top_level_keys: list[str] | None
     tables: list[str] | None
@@ -414,6 +434,7 @@ class TomlShapeResult(TypedDict):
 
 class VersionCompareResult(TypedDict):
     """Result of version comparison."""
+
     comparison: int
     valid: bool
     scheme: str
@@ -489,13 +510,9 @@ def version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareRes
         ValueError: If either input string exceeds MAX_INPUT_LENGTH.
     """
     if len(a) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Input 'a' length {len(a)} exceeds maximum {MAX_INPUT_LENGTH}"
-        )
+        raise ValueError(f"Input 'a' length {len(a)} exceeds maximum {MAX_INPUT_LENGTH}")
     if len(b) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Input 'b' length {len(b)} exceeds maximum {MAX_INPUT_LENGTH}"
-        )
+        raise ValueError(f"Input 'b' length {len(b)} exceeds maximum {MAX_INPUT_LENGTH}")
     if scheme == "semver":
         return _semver_compare(a, b)
     elif scheme == "pep440":
@@ -526,6 +543,7 @@ def _parse_semver(version: str) -> tuple[int, int, int] | None:
         Tuple of (major, minor, patch) or None if invalid.
     """
     import re
+
     match = re.match(r'^(\d+)\.(\d+)\.(\d+)', version.strip())
     if not match:
         return None
@@ -647,9 +665,7 @@ def list_dedupe(
         ValueError: If items list is too large.
     """
     if len(items) > MAX_LIST_ITEMS:
-        raise ValueError(
-            f"Items count {len(items)} exceeds maximum {MAX_LIST_ITEMS}"
-        )
+        raise ValueError(f"Items count {len(items)} exceeds maximum {MAX_LIST_ITEMS}")
     seen: set[str] = set()
     result: list[str] = []
 
@@ -693,9 +709,8 @@ def list_sort(
         ValueError: If items list is too large.
     """
     if len(items) > MAX_LIST_ITEMS:
-        raise ValueError(
-            f"Items count {len(items)} exceeds maximum {MAX_LIST_ITEMS}"
-        )
+        raise ValueError(f"Items count {len(items)} exceeds maximum {MAX_LIST_ITEMS}")
+
     def transform(s: str) -> str:
         if casefold:
             s = s.casefold()
@@ -921,28 +936,32 @@ def regex_test(
             )
         match = compiled.search(sample)
         if match is None:
-            results.append(RegexMatch(
-                sample=sample,
-                matches=False,
-                fullmatch=False,
-                span=None,
-                groups=[],
-                groupdict={},
-            ))
+            results.append(
+                RegexMatch(
+                    sample=sample,
+                    matches=False,
+                    fullmatch=False,
+                    span=None,
+                    groups=[],
+                    groupdict={},
+                )
+            )
         else:
             full_match = compiled.fullmatch(sample)
             span = list(match.span()) if match else None
             groups = list(match.groups())
             groupdict = match.groupdict() if match else {}
 
-            results.append(RegexMatch(
-                sample=sample,
-                matches=True,
-                fullmatch=full_match is not None,
-                span=span,
-                groups=groups,
-                groupdict=groupdict,
-            ))
+            results.append(
+                RegexMatch(
+                    sample=sample,
+                    matches=True,
+                    fullmatch=full_match is not None,
+                    span=span,
+                    groups=groups,
+                    groupdict=groupdict,
+                )
+            )
 
     return RegexTestResult(
         valid_pattern=True,
@@ -984,10 +1003,10 @@ def regex_replace_preview(
             exceeds MAX_PATTERN_LENGTH.
     """
     if len(samples) > MAX_LIST_ITEMS:
-        raise ValueError(
-            f"Samples count {len(samples)} exceeds maximum {MAX_LIST_ITEMS}"
-        )
-    long_samples = [i for i, s in enumerate(samples) if not isinstance(s, str) or len(s) > MAX_SAMPLE_LENGTH]
+        raise ValueError(f"Samples count {len(samples)} exceeds maximum {MAX_LIST_ITEMS}")
+    long_samples = [
+        i for i, s in enumerate(samples) if not isinstance(s, str) or len(s) > MAX_SAMPLE_LENGTH
+    ]
     if long_samples:
         raise ValueError(
             f"Sample(s) at indices {long_samples[:5]} exceed MAX_SAMPLE_LENGTH {MAX_SAMPLE_LENGTH}"
@@ -1023,19 +1042,23 @@ def regex_replace_preview(
     for sample in samples:
         try:
             new_text, count = compiled.subn(replacement, sample)
-            previews.append(RegexMatchPreview(
-                sample=sample,
-                original=sample,
-                replacement=new_text,
-                changed=count > 0,
-            ))
+            previews.append(
+                RegexMatchPreview(
+                    sample=sample,
+                    original=sample,
+                    replacement=new_text,
+                    changed=count > 0,
+                )
+            )
         except Exception:
-            previews.append(RegexMatchPreview(
-                sample=sample,
-                original=sample,
-                replacement=sample,
-                changed=False,
-            ))
+            previews.append(
+                RegexMatchPreview(
+                    sample=sample,
+                    original=sample,
+                    replacement=sample,
+                    changed=False,
+                )
+            )
 
     return {
         "valid_pattern": True,
@@ -1072,7 +1095,7 @@ def _value_preview(value: Any, max_len: int = 30) -> str | None:
         return "true" if value else "false"
     elif isinstance(value, (int, float)):
         s = str(value)
-        return s if len(s) <= max_len else s[:max_len - 3] + "..."
+        return s if len(s) <= max_len else s[: max_len - 3] + "..."
     elif isinstance(value, str):
         if len(value) <= max_len:
             return f'"{value}"'
@@ -1146,13 +1169,9 @@ def json_compare(
         ValueError: If either input string exceeds MAX_INPUT_LENGTH.
     """
     if len(a) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Input 'a' length {len(a)} exceeds maximum {MAX_INPUT_LENGTH}"
-        )
+        raise ValueError(f"Input 'a' length {len(a)} exceeds maximum {MAX_INPUT_LENGTH}")
     if len(b) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Input 'b' length {len(b)} exceeds maximum {MAX_INPUT_LENGTH}"
-        )
+        raise ValueError(f"Input 'b' length {len(b)} exceeds maximum {MAX_INPUT_LENGTH}")
     diffs: list[JsonCompareDiff] = []
     valid_json_a = True
     valid_json_b = True
@@ -1165,27 +1184,31 @@ def json_compare(
         parsed_a = json.loads(a)
     except json.JSONDecodeError as e:
         valid_json_a = False
-        diffs.append(JsonCompareDiff(
-            path="",
-            kind="parse_error_a",
-            a_type=None,
-            b_type=None,
-            a_preview=f"Line {e.lineno}, Col {e.colno}: {e.msg}",
-            b_preview=None,
-        ))
+        diffs.append(
+            JsonCompareDiff(
+                path="",
+                kind="parse_error_a",
+                a_type=None,
+                b_type=None,
+                a_preview=f"Line {e.lineno}, Col {e.colno}: {e.msg}",
+                b_preview=None,
+            )
+        )
 
     try:
         parsed_b = json.loads(b)
     except json.JSONDecodeError as e:
         valid_json_b = False
-        diffs.append(JsonCompareDiff(
-            path="",
-            kind="parse_error_b",
-            a_type=None,
-            b_type=None,
-            a_preview=None,
-            b_preview=f"Line {e.lineno}, Col {e.colno}: {e.msg}",
-        ))
+        diffs.append(
+            JsonCompareDiff(
+                path="",
+                kind="parse_error_b",
+                a_type=None,
+                b_type=None,
+                a_preview=None,
+                b_preview=f"Line {e.lineno}, Col {e.colno}: {e.msg}",
+            )
+        )
 
     if not valid_json_a or not valid_json_b:
         return JsonCompareResult(
@@ -1230,22 +1253,25 @@ def json_compare(
         b_type = _get_json_type(b_val)
 
         if numeric_string_equivalence and a_type != b_type:
-            if (a_type == "string" and b_type in ("integer", "float")) or \
-               (b_type == "string" and a_type in ("integer", "float")):
+            if (a_type == "string" and b_type in ("integer", "float")) or (
+                b_type == "string" and a_type in ("integer", "float")
+            ):
                 try:
                     num_a = float(a_val)
                     num_b = float(b_val)
                     if num_a == num_b:
                         return
                     type_match = False
-                    diffs.append(JsonCompareDiff(
-                        path=path,
-                        kind="value_changed",
-                        a_type=a_type,
-                        b_type=b_type,
-                        a_preview=_value_preview(a_val),
-                        b_preview=_value_preview(b_val),
-                    ))
+                    diffs.append(
+                        JsonCompareDiff(
+                            path=path,
+                            kind="value_changed",
+                            a_type=a_type,
+                            b_type=b_type,
+                            a_preview=_value_preview(a_val),
+                            b_preview=_value_preview(b_val),
+                        )
+                    )
                     return
                 except (ValueError, TypeError):
                     pass
@@ -1256,25 +1282,29 @@ def json_compare(
                 b_is_null = b_val is None
                 if not (a_is_null or b_is_null):
                     type_match = False
-                    diffs.append(JsonCompareDiff(
+                    diffs.append(
+                        JsonCompareDiff(
+                            path=path,
+                            kind="type_changed",
+                            a_type=a_type,
+                            b_type=b_type,
+                            a_preview=_value_preview(a_val),
+                            b_preview=_value_preview(b_val),
+                        )
+                    )
+                    return
+            else:
+                type_match = False
+                diffs.append(
+                    JsonCompareDiff(
                         path=path,
                         kind="type_changed",
                         a_type=a_type,
                         b_type=b_type,
                         a_preview=_value_preview(a_val),
                         b_preview=_value_preview(b_val),
-                    ))
-                    return
-            else:
-                type_match = False
-                diffs.append(JsonCompareDiff(
-                    path=path,
-                    kind="type_changed",
-                    a_type=a_type,
-                    b_type=b_type,
-                    a_preview=_value_preview(a_val),
-                    b_preview=_value_preview(b_val),
-                ))
+                    )
+                )
                 return
 
         if numeric_string_equivalence and a_type == "string" and b_type == "string":
@@ -1308,26 +1338,30 @@ def json_compare(
                     b_key = b_key_order[i]
                     if _normalize_key(a_key) != _normalize_key(b_key):
                         type_match = False
-                        diffs.append(JsonCompareDiff(
-                            path=f"{path}/{a_key}" if path else f"/{a_key}",
-                            kind="key_missing_in_b",
-                            a_type=_get_json_type(a_val[a_key]),
-                            b_type=None,
-                            a_preview=_value_preview(a_val[a_key]),
-                            b_preview=None,
-                        ))
+                        diffs.append(
+                            JsonCompareDiff(
+                                path=f"{path}/{a_key}" if path else f"/{a_key}",
+                                kind="key_missing_in_b",
+                                a_type=_get_json_type(a_val[a_key]),
+                                b_type=None,
+                                a_preview=_value_preview(a_val[a_key]),
+                                b_preview=None,
+                            )
+                        )
                         break
                 if len_a != len_b:
                     type_match = False
                     longer = a_key_order if len_a > len_b else b_key_order
-                    diffs.append(JsonCompareDiff(
-                        path=path,
-                        kind="array_length_changed",
-                        a_type="object",
-                        b_type="object",
-                        a_preview=f"{len_a} keys",
-                        b_preview=f"{len_b} keys",
-                    ))
+                    diffs.append(
+                        JsonCompareDiff(
+                            path=path,
+                            kind="array_length_changed",
+                            a_type="object",
+                            b_type="object",
+                            a_preview=f"{len_a} keys",
+                            b_preview=f"{len_b} keys",
+                        )
+                    )
                 return
 
             for key in sorted(a_keys - b_keys):
@@ -1335,48 +1369,56 @@ def json_compare(
                 if treat_missing_null_as_equal:
                     if a_val[orig_key] is not None:
                         type_match = False
-                        diffs.append(JsonCompareDiff(
+                        diffs.append(
+                            JsonCompareDiff(
+                                path=f"{path}/{orig_key}" if path else f"/{orig_key}",
+                                kind="key_missing_in_b",
+                                a_type=_get_json_type(a_val[orig_key]),
+                                b_type=None,
+                                a_preview=_value_preview(a_val[orig_key]),
+                                b_preview=None,
+                            )
+                        )
+                else:
+                    type_match = False
+                    diffs.append(
+                        JsonCompareDiff(
                             path=f"{path}/{orig_key}" if path else f"/{orig_key}",
                             kind="key_missing_in_b",
                             a_type=_get_json_type(a_val[orig_key]),
                             b_type=None,
                             a_preview=_value_preview(a_val[orig_key]),
                             b_preview=None,
-                        ))
-                else:
-                    type_match = False
-                    diffs.append(JsonCompareDiff(
-                        path=f"{path}/{orig_key}" if path else f"/{orig_key}",
-                        kind="key_missing_in_b",
-                        a_type=_get_json_type(a_val[orig_key]),
-                        b_type=None,
-                        a_preview=_value_preview(a_val[orig_key]),
-                        b_preview=None,
-                    ))
+                        )
+                    )
 
             for key in sorted(b_keys - a_keys):
                 orig_key = keys_b[key]
                 if treat_missing_null_as_equal:
                     if b_val[orig_key] is not None:
                         type_match = False
-                        diffs.append(JsonCompareDiff(
+                        diffs.append(
+                            JsonCompareDiff(
+                                path=f"{path}/{orig_key}" if path else f"/{orig_key}",
+                                kind="key_missing_in_a",
+                                a_type=None,
+                                b_type=_get_json_type(b_val[orig_key]),
+                                a_preview=None,
+                                b_preview=_value_preview(b_val[orig_key]),
+                            )
+                        )
+                else:
+                    type_match = False
+                    diffs.append(
+                        JsonCompareDiff(
                             path=f"{path}/{orig_key}" if path else f"/{orig_key}",
                             kind="key_missing_in_a",
                             a_type=None,
                             b_type=_get_json_type(b_val[orig_key]),
                             a_preview=None,
                             b_preview=_value_preview(b_val[orig_key]),
-                        ))
-                else:
-                    type_match = False
-                    diffs.append(JsonCompareDiff(
-                        path=f"{path}/{orig_key}" if path else f"/{orig_key}",
-                        kind="key_missing_in_a",
-                        a_type=None,
-                        b_type=_get_json_type(b_val[orig_key]),
-                        a_preview=None,
-                        b_preview=_value_preview(b_val[orig_key]),
-                    ))
+                        )
+                    )
 
             common_keys = a_keys & b_keys
             for key in sorted(common_keys):
@@ -1390,14 +1432,16 @@ def json_compare(
         elif a_type == "array":
             if len(a_val) != len(b_val):
                 type_match = False
-                diffs.append(JsonCompareDiff(
-                    path=path,
-                    kind="array_length_changed",
-                    a_type=a_type,
-                    b_type=b_type,
-                    a_preview=f"{len(a_val)} items",
-                    b_preview=f"{len(b_val)} items",
-                ))
+                diffs.append(
+                    JsonCompareDiff(
+                        path=path,
+                        kind="array_length_changed",
+                        a_type=a_type,
+                        b_type=b_type,
+                        a_preview=f"{len(a_val)} items",
+                        b_preview=f"{len(b_val)} items",
+                    )
+                )
                 return
 
             if ignore_array_order and _is_serializable(a_val) and _is_serializable(b_val):
@@ -1414,14 +1458,16 @@ def json_compare(
         else:
             if a_val != b_val:
                 type_match = False
-                diffs.append(JsonCompareDiff(
-                    path=path,
-                    kind="value_changed",
-                    a_type=a_type,
-                    b_type=b_type,
-                    a_preview=_value_preview(a_val),
-                    b_preview=_value_preview(b_val),
-                ))
+                diffs.append(
+                    JsonCompareDiff(
+                        path=path,
+                        kind="value_changed",
+                        a_type=a_type,
+                        b_type=b_type,
+                        a_preview=_value_preview(a_val),
+                        b_preview=_value_preview(b_val),
+                    )
+                )
 
     _compare_values("", parsed_a, parsed_b)
     truncated = len(diffs) >= max_diffs
@@ -1447,6 +1493,7 @@ def json_compare(
 
 class JsonExtractResult(TypedDict):
     """Result of JSON extraction using RFC 6901 JSON Pointer."""
+
     valid_json: bool
     found: bool
     pointer: str
@@ -1467,6 +1514,7 @@ class JsonExtractResult(TypedDict):
 
 class SchemaViolation(TypedDict):
     """A single schema validation violation."""
+
     path: str
     message: str
     value_type: str | None
@@ -1475,6 +1523,7 @@ class SchemaViolation(TypedDict):
 
 class ValidateSchemaLightResult(TypedDict):
     """Result of light schema validation."""
+
     valid: bool
     violations: list[SchemaViolation]
     truncated: bool
@@ -1558,7 +1607,7 @@ def json_extract(text: str, pointer: str = "", max_output_chars: int = 4000) -> 
 
     for i, token in enumerate(tokens):
         decoded = _decode_pointer_token(token)
-        path_so_far = "/" + "/".join(_encode_pointer_token(t) for t in tokens[:i+1])
+        path_so_far = "/" + "/".join(_encode_pointer_token(t) for t in tokens[: i + 1])
 
         if isinstance(current, dict):
             if decoded in current:
@@ -1776,6 +1825,7 @@ MAX_SCHEMA_VIOLATIONS = 100
 
 class JsonShapeKey(TypedDict):
     """A single key in json_shape result."""
+
     type: str
     keys: dict[str, JsonShapeKey] | None
     key_count: int | None
@@ -1785,13 +1835,16 @@ class JsonShapeKey(TypedDict):
 
 class JsonShapeResult(TypedDict):
     """Result of JSON shape analysis."""
+
     valid: bool
     shape: JsonShapeKey | None
     truncated: bool
     summary: str
 
 
-def json_shape(text: str, max_depth: int = 4, max_keys: int = 100, max_array_items: int = 5) -> JsonShapeResult:
+def json_shape(
+    text: str, max_depth: int = 4, max_keys: int = 100, max_array_items: int = 5
+) -> JsonShapeResult:
     """Analyze the structure of a JSON document without returning values.
 
     Args:
@@ -1931,6 +1984,7 @@ MAX_GROUPS = 100
 
 class RegexFindIterMatch(TypedDict, total=False):
     """A single regex match found by regex_finditer."""
+
     match: str
     span: list[int]
     line: int
@@ -1941,6 +1995,7 @@ class RegexFindIterMatch(TypedDict, total=False):
 
 class RegexFindIterResult(TypedDict):
     """Result of regex_finditer."""
+
     valid_pattern: bool
     matches: list[RegexFindIterMatch]
     truncated: bool
@@ -1990,7 +2045,9 @@ def regex_finditer(
         ValueError: If text exceeds MAX_TEXT_LENGTH_REGEX.
     """
     if len(text) > MAX_TEXT_LENGTH_REGEX:
-        raise ValueError(f"Text length {len(text)} exceeds MAX_TEXT_LENGTH_REGEX {MAX_TEXT_LENGTH_REGEX}")
+        raise ValueError(
+            f"Text length {len(text)} exceeds MAX_TEXT_LENGTH_REGEX {MAX_TEXT_LENGTH_REGEX}"
+        )
 
     if len(pattern) > MAX_PATTERN_LENGTH_REGEX:
         return RegexFindIterResult(
@@ -2077,6 +2134,7 @@ def regex_finditer(
 
 class RegexSafetyFinding(TypedDict):
     """A single safety finding for a regex pattern."""
+
     kind: str
     span: list[int]
     message: str
@@ -2084,6 +2142,7 @@ class RegexSafetyFinding(TypedDict):
 
 class RegexSafetyResult(TypedDict):
     """Result of regex safety check."""
+
     valid_pattern: bool
     risk: str
     findings: list[RegexSafetyFinding]
@@ -2113,11 +2172,13 @@ def regex_safety_check(pattern: str) -> RegexSafetyResult:
 
     is_safe, error_msg = _check_pattern_complexity(pattern)
     if not is_safe:
-        findings.append(RegexSafetyFinding(
-            kind="complexity",
-            span=[0, len(pattern)],
-            message=error_msg or "Pattern is too complex",
-        ))
+        findings.append(
+            RegexSafetyFinding(
+                kind="complexity",
+                span=[0, len(pattern)],
+                message=error_msg or "Pattern is too complex",
+            )
+        )
         return RegexSafetyResult(
             valid_pattern=True,
             risk="high",
@@ -2169,19 +2230,23 @@ def regex_safety_check(pattern: str) -> RegexSafetyResult:
 
             if paren_depth > 0:
                 if has_inner_quantifier:
-                    findings.append(RegexSafetyFinding(
-                        kind="nested_quantifier",
-                        span=[i, j],
-                        message="Nested quantifiers may cause catastrophic backtracking",
-                    ))
+                    findings.append(
+                        RegexSafetyFinding(
+                            kind="nested_quantifier",
+                            span=[i, j],
+                            message="Nested quantifiers may cause catastrophic backtracking",
+                        )
+                    )
                 has_inner_quantifier = True
             elif paren_depth == 0 and last_paren_end > 0:
                 if has_inner_quantifier:
-                    findings.append(RegexSafetyFinding(
-                        kind="nested_quantifier",
-                        span=[i, j],
-                        message="Quantifier after group with quantifier may cause catastrophic backtracking",
-                    ))
+                    findings.append(
+                        RegexSafetyFinding(
+                            kind="nested_quantifier",
+                            span=[i, j],
+                            message="Quantifier after group with quantifier may cause catastrophic backtracking",
+                        )
+                    )
 
             i = j
             continue
@@ -2195,11 +2260,13 @@ def regex_safety_check(pattern: str) -> RegexSafetyResult:
 
             if paren_depth > 0:
                 if has_inner_quantifier:
-                    findings.append(RegexSafetyFinding(
-                        kind="nested_quantifier",
-                        span=[i, j],
-                        message="Nested quantifiers may cause catastrophic backtracking",
-                    ))
+                    findings.append(
+                        RegexSafetyFinding(
+                            kind="nested_quantifier",
+                            span=[i, j],
+                            message="Nested quantifiers may cause catastrophic backtracking",
+                        )
+                    )
                 has_inner_quantifier = True
 
             i = j
@@ -2209,20 +2276,24 @@ def regex_safety_check(pattern: str) -> RegexSafetyResult:
 
     backref_pattern = re.compile(r'\\([1-9])|\\g<')
     if backref_pattern.search(pattern):
-        findings.append(RegexSafetyFinding(
-            kind="backreference",
-            span=[0, len(pattern)],
-            message="Backreferences can cause exponential matching in some cases",
-        ))
+        findings.append(
+            RegexSafetyFinding(
+                kind="backreference",
+                span=[0, len(pattern)],
+                message="Backreferences can cause exponential matching in some cases",
+            )
+        )
 
     ambiguous_dot = re.compile(r'\.\*')
     for match in ambiguous_dot.finditer(pattern):
         span = list(match.span())
-        findings.append(RegexSafetyFinding(
-            kind="ambiguous_dot_star",
-            span=span,
-            message="Ambiguous dot-star pattern",
-        ))
+        findings.append(
+            RegexSafetyFinding(
+                kind="ambiguous_dot_star",
+                span=span,
+                message="Ambiguous dot-star pattern",
+            )
+        )
 
     if findings:
         high_risk = any(f["kind"] in ("nested_quantifier",) for f in findings)
@@ -2284,15 +2355,18 @@ def validate_schema_light(data: Any, schema: dict) -> ValidateSchemaLightResult:
     violations: list[SchemaViolation] = []
     _walk_count = 0
 
-    def _add_violation(path: str, message: str, value_type: str | None = None,
-                       expected_type: str | None = None) -> None:
+    def _add_violation(
+        path: str, message: str, value_type: str | None = None, expected_type: str | None = None
+    ) -> None:
         if len(violations) < MAX_SCHEMA_VIOLATIONS:
-            violations.append(SchemaViolation(
-                path=path,
-                message=message,
-                value_type=value_type,
-                expected_type=expected_type,
-            ))
+            violations.append(
+                SchemaViolation(
+                    path=path,
+                    message=message,
+                    value_type=value_type,
+                    expected_type=expected_type,
+                )
+            )
 
     def _validate(path: str, value: Any, schema_def: dict, depth: int = 0) -> None:
         nonlocal _walk_count
@@ -2324,7 +2398,9 @@ def validate_schema_light(data: Any, schema: dict) -> ValidateSchemaLightResult:
                 "null": "null",
             }
             allowed_types = type_map.get(expected_type, (expected_type,))
-            if actual_type not in allowed_types and not (expected_type == "number" and actual_type == "integer"):
+            if actual_type not in allowed_types and not (
+                expected_type == "number" and actual_type == "integer"
+            ):
                 _add_violation(
                     path,
                     f"expected {expected_type}, got {actual_type}",
@@ -2442,7 +2518,9 @@ def validate_schema_light(data: Any, schema: dict) -> ValidateSchemaLightResult:
 
     if not violations:
         if truncated:
-            summary = f"Validation truncated after {_walk_count} elements (limit {MAX_SCHEMA_ELEMENTS})"
+            summary = (
+                f"Validation truncated after {_walk_count} elements (limit {MAX_SCHEMA_ELEMENTS})"
+            )
         else:
             summary = "Data is valid"
     elif truncated:
@@ -2460,6 +2538,7 @@ def validate_schema_light(data: Any, schema: dict) -> ValidateSchemaLightResult:
 
 class JsonCanonicalizeResult(TypedDict):
     """Result of JSON canonicalization."""
+
     valid: bool
     canonical: str | None
     minified: str | None
@@ -2474,6 +2553,7 @@ class JsonCanonicalizeResult(TypedDict):
 
 class JsonQueryResult(TypedDict):
     """Result of JSON query using RFC 6901 JSON Pointer."""
+
     found: bool
     pointer: str
     value: Any | None
@@ -2514,6 +2594,7 @@ def json_canonicalize(
     parsed: Any = None
 
     if detect_duplicate_keys:
+
         class DuplicateKeyChecker:
             def __init__(self) -> None:
                 self.keys: list[str] = []
@@ -2578,14 +2659,24 @@ def json_canonicalize(
     else:
         canonical_data = parsed
 
-    canonical = json.dumps(canonical_data, ensure_ascii=ensure_ascii, indent=indent, sort_keys=False)
+    canonical = json.dumps(
+        canonical_data, ensure_ascii=ensure_ascii, indent=indent, sort_keys=False
+    )
     if trailing_newline:
         canonical += "\n"
 
     if indent is None:
-        minified = json.dumps(canonical_data, ensure_ascii=ensure_ascii, indent=None, separators=(",", ":"), sort_keys=False)
+        minified = json.dumps(
+            canonical_data,
+            ensure_ascii=ensure_ascii,
+            indent=None,
+            separators=(",", ":"),
+            sort_keys=False,
+        )
     else:
-        minified = json.dumps(canonical_data, ensure_ascii=ensure_ascii, indent=indent, sort_keys=False)
+        minified = json.dumps(
+            canonical_data, ensure_ascii=ensure_ascii, indent=indent, sort_keys=False
+        )
 
     sha256_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -2655,7 +2746,7 @@ def json_query(text: str, pointer: str = "") -> JsonQueryResult:
 
     for i, token in enumerate(tokens):
         decoded = _decode_pointer_token(token)
-        path_so_far = "/" + "/".join(_encode_pointer_token(t) for t in tokens[:i+1])
+        path_so_far = "/" + "/".join(_encode_pointer_token(t) for t in tokens[: i + 1])
 
         if isinstance(current, dict):
             if decoded in current:

@@ -43,6 +43,7 @@ class TestEvaluator:
         assert abs(evaluate("pi") - 3.141592653589793) < 1e-10
         assert abs(evaluate("e") - 2.718281828459045) < 1e-10
 
+
 class TestUnitConversions:
     """Tests for unit conversions using the run function."""
 
@@ -153,12 +154,14 @@ class TestNormalize:
     def test_empty_input_returns_error(self):
         """Empty string input should return error exit code."""
         from eggcalc.normalize import normalize_expression
+
         _, exit_code = normalize_expression("", NORMALIZE, PATTERNS)
         assert exit_code != 0
 
     def test_whitespace_input_returns_error(self):
         """Whitespace-only input should return error exit code."""
         from eggcalc.normalize import normalize_expression
+
         _, exit_code = normalize_expression("   ", NORMALIZE, PATTERNS)
         assert exit_code != 0
 
@@ -169,6 +172,7 @@ class TestCLI:
     def test_help_flag(self):
         """Test that help flag works."""
         from eggcalc.normalize import print_help
+
         # Just verify it doesn't error
         print_help()
 
@@ -178,6 +182,7 @@ class TestCLI:
         import sys
 
         from eggcalc.normalize import print_help
+
         buf = io.StringIO()
         old_stdout = sys.stdout
         sys.stdout = buf
@@ -198,16 +203,19 @@ class TestCLI:
             elif constants_section and line.strip() and not line.startswith("  "):
                 constants_section = False
             elif constants_section:
-                assert "inf" not in line.lower().split(",")[0:2], \
-                    f"inf should not be listed as a constant: {line}"
-                assert "nan" not in line.lower().split(",")[0:2], \
-                    f"nan should not be listed as a constant: {line}"
+                assert (
+                    "inf" not in line.lower().split(",")[0:2]
+                ), f"inf should not be listed as a constant: {line}"
+                assert (
+                    "nan" not in line.lower().split(",")[0:2]
+                ), f"nan should not be listed as a constant: {line}"
 
     def test_empty_expression(self):
         """Test empty expression shows help."""
         import sys
 
         from eggcalc.normalize import main
+
         old_argv = sys.argv
         try:
             sys.argv = ["eggcalc"]
@@ -306,6 +314,7 @@ class TestEggCalcApp:
     def test_basic_calculate(self):
         """Test basic calculation."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp()
         result = app.calculate("5 + 3")
         assert self._get_value(result) == 8
@@ -313,6 +322,7 @@ class TestEggCalcApp:
     def test_natural_language(self):
         """Test natural language input."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp()
         result = app.calculate("five plus three")
         assert self._get_value(result) == 8
@@ -320,6 +330,7 @@ class TestEggCalcApp:
     def test_caching(self):
         """Test that caching works."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp(cache_size=10)
 
         # First call
@@ -334,6 +345,7 @@ class TestEggCalcApp:
     def test_cache_clear(self):
         """Test cache clearing."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp()
         app.calculate("5 + 3")
         assert app.cache_size == 1
@@ -343,6 +355,7 @@ class TestEggCalcApp:
     def test_cache_disabled(self):
         """Test with caching disabled."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp(enable_cache=False)
         app.calculate("5 + 3")
         assert app.cache_size == 0
@@ -350,6 +363,7 @@ class TestEggCalcApp:
     def test_register_constant(self):
         """Test registering custom constant."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp()
         app.register_constant("myconst", 42)
         result = app.calculate("myconst")
@@ -358,6 +372,7 @@ class TestEggCalcApp:
     def test_register_function(self):
         """Test registering custom function."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp()
         app.register_function("double", lambda x: x * 2)
         result = app.calculate("double(5)")
@@ -366,6 +381,7 @@ class TestEggCalcApp:
     def test_instance_isolation_constants(self):
         """Test that instances have isolated constants."""
         from eggcalc import EggCalcApp
+
         app1 = EggCalcApp()
         app2 = EggCalcApp()
 
@@ -381,6 +397,7 @@ class TestEggCalcApp:
     def test_instance_isolation_functions(self):
         """Test that instances have isolated functions."""
         from eggcalc import EggCalcApp
+
         app1 = EggCalcApp()
         app2 = EggCalcApp()
 
@@ -396,6 +413,7 @@ class TestEggCalcApp:
     def test_unit_calculations(self):
         """Test unit calculations in EggCalcApp."""
         from eggcalc import EggCalcApp
+
         app = EggCalcApp()
         result = app.calculate("30m + 100ft")
         assert hasattr(result, 'unit')
@@ -652,13 +670,16 @@ class TestPrimes:
 
         assert evaluate_raw("nextprime(17)") == 19
 
-    @pytest.mark.parametrize("expr", [
-        "isprime(5.5)",
-        "nextprime(5.5)",
-        "prevprime(5.5)",
-        "primefactors(12.5)",
-        "isprime(5*m)",
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "isprime(5.5)",
+            "nextprime(5.5)",
+            "prevprime(5.5)",
+            "primefactors(12.5)",
+            "isprime(5*m)",
+        ],
+    )
     def test_prime_functions_reject_non_integer_or_unit_inputs(self, expr):
         with pytest.raises(EvaluationError):
             evaluate(expr)
@@ -724,12 +745,15 @@ class TestRandom:
         result = evaluate_raw("randint(1, 100)")
         assert 1 <= result <= 100
 
-    @pytest.mark.parametrize("expr", [
-        "randint(1.5, 10)",
-        "randrange(10.5)",
-        "randrange(1, 10.5)",
-        "randint(1*m, 10)",
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "randint(1.5, 10)",
+            "randrange(10.5)",
+            "randrange(1, 10.5)",
+            "randint(1*m, 10)",
+        ],
+    )
     def test_random_integer_functions_reject_non_integer_or_unit_inputs(self, expr):
         with pytest.raises(EvaluationError):
             evaluate(expr)
@@ -777,36 +801,42 @@ class TestPrefixedUnitConversions:
     def test_kilonewton_to_newton(self):
         """Test kN to N conversion factor is 1000.0."""
         from eggcalc import get_conversion_factor
+
         result = get_conversion_factor("kN", "N")
         assert result == 1000.0
 
     def test_millivolt_to_volt(self):
         """Test mV to V conversion factor is 0.001."""
         from eggcalc import get_conversion_factor
+
         result = get_conversion_factor("mV", "V")
         assert abs(result - 0.001) < 1e-10
 
     def test_milliamp_to_amp(self):
         """Test mA to A conversion factor is 0.001."""
         from eggcalc import get_conversion_factor
+
         result = get_conversion_factor("mA", "A")
         assert abs(result - 0.001) < 1e-10
 
     def test_kilowatt_to_watt(self):
         """Test kW to W conversion factor is 1000.0."""
         from eggcalc import get_conversion_factor
+
         result = get_conversion_factor("kW", "W")
         assert result == 1000.0
 
     def test_megabyte_to_byte(self):
         """Test MB to B conversion factor is 1048576.0."""
         from eggcalc import get_conversion_factor
+
         result = get_conversion_factor("MB", "B")
         assert result == 1048576.0
 
     def test_kilometer_to_meter(self):
         """Test km to m conversion factor is 1000.0."""
         from eggcalc import get_conversion_factor
+
         result = get_conversion_factor("km", "m")
         assert result == 1000.0
 
@@ -817,24 +847,28 @@ class TestTemperatureConversions:
     def test_fahrenheit_to_celsius_exact_freezing(self):
         """Test 32F to C equals exactly 0.0C."""
         from eggcalc.units import convert_temperature
+
         result = convert_temperature(32.0, "F", "C")
         assert abs(result - 0.0) < 1e-9
 
     def test_fahrenheit_to_celsius_boiling(self):
         """Test 212F to C equals approximately 100.0C."""
         from eggcalc.units import convert_temperature
+
         result = convert_temperature(212.0, "F", "C")
         assert abs(result - 100.0) < 1e-9
 
     def test_celsius_to_fahrenheit_freezing(self):
         """Test 0C to F equals exactly 32F."""
         from eggcalc.units import convert_temperature
+
         result = convert_temperature(0.0, "C", "F")
         assert abs(result - 32.0) < 1e-9
 
     def test_celsius_to_fahrenheit_boiling(self):
         """Test 100C to F equals approximately 212F."""
         from eggcalc.units import convert_temperature
+
         result = convert_temperature(100.0, "C", "F")
         assert abs(result - 212.0) < 1e-9
 
@@ -871,6 +905,7 @@ class TestTemperatureConversions:
     def test_kelvin_to_rankine(self):
         """273.15 K = 491.67 Ra"""
         from eggcalc.units import convert_temperature
+
         result = convert_temperature(273.15, "K", "Ra")
         assert abs(result - 491.67) < 1e-6
 
@@ -893,6 +928,7 @@ class TestUnicodeScriptOther:
     def test_digits_return_other(self):
         """Test that ASCII digits return 'Other'."""
         from eggcalc.exact import unicode_script
+
         assert unicode_script("0") == "Other"
         assert unicode_script("1") == "Other"
         assert unicode_script("5") == "Other"
@@ -901,6 +937,7 @@ class TestUnicodeScriptOther:
     def test_punctuation_return_other(self):
         """Test that ASCII punctuation returns 'Other'."""
         from eggcalc.exact import unicode_script
+
         assert unicode_script(".") == "Other"
         assert unicode_script(",") == "Other"
         assert unicode_script("!") == "Other"
@@ -914,11 +951,13 @@ class TestUnicodeScriptOther:
     def test_space_returns_other(self):
         """Test that space returns 'Other'."""
         from eggcalc.exact import unicode_script
+
         assert unicode_script(" ") == "Other"
 
     def test_math_symbols_return_other(self):
         """Test that common math symbols return 'Other'."""
         from eggcalc.exact import unicode_script
+
         assert unicode_script("+") == "Other"
         assert unicode_script("=") == "Other"
         assert unicode_script("*") == "Other"
@@ -1270,6 +1309,7 @@ class TestUntestedMathFunctions:
         """Test arcsine function."""
         result = evaluate("asin(1)")
         import math
+
         val = result.value if isinstance(result, UnitValue) else result
         assert abs(val - math.pi / 2) < 1e-10
 
@@ -1283,6 +1323,7 @@ class TestUntestedMathFunctions:
         """Test arctangent function."""
         result = evaluate("atan(1)")
         import math
+
         val = result.value if isinstance(result, UnitValue) else result
         assert abs(val - math.pi / 4) < 1e-10
 
@@ -1493,7 +1534,7 @@ class TestVisitAttribute:
         """(3+4j).conjugate should be (3-4j)."""
         result = evaluate("(3+4j).conjugate")
         assert isinstance(result, complex)
-        assert result == (3-4j)
+        assert result == (3 - 4j)
 
 
 class TestComplexPower:
@@ -1503,13 +1544,13 @@ class TestComplexPower:
         """i**2 should be -1 (or close to it)."""
         result = evaluate("i**2")
         val = result.value if isinstance(result, UnitValue) else result
-        assert abs(val - (-1)) < 1e-10 or abs(val - (-1+0j)) < 1e-10
+        assert abs(val - (-1)) < 1e-10 or abs(val - (-1 + 0j)) < 1e-10
 
     def test_j_squared(self):
         """j**2 should be -1."""
         result = evaluate("j**2")
         val = result.value if isinstance(result, UnitValue) else result
-        assert abs(val - (-1)) < 1e-10 or abs(val - (-1+0j)) < 1e-10
+        assert abs(val - (-1)) < 1e-10 or abs(val - (-1 + 0j)) < 1e-10
 
     def test_complex_power(self):
         """(1+1j)**2 should be 2j."""
@@ -1541,6 +1582,7 @@ class TestNestingDepth:
     def test_deep_nesting_rejected(self):
         """Deeply nested expressions should raise EvaluationError."""
         from eggcalc.evaluator import MAX_NESTING_DEPTH
+
         expr = "1+" * (MAX_NESTING_DEPTH + 10) + "1"
         with pytest.raises(EvaluationError, match="deeply nested"):
             evaluate(expr)
@@ -1599,15 +1641,18 @@ class TestBitShiftSafety:
         result = evaluate("bitrshift(8, 2)")
         assert result == 2
 
-    @pytest.mark.parametrize("expr", [
-        "bitand(1.5, 3)",
-        "bitor(1.5, 2)",
-        "bitxor(1.5, 3)",
-        "bitnot(1.5)",
-        "bitlshift(1, 1.5)",
-        "bitrshift(8, 1.5)",
-        "bitand(1*m, 3)",
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "bitand(1.5, 3)",
+            "bitor(1.5, 2)",
+            "bitxor(1.5, 3)",
+            "bitnot(1.5)",
+            "bitlshift(1, 1.5)",
+            "bitrshift(8, 1.5)",
+            "bitand(1*m, 3)",
+        ],
+    )
     def test_bitwise_functions_reject_non_integer_or_unit_inputs(self, expr):
         with pytest.raises(EvaluationError):
             evaluate(expr)
@@ -1640,6 +1685,7 @@ class TestEvaluatorEdgeCases:
         """UnitValue with very large int doesn't crash _check_result_size."""
         from eggcalc.evaluator import _check_result_size
         from eggcalc.units import UnitValue
+
         try:
             _check_result_size(UnitValue(10**100001, "m"))
         except EvaluationError:
@@ -1651,6 +1697,7 @@ class TestEvaluatorEdgeCases:
         """-1K in C converts to -274.15C (calculator doesn't enforce physical constraints)."""
         import sys
         from io import StringIO
+
         captured = StringIO()
         old_stdout = sys.stdout
         sys.stdout = captured
@@ -1665,6 +1712,7 @@ class TestEvaluatorEdgeCases:
         """30m + 100gal should produce an error about incompatible units."""
         import sys
         from io import StringIO
+
         captured = StringIO()
         old_stderr = sys.stderr
         sys.stderr = captured
@@ -1713,6 +1761,7 @@ class TestEvaluatorEdgeCases:
     def test_pi_still_works(self):
         """'pi' should still resolve as a constant."""
         import math
+
         result = evaluate("pi")
         assert abs(result - math.pi) < 1e-10
 
@@ -1781,12 +1830,14 @@ class TestReviewerEdgeCases:
     def test_clamp_lo_greater_than_hi(self):
         """clamp(5, 10, 1) should raise ValueError when lo > hi."""
         from eggcalc.evaluator import _clamp
+
         with pytest.raises(ValueError, match="lower bound.*exceeds upper bound"):
             _clamp(5, 10, 1)
 
     def test_clamp_normal_cases(self):
         """clamp works correctly for normal cases."""
         from eggcalc.evaluator import _clamp
+
         assert _clamp(5, 1, 10) == 5
         assert _clamp(-5, 0, 10) == 0
         assert _clamp(15, 0, 10) == 10
@@ -1831,6 +1882,7 @@ class TestReviewerEdgeCases:
     def test_unitvalue_pow_integer(self):
         """UnitValue raised to integer power should work correctly."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(2, "m") ** 3
         assert result.value == 8
         assert result.unit == "m**3"
@@ -1838,12 +1890,14 @@ class TestReviewerEdgeCases:
     def test_unitvalue_pow_non_integer_rejected(self):
         """UnitValue raised to non-integer power should raise ValueError."""
         from eggcalc.units import UnitValue
+
         with pytest.raises(ValueError, match="non-integer power"):
             UnitValue(2, "m") ** 1.5
 
     def test_unitvalue_pow_float_integer(self):
         """UnitValue raised to float integer power should work."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(2, "m") ** 2.0
         assert result.value == 4
         assert result.unit == "m**2"
@@ -1851,6 +1905,7 @@ class TestReviewerEdgeCases:
     def test_atan2_function(self):
         """atan2 function should work correctly."""
         import math
+
         result = evaluate("atan2(1, 1)")
         assert abs(result - math.pi / 4) < 1e-10
 
@@ -1862,18 +1917,21 @@ class TestReviewerEdgeCases:
     def test_radians_function(self):
         """radians function should convert degrees to radians."""
         import math
+
         result = evaluate("radians(180)")
         assert abs(result - math.pi) < 1e-10
 
     def test_expm1_function(self):
         """expm1 function should compute exp(x) - 1."""
         import math
+
         result = evaluate("expm1(1)")
         assert abs(result - (math.e - 1)) < 1e-10
 
     def test_log1p_function(self):
         """log1p function should compute log(1+x)."""
         import math
+
         result = evaluate("log1p(1)")
         assert abs(result - math.log(2)) < 1e-10
 
@@ -1886,11 +1944,14 @@ class TestReviewerEdgeCases:
         with pytest.raises(EvaluationError):
             evaluate("mean()")
 
-    @pytest.mark.parametrize("expr", [
-        "bin(3*m)",
-        "hex(3*m)",
-        "oct(3*m)",
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "bin(3*m)",
+            "hex(3*m)",
+            "oct(3*m)",
+        ],
+    )
     def test_base_conversion_rejects_unit_inputs(self, expr):
         with pytest.raises(EvaluationError):
             evaluate(expr)
@@ -1920,6 +1981,7 @@ class TestGapCoverage:
     def test_safe_pow_negative_base_near_integer_float_exp(self):
         """(-4)**2.000000000001 should return 16, not complex."""
         from eggcalc.evaluator import _safe_pow
+
         result = _safe_pow(-4, 2.000000000001)
         assert result == 16
         assert isinstance(result, int)
@@ -1927,6 +1989,7 @@ class TestGapCoverage:
     def test_unitvalue_rsub_dimensionless(self):
         """10 - UnitValue(5, None) should work."""
         from eggcalc.units import UnitValue
+
         result = 10 - UnitValue(5, None)
         assert result.value == 5
         assert result.unit is None
@@ -1946,6 +2009,7 @@ class TestGapCoverage:
     def test_factorial_boundary(self):
         """factorial(MAX_FACTORIAL) works, factorial(MAX_FACTORIAL+1) fails."""
         from eggcalc.evaluator import MAX_FACTORIAL
+
         evaluate(f'factorial({MAX_FACTORIAL})')  # should not raise
         with pytest.raises(EvaluationError):
             evaluate(f'factorial({MAX_FACTORIAL + 1})')
@@ -1960,6 +2024,7 @@ class TestGapCoverage:
     def test_dimensionless_subtraction_unitvalue(self):
         """10 - UnitValue(5, None) should produce UnitValue(5, None)."""
         from eggcalc.units import UnitValue
+
         result = 10 - UnitValue(5, None)
         assert isinstance(result, UnitValue)
         assert result.value == 5
@@ -1972,6 +2037,7 @@ class TestDeferredD5D6UnitSimplification:
     def test_m_per_s_times_s_simplifies_to_m(self):
         """(1 m / 1 s) * 1 s should give 1 m, not 1 m/s*s."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(1.0, "m/s") * UnitValue(1.0, "s")
         assert result.unit == "m"
         assert result.value == 1.0
@@ -1979,6 +2045,7 @@ class TestDeferredD5D6UnitSimplification:
     def test_m_times_m_over_m_simplifies_to_m(self):
         """(1 m * 1 m) / 1 m should give 1 m, not 1 m*m/m."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(1.0, "m*m") / UnitValue(1.0, "m")
         assert result.unit == "m"
         assert result.value == 1.0
@@ -1986,12 +2053,14 @@ class TestDeferredD5D6UnitSimplification:
     def test_m_per_m_equals_dimensionless(self):
         """1 m / 1 m should give a dimensionless value, not '1/m' string."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(1.0, "m") / UnitValue(1.0, "m")
         assert result.unit is None
 
     def test_m_per_s_squared_times_s_squared_equals_m(self):
         """Acceleration * time_squared should give m, not m/s**2*s**2."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(9.8, "m/s**2") * UnitValue(4.0, "s**2")
         assert result.unit == "m"
         assert abs(result.value - 39.2) < 1e-10
@@ -1999,6 +2068,7 @@ class TestDeferredD5D6UnitSimplification:
     def test_simplify_unit_string_helper(self):
         """The _simplify_unit_string helper should normalize compound forms."""
         from eggcalc.units import _simplify_unit_string
+
         assert _simplify_unit_string("m/s*s") == "m"
         assert _simplify_unit_string("m*m/m") == "m"
         assert _simplify_unit_string("m**2*m") == "m**3"
@@ -2010,6 +2080,7 @@ class TestDeferredD5D6UnitSimplification:
     def test_floordiv_simplifies_compound_units(self):
         """Floor division of compound units should also be simplified."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(7.0, "m/s") // UnitValue(1.0, "s")
         assert result.unit == "m/s**2"
         assert result.value == 7.0
@@ -2017,6 +2088,7 @@ class TestDeferredD5D6UnitSimplification:
     def test_mod_simplifies_compound_units(self):
         """Modulo of compound units should also be simplified."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(7.0, "m/s") % UnitValue(2.0, "s")
         assert result.unit == "m/s**2"
         assert result.value == 1.0
@@ -2024,6 +2096,7 @@ class TestDeferredD5D6UnitSimplification:
     def test_truediv_reciprocal_of_compound(self):
         """1 / (m/s) should produce s/m, not 1/m/s."""
         from eggcalc.units import UnitValue
+
         result = UnitValue(1.0, None) / UnitValue(1.0, "m/s")
         assert result.unit == "s/m"
         assert result.value == 1.0
@@ -2031,6 +2104,7 @@ class TestDeferredD5D6UnitSimplification:
     def test_canonical_forms_unchanged(self):
         """Canonical forms pass through simplification unchanged."""
         from eggcalc.units import _simplify_unit_string
+
         for unit in ("m/s", "m/s**2", "m**2", "km/h", "mi/h", "B/s", "GB/s"):
             assert _simplify_unit_string(unit) == unit, f"{unit!r} changed unexpectedly"
 
@@ -2050,6 +2124,7 @@ class TestProductionReviewBugfixes2026_07:
     # --- MCP constant_lookup: math constants ---
     def test_mcp_constant_lookup_pi(self):
         from eggcalc.mcp.tools import constant_lookup
+
         r = constant_lookup("pi")
         assert r["ok"] is True
         assert abs(r["result"]["value"] - 3.141592653589793) < 1e-12
@@ -2057,18 +2132,21 @@ class TestProductionReviewBugfixes2026_07:
 
     def test_mcp_constant_lookup_e(self):
         from eggcalc.mcp.tools import constant_lookup
+
         r = constant_lookup("e")
         assert r["ok"] is True
         assert abs(r["result"]["value"] - 2.718281828459045) < 1e-12
 
     def test_mcp_constant_lookup_tau(self):
         from eggcalc.mcp.tools import constant_lookup
+
         r = constant_lookup("tau")
         assert r["ok"] is True
         assert abs(r["result"]["value"] - 6.283185307179586) < 1e-12
 
     def test_mcp_constant_lookup_c_still_works(self):
         from eggcalc.mcp.tools import constant_lookup
+
         r = constant_lookup("c")
         assert r["ok"] is True
         assert r["result"]["value"] == 299792458
@@ -2109,12 +2187,14 @@ class TestProductionReviewBugfixes2026_07:
     # --- Units: simplification / cross-form ---
     def test_simplify_returns_none_for_fully_cancelled(self):
         from eggcalc.units import _simplify_unit_string
+
         assert _simplify_unit_string("m**0") is None
         assert _simplify_unit_string("m/m") is None
         assert _simplify_unit_string("m**2*m**-2") is None
 
     def test_unitvalue_pow_zero_is_dimensionless(self):
         from eggcalc.units import UnitValue
+
         r = UnitValue(5.0, "m") ** 0
         assert r.value == 1.0
         assert r.unit is None
@@ -2130,12 +2210,14 @@ class TestProductionReviewBugfixes2026_07:
 
     def test_unit_convert_cross_form(self):
         from eggcalc.mcp.tools import unit_convert
+
         r = unit_convert(1, "m**2", "acre")
         assert r["ok"] is True
         assert abs(r["result"]["value"] - 0.0002471053814671653) < 1e-9
 
     def test_unit_convert_m2_to_acre_preserved(self):
         from eggcalc.mcp.tools import unit_convert
+
         r = unit_convert(4046.8564224, "m2", "acre")
         assert r["ok"] is True
         assert abs(r["result"]["value"] - 1.0) < 0.01
@@ -2209,30 +2291,35 @@ class TestProductionReviewBugfixes2026_07:
     # --- Normalize: arc / hyperbolic functions ---
     def test_arc_cosine(self):
         import math
+
         result, exit_code = run("arc cosine of 0.5", NORMALIZE, PATTERNS)
         assert exit_code == 0
         assert abs(self._get_value(result) - math.acos(0.5)) < 1e-9
 
     def test_arc_tangent(self):
         import math
+
         result, exit_code = run("arc tangent of 1", NORMALIZE, PATTERNS)
         assert exit_code == 0
         assert abs(self._get_value(result) - math.atan(1)) < 1e-9
 
     def test_arccosine_compact(self):
         import math
+
         result, exit_code = run("arccosine of 0.5", NORMALIZE, PATTERNS)
         assert exit_code == 0
         assert abs(self._get_value(result) - math.acos(0.5)) < 1e-9
 
     def test_arctangent_compact(self):
         import math
+
         result, exit_code = run("arctangent of 1", NORMALIZE, PATTERNS)
         assert exit_code == 0
         assert abs(self._get_value(result) - math.atan(1)) < 1e-9
 
     def test_hyperbolic_sine(self):
         import math
+
         result, exit_code = run("hyperbolic sine of 1", NORMALIZE, PATTERNS)
         assert exit_code == 0
         assert abs(self._get_value(result) - math.sinh(1)) < 1e-9

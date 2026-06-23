@@ -76,7 +76,9 @@ class TestTextReplaceCheckModes:
         assert result["match_count"] == 1
 
     def test_whitespace_collapse_mode(self):
-        result = text_replace_check("hello   world", "hello world", "hi earth", mode="whitespace_collapse")
+        result = text_replace_check(
+            "hello   world", "hello world", "hi earth", mode="whitespace_collapse"
+        )
         assert result["match_count"] == 1
 
 
@@ -138,7 +140,9 @@ class TestTextReplaceCheckPreview:
 
     def test_preview_truncation(self):
         long_text = "a" * 5000
-        result = text_replace_check(long_text, "aaa", "bbb", return_preview=True, max_preview_chars=100)
+        result = text_replace_check(
+            long_text, "aaa", "bbb", return_preview=True, max_preview_chars=100
+        )
         assert len(result["preview_before"]) == 100
 
 
@@ -159,5 +163,9 @@ class TestTextReplaceCheckEdgeCases:
         assert result["newline_style_after"] == "LF"
 
     def test_newline_normalize_lf(self):
-        result = text_replace_check("hello\r\nworld", "world", "earth", newline_policy="normalize_lf")
-        assert "\r\n" not in result.get("preview_after", "") or result["newline_style_after"] == "LF"
+        result = text_replace_check(
+            "hello\r\nworld", "world", "earth", newline_policy="normalize_lf"
+        )
+        assert (
+            "\r\n" not in result.get("preview_after", "") or result["newline_style_after"] == "LF"
+        )

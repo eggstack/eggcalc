@@ -18,6 +18,7 @@ from typing import TypedDict
 
 class MarkdownHeading(TypedDict):
     """A heading found in Markdown text."""
+
     level: int
     text: str
     line: int
@@ -26,6 +27,7 @@ class MarkdownHeading(TypedDict):
 
 class MarkdownCodeFence(TypedDict):
     """A code fence found in Markdown text."""
+
     language: str
     start_line: int
     end_line: int | None
@@ -34,6 +36,7 @@ class MarkdownCodeFence(TypedDict):
 
 class MarkdownLink(TypedDict):
     """A Markdown link found in text."""
+
     visible_text: str
     target: str
     line: int
@@ -42,6 +45,7 @@ class MarkdownLink(TypedDict):
 
 class MarkdownFrontmatter(TypedDict):
     """Frontmatter detection result."""
+
     present: bool
     format: str
     line_start: int | None
@@ -50,6 +54,7 @@ class MarkdownFrontmatter(TypedDict):
 
 class MarkdownStructureResult(TypedDict):
     """Result of markdown_structure analysis."""
+
     headings: list[MarkdownHeading]
     code_fences: list[MarkdownCodeFence]
     links: list[MarkdownLink]
@@ -61,6 +66,7 @@ class MarkdownStructureResult(TypedDict):
 
 class CodeFenceBlock(TypedDict):
     """A fenced code block from code_fence_extract."""
+
     index: int
     language: str
     start_line: int
@@ -72,6 +78,7 @@ class CodeFenceBlock(TypedDict):
 
 class CodeFenceExtractResult(TypedDict):
     """Result of code_fence_extract analysis."""
+
     blocks: list[CodeFenceBlock]
     unclosed_fences: list[dict]
     findings: list[str]
@@ -193,12 +200,14 @@ def markdown_structure(
                     fence_lang = lang
                 elif current_fence_char == fence_char and current_fence_len >= fence_len:
                     # Closing fence
-                    code_fences.append(MarkdownCodeFence(
-                        language=fence_lang,
-                        start_line=fence_start_line,
-                        end_line=line_num,
-                        closed=True,
-                    ))
+                    code_fences.append(
+                        MarkdownCodeFence(
+                            language=fence_lang,
+                            start_line=fence_start_line,
+                            end_line=line_num,
+                            closed=True,
+                        )
+                    )
                     in_fence = False
                 continue
 
@@ -208,12 +217,14 @@ def markdown_structure(
             if heading_match:
                 level = len(heading_match.group(1))
                 text_content = heading_match.group(2).strip()
-                headings.append(MarkdownHeading(
-                    level=level,
-                    text=text_content,
-                    line=line_num,
-                    slug=_make_slug(text_content),
-                ))
+                headings.append(
+                    MarkdownHeading(
+                        level=level,
+                        text=text_content,
+                        line=line_num,
+                        slug=_make_slug(text_content),
+                    )
+                )
 
         # Link detection (only outside code fences)
         if include_links and not in_fence:
@@ -231,23 +242,27 @@ def markdown_structure(
                     if visible != target:
                         mismatch_flags.append("visible_is_domain")
 
-                links.append(MarkdownLink(
-                    visible_text=visible,
-                    target=target,
-                    line=line_num,
-                    mismatch_flags=mismatch_flags,
-                ))
+                links.append(
+                    MarkdownLink(
+                        visible_text=visible,
+                        target=target,
+                        line=line_num,
+                        mismatch_flags=mismatch_flags,
+                    )
+                )
 
         # HTML comment detection
         if include_html_comments and not in_fence:
             for comment_match in _HTML_COMMENT_RE.finditer(line):
                 comment_text = comment_match.group(0)
-                html_comments.append({
-                    "text": comment_text,
-                    "line": line_num,
-                    "start_col": comment_match.start() + 1,
-                    "end_col": comment_match.end() + 1,
-                })
+                html_comments.append(
+                    {
+                        "text": comment_text,
+                        "line": line_num,
+                        "start_col": comment_match.start() + 1,
+                        "end_col": comment_match.end() + 1,
+                    }
+                )
 
         # Table detection (only outside code fences)
         if not tables_detected and not in_fence:
@@ -262,15 +277,15 @@ def markdown_structure(
 
     # Handle unclosed code fence
     if in_fence:
-        code_fences.append(MarkdownCodeFence(
-            language=fence_lang,
-            start_line=fence_start_line,
-            end_line=None,
-            closed=False,
-        ))
-        findings.append(
-            f"Unclosed code fence starting at line {fence_start_line}"
+        code_fences.append(
+            MarkdownCodeFence(
+                language=fence_lang,
+                start_line=fence_start_line,
+                end_line=None,
+                closed=False,
+            )
         )
+        findings.append(f"Unclosed code fence starting at line {fence_start_line}")
 
     # Handle unclosed frontmatter
     if in_frontmatter:
@@ -348,15 +363,17 @@ def code_fence_extract(
 
                 # Apply language filter
                 if language is None or fence_lang.lower() == language.lower():
-                    blocks.append(CodeFenceBlock(
-                        index=index,
-                        language=fence_lang,
-                        start_line=fence_start_line,
-                        end_line=line_num,
-                        closed=True,
-                        content=content_text if include_content else None,
-                        fingerprint=fp,
-                    ))
+                    blocks.append(
+                        CodeFenceBlock(
+                            index=index,
+                            language=fence_lang,
+                            start_line=fence_start_line,
+                            end_line=line_num,
+                            closed=True,
+                            content=content_text if include_content else None,
+                            fingerprint=fp,
+                        )
+                    )
                     index += 1
 
                 in_fence = False
@@ -370,31 +387,33 @@ def code_fence_extract(
         content_text = "\n".join(fence_content_lines)
         fp = _fingerprint(content_text)
 
-        unclosed_fences.append({
-            "index": index,
-            "language": fence_lang,
-            "start_line": fence_start_line,
-            "end_line": None,
-            "content_preview": content_text[:200],
-            "fingerprint": fp,
-        })
+        unclosed_fences.append(
+            {
+                "index": index,
+                "language": fence_lang,
+                "start_line": fence_start_line,
+                "end_line": None,
+                "content_preview": content_text[:200],
+                "fingerprint": fp,
+            }
+        )
 
         # Only add to blocks if language filter matches
         if language is None or fence_lang.lower() == language.lower():
-            blocks.append(CodeFenceBlock(
-                index=index,
-                language=fence_lang,
-                start_line=fence_start_line,
-                end_line=None,
-                closed=False,
-                content=content_text if include_content else None,
-                fingerprint=fp,
-            ))
+            blocks.append(
+                CodeFenceBlock(
+                    index=index,
+                    language=fence_lang,
+                    start_line=fence_start_line,
+                    end_line=None,
+                    closed=False,
+                    content=content_text if include_content else None,
+                    fingerprint=fp,
+                )
+            )
             index += 1
 
-        findings.append(
-            f"Unclosed code fence starting at line {fence_start_line}"
-        )
+        findings.append(f"Unclosed code fence starting at line {fence_start_line}")
 
     return CodeFenceExtractResult(
         blocks=blocks,

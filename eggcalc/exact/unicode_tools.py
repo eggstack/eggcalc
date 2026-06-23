@@ -20,6 +20,7 @@ from .confusables import CONFUSABLES
 
 class ScriptInfo(TypedDict):
     """Information about a script detection result."""
+
     index: int
     char: str
     script: str
@@ -28,6 +29,7 @@ class ScriptInfo(TypedDict):
 
 class ConfusableInfo(TypedDict):
     """Information about a confusable character."""
+
     # Position of the character in the input string
     index: int
     # The confusable character itself
@@ -44,6 +46,7 @@ class ConfusableInfo(TypedDict):
 
 class MixedScriptsResult(TypedDict):
     """Result of mixed script detection."""
+
     # True if multiple scripts present (excluding Common/Inherited/Other)
     mixed_scripts: bool
     # Distinct scripts found (excluding Common/Inherited/Other)
@@ -54,28 +57,28 @@ class MixedScriptsResult(TypedDict):
 
 # Unicode script ranges for heuristic detection
 _SCRIPT_RANGES: list[tuple[int, int, str]] = [
-    (0x0041, 0x005a, "Latin"),
-    (0x0061, 0x007a, "Latin"),
-    (0x00c0, 0x00ff, "Latin"),
-    (0x0100, 0x017f, "Latin"),
-    (0x0180, 0x024f, "Latin"),
-    (0x0400, 0x04ff, "Cyrillic"),
-    (0x0500, 0x052f, "Cyrillic"),
-    (0x0370, 0x03ff, "Greek"),
-    (0x1f00, 0x1fff, "Greek"),
-    (0x4e00, 0x9fff, "Han"),
-    (0x3000, 0x303f, "CJK"),
-    (0x3040, 0x309f, "Hiragana"),
-    (0x30a0, 0x30ff, "Katakana"),
-    (0x0600, 0x06ff, "Arabic"),
-    (0x0590, 0x05ff, "Hebrew"),
-    (0x0900, 0x097f, "Devanagari"),
-    (0x0e00, 0x0e7f, "Thai"),
-    (0xac00, 0xd7af, "Hangul"),
-    (0x10a0, 0x10ff, "Georgian"),
-    (0x0530, 0x058f, "Armenian"),
-    (0x13a0, 0x13ff, "Cherokee"),
-    (0x1400, 0x167f, "Canadian_Aboriginal"),
+    (0x0041, 0x005A, "Latin"),
+    (0x0061, 0x007A, "Latin"),
+    (0x00C0, 0x00FF, "Latin"),
+    (0x0100, 0x017F, "Latin"),
+    (0x0180, 0x024F, "Latin"),
+    (0x0400, 0x04FF, "Cyrillic"),
+    (0x0500, 0x052F, "Cyrillic"),
+    (0x0370, 0x03FF, "Greek"),
+    (0x1F00, 0x1FFF, "Greek"),
+    (0x4E00, 0x9FFF, "Han"),
+    (0x3000, 0x303F, "CJK"),
+    (0x3040, 0x309F, "Hiragana"),
+    (0x30A0, 0x30FF, "Katakana"),
+    (0x0600, 0x06FF, "Arabic"),
+    (0x0590, 0x05FF, "Hebrew"),
+    (0x0900, 0x097F, "Devanagari"),
+    (0x0E00, 0x0E7F, "Thai"),
+    (0xAC00, 0xD7AF, "Hangul"),
+    (0x10A0, 0x10FF, "Georgian"),
+    (0x0530, 0x058F, "Armenian"),
+    (0x13A0, 0x13FF, "Cherokee"),
+    (0x1400, 0x167F, "Canadian_Aboriginal"),
 ]
 
 
@@ -180,12 +183,14 @@ def detect_mixed_scripts(s: str) -> MixedScriptsResult:
         if script not in ("Common", "Inherited", "Other"):
             scripts.add(script)
             codepoint_str = f"U+{ord(char):04X}"
-            positions.append(ScriptInfo(
-                index=index,
-                char=char,
-                script=script,
-                codepoint=codepoint_str,
-            ))
+            positions.append(
+                ScriptInfo(
+                    index=index,
+                    char=char,
+                    script=script,
+                    codepoint=codepoint_str,
+                )
+            )
 
     return MixedScriptsResult(
         mixed_scripts=len(scripts) > 1,
@@ -228,14 +233,16 @@ def detect_confusables(s: str) -> list[ConfusableInfo]:
                     confusable_name += c
             confusable_name = confusable_name.strip()
 
-            result.append(ConfusableInfo(
-                index=index,
-                char=char,
-                codepoint=codepoint_str,
-                name=name,
-                confusable_with=confusable_with,
-                confusable_name=confusable_name,
-            ))
+            result.append(
+                ConfusableInfo(
+                    index=index,
+                    char=char,
+                    codepoint=codepoint_str,
+                    name=name,
+                    confusable_with=confusable_with,
+                    confusable_name=confusable_name,
+                )
+            )
 
     return result
 

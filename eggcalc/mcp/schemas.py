@@ -12,6 +12,7 @@ from typing import Any, TypedDict
 
 class FindingSpan(TypedDict, total=False):
     """Location span within a finding."""
+
     byte_start: int
     byte_end: int
     char_start: int
@@ -22,6 +23,7 @@ class FindingSpan(TypedDict, total=False):
 
 class Finding(TypedDict, total=False):
     """Structured finding emitted by MCP tools."""
+
     code: str
     severity: str  # "info" | "warn" | "error"
     message: str
@@ -31,6 +33,7 @@ class Finding(TypedDict, total=False):
 
 class ErrorEnvelope(TypedDict):
     """Standard error envelope for MCP tool responses."""
+
     ok: bool
     error_type: str
     error: str
@@ -60,8 +63,14 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "value": {"type": "string", "description": "Evaluation result as string"},
                 "type": {"type": "string", "description": "Python type name of the result"},
-                "unit": {"type": ["string", "null"], "description": "Unit name (only when result has units)"},
-                "display": {"type": ["string", "null"], "description": "Human-readable result with units (only when result has units)"},
+                "unit": {
+                    "type": ["string", "null"],
+                    "description": "Unit name (only when result has units)",
+                },
+                "display": {
+                    "type": ["string", "null"],
+                    "description": "Human-readable result with units (only when result has units)",
+                },
             },
         },
     },
@@ -72,8 +81,14 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "value": {"type": "number", "description": "Numeric value to convert (must be finite; NaN and infinity are rejected)"},
-                "from_unit": {"type": "string", "description": "Source unit (e.g., 'km', 'ft', 'kg')"},
+                "value": {
+                    "type": "number",
+                    "description": "Numeric value to convert (must be finite; NaN and infinity are rejected)",
+                },
+                "from_unit": {
+                    "type": "string",
+                    "description": "Source unit (e.g., 'km', 'ft', 'kg')",
+                },
                 "to_unit": {"type": "string", "description": "Target unit (e.g., 'm', 'in', 'lb')"},
             },
             "required": ["value", "from_unit", "to_unit"],
@@ -84,7 +99,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "value": {"type": "number", "description": "Converted value"},
                 "from_unit": {"type": "string"},
                 "to_unit": {"type": "string"},
-                "factor": {"type": ["number", "null"], "description": "Conversion factor used (null for temperature conversions)"},
+                "factor": {
+                    "type": ["number", "null"],
+                    "description": "Conversion factor used (null for temperature conversions)",
+                },
             },
         },
     },
@@ -95,7 +113,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "unit": {"type": "string", "description": "Unit name or alias (e.g., 'km', 'kilogram', '℃')"},
+                "unit": {
+                    "type": "string",
+                    "description": "Unit name or alias (e.g., 'km', 'kilogram', '℃')",
+                },
             },
             "required": ["unit"],
         },
@@ -104,7 +125,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "unit": {"type": "string"},
                 "canonical": {"type": "string", "description": "Canonical unit name"},
-                "category": {"type": "string", "description": "Unit category (e.g., 'length', 'mass', 'temperature')"},
+                "category": {
+                    "type": "string",
+                    "description": "Unit category (e.g., 'length', 'mass', 'temperature')",
+                },
                 "is_valid": {"type": "boolean"},
             },
         },
@@ -116,7 +140,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "Constant name (e.g., 'avogadro', 'planck', 'c', 'G')"},
+                "name": {
+                    "type": "string",
+                    "description": "Constant name (e.g., 'avogadro', 'planck', 'c', 'G')",
+                },
             },
             "required": ["name"],
         },
@@ -125,7 +152,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "name": {"type": "string"},
                 "value": {"type": "number", "description": "Constant value"},
-                "symbol": {"type": "string", "description": "Display symbol (e.g., 'N_A', 'h', 'c')"},
+                "symbol": {
+                    "type": "string",
+                    "description": "Display symbol (e.g., 'N_A', 'h', 'c')",
+                },
                 "display_name": {"type": "string", "description": "Human-readable name"},
             },
         },
@@ -411,9 +441,15 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "outputSchema": {
             "type": "object",
             "properties": {
-                "text": {"type": "string", "description": "Result string (truncated if truncation occurred)"},
+                "text": {
+                    "type": "string",
+                    "description": "Result string (truncated if truncation occurred)",
+                },
                 "original_graphemes": {"type": "integer", "description": "Original grapheme count"},
-                "truncated_graphemes": {"type": "integer", "description": "Grapheme count in result"},
+                "truncated_graphemes": {
+                    "type": "integer",
+                    "description": "Grapheme count in result",
+                },
                 "truncated": {"type": "boolean", "description": "True if text was truncated"},
             },
         },
@@ -432,7 +468,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "maxItems": 100,
                     "description": "Operations to apply: normalize_nfc, normalize_nfd, normalize_nfkc, normalize_nfkd, casefold, trim, trim_trailing_whitespace, normalize_newlines_lf, ensure_final_newline, strip_final_newline, remove_zero_width, remove_bidi_controls, visible_repr",
                 },
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text", "operations"],
         },
@@ -619,17 +659,29 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "equal": {"type": "boolean"},
-                "first_diff_index": {"type": ["integer", "null"], "description": "Index of first difference (ordered mode)"},
-                "equal_prefix_length": {"type": "integer", "description": "Length of equal prefix (ordered mode)"},
+                "first_diff_index": {
+                    "type": ["integer", "null"],
+                    "description": "Index of first difference (ordered mode)",
+                },
+                "equal_prefix_length": {
+                    "type": "integer",
+                    "description": "Length of equal prefix (ordered mode)",
+                },
                 "aligned": {"type": "array", "description": "Aligned operations (ordered mode)"},
-                "count_deltas": {"type": "object", "description": "Count differences (multiset mode)"},
+                "count_deltas": {
+                    "type": "object",
+                    "description": "Count differences (multiset mode)",
+                },
                 "only_in_a": {"type": "array"},
                 "only_in_b": {"type": "array"},
                 "missing_in_a": {"type": "array", "description": "Alias for only_in_b"},
                 "missing_in_b": {"type": "array", "description": "Alias for only_in_a"},
                 "duplicates_in_a": {"type": "array"},
                 "duplicates_in_b": {"type": "array"},
-                "near_matches": {"type": "array", "description": "Items that differ only by edit distance"},
+                "near_matches": {
+                    "type": "array",
+                    "description": "Items that differ only by edit distance",
+                },
             },
         },
     },
@@ -641,7 +693,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "TOML document string to validate"},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text"],
         },
@@ -667,8 +723,16 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "JSON document string"},
-                "pointer": {"type": "string", "default": "", "description": "RFC 6901 JSON Pointer path (e.g., /dependencies/tokio)"},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "pointer": {
+                    "type": "string",
+                    "default": "",
+                    "description": "RFC 6901 JSON Pointer path (e.g., /dependencies/tokio)",
+                },
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
                 "max_output_chars": {"type": "integer", "default": 4000},
             },
             "required": ["text"],
@@ -710,7 +774,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "casefold_keys": {"type": "boolean", "default": False},
                 "treat_missing_null_as_equal": {"type": "boolean", "default": False},
                 "max_diffs": {"type": "integer", "default": 50, "minimum": 0, "maximum": 10000},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["a", "b"],
         },
@@ -743,7 +811,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "utf16_offset": {"type": "integer", "minimum": 0, "maximum": 1000000000},
                 "line_base": {"type": "integer", "default": 1, "minimum": 0, "maximum": 1},
                 "column_base": {"type": "integer", "default": 1, "minimum": 0, "maximum": 1},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text"],
         },
@@ -783,7 +855,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "maxItems": 10,
                 },
                 "encoding": {"type": "string", "default": "utf-8"},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text"],
         },
@@ -809,9 +885,23 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "text": {"type": "string"},
                 "mode": {
                     "type": "string",
-                    "enum": ["json_string", "python_string", "rust_string", "posix_shell_single", "regex_literal", "markdown_inline_code", "markdown_code_block", "html_text", "url_component"],
+                    "enum": [
+                        "json_string",
+                        "python_string",
+                        "rust_string",
+                        "posix_shell_single",
+                        "regex_literal",
+                        "markdown_inline_code",
+                        "markdown_code_block",
+                        "html_text",
+                        "url_component",
+                    ],
                 },
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text", "mode"],
         },
@@ -837,7 +927,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "type": "string",
                     "enum": ["json_string", "python_string", "unicode_escape", "url_component"],
                 },
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text", "mode"],
         },
@@ -866,7 +960,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "description": "Languages to check (python, rust, javascript, env)",
                     "default": ["python", "rust", "javascript", "env"],
                 },
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text"],
         },
@@ -880,7 +978,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "rust_valid": {"type": ["boolean", "null"]},
                 "javascript_valid": {"type": ["boolean", "null"]},
                 "env_valid": {"type": "boolean"},
-                "suggestions": {"type": "object", "description": "Map of language to suggested name"},
+                "suggestions": {
+                    "type": "object",
+                    "description": "Map of language to suggested name",
+                },
                 "warnings": {"type": "array", "items": {"type": "string"}},
                 "summary": {"type": "string"},
             },
@@ -899,10 +1000,28 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "maxLength": 1000,
                 },
                 "text": {"type": "string", "description": "Input string to search"},
-                "flags": {"type": "array", "items": {"type": "string"}, "description": "Flag names (IGNORECASE, MULTILINE, DOTALL, etc.)", "maxItems": 10},
-                "max_matches": {"type": "integer", "default": 100, "description": "Maximum matches to return", "maximum": 1000},
-                "include_line_column": {"type": "boolean", "default": True, "description": "Include line and column info"},
-                "include_groups": {"type": "boolean", "default": True, "description": "Include capture groups"},
+                "flags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Flag names (IGNORECASE, MULTILINE, DOTALL, etc.)",
+                    "maxItems": 10,
+                },
+                "max_matches": {
+                    "type": "integer",
+                    "default": 100,
+                    "description": "Maximum matches to return",
+                    "maximum": 1000,
+                },
+                "include_line_column": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include line and column info",
+                },
+                "include_groups": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include capture groups",
+                },
             },
             "required": ["pattern", "text"],
         },
@@ -910,7 +1029,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "valid_pattern": {"type": "boolean"},
-                "matches": {"type": "array", "description": "List of regex matches with positions and groups"},
+                "matches": {
+                    "type": "array",
+                    "description": "List of regex matches with positions and groups",
+                },
                 "truncated": {"type": "boolean"},
                 "match_count": {"type": "integer"},
                 "error": {"type": ["string", "null"]},
@@ -957,7 +1079,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "text": {"type": "string", "description": "JSON document to validate"},
                 "schema": {"type": "object", "description": "Schema to validate against"},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text", "schema"],
         },
@@ -991,9 +1117,22 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "path": {"type": "string", "description": "Path string to normalize"},
-                "platform": {"type": "string", "enum": ["posix", "windows"], "default": "posix", "description": "Platform semantics to use"},
-                "collapse_dot_segments": {"type": "boolean", "default": True, "description": "Collapse dot and dot-dot segments"},
-                "preserve_trailing_separator": {"type": "boolean", "default": False, "description": "Preserve trailing separator"},
+                "platform": {
+                    "type": "string",
+                    "enum": ["posix", "windows"],
+                    "default": "posix",
+                    "description": "Platform semantics to use",
+                },
+                "collapse_dot_segments": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Collapse dot and dot-dot segments",
+                },
+                "preserve_trailing_separator": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Preserve trailing separator",
+                },
             },
             "required": ["path"],
         },
@@ -1015,8 +1154,16 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "path": {"type": "string"},
-                "style": {"type": "string", "enum": ["auto", "posix", "windows"], "default": "auto"},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "style": {
+                    "type": "string",
+                    "enum": ["auto", "posix", "windows"],
+                    "default": "auto",
+                },
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["path"],
         },
@@ -1049,17 +1196,37 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "left": {"type": "string", "description": "First path string"},
                 "right": {"type": "string", "description": "Second path string"},
-                "platform": {"type": "string", "enum": ["posix", "windows"], "default": "posix", "description": "Platform semantics"},
-                "case_sensitive": {"type": "boolean", "default": True, "description": "Case-sensitive comparison"},
-                "normalize_separators": {"type": "boolean", "default": True, "description": "Normalize path separators"},
-                "collapse_dot_segments": {"type": "boolean", "default": True, "description": "Collapse . and .. segments"},
+                "platform": {
+                    "type": "string",
+                    "enum": ["posix", "windows"],
+                    "default": "posix",
+                    "description": "Platform semantics",
+                },
+                "case_sensitive": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Case-sensitive comparison",
+                },
+                "normalize_separators": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Normalize path separators",
+                },
+                "collapse_dot_segments": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Collapse . and .. segments",
+                },
             },
             "required": ["left", "right"],
         },
         "outputSchema": {
             "type": "object",
             "properties": {
-                "equal": {"type": "boolean", "description": "Whether paths are equal under normalization"},
+                "equal": {
+                    "type": "boolean",
+                    "description": "Whether paths are equal under normalization",
+                },
                 "left_normalized": {"type": "string", "description": "Normalized left path"},
                 "right_normalized": {"type": "string", "description": "Normalized right path"},
                 "differences": {"type": "array", "description": "List of differences found"},
@@ -1076,19 +1243,37 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "root": {"type": "string", "description": "Root directory path"},
                 "target": {"type": "string", "description": "Target path to check"},
-                "platform": {"type": "string", "enum": ["posix", "windows"], "default": "posix", "description": "Platform semantics"},
-                "case_sensitive": {"type": "boolean", "default": True, "description": "Case-sensitive comparison"},
+                "platform": {
+                    "type": "string",
+                    "enum": ["posix", "windows"],
+                    "default": "posix",
+                    "description": "Platform semantics",
+                },
+                "case_sensitive": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Case-sensitive comparison",
+                },
             },
             "required": ["root", "target"],
         },
         "outputSchema": {
             "type": "object",
             "properties": {
-                "inside_root": {"type": "boolean", "description": "Whether target is lexically inside root"},
+                "inside_root": {
+                    "type": "boolean",
+                    "description": "Whether target is lexically inside root",
+                },
                 "root_normalized": {"type": "string", "description": "Normalized root path"},
                 "target_normalized": {"type": "string", "description": "Normalized target path"},
-                "relative_path": {"type": "string", "description": "Relative path from root to target (if inside)"},
-                "escapes_via_dotdot": {"type": "boolean", "description": "Whether target contains parent traversal"},
+                "relative_path": {
+                    "type": "string",
+                    "description": "Relative path from root to target (if inside)",
+                },
+                "escapes_via_dotdot": {
+                    "type": "boolean",
+                    "description": "Whether target contains parent traversal",
+                },
                 "absolute_target": {"type": "string", "description": "Absolute form of target"},
                 "findings": {"type": "array", "description": "Analysis notes"},
             },
@@ -1102,9 +1287,21 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "JSON document string to analyze"},
-                "max_depth": {"type": "integer", "default": 4, "description": "Maximum depth for nested structure"},
-                "max_keys": {"type": "integer", "default": 100, "description": "Maximum keys to show per object"},
-                "max_array_items": {"type": "integer", "default": 5, "description": "Maximum array item previews"},
+                "max_depth": {
+                    "type": "integer",
+                    "default": 4,
+                    "description": "Maximum depth for nested structure",
+                },
+                "max_keys": {
+                    "type": "integer",
+                    "default": 100,
+                    "description": "Maximum keys to show per object",
+                },
+                "max_array_items": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Maximum array item previews",
+                },
             },
             "required": ["text"],
         },
@@ -1140,20 +1337,62 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "type": "object",
                     "description": "Position specification with kind and value",
                     "properties": {
-                        "kind": {"type": "string", "enum": ["byte_offset", "codepoint_index", "grapheme_index", "line_column"]},
-                        "value": {"type": "integer", "description": "Value for byte_offset, codepoint_index, or grapheme_index"},
-                        "byte_offset": {"type": "integer", "description": "UTF-8 byte offset (alternative to value)"},
-                        "codepoint_index": {"type": "integer", "description": "Codepoint index (alternative to value)"},
-                        "grapheme_index": {"type": "integer", "description": "Grapheme index (alternative to value)"},
-                        "line": {"type": "integer", "description": "Line number for line_column kind"},
-                        "column": {"type": "integer", "description": "Column number for line_column kind"},
-                        "line_base": {"type": "integer", "default": 1, "description": "Base for line numbers (1 for 1-based)"},
-                        "column_base": {"type": "integer", "default": 1, "description": "Base for column numbers (1 for 1-based)"},
+                        "kind": {
+                            "type": "string",
+                            "enum": [
+                                "byte_offset",
+                                "codepoint_index",
+                                "grapheme_index",
+                                "line_column",
+                            ],
+                        },
+                        "value": {
+                            "type": "integer",
+                            "description": "Value for byte_offset, codepoint_index, or grapheme_index",
+                        },
+                        "byte_offset": {
+                            "type": "integer",
+                            "description": "UTF-8 byte offset (alternative to value)",
+                        },
+                        "codepoint_index": {
+                            "type": "integer",
+                            "description": "Codepoint index (alternative to value)",
+                        },
+                        "grapheme_index": {
+                            "type": "integer",
+                            "description": "Grapheme index (alternative to value)",
+                        },
+                        "line": {
+                            "type": "integer",
+                            "description": "Line number for line_column kind",
+                        },
+                        "column": {
+                            "type": "integer",
+                            "description": "Column number for line_column kind",
+                        },
+                        "line_base": {
+                            "type": "integer",
+                            "default": 1,
+                            "description": "Base for line numbers (1 for 1-based)",
+                        },
+                        "column_base": {
+                            "type": "integer",
+                            "default": 1,
+                            "description": "Base for column numbers (1 for 1-based)",
+                        },
                     },
                     "required": ["kind"],
                 },
-                "context_lines": {"type": "integer", "default": 2, "description": "Number of context lines before and after"},
-                "include_visible_repr": {"type": "boolean", "default": True, "description": "Include visible representation of the line"},
+                "context_lines": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Number of context lines before and after",
+                },
+                "include_visible_repr": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include visible representation of the line",
+                },
             },
             "required": ["text", "position"],
         },
@@ -1182,11 +1421,30 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "Input JSON string to canonicalize"},
-                "sort_keys": {"type": "boolean", "default": True, "description": "Sort object keys alphabetically"},
-                "indent": {"type": ["integer", "null"], "description": "Indentation spaces (null for minified)"},
-                "ensure_ascii": {"type": "boolean", "default": False, "description": "Use ASCII escaping for non-ASCII characters"},
-                "detect_duplicate_keys": {"type": "boolean", "default": True, "description": "Report duplicate keys in the input"},
-                "trailing_newline": {"type": "boolean", "default": False, "description": "Add a trailing newline to the canonical form"},
+                "sort_keys": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Sort object keys alphabetically",
+                },
+                "indent": {
+                    "type": ["integer", "null"],
+                    "description": "Indentation spaces (null for minified)",
+                },
+                "ensure_ascii": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Use ASCII escaping for non-ASCII characters",
+                },
+                "detect_duplicate_keys": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Report duplicate keys in the input",
+                },
+                "trailing_newline": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Add a trailing newline to the canonical form",
+                },
             },
             "required": ["text"],
         },
@@ -1215,7 +1473,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "JSON document string"},
-                "pointer": {"type": "string", "default": "", "description": "RFC 6901 JSON Pointer path (e.g., /foo/bar/0)"},
+                "pointer": {
+                    "type": "string",
+                    "default": "",
+                    "description": "RFC 6901 JSON Pointer path (e.g., /foo/bar/0)",
+                },
             },
             "required": ["text"],
         },
@@ -1241,10 +1503,22 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Glob pattern to match (e.g., src/**/*.rs)"},
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern to match (e.g., src/**/*.rs)",
+                },
                 "path": {"type": "string", "description": "Path string to match against"},
-                "platform": {"type": "string", "enum": ["posix", "windows"], "default": "posix", "description": "Path platform"},
-                "case_sensitive": {"type": "boolean", "default": True, "description": "Case-sensitive matching"},
+                "platform": {
+                    "type": "string",
+                    "enum": ["posix", "windows"],
+                    "default": "posix",
+                    "description": "Path platform",
+                },
+                "case_sensitive": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Case-sensitive matching",
+                },
             },
             "required": ["pattern", "path"],
         },
@@ -1268,10 +1542,28 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "Input string to fingerprint"},
-                "unicode": {"type": "string", "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"], "default": "raw", "description": "Unicode normalization form"},
-                "newline": {"type": "string", "enum": ["raw", "LF"], "default": "raw", "description": "Newline normalization"},
-                "trim_final_newline": {"type": "boolean", "default": False, "description": "Remove trailing newline before hashing"},
-                "casefold": {"type": "boolean", "default": False, "description": "Apply casefolding before hashing"},
+                "unicode": {
+                    "type": "string",
+                    "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"],
+                    "default": "raw",
+                    "description": "Unicode normalization form",
+                },
+                "newline": {
+                    "type": "string",
+                    "enum": ["raw", "LF"],
+                    "default": "raw",
+                    "description": "Newline normalization",
+                },
+                "trim_final_newline": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Remove trailing newline before hashing",
+                },
+                "casefold": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Apply casefolding before hashing",
+                },
             },
             "required": ["text"],
         },
@@ -1295,11 +1587,34 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "identifiers": {"type": "array", "items": {"type": "string"}, "description": "List of identifier strings to inspect", "maxItems": 10000},
-                "language": {"type": "string", "enum": ["generic", "python", "rust", "javascript", "typescript", "json_key"], "default": "generic", "description": "Language for validation"},
-                "normalization": {"type": "string", "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"], "default": "NFC", "description": "Unicode normalization form"},
-                "casefold": {"type": "boolean", "default": False, "description": "Apply casefolding for collision detection"},
-                "check_confusables": {"type": "boolean", "default": True, "description": "Check for confusable characters"},
+                "identifiers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of identifier strings to inspect",
+                    "maxItems": 10000,
+                },
+                "language": {
+                    "type": "string",
+                    "enum": ["generic", "python", "rust", "javascript", "typescript", "json_key"],
+                    "default": "generic",
+                    "description": "Language for validation",
+                },
+                "normalization": {
+                    "type": "string",
+                    "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"],
+                    "default": "NFC",
+                    "description": "Unicode normalization form",
+                },
+                "casefold": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Apply casefolding for collision detection",
+                },
+                "check_confusables": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Check for confusable characters",
+                },
             },
             "required": ["identifiers"],
         },
@@ -1326,15 +1641,26 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "a": {"type": "string", "description": "First version string"},
                 "b": {"type": "string", "description": "Second version string"},
-                "scheme": {"type": "string", "enum": ["semver", "pep440", "loose"], "default": "semver", "description": "Version scheme"},
+                "scheme": {
+                    "type": "string",
+                    "enum": ["semver", "pep440", "loose"],
+                    "default": "semver",
+                    "description": "Version scheme",
+                },
             },
             "required": ["a", "b"],
         },
         "outputSchema": {
             "type": "object",
             "properties": {
-                "comparison": {"type": "integer", "description": "Comparison result: -1 (a < b), 0 (equal), 1 (a > b)"},
-                "valid": {"type": "boolean", "description": "Whether versions are valid for the scheme"},
+                "comparison": {
+                    "type": "integer",
+                    "description": "Comparison result: -1 (a < b), 0 (equal), 1 (a > b)",
+                },
+                "valid": {
+                    "type": "boolean",
+                    "description": "Whether versions are valid for the scheme",
+                },
                 "scheme": {"type": "string"},
                 "summary": {"type": "string"},
             },
@@ -1348,8 +1674,18 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "TOML document string"},
-                "max_tables": {"type": "integer", "default": 100, "minimum": 1, "maximum": 100000, "description": "Maximum tables to return"},
-                "detail": {"type": "string", "enum": ["summary", "normal", "full"], "default": "normal"},
+                "max_tables": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 100000,
+                    "description": "Maximum tables to return",
+                },
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "normal", "full"],
+                    "default": "normal",
+                },
             },
             "required": ["text"],
         },
@@ -1371,10 +1707,27 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "items": {"type": "array", "items": {"type": "string"}, "description": "List of strings to dedupe", "maxItems": 10000},
-                "normalization": {"type": "string", "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"], "default": "NFC"},
-                "casefold": {"type": "boolean", "default": False, "description": "Apply casefolding before comparison"},
-                "stable": {"type": "boolean", "default": True, "description": "Preserve first occurrence order"},
+                "items": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of strings to dedupe",
+                    "maxItems": 10000,
+                },
+                "normalization": {
+                    "type": "string",
+                    "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"],
+                    "default": "NFC",
+                },
+                "casefold": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Apply casefolding before comparison",
+                },
+                "stable": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Preserve first occurrence order",
+                },
             },
             "required": ["items"],
         },
@@ -1395,11 +1748,32 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "items": {"type": "array", "items": {"type": "string"}, "description": "List of strings to sort", "maxItems": 10000},
-                "normalization": {"type": "string", "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"], "default": "NFC"},
-                "casefold": {"type": "boolean", "default": False, "description": "Apply casefolding for sorting"},
-                "reverse": {"type": "boolean", "default": False, "description": "Sort in descending order"},
-                "stable": {"type": "boolean", "default": True, "description": "Preserve original order for equal elements"},
+                "items": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of strings to sort",
+                    "maxItems": 10000,
+                },
+                "normalization": {
+                    "type": "string",
+                    "enum": ["raw", "NFC", "NFD", "NFKC", "NFKD"],
+                    "default": "NFC",
+                },
+                "casefold": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Apply casefolding for sorting",
+                },
+                "reverse": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Sort in descending order",
+                },
+                "stable": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Preserve original order for equal elements",
+                },
             },
             "required": ["items"],
         },
@@ -1461,10 +1835,22 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "match_count": {"type": "integer", "description": "Number of matches found"},
                 "unique_match": {"type": "boolean", "description": "True if exactly one match"},
-                "expected_count_met": {"type": "boolean", "description": "True if match count matches expected_count"},
-                "would_change": {"type": "boolean", "description": "True if replacement would change text"},
-                "positions": {"type": "array", "description": "Match positions with byte offsets and line/column"},
-                "changed_text_fingerprint": {"type": "string", "description": "SHA-256 fingerprint of changed text"},
+                "expected_count_met": {
+                    "type": "boolean",
+                    "description": "True if match count matches expected_count",
+                },
+                "would_change": {
+                    "type": "boolean",
+                    "description": "True if replacement would change text",
+                },
+                "positions": {
+                    "type": "array",
+                    "description": "Match positions with byte offsets and line/column",
+                },
+                "changed_text_fingerprint": {
+                    "type": "string",
+                    "description": "SHA-256 fingerprint of changed text",
+                },
                 "newline_style_before": {"type": "string"},
                 "newline_style_after": {"type": "string"},
                 "preview_before": {"type": "string"},
@@ -1481,8 +1867,18 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "Input text"},
-                "start_line": {"type": "integer", "description": "First line to extract", "minimum": 0, "maximum": 100000000},
-                "end_line": {"type": "integer", "description": "Last line to extract (inclusive)", "minimum": 0, "maximum": 100000000},
+                "start_line": {
+                    "type": "integer",
+                    "description": "First line to extract",
+                    "minimum": 0,
+                    "maximum": 100000000,
+                },
+                "end_line": {
+                    "type": "integer",
+                    "description": "Last line to extract (inclusive)",
+                    "minimum": 0,
+                    "maximum": 100000000,
+                },
                 "line_base": {
                     "type": "integer",
                     "default": 1,
@@ -1532,8 +1928,18 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "left_text": {"type": "string", "description": "First text input"},
                 "right_text": {"type": "string", "description": "Second text input"},
-                "start_line": {"type": "integer", "description": "First line to compare", "minimum": 0, "maximum": 100000000},
-                "end_line": {"type": "integer", "description": "Last line to compare (inclusive)", "minimum": 0, "maximum": 100000000},
+                "start_line": {
+                    "type": "integer",
+                    "description": "First line to compare",
+                    "minimum": 0,
+                    "maximum": 100000000,
+                },
+                "end_line": {
+                    "type": "integer",
+                    "description": "Last line to compare (inclusive)",
+                    "minimum": 0,
+                    "maximum": 100000000,
+                },
                 "line_base": {
                     "type": "integer",
                     "default": 1,
@@ -1553,11 +1959,23 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "outputSchema": {
             "type": "object",
             "properties": {
-                "equal": {"type": "boolean", "description": "True if ranges are equal under the chosen mode"},
-                "left_fingerprint": {"type": "string", "description": "SHA-256 fingerprint of left range"},
-                "right_fingerprint": {"type": "string", "description": "SHA-256 fingerprint of right range"},
+                "equal": {
+                    "type": "boolean",
+                    "description": "True if ranges are equal under the chosen mode",
+                },
+                "left_fingerprint": {
+                    "type": "string",
+                    "description": "SHA-256 fingerprint of left range",
+                },
+                "right_fingerprint": {
+                    "type": "string",
+                    "description": "SHA-256 fingerprint of right range",
+                },
                 "diff_summary": {"type": "string", "description": "Human-readable diff summary"},
-                "first_difference": {"type": "object", "description": "First differing line (if any)"},
+                "first_difference": {
+                    "type": "object",
+                    "description": "First differing line (if any)",
+                },
             },
         },
     },
@@ -1589,8 +2007,15 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "outputSchema": {
             "type": "object",
             "properties": {
-                "parse_ok": {"type": "boolean", "description": "True if the command parsed successfully"},
-                "argv": {"type": "array", "items": {"type": "string"}, "description": "Parsed argument tokens"},
+                "parse_ok": {
+                    "type": "boolean",
+                    "description": "True if the command parsed successfully",
+                },
+                "argv": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Parsed argument tokens",
+                },
                 "argc": {"type": "integer", "description": "Number of arguments"},
                 "features": {
                     "type": "object",
@@ -1605,7 +2030,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                         "has_unbalanced_quotes": {"type": "boolean"},
                     },
                 },
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Analysis notes and warnings"},
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Analysis notes and warnings",
+                },
             },
         },
     },
@@ -1635,8 +2064,15 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "command": {"type": "string", "description": "Safely quoted command string"},
-                "roundtrip_ok": {"type": "boolean", "description": "True if shell_split(quote_join(argv)) produces equivalent argv"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Analysis notes"},
+                "roundtrip_ok": {
+                    "type": "boolean",
+                    "description": "True if shell_split(quote_join(argv)) produces equivalent argv",
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Analysis notes",
+                },
             },
         },
     },
@@ -1681,11 +2117,29 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "outputSchema": {
             "type": "object",
             "properties": {
-                "argv_equal": {"type": "boolean", "description": "True if parsed argv lists are identical"},
-                "left_argv": {"type": "array", "items": {"type": "string"}, "description": "Resolved left argv"},
-                "right_argv": {"type": "array", "items": {"type": "string"}, "description": "Resolved right argv"},
-                "first_difference": {"type": "integer", "description": "Index of first differing token, or null if equal"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Analysis notes"},
+                "argv_equal": {
+                    "type": "boolean",
+                    "description": "True if parsed argv lists are identical",
+                },
+                "left_argv": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Resolved left argv",
+                },
+                "right_argv": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Resolved right argv",
+                },
+                "first_difference": {
+                    "type": "integer",
+                    "description": "Index of first differing token, or null if equal",
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Analysis notes",
+                },
             },
         },
     },
@@ -1697,23 +2151,61 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "Markdown text to analyze"},
-                "include_sections": {"type": "boolean", "default": True, "description": "Include heading detection"},
-                "include_links": {"type": "boolean", "default": True, "description": "Include link detection"},
-                "include_code_fences": {"type": "boolean", "default": True, "description": "Include code fence detection"},
-                "include_html_comments": {"type": "boolean", "default": True, "description": "Include HTML comment detection"},
+                "include_sections": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include heading detection",
+                },
+                "include_links": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include link detection",
+                },
+                "include_code_fences": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include code fence detection",
+                },
+                "include_html_comments": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include HTML comment detection",
+                },
             },
             "required": ["text"],
         },
         "outputSchema": {
             "type": "object",
             "properties": {
-                "headings": {"type": "array", "description": "Headings with level, text, line, slug"},
-                "code_fences": {"type": "array", "description": "Code fences with language, lines, closed state"},
-                "links": {"type": "array", "description": "Links with visible text, target, mismatch flags"},
-                "html_comments": {"type": "array", "description": "HTML comments with text and position"},
-                "frontmatter": {"type": "object", "description": "Frontmatter detection (present, format, line range)"},
-                "tables_detected": {"type": "boolean", "description": "Whether Markdown tables were detected"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Warnings and findings"},
+                "headings": {
+                    "type": "array",
+                    "description": "Headings with level, text, line, slug",
+                },
+                "code_fences": {
+                    "type": "array",
+                    "description": "Code fences with language, lines, closed state",
+                },
+                "links": {
+                    "type": "array",
+                    "description": "Links with visible text, target, mismatch flags",
+                },
+                "html_comments": {
+                    "type": "array",
+                    "description": "HTML comments with text and position",
+                },
+                "frontmatter": {
+                    "type": "object",
+                    "description": "Frontmatter detection (present, format, line range)",
+                },
+                "tables_detected": {
+                    "type": "boolean",
+                    "description": "Whether Markdown tables were detected",
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Warnings and findings",
+                },
             },
         },
     },
@@ -1725,17 +2217,31 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "Markdown text to scan"},
-                "language": {"type": "string", "description": "Optional language filter (case-insensitive)"},
-                "include_content": {"type": "boolean", "default": True, "description": "Include block content in output"},
+                "language": {
+                    "type": "string",
+                    "description": "Optional language filter (case-insensitive)",
+                },
+                "include_content": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Include block content in output",
+                },
             },
             "required": ["text"],
         },
         "outputSchema": {
             "type": "object",
             "properties": {
-                "blocks": {"type": "array", "description": "Extracted code blocks with index, language, lines, content, fingerprint"},
+                "blocks": {
+                    "type": "array",
+                    "description": "Extracted code blocks with index, language, lines, content, fingerprint",
+                },
                 "unclosed_fences": {"type": "array", "description": "Unclosed code fences found"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Warnings and findings"},
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Warnings and findings",
+                },
             },
         },
     },
@@ -1747,9 +2253,22 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": ".env file content to validate"},
-                "allow_export": {"type": "boolean", "default": True, "description": "Allow export KEY=VALUE syntax"},
-                "key_pattern": {"type": "string", "default": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Regex pattern keys must match"},
-                "duplicate_policy": {"type": "string", "enum": ["warn", "error", "allow"], "default": "warn", "description": "How to handle duplicate keys"},
+                "allow_export": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Allow export KEY=VALUE syntax",
+                },
+                "key_pattern": {
+                    "type": "string",
+                    "default": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "Regex pattern keys must match",
+                },
+                "duplicate_policy": {
+                    "type": "string",
+                    "enum": ["warn", "error", "allow"],
+                    "default": "warn",
+                    "description": "How to handle duplicate keys",
+                },
             },
             "required": ["text"],
         },
@@ -1757,12 +2276,28 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "parse_ok": {"type": "boolean", "description": "True if no parse errors found"},
-                "entries": {"type": "array", "description": "Parsed entries with key, value, quote_style, line"},
-                "duplicates": {"type": "array", "description": "Duplicate key entries with line numbers"},
+                "entries": {
+                    "type": "array",
+                    "description": "Parsed entries with key, value, quote_style, line",
+                },
+                "duplicates": {
+                    "type": "array",
+                    "description": "Duplicate key entries with line numbers",
+                },
                 "invalid_lines": {"type": "array", "description": "Lines that failed to parse"},
-                "requires_quoting": {"type": "array", "description": "Keys whose values contain spaces and should be quoted"},
-                "contains_expansion_syntax": {"type": "array", "description": "Keys with ${VAR} or $VAR expansion syntax"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Human-readable findings"},
+                "requires_quoting": {
+                    "type": "array",
+                    "description": "Keys whose values contain spaces and should be quoted",
+                },
+                "contains_expansion_syntax": {
+                    "type": "array",
+                    "description": "Keys with ${VAR} or $VAR expansion syntax",
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Human-readable findings",
+                },
             },
         },
     },
@@ -1774,7 +2309,12 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "INI file content to validate"},
-                "duplicate_policy": {"type": "string", "enum": ["warn", "error", "allow"], "default": "warn", "description": "How to handle duplicate keys/sections"},
+                "duplicate_policy": {
+                    "type": "string",
+                    "enum": ["warn", "error", "allow"],
+                    "default": "warn",
+                    "description": "How to handle duplicate keys/sections",
+                },
             },
             "required": ["text"],
         },
@@ -1784,9 +2324,16 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "parse_ok": {"type": "boolean", "description": "True if no parse errors found"},
                 "sections": {"type": "array", "description": "Ordered list of section names"},
                 "keys_by_section": {"type": "object", "description": "Keys grouped by section"},
-                "duplicates": {"type": "array", "description": "Duplicate keys/sections with line numbers"},
+                "duplicates": {
+                    "type": "array",
+                    "description": "Duplicate keys/sections with line numbers",
+                },
                 "invalid_lines": {"type": "array", "description": "Lines that failed to parse"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Human-readable findings"},
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Human-readable findings",
+                },
             },
         },
     },
@@ -1826,11 +2373,20 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "outputSchema": {
             "type": "object",
             "properties": {
-                "patch_parse_ok": {"type": "boolean", "description": "True if patch parsed successfully"},
+                "patch_parse_ok": {
+                    "type": "boolean",
+                    "description": "True if patch parsed successfully",
+                },
                 "applies": {"type": "boolean", "description": "True if all hunks applied cleanly"},
                 "hunks_total": {"type": "integer", "description": "Total number of hunks in patch"},
-                "hunks_applied": {"type": "integer", "description": "Number of hunks that applied successfully"},
-                "hunks_failed": {"type": "integer", "description": "Number of hunks that failed to apply"},
+                "hunks_applied": {
+                    "type": "integer",
+                    "description": "Number of hunks that applied successfully",
+                },
+                "hunks_failed": {
+                    "type": "integer",
+                    "description": "Number of hunks that failed to apply",
+                },
                 "failed_hunks": {
                     "type": "array",
                     "description": "Details of each failed hunk",
@@ -1857,11 +2413,27 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                         },
                     },
                 },
-                "newline_style_before": {"type": "string", "description": "Newline style in original text"},
-                "newline_style_after": {"type": "string", "description": "Newline style in result text"},
-                "result_fingerprint": {"type": "string", "description": "SHA-256 of the result text"},
-                "result_text": {"type": ["string", "null"], "description": "Resulting text if requested"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Analysis notes and warnings"},
+                "newline_style_before": {
+                    "type": "string",
+                    "description": "Newline style in original text",
+                },
+                "newline_style_after": {
+                    "type": "string",
+                    "description": "Newline style in result text",
+                },
+                "result_fingerprint": {
+                    "type": "string",
+                    "description": "SHA-256 of the result text",
+                },
+                "result_text": {
+                    "type": ["string", "null"],
+                    "description": "Resulting text if requested",
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Analysis notes and warnings",
+                },
             },
         },
     },
@@ -1883,7 +2455,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "files_changed": {"type": "integer", "description": "Number of files changed"},
-                "hunks_total": {"type": "integer", "description": "Total number of hunks across all files"},
+                "hunks_total": {
+                    "type": "integer",
+                    "description": "Total number of hunks across all files",
+                },
                 "additions": {"type": "integer", "description": "Total number of added lines"},
                 "deletions": {"type": "integer", "description": "Total number of deleted lines"},
                 "renames_detected": {
@@ -1897,7 +2472,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                         },
                     },
                 },
-                "binary_patch_detected": {"type": "boolean", "description": "True if binary patch content detected"},
+                "binary_patch_detected": {
+                    "type": "boolean",
+                    "description": "True if binary patch content detected",
+                },
                 "line_ranges_by_file": {
                     "type": "object",
                     "description": "Line ranges affected per file",
@@ -1912,7 +2490,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                         },
                     },
                 },
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Analysis notes and warnings"},
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Analysis notes and warnings",
+                },
             },
         },
     },
@@ -1926,7 +2508,14 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "text": {"type": "string", "description": "Input text to check"},
                 "policy": {
                     "type": "string",
-                    "enum": ["identifier_strict", "filename_safe", "source_code", "human_text", "json_key", "domain_like"],
+                    "enum": [
+                        "identifier_strict",
+                        "filename_safe",
+                        "source_code",
+                        "human_text",
+                        "json_key",
+                        "domain_like",
+                    ],
                     "description": "Policy to apply",
                 },
                 "normalization": {
@@ -1940,7 +2529,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "outputSchema": {
             "type": "object",
             "properties": {
-                "pass_": {"type": "boolean", "description": "True if text passes the policy (no errors)"},
+                "pass_": {
+                    "type": "boolean",
+                    "description": "True if text passes the policy (no errors)",
+                },
                 "policy": {"type": "string", "description": "Policy name that was applied"},
                 "normalized_form": {"type": "string", "description": "Text after normalization"},
                 "findings": {
@@ -1969,7 +2561,13 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "text": {"type": "string", "description": "Input text to canonicalize"},
                 "profile": {
                     "type": "string",
-                    "enum": ["source_file_identity", "identifier_compare", "human_label_compare", "json_key_compare", "path_segment_compare"],
+                    "enum": [
+                        "source_file_identity",
+                        "identifier_compare",
+                        "human_label_compare",
+                        "json_key_compare",
+                        "path_segment_compare",
+                    ],
                     "description": "Canonicalization profile to apply",
                 },
                 "return_mapping": {
@@ -1985,11 +2583,24 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "text": {"type": "string", "description": "Canonicalized text"},
                 "changed": {"type": "boolean", "description": "True if text was modified"},
-                "operations_applied": {"type": "array", "description": "List of operations applied"},
+                "operations_applied": {
+                    "type": "array",
+                    "description": "List of operations applied",
+                },
                 "fingerprint_before": {"type": "string", "description": "SHA-256 of original text"},
-                "fingerprint_after": {"type": "string", "description": "SHA-256 of canonicalized text"},
-                "mapping": {"type": "array", "description": "Character mapping if return_mapping was True"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Analysis notes and warnings"},
+                "fingerprint_after": {
+                    "type": "string",
+                    "description": "SHA-256 of canonicalized text",
+                },
+                "mapping": {
+                    "type": "array",
+                    "description": "Character mapping if return_mapping was True",
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Analysis notes and warnings",
+                },
             },
         },
     },
@@ -2101,12 +2712,22 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "outputSchema": {
             "type": "object",
             "properties": {
-                "satisfies": {"type": "boolean", "description": "Whether the version satisfies the constraint"},
+                "satisfies": {
+                    "type": "boolean",
+                    "description": "Whether the version satisfies the constraint",
+                },
                 "parsed_version": {"type": "object", "description": "Parsed version components"},
-                "parsed_constraint": {"type": "object", "description": "Parsed constraint components"},
+                "parsed_constraint": {
+                    "type": "object",
+                    "description": "Parsed constraint components",
+                },
                 "scheme": {"type": "string", "description": "Versioning scheme used"},
                 "explanation": {"type": "string", "description": "Human-readable explanation"},
-                "findings": {"type": "array", "items": {"type": "string"}, "description": "Analysis notes and warnings"},
+                "findings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Analysis notes and warnings",
+                },
             },
         },
     },
@@ -2234,8 +2855,15 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "description": "Recommended follow-up tool(s)",
                 },
                 "text_length": {"type": "integer", "description": "Input text length"},
-                "checks_run": {"type": "array", "items": {"type": "string"}, "description": "Checks that were executed"},
-                "findings_truncated": {"type": "boolean", "description": "True if findings were truncated due to limits"},
+                "checks_run": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Checks that were executed",
+                },
+                "findings_truncated": {
+                    "type": "boolean",
+                    "description": "True if findings were truncated due to limits",
+                },
             },
         },
     },
@@ -2305,9 +2933,19 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "new": {"type": "string", "description": "Replacement text (literal mode)"},
                 "patch": {"type": "string", "description": "Unified diff patch (patch mode)"},
                 "start_line": {"type": "integer", "description": "First line (line_range mode)"},
-                "end_line": {"type": "integer", "description": "Last line inclusive (line_range mode)"},
-                "expected_fingerprint": {"type": "string", "description": "Expected SHA-256 fingerprint for verification"},
-                "strict": {"type": "boolean", "default": True, "description": "Strict mode for patch matching"},
+                "end_line": {
+                    "type": "integer",
+                    "description": "Last line inclusive (line_range mode)",
+                },
+                "expected_fingerprint": {
+                    "type": "string",
+                    "description": "Expected SHA-256 fingerprint for verification",
+                },
+                "strict": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Strict mode for patch matching",
+                },
             },
             "required": ["original"],
         },
@@ -2344,7 +2982,10 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "default": "default",
                     "description": "Analysis policy",
                 },
-                "working_directory": {"type": "string", "description": "Working directory context (informational)"},
+                "working_directory": {
+                    "type": "string",
+                    "description": "Working directory context (informational)",
+                },
             },
             "required": ["command"],
         },
@@ -2377,7 +3018,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "description": "Config format (auto-detect if not specified)",
                 },
                 "schema": {"type": "object", "description": "Optional JSON schema for validation"},
-                "strict": {"type": "boolean", "default": False, "description": "Strict validation mode"},
+                "strict": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Strict validation mode",
+                },
             },
             "required": ["text"],
         },
@@ -2409,9 +3054,21 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "default": "json",
                     "description": "Data format (json only for now)",
                 },
-                "ignore_object_order": {"type": "boolean", "default": True, "description": "Ignore object key order"},
-                "ignore_array_order": {"type": "boolean", "default": False, "description": "Sort arrays before comparison"},
-                "max_diffs": {"type": "integer", "default": 50, "description": "Maximum differences to report"},
+                "ignore_object_order": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Ignore object key order",
+                },
+                "ignore_array_order": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Sort arrays before comparison",
+                },
+                "max_diffs": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Maximum differences to report",
+                },
             },
             "required": ["a", "b"],
         },
@@ -2526,7 +3183,6 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "stability": "stable",
         "composite": False,
     },
-
     # ── Tier 1: Default coding-agent sanity ───────────────────────────────
     "text_diff_explain": {
         "category": "text",
@@ -2737,7 +3393,6 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "stability": "stable",
         "composite": False,
     },
-
     # ── Tier 2: Contextual / heavier analysis ─────────────────────────────
     "unit_convert": {
         "category": "math",
@@ -3036,7 +3691,6 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "stability": "stable",
         "composite": False,
     },
-
     # ── Tier 3: Specialized / domain-specific ──────────────────────────────
     "identifier_analyze": {
         "category": "identifier",
@@ -3107,7 +3761,13 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     "text_security_inspect": {
         "category": "text",
         "tier": 1,
-        "profiles": ["full", "codegg_core", "codegg_core_min", "codegg_preflight", "codegg_unicode_security"],
+        "profiles": [
+            "full",
+            "codegg_core",
+            "codegg_core_min",
+            "codegg_preflight",
+            "codegg_unicode_security",
+        ],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["prompt_input_preflight"],
@@ -3167,6 +3827,7 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
 # from TOOL_METADATA.  Each entry maps a profile name to the sorted
 # list of tool names that include that profile in their metadata.
 # ---------------------------------------------------------------------------
+
 
 def _build_profiles() -> dict[str, list[str]]:
     """Build profile → tool list from TOOL_METADATA."""
@@ -3302,9 +3963,18 @@ def _compact_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
         if "items" in prop_def:
             cp["items"] = prop_def["items"]
         # Keep constraints
-        for key in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
-                    "minLength", "maxLength", "pattern", "minItems", "maxItems",
-                    "multipleOf"):
+        for key in (
+            "minimum",
+            "maximum",
+            "exclusiveMinimum",
+            "exclusiveMaximum",
+            "minLength",
+            "maxLength",
+            "pattern",
+            "minItems",
+            "maxItems",
+            "multipleOf",
+        ):
             if key in prop_def:
                 cp[key] = prop_def[key]
         # Truncated description

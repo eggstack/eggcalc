@@ -11,6 +11,7 @@ from eggcalc.normalize import _run_repl, run
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _run_cli(*args: str, stdin: str | None = None) -> subprocess.CompletedProcess:
     """Run eggcalc as a subprocess and return the result."""
     cmd = [sys.executable, "-m", "eggcalc", *args]
@@ -26,6 +27,7 @@ def _run_cli(*args: str, stdin: str | None = None) -> subprocess.CompletedProces
 def _get_value(result):
     """Extract numeric value from result, handling UnitValue."""
     from eggcalc import UnitValue
+
     if isinstance(result, UnitValue):
         return result.value
     return result
@@ -34,6 +36,7 @@ def _get_value(result):
 # ---------------------------------------------------------------------------
 # REPL Tests
 # ---------------------------------------------------------------------------
+
 
 class TestReplBasicEvaluation:
     """Test basic expression evaluation in REPL mode."""
@@ -134,8 +137,10 @@ class TestReplEdgeCases:
                 raise KeyboardInterrupt()
             return original_run(expression, operators, patterns, output_format, show_expression)
 
-        with patch("builtins.input", side_effect=mock_input), \
-             patch("eggcalc.normalize.run", side_effect=mock_run):
+        with (
+            patch("builtins.input", side_effect=mock_input),
+            patch("eggcalc.normalize.run", side_effect=mock_run),
+        ):
             exit_code = _run_repl()
         assert exit_code == 0
         captured = capsys.readouterr()
@@ -185,8 +190,10 @@ class TestReplEdgeCases:
 
     def test_repl_show_expression_true(self, capsys):
         """REPL passes show_expression=True to run()."""
-        with patch("builtins.input", side_effect=["5 + 3", EOFError]), \
-             patch("eggcalc.normalize.run", wraps=run) as mock_run:
+        with (
+            patch("builtins.input", side_effect=["5 + 3", EOFError]),
+            patch("eggcalc.normalize.run", wraps=run) as mock_run,
+        ):
             exit_code = _run_repl(show_expression=True)
         assert exit_code == 0
         mock_run.assert_called_once()
@@ -195,8 +202,10 @@ class TestReplEdgeCases:
 
     def test_repl_show_expression_false(self, capsys):
         """REPL passes show_expression=False to run()."""
-        with patch("builtins.input", side_effect=["5 + 3", EOFError]), \
-             patch("eggcalc.normalize.run", wraps=run) as mock_run:
+        with (
+            patch("builtins.input", side_effect=["5 + 3", EOFError]),
+            patch("eggcalc.normalize.run", wraps=run) as mock_run,
+        ):
             exit_code = _run_repl(show_expression=False)
         assert exit_code == 0
         mock_run.assert_called_once()
@@ -207,6 +216,7 @@ class TestReplEdgeCases:
 # ---------------------------------------------------------------------------
 # CLI Flag Tests
 # ---------------------------------------------------------------------------
+
 
 class TestCliVersionFlag:
     """Test --version flag."""
@@ -375,6 +385,7 @@ class TestCliStdinExpression:
 # ---------------------------------------------------------------------------
 # Output Format Tests
 # ---------------------------------------------------------------------------
+
 
 class TestOutputFormat:
     """Test output formatting details."""

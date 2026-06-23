@@ -27,28 +27,34 @@ class TestMultiDigitSubtraction:
     Regression tests for bug where '90-1' returned '901'.
     """
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("90-1", 89),
-        ("100-10", 90),
-        ("1000-1", 999),
-        ("50-5", 45),
-        ("123-45", 78),
-        ("999-99", 900),
-        ("10000-1", 9999),
-        ("10-0", 10),
-        ("0-10", -10),
-        ("0-0", 0),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("90-1", 89),
+            ("100-10", 90),
+            ("1000-1", 999),
+            ("50-5", 45),
+            ("123-45", 78),
+            ("999-99", 900),
+            ("10000-1", 9999),
+            ("10-0", 10),
+            ("0-10", -10),
+            ("0-0", 0),
+        ],
+    )
     def test_multi_digit_subtraction(self, expr, expected):
         result = evaluate(expr)
         assert abs(get_value(result) - expected) < 1e-10
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("12+34-56", -10),
-        ("100-10-20-30", 40),
-        ("50-5-5-5", 35),
-        ("1000-100-10-1", 889),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("12+34-56", -10),
+            ("100-10-20-30", 40),
+            ("50-5-5-5", 35),
+            ("1000-100-10-1", 889),
+        ],
+    )
     def test_chained_subtraction(self, expr, expected):
         result = evaluate(expr)
         assert abs(get_value(result) - expected) < 1e-10
@@ -57,31 +63,40 @@ class TestMultiDigitSubtraction:
 class TestMultiDigitOperations:
     """Test operations with multi-digit numbers."""
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("12+34", 46),
-        ("100+200", 300),
-        ("123+456", 579),
-        ("99+1", 100),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("12+34", 46),
+            ("100+200", 300),
+            ("123+456", 579),
+            ("99+1", 100),
+        ],
+    )
     def test_multi_digit_addition(self, expr, expected):
         result = evaluate(expr)
         assert abs(get_value(result) - expected) < 1e-10
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("10*10", 100),
-        ("12*12", 144),
-        ("100*100", 10000),
-        ("99*99", 9801),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("10*10", 100),
+            ("12*12", 144),
+            ("100*100", 10000),
+            ("99*99", 9801),
+        ],
+    )
     def test_multi_digit_multiplication(self, expr, expected):
         result = evaluate(expr)
         assert abs(get_value(result) - expected) < 1e-10
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("100/10", 10),
-        ("144/12", 12),
-        ("1000/8", 125),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("100/10", 10),
+            ("144/12", 12),
+            ("1000/8", 125),
+        ],
+    )
     def test_multi_digit_division(self, expr, expected):
         result = evaluate(expr)
         assert abs(get_value(result) - expected) < 1e-10
@@ -116,14 +131,17 @@ class TestOperatorPrecedence:
 class TestNegativeNumbers:
     """Test handling of negative numbers."""
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("-5", -5),
-        ("--5", 5),
-        ("---5", -5),
-        ("5*-3", -15),
-        ("10+-2", 8),
-        ("-10*-2", 20),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("-5", -5),
+            ("--5", 5),
+            ("---5", -5),
+            ("5*-3", -15),
+            ("10+-2", 8),
+            ("-10*-2", 20),
+        ],
+    )
     def test_negative_literals(self, expr, expected):
         result = evaluate(expr)
         assert abs(get_value(result) - expected) < 1e-10
@@ -132,14 +150,17 @@ class TestNegativeNumbers:
 class TestDecimalNumbers:
     """Test handling of decimal numbers."""
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("3.14", 3.14),
-        ("0.5", 0.5),
-        (".5", 0.5),
-        ("3.14*2", 6.28),
-        ("1.5+2.5", 4.0),
-        ("10.5-5.5", 5.0),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("3.14", 3.14),
+            ("0.5", 0.5),
+            (".5", 0.5),
+            ("3.14*2", 6.28),
+            ("1.5+2.5", 4.0),
+            ("10.5-5.5", 5.0),
+        ],
+    )
     def test_decimals(self, expr, expected):
         result = evaluate(expr)
         assert abs(get_value(result) - expected) < 1e-10

@@ -192,6 +192,7 @@ class TestSpecialCases:
 
     def test_any_to_power_one_half(self):
         import math
+
         result = evaluate("4**0.5")
         expected = math.sqrt(4)
         assert abs(get_value(result) - expected) < 1e-10

@@ -111,9 +111,12 @@ class UnitValue:
                 result = self.value + other
                 out_unit = None
             else:
-                raise ValueError(f"Cannot add a dimensionless value to {self.unit}; use matching units or convert first")
+                raise ValueError(
+                    f"Cannot add a dimensionless value to {self.unit}; use matching units or convert first"
+                )
         UnitValue._check_overflow(result)
         return UnitValue(result, out_unit)
+
     def __radd__(self, other: Numeric) -> UnitValue:
         return self.__add__(other)
 
@@ -139,7 +142,9 @@ class UnitValue:
                 result = self.value - other
                 out_unit = None
             else:
-                raise ValueError(f"Cannot subtract a dimensionless value from {self.unit}; use matching units or convert first")
+                raise ValueError(
+                    f"Cannot subtract a dimensionless value from {self.unit}; use matching units or convert first"
+                )
         UnitValue._check_overflow(result)
         return UnitValue(result, out_unit)
 
@@ -223,9 +228,7 @@ class UnitValue:
         if self.unit:
             if self.value == 0:
                 raise ZeroDivisionError("Cannot divide by zero UnitValue")
-            raise ValueError(
-                f"Cannot floor-divide a number by a unit value ('{self.unit}')"
-            )
+            raise ValueError(f"Cannot floor-divide a number by a unit value ('{self.unit}')")
         if self.value == 0:
             raise ZeroDivisionError("Cannot divide by zero UnitValue")
         return UnitValue(other // self.value, None)
@@ -259,9 +262,7 @@ class UnitValue:
         if self.unit:
             if self.value == 0:
                 raise ZeroDivisionError("Cannot mod by zero UnitValue")
-            raise ValueError(
-                f"Cannot take modulo by a unit value ('{self.unit}')"
-            )
+            raise ValueError(f"Cannot take modulo by a unit value ('{self.unit}')")
         if self.value == 0:
             raise ZeroDivisionError("Cannot mod by zero UnitValue")
         return UnitValue(other % self.value, None)
@@ -293,9 +294,7 @@ class UnitValue:
                     return UnitValue(result, None)
                 unit = _simplify_unit_string(f"{self.unit}**{int_exp}") or f"{self.unit}**{int_exp}"
             else:
-                raise ValueError(
-                    f"Cannot raise unit '{self.unit}' to non-integer power"
-                )
+                raise ValueError(f"Cannot raise unit '{self.unit}' to non-integer power")
         else:
             result = self.value**other
             unit = self.unit
@@ -911,7 +910,7 @@ def _add_compound_conversions(
             if f is None:
                 ok = False
                 break
-            factor *= f ** exp
+            factor *= f**exp
         if not ok:
             continue
         grouped.setdefault(category, []).append((unit_name, factor))
@@ -1626,9 +1625,15 @@ _SHORT_COMPOUND_FORMS: dict[str, tuple[str, str, str]] = {
     "yd3": ("yd3", "yd**3", "yd^3"),
     "mi3": ("mi3", "mi**3", "mi^3"),
 }
-_SHORT_COMPOUND_EXPANSION: dict[str, str] = {short: star for short, (_, star, _) in _SHORT_COMPOUND_FORMS.items()}
-_SHORT_COMPOUND_CARET: dict[str, str] = {short: caret for short, (_, _, caret) in _SHORT_COMPOUND_FORMS.items()}
-_SHORT_COMPOUND_COLLAPSE: dict[str, str] = {star: short for short, (short, star, _) in _SHORT_COMPOUND_FORMS.items()}
+_SHORT_COMPOUND_EXPANSION: dict[str, str] = {
+    short: star for short, (_, star, _) in _SHORT_COMPOUND_FORMS.items()
+}
+_SHORT_COMPOUND_CARET: dict[str, str] = {
+    short: caret for short, (_, _, caret) in _SHORT_COMPOUND_FORMS.items()
+}
+_SHORT_COMPOUND_COLLAPSE: dict[str, str] = {
+    star: short for short, (short, star, _) in _SHORT_COMPOUND_FORMS.items()
+}
 
 
 def _expand_short_compound(unit: str) -> str:
@@ -1684,9 +1689,7 @@ def is_unit(text: str) -> bool:
 
 
 UNIT_CATEGORIES: dict[str, str] = {
-    base_unit: category
-    for category, units_dict in UNIT_BASE.items()
-    for base_unit in units_dict
+    base_unit: category for category, units_dict in UNIT_BASE.items() for base_unit in units_dict
 }
 
 # Manual category mapping. The base unit names in UNIT_BASE (e.g. "m"
@@ -1715,10 +1718,7 @@ _BASE_CATEGORY: dict[str, str] = {
 # Remap the auto-derived UNIT_CATEGORIES from the raw base unit (e.g.
 # "m") to a friendly category name (e.g. "length") so MCP tools and
 # external consumers see stable category strings.
-UNIT_CATEGORIES = {
-    unit: _BASE_CATEGORY.get(cat, cat)
-    for unit, cat in UNIT_CATEGORIES.items()
-}
+UNIT_CATEGORIES = {unit: _BASE_CATEGORY.get(cat, cat) for unit, cat in UNIT_CATEGORIES.items()}
 
 # Manual categories for units that live outside UNIT_BASE (temperatures
 # use offset math and dimensionless categories, neither of which fit the
@@ -1748,7 +1748,9 @@ def get_unit_category(unit: str) -> str | None:
     return _derived_category(normalized)
 
 
-def _parse_compound_signature(unit: str) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, int], ...]] | None:
+def _parse_compound_signature(
+    unit: str,
+) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, int], ...]] | None:
     """Parse a compound unit string into (numerator, denominator) signatures.
 
     Each signature is a tuple of ``(base_unit, exponent)`` pairs, sorted
@@ -1801,7 +1803,7 @@ def _parse_compound_signature(unit: str) -> tuple[tuple[tuple[str, int], ...], t
     op_idx, op = _find_last_top_level_op(unit)
     if op_idx != -1:
         left_str = unit[:op_idx]
-        right_str = unit[op_idx + len(op):]
+        right_str = unit[op_idx + len(op) :]
         left = _parse_compound_signature(left_str)
         right = _parse_compound_signature(right_str)
         if left is None or right is None:

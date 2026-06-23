@@ -89,18 +89,20 @@ class TestPatchApplyCheckMCP:
     """Test patch_apply_check via MCP protocol."""
 
     def test_basic_apply(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": SINGLE_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": SINGLE_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["patch_parse_ok"] is True
@@ -111,18 +113,20 @@ class TestPatchApplyCheckMCP:
         assert len(content["result"]["failed_hunks"]) == 0
 
     def test_wrong_context(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": WRONG_CONTEXT_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": WRONG_CONTEXT_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["patch_parse_ok"] is True
@@ -132,73 +136,81 @@ class TestPatchApplyCheckMCP:
         assert "mismatch" in content["result"]["failed_hunks"][0]["reason"]
 
     def test_multiple_hunks(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT_WITH_ADD,
-                    "patch_text": MULTI_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT_WITH_ADD,
+                        "patch_text": MULTI_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["hunks_total"] == 2
         assert content["result"]["applies"] is True
 
     def test_return_result_text(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": SINGLE_HUNK_PATCH,
-                    "return_result_text": True,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": SINGLE_HUNK_PATCH,
+                        "return_result_text": True,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["result_text"] is not None
         assert "hello world" in content["result"]["result_text"]
 
     def test_return_result_fingerprint(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": SINGLE_HUNK_PATCH,
-                    "return_result_fingerprint": True,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": SINGLE_HUNK_PATCH,
+                        "return_result_fingerprint": True,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert len(content["result"]["result_fingerprint"]) == 64
 
     def test_affected_line_ranges(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": SINGLE_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": SINGLE_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         ranges = content["result"]["affected_line_ranges"]
@@ -207,102 +219,114 @@ class TestPatchApplyCheckMCP:
         assert "end" in ranges[0]
 
     def test_newline_style_detection(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": "hello\r\nworld\r\n",
-                    "patch_text": SINGLE_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": "hello\r\nworld\r\n",
+                        "patch_text": SINGLE_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["newline_style_before"] == "CRLF"
 
     def test_empty_patch(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": "",
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": "",
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["patch_parse_ok"] is False
 
     def test_malformed_patch(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": "not a real patch",
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": "not a real patch",
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["patch_parse_ok"] is False
 
     def test_strict_false(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": SINGLE_HUNK_PATCH,
-                    "strict": False,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": SINGLE_HUNK_PATCH,
+                        "strict": False,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
 
     def test_input_too_large_original(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": "a" * 300000,
-                    "patch_text": SINGLE_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": "a" * 300000,
+                        "patch_text": SINGLE_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         assert "result" in response
         assert response["result"]["isError"] is True
 
     def test_input_too_large_patch(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_apply_check",
-                "arguments": {
-                    "original_text": ORIGINAL_TEXT,
-                    "patch_text": "x" * 300000,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_apply_check",
+                    "arguments": {
+                        "original_text": ORIGINAL_TEXT,
+                        "patch_text": "x" * 300000,
+                    },
                 },
-            },
-        })
+            }
+        )
         assert "result" in response
         assert response["result"]["isError"] is True
 
@@ -311,17 +335,19 @@ class TestPatchSummaryMCP:
     """Test patch_summary via MCP protocol."""
 
     def test_basic_summary(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": SINGLE_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": SINGLE_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["files_changed"] == 1
@@ -331,17 +357,19 @@ class TestPatchSummaryMCP:
         assert content["result"]["binary_patch_detected"] is False
 
     def test_multi_hunk_summary(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": MULTI_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": MULTI_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["files_changed"] == 1
@@ -356,49 +384,55 @@ class TestPatchSummaryMCP:
         # format, e.g. `git diff -M`). The current parser does not
         # surface that metadata, so renames_detected stays empty for
         # this input. See plans/production_review_2026_07_b.md (B3).
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": RENAME_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": RENAME_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["renames_detected"] == []
 
     def test_binary_patch_detection(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": BINARY_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": BINARY_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["binary_patch_detected"] is True
 
     def test_line_ranges_by_file(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": SINGLE_HUNK_PATCH,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": SINGLE_HUNK_PATCH,
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert "b/example.py" in content["result"]["line_ranges_by_file"]
@@ -408,50 +442,56 @@ class TestPatchSummaryMCP:
         assert "end" in ranges[0]
 
     def test_empty_patch_summary(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": "",
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": "",
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["files_changed"] == 0
         assert content["result"]["hunks_total"] == 0
 
     def test_malformed_patch_summary(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": "not a real patch",
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": "not a real patch",
+                    },
                 },
-            },
-        })
+            }
+        )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is True
         assert content["result"]["files_changed"] == 0
 
     def test_input_too_large_summary(self):
-        response = handle_request({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": "x" * 300000,
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": "x" * 300000,
+                    },
                 },
-            },
-        })
+            }
+        )
         assert "result" in response
         assert response["result"]["isError"] is True
 

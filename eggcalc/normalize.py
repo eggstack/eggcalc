@@ -59,7 +59,9 @@ MAX_NESTING_DEPTH = 100
 _UNITS_BY_LENGTH: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
 
 # Regex alternation for matching any known unit name (for "in"/"into" disambiguation)
-_UNIT_NAMES_ALTERNATION: str = "|".join(re.escape(u) for u in sorted(UNIT_ALIASES.keys(), key=len, reverse=True))
+_UNIT_NAMES_ALTERNATION: str = "|".join(
+    re.escape(u) for u in sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
+)
 
 # Lowercase temperature abbreviations that should map to canonical uppercase forms
 _LOWERCASE_TEMP_UNITS: dict[str, str] = {"f": "F", "c": "C", "k": "K"}
@@ -438,7 +440,9 @@ def _build_config() -> tuple[dict, dict]:
         "parenthesis": re.compile(r"\(|\)"),
         "operators": re.compile(f"^({'|'.join([re.escape(s) for s in symbols])}){{1}}$"),
         # Handle stripped_chars: literals get escaped, but regex patterns like \bof\b are preserved
-        "stripped_chars": re.compile(f"({'|'.join([re.escape(p) if not (p.startswith(_wb) or _wb in p) else p for p in sorted(STRIPPED_PHRASES, key=len, reverse=True)])})"),
+        "stripped_chars": re.compile(
+            f"({'|'.join([re.escape(p) if not (p.startswith(_wb) or _wb in p) else p for p in sorted(STRIPPED_PHRASES, key=len, reverse=True)])})"
+        ),
         "int": re.compile(r"^[-+]?[0-9]\d*$"),
         # Float regex accepts a trailing decimal point ("5." -> 5.0) so
         # users can write Python-style shorthand. Both ".5" and "5." are
@@ -743,6 +747,7 @@ def apply_math_functions(
     - 5 factorial -> factorial(5)  (implicit-mul swap: leading number becomes the arg)
     - 5 sin -> sin(5)
     """
+
     def _is_pure_num_token(tok: str) -> bool:
         stripped = tok.strip("+-")
         return stripped.isdigit() and not any(c.isalpha() for c in stripped)
@@ -809,7 +814,9 @@ def apply_math_functions(
                     next_idx < len(tokens)
                     and tokens[next_idx] not in operators["functions"]
                     and tokens[next_idx] != ")"
-                    and (tokens[next_idx] == "(" or not patterns["operators"].match(tokens[next_idx]))
+                    and (
+                        tokens[next_idx] == "(" or not patterns["operators"].match(tokens[next_idx])
+                    )
                 )
                 if not has_trailing_value and output_tokens:
                     if output_tokens[-1] == "*":
@@ -852,7 +859,9 @@ def apply_math_functions(
                     if is_operator:
                         if next_token == ".":
                             pass  # continue collecting
-                        elif skipped_of and next_token in ("+", "-") and token in _MULTI_ARG_OF_FUNCS:
+                        elif (
+                            skipped_of and next_token in ("+", "-") and token in _MULTI_ARG_OF_FUNCS
+                        ):
                             # "of" chains: replace +/- with , for multi-arg functions
                             # e.g., mean*1+2+3 -> mean(1,2,3)
                             # Restricted to multi-arg functions; for single-arg
@@ -878,7 +887,15 @@ def apply_math_functions(
 def error_message(original: str, exception: BaseException, verbose: bool = False) -> None:
     """Print an error message based on the exception type."""
     # Sanitize input for safe terminal display
-    safe_original = ''.join(c if c.isprintable() and c not in '\x00\x01\x02\x03\x04\x05\x06\x07\x08\x0a\x0b\x0c\x0d\x0e\x0f' else '?' for c in original)
+    safe_original = ''.join(
+        (
+            c
+            if c.isprintable()
+            and c not in '\x00\x01\x02\x03\x04\x05\x06\x07\x08\x0a\x0b\x0c\x0d\x0e\x0f'
+            else '?'
+        )
+        for c in original
+    )
     exc_type = type(exception)
     if exc_type is ValueError:
         print(f"Error: {exception}: '{safe_original}'", file=sys.stderr)
@@ -911,9 +928,7 @@ def convert_from_human_handler(
             for word, num_val in word_to_number.items():
                 # Word-boundary replacement so substrings inside other words
                 # (e.g. "one" inside "None", "Phone", "stone") are not mutated.
-                replaced = re.sub(
-                    rf"\b{re.escape(word)}\b", f"@{num_val}", replaced
-                )
+                replaced = re.sub(rf"\b{re.escape(word)}\b", f"@{num_val}", replaced)
             tokens[i] = {0: replaced, 1: is_number}
         else:
             tokens[i] = {0: tokens[i], 1: is_number}
@@ -1010,7 +1025,7 @@ def split_at_operators(
                 tokens.insert(i + 2, f"-{parts[1]}")
             elif _should_split_number_sequence(tokens[i]):
                 parts = tokens[i].split()
-                tokens[i:i+1] = parts
+                tokens[i : i + 1] = parts
         i += 1
 
     return tokens
@@ -1143,9 +1158,7 @@ def _should_split_number_sequence(token: str) -> bool:
 # patterns and raises a clear error (e.g., "5 not 6" -> SyntaxError rather than
 # the silent "5~6" that would be produced by naive word substitution).
 _BINARY_WORD_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\))\s+"
-    r"(not|in|to|as|into)\s+"
-    r"(\d+(?:\.\d+)?)\b",
+    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\))\s+" r"(not|in|to|as|into)\s+" r"(\d+(?:\.\d+)?)\b",
     flags=re.IGNORECASE,
 )
 
@@ -1155,16 +1168,60 @@ _BINARY_WORD_PATTERN = re.compile(
 # function name, and (in apply_math_functions) to swap leading numbers into
 # the function's argument list when the function takes exactly one argument.
 _IMPLICIT_MUL_FUNCS: set[str] = {
-    "sqrt", "sin", "cos", "tan", "asin", "acos", "atan",
-    "sinh", "cosh", "tanh", "log", "ln", "log10", "log2",
-    "exp", "abs", "factorial", "fact", "cbrt", "floor",
-    "ceil", "round", "sign", "mean", "median", "mode",
-    "std", "variance", "var", "gcd", "lcm", "perm", "comb",
-    "nPr", "nCr", "isprime", "nextprime", "prevprime",
-    "primefactors", "random", "randint", "gauss", "sum",
-    "max", "min", "hypot", "clamp",
-    "sine", "cosine", "tangent", "absolute", "ceiling",
-    "stdev", "average",
+    "sqrt",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "log",
+    "ln",
+    "log10",
+    "log2",
+    "exp",
+    "abs",
+    "factorial",
+    "fact",
+    "cbrt",
+    "floor",
+    "ceil",
+    "round",
+    "sign",
+    "mean",
+    "median",
+    "mode",
+    "std",
+    "variance",
+    "var",
+    "gcd",
+    "lcm",
+    "perm",
+    "comb",
+    "nPr",
+    "nCr",
+    "isprime",
+    "nextprime",
+    "prevprime",
+    "primefactors",
+    "random",
+    "randint",
+    "gauss",
+    "sum",
+    "max",
+    "min",
+    "hypot",
+    "clamp",
+    "sine",
+    "cosine",
+    "tangent",
+    "absolute",
+    "ceiling",
+    "stdev",
+    "average",
 }
 
 # Named constants that participate in implicit multiplication with numbers.
@@ -1172,18 +1229,46 @@ _IMPLICIT_MUL_FUNCS: set[str] = {
 # Single-letter "e" is excluded because it conflicts with scientific notation
 # like "1e3" and with reserved identifiers — use "2.71828" or "(pi tau)" instead.
 _IMPLICIT_MUL_CONSTANTS: set[str] = {
-    "pi", "tau",
+    "pi",
+    "tau",
 }
 
 # Subset of _IMPLICIT_MUL_FUNCS that take exactly one argument. Used by
 # apply_math_functions to detect "<num> <func>" -> "<func>(<num>)" swap.
 _SINGLE_ARG_IMPLICIT_MUL: set[str] = {
-    "sqrt", "sin", "cos", "tan", "asin", "acos", "atan",
-    "sinh", "cosh", "tanh", "log", "ln", "log10", "log2",
-    "exp", "abs", "factorial", "fact", "cbrt", "floor",
-    "ceil", "round", "sign", "isprime", "nextprime",
-    "prevprime", "random", "primefactors",
-    "sine", "cosine", "tangent", "absolute", "ceiling",
+    "sqrt",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "log",
+    "ln",
+    "log10",
+    "log2",
+    "exp",
+    "abs",
+    "factorial",
+    "fact",
+    "cbrt",
+    "floor",
+    "ceil",
+    "round",
+    "sign",
+    "isprime",
+    "nextprime",
+    "prevprime",
+    "random",
+    "primefactors",
+    "sine",
+    "cosine",
+    "tangent",
+    "absolute",
+    "ceiling",
 }
 
 # Subset of _IMPLICIT_MUL_FUNCS that take multiple arguments. Used by
@@ -1191,10 +1276,25 @@ _SINGLE_ARG_IMPLICIT_MUL: set[str] = {
 # "mean(1,2,3)". Single-arg functions keep "+" / "-" as real operators
 # (e.g., "sqrt of 144 + 5" -> "sqrt(144) + 5").
 _MULTI_ARG_OF_FUNCS: set[str] = {
-    "mean", "median", "mode", "std", "variance", "var",
-    "gcd", "lcm", "perm", "comb", "nPr", "nCr",
-    "sum", "max", "min", "clamp",
-    "gauss", "hypot", "randint",
+    "mean",
+    "median",
+    "mode",
+    "std",
+    "variance",
+    "var",
+    "gcd",
+    "lcm",
+    "perm",
+    "comb",
+    "nPr",
+    "nCr",
+    "sum",
+    "max",
+    "min",
+    "clamp",
+    "gauss",
+    "hypot",
+    "randint",
 }
 
 
@@ -1312,8 +1412,7 @@ def _normalize_postfix_unit_power_words(expression: str) -> str:
         return _canonical_power_unit(m.group("unit"), exponent)
 
     return re.sub(
-        rf"(?<![A-Za-z0-9_])(?P<unit>{unit_alt})(?![A-Za-z0-9_])\s+"
-        rf"(?P<power>squared|cubed)\b",
+        rf"(?<![A-Za-z0-9_])(?P<unit>{unit_alt})(?![A-Za-z0-9_])\s+" rf"(?P<power>squared|cubed)\b",
         _replace,
         expression,
         flags=re.IGNORECASE,
@@ -1403,19 +1502,39 @@ _NUMBER_SCALES: dict[str, list[str]] = {
 }
 
 _NUMBER_WORDS_SINGLE: dict[str, list[str]] = {
-    "1": ["one"], "2": ["two"], "3": ["three"], "4": ["four"], "5": ["five"],
-    "6": ["six"], "7": ["seven"], "8": ["eight"], "9": ["nine"],
+    "1": ["one"],
+    "2": ["two"],
+    "3": ["three"],
+    "4": ["four"],
+    "5": ["five"],
+    "6": ["six"],
+    "7": ["seven"],
+    "8": ["eight"],
+    "9": ["nine"],
 }
 
 _NUMBER_WORDS_TEENS: dict[str, list[str]] = {
-    "10": ["ten"], "11": ["eleven"], "12": ["twelve"], "13": ["thirteen"],
-    "14": ["fourteen"], "15": ["fifteen"], "16": ["sixteen"], "17": ["seventeen"],
-    "18": ["eighteen"], "19": ["nineteen"],
+    "10": ["ten"],
+    "11": ["eleven"],
+    "12": ["twelve"],
+    "13": ["thirteen"],
+    "14": ["fourteen"],
+    "15": ["fifteen"],
+    "16": ["sixteen"],
+    "17": ["seventeen"],
+    "18": ["eighteen"],
+    "19": ["nineteen"],
 }
 
 _NUMBER_WORDS_TENS: dict[str, list[str]] = {
-    "20": ["twenty"], "30": ["thirty"], "40": ["forty"], "50": ["fifty"],
-    "60": ["sixty"], "70": ["seventy"], "80": ["eighty"], "90": ["ninety"],
+    "20": ["twenty"],
+    "30": ["thirty"],
+    "40": ["forty"],
+    "50": ["fifty"],
+    "60": ["sixty"],
+    "70": ["seventy"],
+    "80": ["eighty"],
+    "90": ["ninety"],
 }
 
 
@@ -1440,14 +1559,10 @@ def _build_multi_word_numbers() -> dict[str, str]:
                     for ones_word in ones_words:
                         for scale_word in scale_words:
                             key = f"{tens_word} {ones_word} {scale_word}"
-                            result[key] = str(
-                                (int(tens_val) + int(ones_val)) * int(scale_val)
-                            )
+                            result[key] = str((int(tens_val) + int(ones_val)) * int(scale_val))
     # Compound hundreds with larger scales: "X hundred Y thousand" -> (X*100+Y)*1000
     # E.g., "one hundred twenty one thousand" -> 121000
-    larger_scales = {
-        sv: sw for sv, sw in _NUMBER_SCALES.items() if int(sv) > 100
-    }
+    larger_scales = {sv: sw for sv, sw in _NUMBER_SCALES.items() if int(sv) > 100}
     all_ones = {**_NUMBER_WORDS_SINGLE, **_NUMBER_WORDS_TEENS}
     for hundred_val, hundred_words in _NUMBER_WORDS_SINGLE.items():
         for scale_val, scale_words in larger_scales.items():
@@ -1461,10 +1576,7 @@ def _build_multi_word_numbers() -> dict[str, str]:
                         tens_only = int(tens_val)
                         combined = int(hundred_val) * 100 + tens_only
                         for tens_word in tens_words:
-                            key = (
-                                f"{hundred_word} hundred "
-                                f"{tens_word} {scale_word}"
-                            )
+                            key = f"{hundred_word} hundred " f"{tens_word} {scale_word}"
                             result[key] = str(combined * int(scale_val))
                     # "X hundred tens ones scale" for tens+ones (e.g., "one hundred twenty one thousand")
                     for tens_val, tens_words in _NUMBER_WORDS_TENS.items():
@@ -1482,19 +1594,13 @@ def _build_multi_word_numbers() -> dict[str, str]:
                     for teen_val, teen_words in _NUMBER_WORDS_TEENS.items():
                         combined = int(hundred_val) * 100 + int(teen_val)
                         for teen_word in teen_words:
-                            key = (
-                                f"{hundred_word} hundred "
-                                f"{teen_word} {scale_word}"
-                            )
+                            key = f"{hundred_word} hundred " f"{teen_word} {scale_word}"
                             result[key] = str(combined * int(scale_val))
                     # "X hundred ones scale" for ones (e.g., "one hundred one thousand")
                     for ones_val, ones_words in _NUMBER_WORDS_SINGLE.items():
                         combined = int(hundred_val) * 100 + int(ones_val)
                         for ones_word in ones_words:
-                            key = (
-                                f"{hundred_word} hundred "
-                                f"{ones_word} {scale_word}"
-                            )
+                            key = f"{hundred_word} hundred " f"{ones_word} {scale_word}"
                             result[key] = str(combined * int(scale_val))
     # Standalone compound numbers (tens + ones, no scale word)
     # E.g., "twenty one" -> 21, "forty two" -> 42
@@ -1551,9 +1657,7 @@ _MULTI_WORD_NUMBERS["three quarters"] = "0.75"
 _ALL_NUMBER_WORDS_SET: frozenset[str] = frozenset(
     word for words in NUMBER_WORDS.values() for word in words
 )
-_NUMBER_WORDS_HYPHEN_PATTERN: str = "|".join(
-    sorted(_ALL_NUMBER_WORDS_SET, key=len, reverse=True)
-)
+_NUMBER_WORDS_HYPHEN_PATTERN: str = "|".join(sorted(_ALL_NUMBER_WORDS_SET, key=len, reverse=True))
 
 # Flattened word -> digit mapping (for single-word replacement)
 _ALL_NUMBER_WORDS_FLAT: dict[str, str] = {}
@@ -1605,8 +1709,12 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
 
     # Replace multi-word function names before whitespace removal collapses them
     # e.g., "square root" -> "sqrt", "cube root" -> "cbrt"
-    for phrase, replacement in sorted(_MULTI_WORD_FUNCTIONS.items(), key=lambda x: len(x[0]), reverse=True):
-        expression = re.sub(r"\b" + re.escape(phrase) + r"\b", replacement, expression, flags=re.IGNORECASE)
+    for phrase, replacement in sorted(
+        _MULTI_WORD_FUNCTIONS.items(), key=lambda x: len(x[0]), reverse=True
+    ):
+        expression = re.sub(
+            r"\b" + re.escape(phrase) + r"\b", replacement, expression, flags=re.IGNORECASE
+        )
 
     # Accept compact single-argument function forms promised by the parser
     # comments, e.g. "sin30" -> "sin 30" and "2sqrt9" -> "2sqrt 9".
@@ -1616,13 +1724,16 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
         name.lower() for name in operators["functions"] if name[-1:].isdigit()
     }
     compact_arg_functions = [
-        name for name in operators["functions"]
+        name
+        for name in operators["functions"]
         if name in _SINGLE_ARG_IMPLICIT_MUL and not name[-1:].isdigit()
     ]
     if compact_arg_functions:
         compact_arg_pattern = re.compile(
             r"(?<![A-Za-z_])("
-            + "|".join(re.escape(name) for name in sorted(compact_arg_functions, key=len, reverse=True))
+            + "|".join(
+                re.escape(name) for name in sorted(compact_arg_functions, key=len, reverse=True)
+            )
             + r")([+-]?\d+(?:\.\d+)?)(?![A-Za-z_])",
             flags=re.IGNORECASE,
         )
@@ -1658,7 +1769,9 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # Replace multi-word number phrases to prevent incorrect joining
     # e.g., "one hundred" -> "100", "two thousand" -> "2000"
     for phrase, replacement in _SORTED_MULTI_WORD_NUMBERS:
-        expression = re.sub(r"\b" + re.escape(phrase) + r"\b", replacement, expression, flags=re.IGNORECASE)
+        expression = re.sub(
+            r"\b" + re.escape(phrase) + r"\b", replacement, expression, flags=re.IGNORECASE
+        )
 
     # Strip "and" as a filler word in NL number expressions
     expression = re.sub(r"\band\b", "", expression, flags=re.IGNORECASE)
@@ -1708,7 +1821,9 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # This ensures unrecognized number words are converted to digits for the fallback path.
     # Compound numbers like "twenty one" are already resolved by _MULTI_WORD_NUMBERS above.
     for word, replacement in _SORTED_ALL_NUMBER_WORDS:
-        expression = re.sub(r"\b" + re.escape(word) + r"\b", replacement, expression, flags=re.IGNORECASE)
+        expression = re.sub(
+            r"\b" + re.escape(word) + r"\b", replacement, expression, flags=re.IGNORECASE
+        )
 
     # Handle short-form power phrases AFTER word replacement to support
     # word numbers like "three to the ten" → "3**10". This must run after
@@ -1758,7 +1873,9 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
                 flags=re.IGNORECASE,
             ):
                 continue
-        expression = re.sub(r"\b" + re.escape(word) + r"\b", replacement, expression, flags=re.IGNORECASE)
+        expression = re.sub(
+            r"\b" + re.escape(word) + r"\b", replacement, expression, flags=re.IGNORECASE
+        )
 
     # Handle "point" as decimal separator: only when preceded by a digit or ')'
     # This avoids ".5" at expression start while still allowing "5 point 3" -> "5.3"
@@ -1798,7 +1915,9 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
                     rf"(\d+(?:\.\d+)?)\s*\*?\s*{_compound_unit_pattern(from_unit)}"
                     rf"\s*(?:in|to|IN|TO)\s*{_compound_unit_pattern(to_unit)}"
                 )
-                replacement_fn = lambda m, fu=from_unit, tu=to_unit: f"convert({m.group(1)}*{fu},{tu})"
+                replacement_fn = (
+                    lambda m, fu=from_unit, tu=to_unit: f"convert({m.group(1)}*{fu},{tu})"
+                )
                 expression = re.sub(pattern, replacement_fn, expression, flags=re.IGNORECASE)
 
     # Handle single-unit sources converting to compound targets
@@ -1812,7 +1931,9 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
                     rf"(\d+(?:\.\d+)?)\s*\*?\s*{_compound_unit_pattern(from_unit)}"
                     rf"\s*(?:in|to|IN|TO)\s*{_compound_unit_pattern(to_unit)}"
                 )
-                replacement_fn = lambda m, fu=from_unit, tu=to_unit: f"convert({m.group(1)}*{fu},{tu})"
+                replacement_fn = (
+                    lambda m, fu=from_unit, tu=to_unit: f"convert({m.group(1)}*{fu},{tu})"
+                )
                 expression = re.sub(pattern, replacement_fn, expression, flags=re.IGNORECASE)
 
     # Handle bare compound unit expressions: "30 km/h" -> "30*km/h"
@@ -1820,15 +1941,26 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # would be lost). Only insert "*" between the number and the compound unit.
     for unit in _COMPOUND_UNITS:
         pattern = rf"(\d+(?:\.\d+)?)(\s*)({re.escape(unit)})\b"
-        expression = re.sub(pattern, lambda m: f"{m.group(1)}*{m.group(3)}", expression, flags=re.IGNORECASE)
+        expression = re.sub(
+            pattern, lambda m: f"{m.group(1)}*{m.group(3)}", expression, flags=re.IGNORECASE
+        )
 
     # Handle "<num> <unit> / <unit>" expressions (e.g., "5 km / h") - convert
     # to a form the evaluator can handle without naming `h` as a Planck constant.
     # We emit convert(N*unit1, base_unit) / convert(1*unit2, base_unit2) form.
     _COMPOUND_SPLIT_PAIRS: list[tuple[str, str]] = [
-        ("km", "h"), ("mi", "h"), ("m", "s"), ("km", "s"), ("mi", "s"),
-        ("km", "hr"), ("mi", "hr"), ("m", "sec"), ("km", "sec"), ("mi", "sec"),
-        ("km", "min"), ("mi", "min"),
+        ("km", "h"),
+        ("mi", "h"),
+        ("m", "s"),
+        ("km", "s"),
+        ("mi", "s"),
+        ("km", "hr"),
+        ("mi", "hr"),
+        ("m", "sec"),
+        ("km", "sec"),
+        ("mi", "sec"),
+        ("km", "min"),
+        ("mi", "min"),
     ]
     for u1, u2 in _COMPOUND_SPLIT_PAIRS:
         pattern = rf"(\d+(?:\.\d+)?)\s*{re.escape(u1)}\s*/\s*{re.escape(u2)}\b"
@@ -1861,11 +1993,22 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # Also handle "degrees in <unit>" by converting the full phrase.
     # Temperature units are skipped so "100 degrees in fahrenheit" is handled
     # by the unit conversion system, not the angle conversion.
-    _TEMP_UNITS = frozenset({
-        "f", "c", "k",
-        "fahrenheit", "celsius", "kelvin", "rankine",
-        "degf", "degc", "degk", "degr", "ra",
-    })
+    _TEMP_UNITS = frozenset(
+        {
+            "f",
+            "c",
+            "k",
+            "fahrenheit",
+            "celsius",
+            "kelvin",
+            "rankine",
+            "degf",
+            "degc",
+            "degk",
+            "degr",
+            "ra",
+        }
+    )
     # Use a placeholder to prevent subsequent regexes from re-matching temperature expressions.
     _DEG_PLACEHOLDER = "\x00DEG_TEMP\x00"
 
@@ -1966,9 +2109,10 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
             # "pi tau" -> "pi*tau", "2 sqrt 9" -> "2*sqrt 9").
             prev_back_token = _peek_alpha_token_back(result)
             is_prev_constant = prev_back_token in _IMPLICIT_MUL_CONSTANTS
-            if char.isalpha() and result and (
-                result[-1] in "0123456789)"
-                or (result[-1].isalpha() and is_prev_constant)
+            if (
+                char.isalpha()
+                and result
+                and (result[-1] in "0123456789)" or (result[-1].isalpha() and is_prev_constant))
             ):
                 # Look ahead to see if current alpha sequence matches an implicit-mul function
                 trail: list[str] = []
@@ -1978,7 +2122,11 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
                     j += 1
                 candidate = "".join(trail)
                 # Skip if the candidate is a unit alias (e.g., "30 min" -> "30min", not "30*min()")
-                if (candidate in _IMPLICIT_MUL_FUNCS or candidate in _IMPLICIT_MUL_CONSTANTS) and candidate not in UNIT_ALIASES and candidate.lower() not in UNIT_ALIASES:
+                if (
+                    (candidate in _IMPLICIT_MUL_FUNCS or candidate in _IMPLICIT_MUL_CONSTANTS)
+                    and candidate not in UNIT_ALIASES
+                    and candidate.lower() not in UNIT_ALIASES
+                ):
                     result.append("*")
                     for c in candidate:
                         result.append(c)
@@ -2010,7 +2158,10 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
                 full_name = alpha_run + char
                 # If the full name is a function in the implicit-mul set,
                 # do NOT insert '*' — keep them together.
-                if full_name not in _IMPLICIT_MUL_FUNCS and full_name not in _IMPLICIT_MUL_CONSTANTS:
+                if (
+                    full_name not in _IMPLICIT_MUL_FUNCS
+                    and full_name not in _IMPLICIT_MUL_CONSTANTS
+                ):
                     result.append("*")
             if result and result[-1] == ")" and (char.isdigit() or char == "("):
                 # Implicit multiplication: ")(" or ")<digit>" -> ")*(" or ")*<digit>"
@@ -2042,7 +2193,7 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
                 # Look ahead: if the next char is alphanumeric, this is
                 # not yet a complete function name (e.g. "log" in
                 # "log10" — wait for "log10" before deciding).
-                next_is_alnum = (i + 1 < n and (expression[i + 1].isalnum()))
+                next_is_alnum = i + 1 < n and (expression[i + 1].isalnum())
                 if next_is_alnum:
                     # Don't set prev_was_func_end yet — wait for the
                     # alpha run to complete.
@@ -2124,7 +2275,7 @@ def _join_number_parts(expression: str) -> str:
             match = boundary_operator_re.match(rest)
             if match and match.end() < len(rest):
                 parts.append(match.group(1))
-                rest = rest[match.end():]
+                rest = rest[match.end() :]
                 continue
             break
 
@@ -2138,7 +2289,7 @@ def _join_number_parts(expression: str) -> str:
             if match is None:
                 break
             suffixes.append(match)
-            rest = rest[:-len(match)]
+            rest = rest[: -len(match)]
 
         if rest:
             parts.append(rest)
@@ -2171,8 +2322,25 @@ def _join_number_parts(expression: str) -> str:
     tokens = merged_ops
 
     _OPERATOR_TOKENS: set[str] = {
-        "+", "-", "*", "/", "//", "**", "%", "&", "|", "^", "<<", ">>", "~",
-        "(", ")", "!", "IN", "TO", "MOD",
+        "+",
+        "-",
+        "*",
+        "/",
+        "//",
+        "**",
+        "%",
+        "&",
+        "|",
+        "^",
+        "<<",
+        ">>",
+        "~",
+        "(",
+        ")",
+        "!",
+        "IN",
+        "TO",
+        "MOD",
     }
 
     def _is_digit_token(tok: str) -> bool:
@@ -2287,7 +2455,8 @@ def _preprocess_units(expression: str) -> str:
                 # Hex letters; binary/octal digits are already matched below.
                 while j < len(expression) and (
                     expression[j].isdigit()
-                    or expression[j] in ("a", "b", "c", "d", "e", "f", "A", "B", "C", "D", "E", "F", "_")
+                    or expression[j]
+                    in ("a", "b", "c", "d", "e", "f", "A", "B", "C", "D", "E", "F", "_")
                 ):
                     j += 1
                 result.append(expression[i:j])
@@ -2327,7 +2496,11 @@ def _preprocess_units(expression: str) -> str:
                         k = i + len(unit)
                         while k < len(expression) and expression[k].isspace():
                             k += 1
-                        if k + 1 < len(expression) and expression[k] == "*" and expression[k + 1] == "*":
+                        if (
+                            k + 1 < len(expression)
+                            and expression[k] == "*"
+                            and expression[k + 1] == "*"
+                        ):
                             result.append("(")
                             result.append(num)
                             result.append("*")
@@ -2347,11 +2520,7 @@ def _preprocess_units(expression: str) -> str:
                         # Skip if this looks like a hex literal (0x...) —
                         # the 'f'/'c'/'k' suffix is part of the hex digits,
                         # not a temperature unit.
-                        is_hex = (
-                            len(result) >= 2
-                            and result[-1] in ("x", "X")
-                            and result[-2] == "0"
-                        )
+                        is_hex = len(result) >= 2 and result[-1] in ("x", "X") and result[-2] == "0"
                         if not is_hex:
                             temp_canonical = _LOWERCASE_TEMP_UNITS[first_char.lower()]
                             # If followed by "**", wrap "<num>*<unit>" in
@@ -2360,7 +2529,11 @@ def _preprocess_units(expression: str) -> str:
                             k = i + 1
                             while k < len(expression) and expression[k].isspace():
                                 k += 1
-                            if k + 1 < len(expression) and expression[k] == "*" and expression[k + 1] == "*":
+                            if (
+                                k + 1 < len(expression)
+                                and expression[k] == "*"
+                                and expression[k + 1] == "*"
+                            ):
                                 result.append("(")
                                 result.append(num)
                                 result.append("*")
@@ -2376,7 +2549,12 @@ def _preprocess_units(expression: str) -> str:
                     result.append(num)
             else:
                 result.append(num)
-        elif char == "*" and result and (result[-1][-1:].isdigit() or result[-1][-1:] == ")") and i + 1 < len(expression):
+        elif (
+            char == "*"
+            and result
+            and (result[-1][-1:].isdigit() or result[-1][-1:] == ")")
+            and i + 1 < len(expression)
+        ):
             # "*" preceded by a digit. Check if the next alpha-only token is a
             # unit alias. Find the longest prefix that matches a unit alias.
             # (E.g., for "5*inTOcm", find "in" even though "i" alone isn't a unit.)
@@ -2386,7 +2564,7 @@ def _preprocess_units(expression: str) -> str:
             j = i
             best_end = i
             while j < len(expression) and expression[j].isalpha():
-                candidate = expression[i:j + 1]
+                candidate = expression[i : j + 1]
                 if candidate in UNIT_ALIASES or candidate.lower() in UNIT_ALIASES:
                     unit_tok = candidate
                     best_end = j + 1
@@ -2409,7 +2587,9 @@ def _preprocess_units(expression: str) -> str:
                         result.append(expression[i])
                         i += 1
                 else:
-                    canonical = UNIT_ALIASES.get(unit_tok, UNIT_ALIASES.get(unit_tok.lower(), unit_tok))
+                    canonical = UNIT_ALIASES.get(
+                        unit_tok, UNIT_ALIASES.get(unit_tok.lower(), unit_tok)
+                    )
                     result.append(canonical)
                     i = best_end
             else:
@@ -2465,6 +2645,7 @@ def _add_same_unit_division_parens(expression: str) -> str:
     Also handles same-unit division: "5*m/3*m" -> "5*m/(3*m)" so the
     units cancel and the result is dimensionless.
     """
+
     def _replace(match: re.Match) -> str:
         left_unit = match.group(1)
         denom = match.group(2)
@@ -2533,7 +2714,12 @@ def _handle_unit_conversion_from_tokens(tokens: list) -> list:
 
         # Bare-number source: e.g., tokens[i] is just "1" (no unit suffix)
         bare_number = False
-        if from_unit is None and token and (token[0].isdigit() or token[0] == "-") and token[-1].isdigit():
+        if (
+            from_unit is None
+            and token
+            and (token[0].isdigit() or token[0] == "-")
+            and token[-1].isdigit()
+        ):
             try:
                 float(token)
                 bare_number = True
@@ -2566,7 +2752,7 @@ def _handle_unit_conversion_from_tokens(tokens: list) -> list:
                         new_tokens = (
                             tokens[:i]
                             + [f"{num_part}*{to_unit_normalized}"]
-                            + tokens[next_idx + 2:]
+                            + tokens[next_idx + 2 :]
                         )
                         return new_tokens
                 elif to_unit_normalized and from_unit_normalized in UNIT_ALIASES:
@@ -2582,10 +2768,8 @@ def _handle_unit_conversion_from_tokens(tokens: list) -> list:
                     ):
                         new_tokens = (
                             tokens[:i]
-                            + [
-                                f"convert({num_part}*{from_unit_normalized},{to_unit_normalized})"
-                            ]
-                            + tokens[next_idx + 2:]
+                            + [f"convert({num_part}*{from_unit_normalized},{to_unit_normalized})"]
+                            + tokens[next_idx + 2 :]
                         )
                         return new_tokens
 
@@ -2897,6 +3081,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -2930,6 +3115,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
                 return 1
             if json_output:
                 import json
+
                 print(json.dumps(result))
                 return 0
             print(f"'{char}' appears {result['count']} time(s) in \"{text}\"")
@@ -2941,6 +3127,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
                 result = count_chars(text)
                 if json_output:
                     import json
+
                     print(json.dumps(result))
                     return 0
                 if isinstance(result, dict):
@@ -2957,6 +3144,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
                 result = count_chars(text)
                 if json_output:
                     import json
+
                     print(json.dumps(result))
                     return 0
                 print(f"\"{text}\": {len(text)} character(s)")
@@ -2983,6 +3171,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -3002,12 +3191,16 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
     if cmd == "replace-check":
         if _DELIM not in expression:
-            print(f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr)
+            print(
+                f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr
+            )
             return 1
-        raw = expression[len(cmd):].strip()
+        raw = expression[len(cmd) :].strip()
         segments = raw.split(_DELIM)
         if len(segments) < 3:
-            print(f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr)
+            print(
+                f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr
+            )
             return 1
         old = segments[0].strip()
         new = segments[1].strip()
@@ -3020,6 +3213,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -3066,6 +3260,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -3083,7 +3278,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
         if _DELIM not in expression:
             print(f"Usage: calc patch-check <original> {_DELIM} <patch>", file=sys.stderr)
             return 1
-        raw = expression[len(cmd):].strip()
+        raw = expression[len(cmd) :].strip()
         segments = raw.split(_DELIM, 1)
         if len(segments) < 2:
             print(f"Usage: calc patch-check <original> {_DELIM} <patch>", file=sys.stderr)
@@ -3098,6 +3293,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -3130,6 +3326,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -3163,6 +3360,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -3206,6 +3404,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
 
         if json_output:
             import json
+
             print(json.dumps(result))
             return 0
 
@@ -3274,9 +3473,7 @@ def main() -> int:
         action="store_true",
         help="Show expression in output (default for interactive)",
     )
-    parser.add_argument(
-        "--mcp", action="store_true", help="Run as MCP server for exact text tools"
-    )
+    parser.add_argument("--mcp", action="store_true", help="Run as MCP server for exact text tools")
     parser.add_argument(
         "--mcp-profile",
         default=None,
@@ -3294,11 +3491,14 @@ def main() -> int:
     if args.mcp:
         if args.mcp_profile:
             from eggcalc.mcp.server import set_active_profile
+
             set_active_profile(args.mcp_profile)
         if args.mcp_schema_detail:
             from eggcalc.mcp.server import set_schema_detail
+
             set_schema_detail(args.mcp_schema_detail)
         from eggcalc.mcp.server import mcp_main
+
         return mcp_main()
 
     if args.version:
@@ -3330,7 +3530,12 @@ def main() -> int:
         glob_indicators = []
         for arg in args.expression:
             path = os.path.join(cwd, arg)
-            if os.path.exists(path) and arg not in (".", "..") and not arg.startswith("./") and not arg.startswith("../"):
+            if (
+                os.path.exists(path)
+                and arg not in (".", "..")
+                and not arg.startswith("./")
+                and not arg.startswith("../")
+            ):
                 glob_indicators.append(arg)
 
         if glob_indicators:

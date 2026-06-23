@@ -25,13 +25,48 @@ class IdentifierAnalyzeResult(TypedDict):
     summary: str
 
 
-_RUST_KEYWORDS: frozenset[str] = frozenset({
-    "as", "async", "await", "break", "const", "continue", "crate", "dyn",
-    "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in",
-    "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
-    "self", "Self", "static", "struct", "super", "trait", "true", "type",
-    "unsafe", "use", "where", "while",
-})
+_RUST_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "as",
+        "async",
+        "await",
+        "break",
+        "const",
+        "continue",
+        "crate",
+        "dyn",
+        "else",
+        "enum",
+        "extern",
+        "false",
+        "fn",
+        "for",
+        "if",
+        "impl",
+        "in",
+        "let",
+        "loop",
+        "match",
+        "mod",
+        "move",
+        "mut",
+        "pub",
+        "ref",
+        "return",
+        "self",
+        "Self",
+        "static",
+        "struct",
+        "super",
+        "trait",
+        "true",
+        "type",
+        "unsafe",
+        "use",
+        "where",
+        "while",
+    }
+)
 
 _ENV_PATTERN = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
@@ -131,7 +166,11 @@ def _to_snake_case(text: str) -> str:
             prev_underscore = True
             continue
         if char.isupper():
-            if result and not prev_underscore and (prev_upper or i + 1 < len(text) and text[i + 1].isupper()):
+            if (
+                result
+                and not prev_underscore
+                and (prev_upper or i + 1 < len(text) and text[i + 1].isupper())
+            ):
                 result.append("_")
             result.append(char.lower())
             prev_upper = True
@@ -219,7 +258,9 @@ def identifier_analyze(
     if classification == "mixed":
         warnings.append("Identifier has mixed naming convention")
     if text.startswith("_"):
-        warnings.append("Identifier starts with underscore - typically reserved for private/use-only")
+        warnings.append(
+            "Identifier starts with underscore - typically reserved for private/use-only"
+        )
 
     suggestions = {
         "snake_case": _to_snake_case(text),

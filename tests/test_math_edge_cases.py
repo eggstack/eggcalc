@@ -10,6 +10,7 @@ from eggcalc.evaluator import EvaluationError, evaluate
 # Hyperbolic function tests
 # ---------------------------------------------------------------------------
 
+
 class TestHyperbolicFunctions:
     def test_sinh(self):
         assert evaluate("sinh(0)") == pytest.approx(0.0)
@@ -40,6 +41,7 @@ class TestHyperbolicFunctions:
 # atan2 test
 # ---------------------------------------------------------------------------
 
+
 class TestAtan2:
     def test_atan2(self):
         assert evaluate("atan2(1, 1)") == pytest.approx(math.pi / 4)
@@ -50,6 +52,7 @@ class TestAtan2:
 # ---------------------------------------------------------------------------
 # Additional math function tests
 # ---------------------------------------------------------------------------
+
 
 class TestAdditionalMathFunctions:
     def test_log1p(self):
@@ -81,6 +84,7 @@ class TestAdditionalMathFunctions:
 # ---------------------------------------------------------------------------
 # Edge case tests
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_mismatched_parens_open(self):
@@ -134,6 +138,7 @@ class TestEdgeCases:
 # ---------------------------------------------------------------------------
 # Function argument tests
 # ---------------------------------------------------------------------------
+
 
 class TestFunctionArguments:
     def test_function_too_many_args(self):

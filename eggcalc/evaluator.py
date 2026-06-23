@@ -89,6 +89,7 @@ class _EvalSpawnPermit:
         except Exception:
             pass
 
+
 MAX_EXPONENT = 10000
 MAX_FACTORIAL = 1000
 MAX_NESTING_DEPTH = 100
@@ -106,33 +107,82 @@ _SORTED_UNIT_ALIASES: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=T
 # default CLI evaluator leaves them enabled; the MCP-mode default evaluator
 # disables them so that "Deterministically evaluate" is true by default for
 # agents consuming the math_eval tool.
-_RANDOM_FUNCTIONS: frozenset[str] = frozenset({
-    "random", "randint", "randrange", "uniform", "randn", "gauss", "seed",
-})
+_RANDOM_FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "random",
+        "randint",
+        "randrange",
+        "uniform",
+        "randn",
+        "gauss",
+        "seed",
+    }
+)
 
 # Functions that mutate Evaluator state across calls (memory registers,
 # user variables). In MCP mode these are disabled to prevent cross-request
 # state pollution and uncontrolled memory growth.
-_SIDE_EFFECT_FUNCTIONS: frozenset[str] = frozenset({
-    "store", "recall", "M", "Mplus", "Mminus", "MC", "MR",
-    "setvar", "getvar", "delvar", "listvars", "clearvars",
-})
+_SIDE_EFFECT_FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "store",
+        "recall",
+        "M",
+        "Mplus",
+        "Mminus",
+        "MC",
+        "MR",
+        "setvar",
+        "getvar",
+        "delvar",
+        "listvars",
+        "clearvars",
+    }
+)
 
 # Functions that require a dimensionless argument. Calling these with a
 # UnitValue previously silently stripped the unit (e.g. ``fact(5m) -> 120``,
 # ``ceil(3.7m) -> 4``), which is misleading because the unit looks like it
 # participates in the computation. We now reject UnitValue with a unit and
 # raise a clear EvaluationError.
-_DIMENSIONLESS_REQUIRED_FUNCTIONS: frozenset[str] = frozenset({
-    "abs", "floor", "ceil", "trunc", "round", "sign",
-    "factorial", "fact", "gcd", "lcm", "perm", "comb", "nPr", "nCr",
-    "pow", "expm1",
-    "bin", "hex", "oct",
-    "bitand", "bitor", "bitxor", "bitnot", "bitlshift", "bitrshift",
-    "isprime", "is_prime", "primefactors", "prime_factors", "nextprime",
-    "next_prime", "prevprime", "prev_prime",
-    "randint", "randrange",
-})
+_DIMENSIONLESS_REQUIRED_FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "abs",
+        "floor",
+        "ceil",
+        "trunc",
+        "round",
+        "sign",
+        "factorial",
+        "fact",
+        "gcd",
+        "lcm",
+        "perm",
+        "comb",
+        "nPr",
+        "nCr",
+        "pow",
+        "expm1",
+        "bin",
+        "hex",
+        "oct",
+        "bitand",
+        "bitor",
+        "bitxor",
+        "bitnot",
+        "bitlshift",
+        "bitrshift",
+        "isprime",
+        "is_prime",
+        "primefactors",
+        "prime_factors",
+        "nextprime",
+        "next_prime",
+        "prevprime",
+        "prev_prime",
+        "randint",
+        "randrange",
+    }
+)
 
 # Historical note: some one-letter constant names (e.g., 'c', 'k', 'r') are
 # effectively shadowed by UNIT_ALIASES in visit_Name's lookup order, but
@@ -172,6 +222,7 @@ def _check_constant_unit_collisions() -> None:
     the inlined single-file build share the flag.
     """
     import warnings
+
     if getattr(warnings, "_eggcalc_collision_warned", False):
         return
     warnings._eggcalc_collision_warned = True
@@ -184,6 +235,7 @@ def _check_constant_unit_collisions() -> None:
             collisions.append(c)
     if collisions:
         import sys
+
         print(
             f"Warning: UNIT_ALIASES shadow CONSTANTS (unreachable as "
             f"constants; use long form): {sorted(collisions)}",
@@ -195,8 +247,12 @@ def _check_result_size(result: Any) -> Any:
     """Raise EvaluationError if a result has too many digits or is NaN/inf."""
     if isinstance(result, UnitValue):
         if isinstance(result.value, complex):
-            if math.isnan(result.value.real) or math.isnan(result.value.imag) or \
-               math.isinf(result.value.real) or math.isinf(result.value.imag):
+            if (
+                math.isnan(result.value.real)
+                or math.isnan(result.value.imag)
+                or math.isinf(result.value.real)
+                or math.isinf(result.value.imag)
+            ):
                 raise EvaluationError("Result too large")
             if abs(result.value) > MAX_RESULT_VALUE:
                 raise EvaluationError("Result too large")
@@ -215,7 +271,12 @@ def _check_result_size(result: Any) -> Any:
             if _int_digit_count(result.value) > MAX_RESULT_DIGITS:
                 raise EvaluationError(f"Result has too many digits (max {MAX_RESULT_DIGITS})")
     if isinstance(result, complex):
-        if math.isnan(result.real) or math.isnan(result.imag) or math.isinf(result.real) or math.isinf(result.imag):
+        if (
+            math.isnan(result.real)
+            or math.isnan(result.imag)
+            or math.isinf(result.real)
+            or math.isinf(result.imag)
+        ):
             raise EvaluationError("Result too large")
         if abs(result) > MAX_RESULT_VALUE:
             raise EvaluationError("Result too large")
@@ -308,8 +369,11 @@ def load_user_config() -> None:
                         # Infer category from the first existing unit in this
                         # base, or fall back to the base key itself.
                         existing = next(
-                            iter(units.UNIT_CATEGORIES.get(u) for u in units.UNIT_BASE[base]
-                                 if u in units.UNIT_CATEGORIES),
+                            iter(
+                                units.UNIT_CATEGORIES.get(u)
+                                for u in units.UNIT_BASE[base]
+                                if u in units.UNIT_CATEGORIES
+                            ),
                             None,
                         )
                         units.UNIT_CATEGORIES[unit_name] = existing or base
@@ -376,10 +440,7 @@ def _cached_normalize_and_evaluate(expression: str) -> Any:
     # function name only when followed by '(' so we don't false-positive
     # on the word "random" inside a larger identifier or comment.
     lowered = expression.lower()
-    if any(
-        f"{name}(" in lowered
-        for name in _RANDOM_FUNCTIONS
-    ):
+    if any(f"{name}(" in lowered for name in _RANDOM_FUNCTIONS):
         return _normalize_and_evaluate_uncached(expression)
     with _cache_lock:
         if expression in _cache:
@@ -478,26 +539,25 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
     if not isinstance(base, complex) and base < 0:
         if isinstance(exp, complex):
             if abs(exp.imag) > 1e-9 or not math.isclose(exp.real, round(exp.real), rel_tol=1e-9):
-                raise EvaluationError(
-                    "Cannot raise negative number to non-integer power"
-                )
+                raise EvaluationError("Cannot raise negative number to non-integer power")
             exp = int(round(exp.real))
         else:
             try:
                 if not math.isclose(exp, round(exp), rel_tol=1e-9):
-                    raise EvaluationError(
-                        "Cannot raise negative number to non-integer power"
-                    )
+                    raise EvaluationError("Cannot raise negative number to non-integer power")
                 exp = int(round(exp))
             except (TypeError, ValueError):
-                raise EvaluationError(
-                    "Cannot raise negative number to non-integer power"
-                )
+                raise EvaluationError("Cannot raise negative number to non-integer power")
     try:
         # For float base with large integer exponent, use int arithmetic
         # to avoid float overflow (e.g., pow(5.0, 500) overflows but 5**500 is exact)
         # Only apply when base is an exact integer (5.0, not 5.1) to avoid truncation.
-        if isinstance(base, float) and isinstance(exp, int) and abs(exp) > 300 and base.is_integer():
+        if (
+            isinstance(base, float)
+            and isinstance(exp, int)
+            and abs(exp) > 300
+            and base.is_integer()
+        ):
             result = pow(int(base), exp)
         else:
             result = pow(base, exp)
@@ -506,7 +566,12 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
     except OverflowError:
         raise EvaluationError("Result too large") from None
     if isinstance(result, complex):
-        if math.isnan(result.real) or math.isnan(result.imag) or math.isinf(result.real) or math.isinf(result.imag):
+        if (
+            math.isnan(result.real)
+            or math.isnan(result.imag)
+            or math.isinf(result.real)
+            or math.isinf(result.imag)
+        ):
             raise EvaluationError("Result too large")
     elif isinstance(result, float):
         if math.isnan(result) or math.isinf(result):
@@ -541,9 +606,7 @@ def _require_int(value: Any, name: str) -> int:
         return int(value)
     if isinstance(value, int):
         return value
-    raise EvaluationError(
-        f"{name}() requires an integer argument, got {type(value).__name__}"
-    )
+    raise EvaluationError(f"{name}() requires an integer argument, got {type(value).__name__}")
 
 
 def _int_digit_count(n: int) -> int:
@@ -833,8 +896,7 @@ def _bitlshift_safe(a: int, b: int) -> int:
     # before computing so we don't allocate huge ints in the worker.
     if a.bit_length() + b > MAX_RESULT_DIGITS * 3:
         raise EvaluationError(
-            f"Left shift would produce an integer with more than "
-            f"{MAX_RESULT_DIGITS} digits"
+            f"Left shift would produce an integer with more than " f"{MAX_RESULT_DIGITS} digits"
         )
     return a << b
 
@@ -1169,6 +1231,7 @@ _log_complex = _complex_aware(math.log, cmath.log, use_complex_for_negative=True
 _log10_complex = _complex_aware(math.log10, cmath.log10, use_complex_for_negative=True)
 _log2_complex = _complex_aware(math.log2, lambda x: cmath.log(x, 2), use_complex_for_negative=True)
 
+
 def _safe_log(*args):
     try:
         return _log_complex(*args)
@@ -1176,6 +1239,7 @@ def _safe_log(*args):
         if args and isinstance(args[0], (int, float)) and args[0] <= 0:
             raise EvaluationError("Logarithm undefined for non-positive values")
         raise
+
 
 def _safe_log10(*args):
     try:
@@ -1185,6 +1249,7 @@ def _safe_log10(*args):
             raise EvaluationError("Logarithm undefined for non-positive values")
         raise
 
+
 def _safe_log2(*args):
     try:
         return _log2_complex(*args)
@@ -1192,6 +1257,7 @@ def _safe_log2(*args):
         if args and isinstance(args[0], (int, float)) and args[0] <= 0:
             raise EvaluationError("Logarithm undefined for non-positive values")
         raise
+
 
 _log = _safe_log
 _log10 = _safe_log10
@@ -1219,13 +1285,15 @@ def _acosh(x):
 
 
 _atanh = _complex_aware(math.atanh, cmath.atanh, use_complex_for_abs_gt_one=True)
+
+
 def _cbrt_impl(x: float) -> float:
     return math.cbrt(x)
 
 
 def _cbrt_complex(x: complex) -> complex:
     """Complex cube root using principal branch."""
-    return x ** (1/3)
+    return x ** (1 / 3)
 
 
 _cbrt = _complex_aware(_cbrt_impl, _cbrt_complex)
@@ -1292,9 +1360,7 @@ def _set_user_variable(ev: Evaluator, name: Any, value: Any) -> Any:
     if not isinstance(name, str) or not name:
         raise EvaluationError("setvar: name must be a non-empty string")
     if not name.isidentifier():
-        raise EvaluationError(
-            f"setvar: name must be a valid identifier, got {name!r}"
-        )
+        raise EvaluationError(f"setvar: name must be a valid identifier, got {name!r}")
     with ev._var_lock:
         # Cap _user_variables size to prevent unbounded memory growth from
         # repeated setvar calls with unique names. Oldest entries (in
@@ -1550,12 +1616,16 @@ def _build_allowed_ast_types() -> frozenset[type[ast.AST]]:
     allowed.add(ast.Expression)
     for name in dir(ast):
         obj = getattr(ast, name)
-        if isinstance(obj, type) and issubclass(obj, ast.AST) and (
-            issubclass(obj, ast.operator)
-            or issubclass(obj, ast.unaryop)
-            or issubclass(obj, ast.expr_context)
-            or issubclass(obj, ast.cmpop)
-            or issubclass(obj, ast.boolop)
+        if (
+            isinstance(obj, type)
+            and issubclass(obj, ast.AST)
+            and (
+                issubclass(obj, ast.operator)
+                or issubclass(obj, ast.unaryop)
+                or issubclass(obj, ast.expr_context)
+                or issubclass(obj, ast.cmpop)
+                or issubclass(obj, ast.boolop)
+            )
         ):
             allowed.add(obj)
     return frozenset(allowed)
@@ -1663,7 +1733,9 @@ class Evaluator(ast.NodeVisitor):
         "ln": _log,
         "log10": _log10,
         "log2": _log2,
-        "log1p": _complex_aware(math.log1p, lambda x: cmath.log(1 + x), use_complex_for_negative=True),
+        "log1p": _complex_aware(
+            math.log1p, lambda x: cmath.log(1 + x), use_complex_for_negative=True
+        ),
         "exp": _exp,
         "expm1": _complex_aware(math.expm1, lambda x: cmath.exp(x) - 1),
         # Power and root (complex-aware)
@@ -1847,9 +1919,7 @@ class Evaluator(ast.NodeVisitor):
         self._depth += 1
         if self._depth > MAX_NESTING_DEPTH:
             self._depth -= 1
-            raise EvaluationError(
-                f"Expression too deeply nested (max {MAX_NESTING_DEPTH})"
-            )
+            raise EvaluationError(f"Expression too deeply nested (max {MAX_NESTING_DEPTH})")
         try:
             return super().visit(node)
         finally:
@@ -2070,7 +2140,12 @@ class Evaluator(ast.NodeVisitor):
 
         # Check for NaN/inf in float/complex results (int results cannot be NaN/inf)
         if isinstance(result, complex):
-            if math.isnan(result.real) or math.isnan(result.imag) or math.isinf(result.real) or math.isinf(result.imag):
+            if (
+                math.isnan(result.real)
+                or math.isnan(result.imag)
+                or math.isinf(result.real)
+                or math.isinf(result.imag)
+            ):
                 raise EvaluationError("Result too large")
         elif isinstance(result, float):
             if math.isnan(result) or math.isinf(result):
@@ -2079,7 +2154,13 @@ class Evaluator(ast.NodeVisitor):
                 raise EvaluationError("Result too large")
 
         # Check digit count for large int results from Add/Sub/Mult/Shift
-        if isinstance(result, int) and op_class in (ast.Add, ast.Sub, ast.Mult, ast.LShift, ast.RShift):
+        if isinstance(result, int) and op_class in (
+            ast.Add,
+            ast.Sub,
+            ast.Mult,
+            ast.LShift,
+            ast.RShift,
+        ):
             if _int_digit_count(result) > MAX_RESULT_DIGITS:
                 raise EvaluationError(f"Result has too many digits (max {MAX_RESULT_DIGITS})")
 
@@ -2087,26 +2168,27 @@ class Evaluator(ast.NodeVisitor):
         # (e.g., 2 ** 5m). Reject explicitly rather than silently dropping the
         # right-hand unit, which would let nonsense like "32.0 m" pass.
         if op_class is ast.Pow and isinstance(right, UnitValue) and right.unit:
-            raise EvaluationError(
-                f"Cannot raise a value to a power with units ('{right.unit}')"
-            )
+            raise EvaluationError(f"Cannot raise a value to a power with units ('{right.unit}')")
 
         # Power operator: handle unit exponentiation (e.g., 5m ** 2 -> 25 m**2)
         if op_class is ast.Pow and isinstance(left, UnitValue) and left.unit:
             if isinstance(right, int):
                 if right == 0:
                     return result  # anything**0 is dimensionless
-                simplified = _simplify_unit_string(f"{left.unit}**{right}") or f"{left.unit}**{right}"
+                simplified = (
+                    _simplify_unit_string(f"{left.unit}**{right}") or f"{left.unit}**{right}"
+                )
                 return UnitValue(result, simplified)
             if isinstance(right, float) and right.is_integer():
                 if int(right) == 0:
                     return result
-                simplified = _simplify_unit_string(f"{left.unit}**{int(right)}") or f"{left.unit}**{int(right)}"
+                simplified = (
+                    _simplify_unit_string(f"{left.unit}**{int(right)}")
+                    or f"{left.unit}**{int(right)}"
+                )
                 return UnitValue(result, simplified)
             # Non-integer exponent on a unit is physically nonsensical
-            raise EvaluationError(
-                f"Cannot raise unit '{left.unit}' to non-integer power"
-            )
+            raise EvaluationError(f"Cannot raise unit '{left.unit}' to non-integer power")
 
         # Compound unit detection for division:
         # 0. UnitValue / UnitValue with same units -> dimensionless (e.g., 5m / 3m -> 1.666...)
@@ -2145,18 +2227,10 @@ class Evaluator(ast.NodeVisitor):
                     f"Floor division and modulo with different units "
                     f"('{left.unit}' and '{right.unit}') are not supported"
                 )
-            if (
-                op_class is ast.FloorDiv
-                and not isinstance(right, UnitValue)
-                and right_unit_name
-            ):
+            if op_class is ast.FloorDiv and not isinstance(right, UnitValue) and right_unit_name:
                 compound = _simplify_unit_string(f"{left.unit}//{right_unit_name}")
                 return UnitValue(result, compound)
-            if (
-                op_class is ast.Mod
-                and not isinstance(right, UnitValue)
-                and right_unit_name
-            ):
+            if op_class is ast.Mod and not isinstance(right, UnitValue) and right_unit_name:
                 compound = _simplify_unit_string(f"{left.unit}%{right_unit_name}")
                 return UnitValue(result, compound)
 
@@ -2231,8 +2305,7 @@ class Evaluator(ast.NodeVisitor):
 
         if func_name is None:
             raise EvaluationError(
-                "Only simple function calls are supported "
-                "(e.g. sin(x), sqrt(y))"
+                "Only simple function calls are supported " "(e.g. sin(x), sqrt(y))"
             )
         if func_name not in self.FUNCTIONS:
             raise EvaluationError(f"Function '{func_name}' is not allowed")
@@ -2462,6 +2535,7 @@ def _evaluate_with_timeout_worker(
     """
     try:
         import resource
+
         resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
     except (ImportError, ValueError, OSError):
         # RLIMIT_AS may not be supported or enforced on all platforms (e.g., macOS).

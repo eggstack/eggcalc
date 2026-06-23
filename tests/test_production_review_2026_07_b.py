@@ -24,34 +24,58 @@ class TestJSONRPCBoolID:
 
     def test_bool_true_rejected(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": True, "method": "ping", "params": {},
-        })
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": True,
+                "method": "ping",
+                "params": {},
+            }
+        )
         assert "error" in r, f"bool id should be rejected, got: {r}"
         assert r["error"]["code"] == -32600
         assert "id" in r["error"]["message"].lower()
 
     def test_bool_false_rejected(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": False, "method": "ping", "params": {},
-        })
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": False,
+                "method": "ping",
+                "params": {},
+            }
+        )
         assert "error" in r, f"bool id should be rejected, got: {r}"
         assert r["error"]["code"] == -32600
 
     def test_int_id_still_accepted(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": 42, "method": "ping", "params": {},
-        })
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 42,
+                "method": "ping",
+                "params": {},
+            }
+        )
         assert "result" in r
         assert r["id"] == 42
 
     def test_string_id_still_accepted(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": "abc", "method": "ping", "params": {},
-        })
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "abc",
+                "method": "ping",
+                "params": {},
+            }
+        )
         assert "result" in r
         assert r["id"] == "abc"
 
@@ -65,15 +89,20 @@ class TestIdentifierTableInspectLanguage:
 
     def test_default_language_is_python(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {
-                "name": "identifier_table_inspect",
-                "arguments": {
-                    "identifiers": [{"name": "for"}, {"name": "x"}],
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "identifier_table_inspect",
+                    "arguments": {
+                        "identifiers": [{"name": "for"}, {"name": "x"}],
+                    },
                 },
-            },
-        })
+            }
+        )
         text = json.loads(r["result"]["content"][0]["text"])
         assert text["ok"], text
         # 'for' is a Python keyword; default language is python
@@ -83,16 +112,21 @@ class TestIdentifierTableInspectLanguage:
 
     def test_explicit_language_works(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {
-                "name": "identifier_table_inspect",
-                "arguments": {
-                    "identifiers": [{"name": "x"}],
-                    "language": "rust",
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "identifier_table_inspect",
+                    "arguments": {
+                        "identifiers": [{"name": "x"}],
+                        "language": "rust",
+                    },
                 },
-            },
-        })
+            }
+        )
         text = json.loads(r["result"]["content"][0]["text"])
         assert text["ok"], text
 
@@ -105,21 +139,26 @@ class TestPatchSummaryRenames:
 
     def test_simple_diff_not_a_rename(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": (
-                        "--- a/foo.txt\n"
-                        "+++ b/foo.txt\n"
-                        "@@ -1,1 +1,1 @@\n"
-                        "-old\n"
-                        "+new\n"
-                    ),
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": (
+                            "--- a/foo.txt\n"
+                            "+++ b/foo.txt\n"
+                            "@@ -1,1 +1,1 @@\n"
+                            "-old\n"
+                            "+new\n"
+                        ),
+                    },
                 },
-            },
-        })
+            }
+        )
         text = json.loads(r["result"]["content"][0]["text"])
         assert text["ok"], text
         assert text["result"]["renames_detected"] == [], (
@@ -129,21 +168,22 @@ class TestPatchSummaryRenames:
 
     def test_same_filename_not_a_rename(self):
         from eggcalc.mcp.server import handle_request
-        r = handle_request({
-            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {
-                "name": "patch_summary",
-                "arguments": {
-                    "patch_text": (
-                        "--- foo\n"
-                        "+++ foo\n"
-                        "@@ -1,1 +1,1 @@\n"
-                        "-old\n"
-                        "+new\n"
-                    ),
+
+        r = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "patch_summary",
+                    "arguments": {
+                        "patch_text": (
+                            "--- foo\n" "+++ foo\n" "@@ -1,1 +1,1 @@\n" "-old\n" "+new\n"
+                        ),
+                    },
                 },
-            },
-        })
+            }
+        )
         text = json.loads(r["result"]["content"][0]["text"])
         assert text["ok"], text
         assert text["result"]["renames_detected"] == []
@@ -166,21 +206,19 @@ class TestSetvarPublicAPICap:
 
         size = len(_default_evaluator._user_variables)
         assert size <= MAX_USER_VARIABLES, (
-            f"setvar() must enforce the {MAX_USER_VARIABLES} cap, "
-            f"got {size} entries"
+            f"setvar() must enforce the {MAX_USER_VARIABLES} cap, " f"got {size} entries"
         )
         # The oldest entries should have been evicted
-        assert _default_evaluator._user_variables.get("v0") is None, (
-            "v0 should have been evicted as the oldest entry"
-        )
+        assert (
+            _default_evaluator._user_variables.get("v0") is None
+        ), "v0 should have been evicted as the oldest entry"
         # The most recent should be present
-        assert _default_evaluator._user_variables.get(
-            f"v{MAX_USER_VARIABLES + 49}"
-        ) is not None
+        assert _default_evaluator._user_variables.get(f"v{MAX_USER_VARIABLES + 49}") is not None
         clearvars()
 
     def test_name_must_be_identifier(self):
         from eggcalc import EvaluationError, setvar
+
         with pytest.raises(EvaluationError):
             setvar("", 5)
         with pytest.raises(EvaluationError):
@@ -197,14 +235,14 @@ class TestUnitValueDimensionlessDivUnit:
 
     def test_dimensionless_div_unit_preserves_unit(self):
         from eggcalc.units import UnitValue
+
         result = UnitValue(1, None) / UnitValue(1, "m")
-        assert result.unit is not None, (
-            f"1/m should have a unit, got {result.unit!r}"
-        )
+        assert result.unit is not None, f"1/m should have a unit, got {result.unit!r}"
         assert result.value == 1.0
 
     def test_unit_div_dimensionless_preserves_unit(self):
         from eggcalc.units import UnitValue
+
         # 2m / 1 = 2m (already works)
         result = UnitValue(2, "m") / 1
         assert result.unit == "m"
@@ -218,11 +256,13 @@ class TestCompoundUnitCategory:
 
     def test_m_squared_has_category(self):
         from eggcalc.units import get_unit_category
+
         cat = get_unit_category("m**2")
         assert cat is not None, "m**2 must have a category for area"
 
     def test_m_squared_self_addition(self):
         from eggcalc.units import UnitValue
+
         r = UnitValue(5, "m**2") + UnitValue(3, "m**2")
         assert r.value == 8
         # 8 m**2 in some normalized form
@@ -230,10 +270,12 @@ class TestCompoundUnitCategory:
 
     def test_m_squared_to_cm_squared_conversion_factor(self):
         from eggcalc.units import get_conversion_factor
+
         f = get_conversion_factor("m**2", "cm**2")
         assert f == 10000.0, f"m**2 -> cm**2 factor should be 10000, got {f}"
 
     def test_m_per_s_squared_has_category(self):
         from eggcalc.units import get_unit_category
+
         cat = get_unit_category("m/s**2")
         assert cat is not None, "m/s**2 must have a category for acceleration"

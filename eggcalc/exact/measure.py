@@ -14,6 +14,7 @@ from typing import TypedDict
 
 class LineMetrics(TypedDict):
     """Line-level metrics."""
+
     lines: int
     nonempty_lines: int
     blank_lines: int
@@ -25,6 +26,7 @@ class LineMetrics(TypedDict):
 
 class WordMetrics(TypedDict):
     """Word-level metrics."""
+
     words: int
     unique_words_casefolded: int
     sentences_estimate: int
@@ -34,6 +36,7 @@ class WordMetrics(TypedDict):
 
 class CharCategoryMetrics(TypedDict):
     """Character category metrics."""
+
     letters: int
     digits: int
     punctuation: int

@@ -31,6 +31,7 @@ MAX_TEXT_LENGTH = 100_000
 
 class PolicyFinding(TypedDict):
     """A single finding from a policy check."""
+
     rule: str
     severity: str
     message: str
@@ -38,6 +39,7 @@ class PolicyFinding(TypedDict):
 
 class UnicodePolicyCheckResult(TypedDict):
     """Result of a Unicode policy check."""
+
     pass_: bool
     policy: str
     normalized_form: str
@@ -47,6 +49,7 @@ class UnicodePolicyCheckResult(TypedDict):
 
 class CanonicalizeResult(TypedDict):
     """Result of text canonicalization."""
+
     text: str
     changed: bool
     operations_applied: list[str]
@@ -57,43 +60,92 @@ class CanonicalizeResult(TypedDict):
 
 class CanonicalizeResultWithMapping(CanonicalizeResult):
     """Result of text canonicalization with character mapping."""
+
     mapping: list[dict[str, str]] | None
 
 
 # --- Policy definitions ---
 
-_VALID_POLICIES = frozenset({
-    "identifier_strict",
-    "filename_safe",
-    "source_code",
-    "human_text",
-    "json_key",
-    "domain_like",
-})
+_VALID_POLICIES = frozenset(
+    {
+        "identifier_strict",
+        "filename_safe",
+        "source_code",
+        "human_text",
+        "json_key",
+        "domain_like",
+    }
+)
 
 # Reserved Windows device names (case-insensitive)
-_WINDOWS_RESERVED = frozenset({
-    "CON", "PRN", "AUX", "NUL",
-    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-})
+_WINDOWS_RESERVED = frozenset(
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9",
+    }
+)
 
 # Bidi control characters (includes LRM/RLM marks per Unicode Bidirectional Algorithm)
-_BIDI_CHARS = frozenset({
-    "\u200e", "\u200f",  # LEFT-TO-RIGHT MARK, RIGHT-TO-LEFT MARK
-    "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
-    "\u2066", "\u2067", "\u2068", "\u2069",
-})
+_BIDI_CHARS = frozenset(
+    {
+        "\u200e",
+        "\u200f",  # LEFT-TO-RIGHT MARK, RIGHT-TO-LEFT MARK
+        "\u202a",
+        "\u202b",
+        "\u202c",
+        "\u202d",
+        "\u202e",
+        "\u2066",
+        "\u2067",
+        "\u2068",
+        "\u2069",
+    }
+)
 
 # Zero-width characters
-_ZERO_WIDTH_CHARS = frozenset({
-    "\u200b", "\u200c", "\u200d", "\u2060",
-})
+_ZERO_WIDTH_CHARS = frozenset(
+    {
+        "\u200b",
+        "\u200c",
+        "\u200d",
+        "\u2060",
+    }
+)
 
 # Windows forbidden characters
-_WIN_FORBIDDEN = frozenset({
-    "\\", "/", ":", "*", "?", "\"", "<", ">", "|",
-})
+_WIN_FORBIDDEN = frozenset(
+    {
+        "\\",
+        "/",
+        ":",
+        "*",
+        "?",
+        "\"",
+        "<",
+        ">",
+        "|",
+    }
+)
 
 
 def unicode_policy_check(
@@ -120,11 +172,13 @@ def unicode_policy_check(
             pass_=False,
             policy=policy,
             normalized_form="",
-            findings=[PolicyFinding(
-                rule="input_too_large",
-                severity="error",
-                message=f"Input length {len(text)} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}",
-            )],
+            findings=[
+                PolicyFinding(
+                    rule="input_too_large",
+                    severity="error",
+                    message=f"Input length {len(text)} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}",
+                )
+            ],
             summary=f"Input too large: {len(text)} > {MAX_TEXT_LENGTH}",
         )
 
@@ -133,11 +187,13 @@ def unicode_policy_check(
             pass_=False,
             policy=policy,
             normalized_form="",
-            findings=[PolicyFinding(
-                rule="invalid_policy",
-                severity="error",
-                message=f"Unknown policy: {policy}. Valid policies: {', '.join(sorted(_VALID_POLICIES))}",
-            )],
+            findings=[
+                PolicyFinding(
+                    rule="invalid_policy",
+                    severity="error",
+                    message=f"Unknown policy: {policy}. Valid policies: {', '.join(sorted(_VALID_POLICIES))}",
+                )
+            ],
             summary=f"Invalid policy: {policy}",
         )
 
@@ -156,11 +212,13 @@ def unicode_policy_check(
                 pass_=False,
                 policy=policy,
                 normalized_form="",
-                findings=[PolicyFinding(
-                    rule="invalid_normalization",
-                    severity="error",
-                    message=f"Invalid normalization form: {normalization}",
-                )],
+                findings=[
+                    PolicyFinding(
+                        rule="invalid_normalization",
+                        severity="error",
+                        message=f"Invalid normalization form: {normalization}",
+                    )
+                ],
                 summary=f"Invalid normalization: {normalization}",
             )
     else:
@@ -225,38 +283,46 @@ def _check_identifier_strict(text: str, normalized: str) -> list[PolicyFinding]:
     # Mixed scripts
     ms = detect_mixed_scripts(normalized)
     if ms["mixed_scripts"]:
-        findings.append(PolicyFinding(
-            rule="mixed_scripts",
-            severity="error",
-            message=f"Mixed scripts detected: {', '.join(ms['scripts'])}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="mixed_scripts",
+                severity="error",
+                message=f"Mixed scripts detected: {', '.join(ms['scripts'])}",
+            )
+        )
 
     # Bidi controls
     bidi_found = [c for c in normalized if c in _BIDI_CHARS]
     if bidi_found:
-        findings.append(PolicyFinding(
-            rule="bidi_controls",
-            severity="error",
-            message=f"Bidi control characters found: {len(bidi_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="bidi_controls",
+                severity="error",
+                message=f"Bidi control characters found: {len(bidi_found)}",
+            )
+        )
 
     # Zero-width characters
     zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
     if zw_found:
-        findings.append(PolicyFinding(
-            rule="zero_width_characters",
-            severity="error",
-            message=f"Zero-width characters found: {len(zw_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="zero_width_characters",
+                severity="error",
+                message=f"Zero-width characters found: {len(zw_found)}",
+            )
+        )
 
     # Confusables
     confusables = detect_confusables(normalized)
     if confusables:
-        findings.append(PolicyFinding(
-            rule="confusables",
-            severity="error",
-            message=f"Confusable characters found: {len(confusables)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="confusables",
+                severity="error",
+                message=f"Confusable characters found: {len(confusables)}",
+            )
+        )
 
     # Normalization instability (NFC != NFD form)
     # NOTE: This is an intentional heuristic for security-sensitive contexts.
@@ -265,23 +331,29 @@ def _check_identifier_strict(text: str, normalized: str) -> list[PolicyFinding]:
     # This is expected to have a high false-positive rate for non-ASCII text
     # with common accented characters. Callers should filter by severity
     # ("warning") if this is too noisy for their use case.
-    if unicodedata.is_normalized("NFC", normalized) and not unicodedata.is_normalized("NFD", normalized):
+    if unicodedata.is_normalized("NFC", normalized) and not unicodedata.is_normalized(
+        "NFD", normalized
+    ):
         nfd_form = unicodedata.normalize("NFD", normalized)
         if nfd_form != normalized:
-            findings.append(PolicyFinding(
-                rule="normalization_instability",
-                severity="warning",
-                message="Text has different forms under NFC vs NFD normalization",
-            ))
+            findings.append(
+                PolicyFinding(
+                    rule="normalization_instability",
+                    severity="warning",
+                    message="Text has different forms under NFC vs NFD normalization",
+                )
+            )
 
     # Invisible characters
     invisibles = find_invisibles(normalized)
     if invisibles:
-        findings.append(PolicyFinding(
-            rule="invisible_characters",
-            severity="error",
-            message=f"Invisible characters found: {len(invisibles)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="invisible_characters",
+                severity="error",
+                message=f"Invisible characters found: {len(invisibles)}",
+            )
+        )
 
     return findings
 
@@ -294,49 +366,59 @@ def _check_filename_safe(text: str, normalized: str) -> list[PolicyFinding]:
     for i, c in enumerate(normalized):
         cat = unicodedata.category(c)
         if cat.startswith("C") and c not in "\n\t\r":
-            findings.append(PolicyFinding(
-                rule="control_characters",
-                severity="error",
-                message=f"Control character at position {i}: U+{ord(c):04X}",
-            ))
+            findings.append(
+                PolicyFinding(
+                    rule="control_characters",
+                    severity="error",
+                    message=f"Control character at position {i}: U+{ord(c):04X}",
+                )
+            )
 
     # Windows forbidden characters
     forbidden_found = [c for c in normalized if c in _WIN_FORBIDDEN]
     if forbidden_found:
-        findings.append(PolicyFinding(
-            rule="path_separators",
-            severity="error",
-            message=f"Forbidden path characters found: {', '.join(repr(c) for c in sorted(set(forbidden_found)))}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="path_separators",
+                severity="error",
+                message=f"Forbidden path characters found: {', '.join(repr(c) for c in sorted(set(forbidden_found)))}",
+            )
+        )
 
     # Bidi controls
     bidi_found = [c for c in normalized if c in _BIDI_CHARS]
     if bidi_found:
-        findings.append(PolicyFinding(
-            rule="bidi_controls",
-            severity="error",
-            message=f"Bidi control characters found: {len(bidi_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="bidi_controls",
+                severity="error",
+                message=f"Bidi control characters found: {len(bidi_found)}",
+            )
+        )
 
     # Zero-width characters
     zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
     if zw_found:
-        findings.append(PolicyFinding(
-            rule="zero_width_characters",
-            severity="error",
-            message=f"Zero-width characters found: {len(zw_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="zero_width_characters",
+                severity="error",
+                message=f"Zero-width characters found: {len(zw_found)}",
+            )
+        )
 
     # Reserved Windows names (check stem, handling path-qualified names)
     # Extract the basename before checking to catch names like "dir/CON.txt"
     basename = normalized.split("/")[-1].split("\\")[-1]
     stem = basename.split(".")[0].upper()
     if stem in _WINDOWS_RESERVED:
-        findings.append(PolicyFinding(
-            rule="reserved_windows_name",
-            severity="error",
-            message=f"Reserved Windows device name: {stem}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="reserved_windows_name",
+                severity="error",
+                message=f"Reserved Windows device name: {stem}",
+            )
+        )
 
     return findings
 
@@ -348,29 +430,35 @@ def _check_source_code(text: str, normalized: str) -> list[PolicyFinding]:
     # Bidi controls
     bidi_found = [c for c in normalized if c in _BIDI_CHARS]
     if bidi_found:
-        findings.append(PolicyFinding(
-            rule="bidi_controls",
-            severity="error",
-            message=f"Bidi control characters found: {len(bidi_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="bidi_controls",
+                severity="error",
+                message=f"Bidi control characters found: {len(bidi_found)}",
+            )
+        )
 
     # Zero-width characters (except word joiner which is sometimes intentional)
     zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS and c != "\u2060"]
     if zw_found:
-        findings.append(PolicyFinding(
-            rule="zero_width_characters",
-            severity="error",
-            message=f"Zero-width characters found: {len(zw_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="zero_width_characters",
+                severity="error",
+                message=f"Zero-width characters found: {len(zw_found)}",
+            )
+        )
 
     # Confusables (warning level for source code)
     confusables = detect_confusables(normalized)
     if confusables:
-        findings.append(PolicyFinding(
-            rule="confusables",
-            severity="warning",
-            message=f"Confusable characters found: {len(confusables)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="confusables",
+                severity="warning",
+                message=f"Confusable characters found: {len(confusables)}",
+            )
+        )
 
     return findings
 
@@ -382,38 +470,46 @@ def _check_human_text(text: str, normalized: str) -> list[PolicyFinding]:
     # Bidi controls (warning only for human text)
     bidi_found = [c for c in normalized if c in _BIDI_CHARS]
     if bidi_found:
-        findings.append(PolicyFinding(
-            rule="bidi_controls",
-            severity="warning",
-            message=f"Bidi control characters found: {len(bidi_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="bidi_controls",
+                severity="warning",
+                message=f"Bidi control characters found: {len(bidi_found)}",
+            )
+        )
 
     # Zero-width characters (warning only)
     zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
     if zw_found:
-        findings.append(PolicyFinding(
-            rule="zero_width_characters",
-            severity="warning",
-            message=f"Zero-width characters found: {len(zw_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="zero_width_characters",
+                severity="warning",
+                message=f"Zero-width characters found: {len(zw_found)}",
+            )
+        )
 
     # Mixed scripts (warning only for human text)
     ms = detect_mixed_scripts(normalized)
     if ms["mixed_scripts"]:
-        findings.append(PolicyFinding(
-            rule="mixed_scripts",
-            severity="warning",
-            message=f"Mixed scripts detected: {', '.join(ms['scripts'])}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="mixed_scripts",
+                severity="warning",
+                message=f"Mixed scripts detected: {', '.join(ms['scripts'])}",
+            )
+        )
 
     # Confusables (warning only for human text)
     confusables = detect_confusables(normalized)
     if confusables:
-        findings.append(PolicyFinding(
-            rule="confusables",
-            severity="warning",
-            message=f"Confusable characters found: {len(confusables)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="confusables",
+                severity="warning",
+                message=f"Confusable characters found: {len(confusables)}",
+            )
+        )
 
     return findings
 
@@ -425,49 +521,59 @@ def _check_json_key(text: str, normalized: str) -> list[PolicyFinding]:
     # Bidi controls
     bidi_found = [c for c in normalized if c in _BIDI_CHARS]
     if bidi_found:
-        findings.append(PolicyFinding(
-            rule="bidi_controls",
-            severity="error",
-            message=f"Bidi control characters found: {len(bidi_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="bidi_controls",
+                severity="error",
+                message=f"Bidi control characters found: {len(bidi_found)}",
+            )
+        )
 
     # Zero-width characters
     zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
     if zw_found:
-        findings.append(PolicyFinding(
-            rule="zero_width_characters",
-            severity="error",
-            message=f"Zero-width characters found: {len(zw_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="zero_width_characters",
+                severity="error",
+                message=f"Zero-width characters found: {len(zw_found)}",
+            )
+        )
 
     # Variation selectors (U+FE00-U+FE0F) — invisible characters that could
     # manipulate JSON key identity
     vs_found = [c for c in normalized if 0xFE00 <= ord(c) <= 0xFE0F]
     if vs_found:
-        findings.append(PolicyFinding(
-            rule="variation_selectors",
-            severity="error",
-            message=f"Variation selector characters found: {len(vs_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="variation_selectors",
+                severity="error",
+                message=f"Variation selector characters found: {len(vs_found)}",
+            )
+        )
 
     # Confusables (warning for JSON keys)
     confusables = detect_confusables(normalized)
     if confusables:
-        findings.append(PolicyFinding(
-            rule="confusables",
-            severity="warning",
-            message=f"Confusable characters found: {len(confusables)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="confusables",
+                severity="warning",
+                message=f"Confusable characters found: {len(confusables)}",
+            )
+        )
 
     # Control characters
     for i, c in enumerate(normalized):
         cat = unicodedata.category(c)
         if cat.startswith("C") and c not in "\n\t\r":
-            findings.append(PolicyFinding(
-                rule="control_characters",
-                severity="error",
-                message=f"Control character at position {i}: U+{ord(c):04X}",
-            ))
+            findings.append(
+                PolicyFinding(
+                    rule="control_characters",
+                    severity="error",
+                    message=f"Control character at position {i}: U+{ord(c):04X}",
+                )
+            )
 
     return findings
 
@@ -479,51 +585,61 @@ def _check_domain_like(text: str, normalized: str) -> list[PolicyFinding]:
     # Mixed scripts
     ms = detect_mixed_scripts(normalized)
     if ms["mixed_scripts"]:
-        findings.append(PolicyFinding(
-            rule="mixed_scripts",
-            severity="error",
-            message=f"Mixed scripts detected: {', '.join(ms['scripts'])}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="mixed_scripts",
+                severity="error",
+                message=f"Mixed scripts detected: {', '.join(ms['scripts'])}",
+            )
+        )
 
     # Confusables (error for domain-like)
     confusables = detect_confusables(normalized)
     if confusables:
-        findings.append(PolicyFinding(
-            rule="confusables",
-            severity="error",
-            message=f"Confusable characters found: {len(confusables)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="confusables",
+                severity="error",
+                message=f"Confusable characters found: {len(confusables)}",
+            )
+        )
 
     # Bidi controls
     bidi_found = [c for c in normalized if c in _BIDI_CHARS]
     if bidi_found:
-        findings.append(PolicyFinding(
-            rule="bidi_controls",
-            severity="error",
-            message=f"Bidi control characters found: {len(bidi_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="bidi_controls",
+                severity="error",
+                message=f"Bidi control characters found: {len(bidi_found)}",
+            )
+        )
 
     # Zero-width characters
     zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
     if zw_found:
-        findings.append(PolicyFinding(
-            rule="zero_width_characters",
-            severity="error",
-            message=f"Zero-width characters found: {len(zw_found)}",
-        ))
+        findings.append(
+            PolicyFinding(
+                rule="zero_width_characters",
+                severity="error",
+                message=f"Zero-width characters found: {len(zw_found)}",
+            )
+        )
 
     return findings
 
 
 # --- Canonicalization profiles ---
 
-_VALID_PROFILES = frozenset({
-    "source_file_identity",
-    "identifier_compare",
-    "human_label_compare",
-    "json_key_compare",
-    "path_segment_compare",
-})
+_VALID_PROFILES = frozenset(
+    {
+        "source_file_identity",
+        "identifier_compare",
+        "human_label_compare",
+        "json_key_compare",
+        "path_segment_compare",
+    }
+)
 
 
 def canonicalize_text(
@@ -554,7 +670,9 @@ def canonicalize_text(
             operations_applied=[],
             fingerprint_before="",
             fingerprint_after="",
-            findings=[f"Invalid profile: {profile}. Valid profiles: {', '.join(sorted(_VALID_PROFILES))}"],
+            findings=[
+                f"Invalid profile: {profile}. Valid profiles: {', '.join(sorted(_VALID_PROFILES))}"
+            ],
             mapping=None,
         )
         return result

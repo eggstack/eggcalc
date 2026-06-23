@@ -62,13 +62,17 @@ class TestPathCompareSeparators:
         assert result["equal"] is True
 
     def test_no_separator_normalization(self):
-        result = path_compare("src\\main.rs", "src/main.rs", platform="posix", normalize_separators=False)
+        result = path_compare(
+            "src\\main.rs", "src/main.rs", platform="posix", normalize_separators=False
+        )
         assert result["equal"] is False
 
 
 class TestPathComparePlatform:
     def test_windows_unc_path(self):
-        result = path_compare("\\\\server\\share\\file.txt", "\\\\server\\share\\file.txt", platform="windows")
+        result = path_compare(
+            "\\\\server\\share\\file.txt", "\\\\server\\share\\file.txt", platform="windows"
+        )
         assert result["equal"] is True
 
     def test_invalid_platform_defaults_posix(self):

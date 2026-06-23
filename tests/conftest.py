@@ -18,6 +18,7 @@ def _restore_evaluator_defaults():
     """
     from eggcalc import evaluator as _evaluator
     from eggcalc import get_default_evaluator
+
     ev = get_default_evaluator()
     orig_mcp_mode = _evaluator._mcp_mode
     orig_allow_random = ev._allow_random
@@ -33,11 +34,13 @@ def eval_result():
     """Optional helper: wraps evaluate result, extracting value from UnitValue if needed.
     Not currently used by any tests — available for convenience if needed.
     """
+
     def _eval_result(expr):
         result = evaluate(expr)
         if isinstance(result, UnitValue):
             return result.value
         return result
+
     return _eval_result
 
 
@@ -45,6 +48,7 @@ def eval_result():
 def evaluate_raw():
     """Direct access to evaluate_raw function."""
     from eggcalc import evaluate_raw
+
     return evaluate_raw
 
 
@@ -61,10 +65,12 @@ def extract_value():
     Use this when you only care about the numeric value and want convenience
     over verifying the UnitValue wrapper type.
     """
+
     def _extract_value(result):
         if isinstance(result, UnitValue):
             return result.value
         return result
+
     return _extract_value
 
 

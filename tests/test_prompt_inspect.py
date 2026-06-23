@@ -267,18 +267,21 @@ class TestInstructionPhrases:
 
     def test_instruction_regex_cached_for_same_patterns(self):
         from eggcalc.exact.inspect_prompt import _get_instruction_re
+
         r1 = _get_instruction_re(["ignore previous", "system prompt"])
         r2 = _get_instruction_re(["ignore previous", "system prompt"])
         assert r1 is r2
 
     def test_instruction_regex_different_patterns_different_objects(self):
         from eggcalc.exact.inspect_prompt import _get_instruction_re
+
         r1 = _get_instruction_re(["ignore previous"])
         r2 = _get_instruction_re(["system prompt"])
         assert r1 is not r2
 
     def test_empty_phrase_pattern_produces_no_findings(self):
         from eggcalc.exact.inspect_prompt import prompt_input_inspect
+
         result = prompt_input_inspect(
             "hello world",
             checks=["instruction_phrases"],
@@ -289,6 +292,7 @@ class TestInstructionPhrases:
 
     def test_all_empty_phrase_patterns_does_not_crash(self):
         from eggcalc.exact.inspect_prompt import prompt_input_inspect
+
         result = prompt_input_inspect(
             "hello world",
             checks=["instruction_phrases"],
@@ -406,6 +410,7 @@ class TestMcpIntegration:
 
     def test_mcp_wrapper_basic(self):
         from eggcalc.mcp.tools import prompt_input_inspect_mcp
+
         result = prompt_input_inspect_mcp("Hello, world!")
         assert result["ok"] is True
         assert result["tool"] == "prompt_input_inspect"
@@ -413,6 +418,7 @@ class TestMcpIntegration:
 
     def test_mcp_wrapper_with_findings(self):
         from eggcalc.mcp.tools import prompt_input_inspect_mcp
+
         text = "test\u200b hidden <!-- comment -->"
         result = prompt_input_inspect_mcp(text)
         assert result["ok"] is True
@@ -421,18 +427,21 @@ class TestMcpIntegration:
 
     def test_mcp_wrapper_input_too_large(self):
         from eggcalc.mcp.tools import prompt_input_inspect_mcp
+
         result = prompt_input_inspect_mcp("x" * 200_000)
         assert result["ok"] is False
         assert result["error_type"] == "input_too_large"
 
     def test_mcp_wrapper_invalid_check(self):
         from eggcalc.mcp.tools import prompt_input_inspect_mcp
+
         result = prompt_input_inspect_mcp("test", checks=["bad_check"])
         assert result["ok"] is False
         assert result["error_type"] == "invalid_arguments"
 
     def test_mcp_wrapper_machine_code(self):
         from eggcalc.mcp.tools import prompt_input_inspect_mcp
+
         text = "test\u200b hidden"
         result = prompt_input_inspect_mcp(text)
         assert result.get("machine_code") is not None

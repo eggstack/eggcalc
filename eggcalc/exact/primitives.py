@@ -15,6 +15,7 @@ from typing import NamedTuple, TypedDict
 
 class CodepointInfo(NamedTuple):
     """Information about a single codepoint."""
+
     index: int
     char: str
     codepoint: str
@@ -24,6 +25,7 @@ class CodepointInfo(NamedTuple):
 
 class MeasureBasic(TypedDict):
     """Basic text measurements."""
+
     bytes_utf8: int
     codepoints: int
     graphemes_estimate: int
@@ -34,6 +36,7 @@ class MeasureBasic(TypedDict):
 
 class InvisibleCharInfo(TypedDict):
     """Information about an invisible character."""
+
     index: int
     char: str
     codepoint: str
@@ -69,7 +72,7 @@ _INVISIBLE_CHARS: dict[str, tuple[str, str]] = {
 }
 
 # Variation selectors (U+FE00 to U+FE0F)
-_VARIATION_SELECTORS = set(range(0xfe00, 0xfe10))
+_VARIATION_SELECTORS = set(range(0xFE00, 0xFE10))
 
 
 def utf8_bytes(s: str) -> bytes:
@@ -119,7 +122,9 @@ def normalize_unicode(s: str, form: str) -> str:
     valid_forms = {"NFC", "NFD", "NFKC", "NFKD"}
     form_upper = form.upper()
     if form_upper not in valid_forms:
-        raise ValueError(f"Unsupported normalization form: {form}. Use one of: {', '.join(valid_forms)}")
+        raise ValueError(
+            f"Unsupported normalization form: {form}. Use one of: {', '.join(valid_forms)}"
+        )
     return unicodedata.normalize(form_upper, s)
 
 
@@ -221,7 +226,7 @@ def find_invisibles(s: str) -> list[InvisibleCharInfo]:
             name = unicodedata.name(char, "<unknown>")
             display = f"FORMAT:{name.split()[-1]}" if name else "FORMAT"
         # Check bidi control characters (U+2066 to U+206F)
-        elif 0x2066 <= codepoint_val <= 0x206f:
+        elif 0x2066 <= codepoint_val <= 0x206F:
             name = unicodedata.name(char, "<unknown>")
             display = f"BIDI:{name.split()[-1]}" if name else "BIDI"
         # Check combining marks (category M*)
@@ -230,20 +235,24 @@ def find_invisibles(s: str) -> list[InvisibleCharInfo]:
             display = "CM"
         # Check other control characters (category C*) but exclude newlines
         elif unicodedata.category(char).startswith("C") and char not in "\n\t\r":
-            name = unicodedata.name(char, "<unknown>") if unicodedata.name(char, None) else "CONTROL"
+            name = (
+                unicodedata.name(char, "<unknown>") if unicodedata.name(char, None) else "CONTROL"
+            )
             display = "CTRL"
 
         if display:
             codepoint_str = f"U+{codepoint_val:04X}"
             category = unicodedata.category(char)
-            result.append(InvisibleCharInfo(
-                index=index,
-                char=char,
-                codepoint=codepoint_str,
-                name=name or "<unknown>",
-                category=category,
-                display=display,
-            ))
+            result.append(
+                InvisibleCharInfo(
+                    index=index,
+                    char=char,
+                    codepoint=codepoint_str,
+                    name=name or "<unknown>",
+                    category=category,
+                    display=display,
+                )
+            )
 
     return result
 
@@ -274,7 +283,7 @@ def visible_repr(s: str) -> str:
         elif char in _INVISIBLE_CHARS:
             _, display = _INVISIBLE_CHARS[char]
             result.append(f"⟦{display}⟧")
-        elif 0xfe00 <= ord(char) <= 0xfe0f:
+        elif 0xFE00 <= ord(char) <= 0xFE0F:
             result.append("⟦VS⟧")
         elif unicodedata.category(char).startswith("M"):
             result.append(f"◌{char}")
@@ -282,11 +291,17 @@ def visible_repr(s: str) -> str:
             name = unicodedata.name(char, "<unknown>")
             label = name.split()[-1] if name else "FORMAT"
             result.append(f"⟦FORMAT:{label}⟧")
-        elif 0x2066 <= ord(char) <= 0x206f:
+        elif 0x2066 <= ord(char) <= 0x206F:
             bidi_names = {
-                0x2066: "LRI", 0x2067: "RLI", 0x2068: "FSI", 0x2069: "PDI",
-                0x202a: "LRE", 0x202b: "RLE", 0x202c: "PDF",
-                0x202d: "LRO", 0x202e: "RLO",
+                0x2066: "LRI",
+                0x2067: "RLI",
+                0x2068: "FSI",
+                0x2069: "PDI",
+                0x202A: "LRE",
+                0x202B: "RLE",
+                0x202C: "PDF",
+                0x202D: "LRO",
+                0x202E: "RLO",
             }
             name = bidi_names.get(ord(char), "BIDI")
             result.append(f"⟦{name}⟧")
@@ -383,9 +398,11 @@ def _is_extended_pictographic(char: str) -> bool:
     Uses codepoint ranges for common emoji blocks.
     """
     cp = ord(char)
-    if (0x1F300 <= cp <= 0x1F9FF or  # Emoticons, Transport, Symbols and Pictographs Extended-A
-        0x2600 <= cp <= 0x26FF or    # Misc symbols
-        0x2700 <= cp <= 0x27BF):     # Dingbats
+    if (
+        0x1F300 <= cp <= 0x1F9FF  # Emoticons, Transport, Symbols and Pictographs Extended-A
+        or 0x2600 <= cp <= 0x26FF  # Misc symbols
+        or 0x2700 <= cp <= 0x27BF
+    ):  # Dingbats
         return True
     # Check if it's an emoji via category and name patterns
     cat = unicodedata.category(char)
@@ -534,7 +551,9 @@ def codepoint_index_to_byte_offset(s: str, codepoint_index: int) -> int:
     return byte_pos
 
 
-def codepoint_index_to_line_column(s: str, codepoint_index: int, line_base: int = 1, column_base: int = 1) -> tuple[int, int]:
+def codepoint_index_to_line_column(
+    s: str, codepoint_index: int, line_base: int = 1, column_base: int = 1
+) -> tuple[int, int]:
     """Convert a codepoint index to line and column (1-based by default).
 
     Args:
@@ -565,7 +584,9 @@ def codepoint_index_to_line_column(s: str, codepoint_index: int, line_base: int 
     return line, column
 
 
-def line_column_to_codepoint_index(s: str, line: int, column: int, line_base: int = 1, column_base: int = 1) -> int:
+def line_column_to_codepoint_index(
+    s: str, line: int, column: int, line_base: int = 1, column_base: int = 1
+) -> int:
     """Convert line and column to a codepoint index.
 
     Args:
@@ -645,7 +666,9 @@ def get_line_text(s: str, line: int, line_base: int = 1) -> str:
     return s[start:end]
 
 
-def get_surrounding_lines(s: str, line: int, context_lines: int, line_base: int = 1) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
+def get_surrounding_lines(
+    s: str, line: int, context_lines: int, line_base: int = 1
+) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
     """Get lines before and after a given line.
 
     Args:

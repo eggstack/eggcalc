@@ -13,6 +13,7 @@ from typing import TypedDict
 
 class TextPositionResult(TypedDict):
     """Result of text position conversion."""
+
     valid: bool
     byte_offset: int | None
     codepoint_index: int | None
@@ -59,8 +60,9 @@ def _codepoint_index_to_utf16_offset(text: str, codepoint_index: int) -> int:
     return utf16_offset
 
 
-def _get_line_col(text: str, byte_offset: int | None = None,
-                   codepoint_index: int | None = None) -> tuple[list[str], int, int]:
+def _get_line_col(
+    text: str, byte_offset: int | None = None, codepoint_index: int | None = None
+) -> tuple[list[str], int, int]:
     """Split text into lines and find line/column for given position.
 
     Returns (lines, line, column) where line and column are 0-based.
@@ -131,15 +133,16 @@ def _is_valid_byte_offset(text: str, offset: int) -> bool:
     if 0xE0 <= byte <= 0xEF:
         if offset + 2 >= len(utf8_bytes):
             return False
-        return (0x80 <= utf8_bytes[offset + 1] <= 0xBF and
-                0x80 <= utf8_bytes[offset + 2] <= 0xBF)
+        return 0x80 <= utf8_bytes[offset + 1] <= 0xBF and 0x80 <= utf8_bytes[offset + 2] <= 0xBF
 
     if 0xF0 <= byte <= 0xF7:
         if offset + 3 >= len(utf8_bytes):
             return False
-        return (0x80 <= utf8_bytes[offset + 1] <= 0xBF and
-                0x80 <= utf8_bytes[offset + 2] <= 0xBF and
-                0x80 <= utf8_bytes[offset + 3] <= 0xBF)
+        return (
+            0x80 <= utf8_bytes[offset + 1] <= 0xBF
+            and 0x80 <= utf8_bytes[offset + 2] <= 0xBF
+            and 0x80 <= utf8_bytes[offset + 3] <= 0xBF
+        )
 
     return False
 
@@ -291,7 +294,9 @@ def text_position(
                 summary="Invalid byte offset: inside multibyte character",
             )
         lines, line_num, col = _get_line_col(text, byte_offset=byte_offset)
-        effective_codepoint_index = len(text.encode("utf-8")[:byte_offset].decode("utf-8", errors="ignore"))
+        effective_codepoint_index = len(
+            text.encode("utf-8")[:byte_offset].decode("utf-8", errors="ignore")
+        )
 
     elif codepoint_index is not None:
         if codepoint_index < 0 or codepoint_index > len(text):
@@ -467,7 +472,9 @@ def text_position(
 
     line_1based = line_num + line_base
     col_1based = col + column_base
-    char_at_pos = text[effective_codepoint_index] if 0 <= effective_codepoint_index < len(text) else ""
+    char_at_pos = (
+        text[effective_codepoint_index] if 0 <= effective_codepoint_index < len(text) else ""
+    )
     codepoint_str = f"U+{ord(char_at_pos):04X}" if char_at_pos else None
     name = unicodedata.name(char_at_pos, "<unknown>") if char_at_pos else None
 

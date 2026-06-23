@@ -52,6 +52,7 @@ class TestInstanceStateIsolation:
 
     def test_setvar_isolated_from_default_evaluator(self):
         from eggcalc import clearvars, getvar
+
         clearvars()
         app = EggCalcApp()
         app.calculate('setvar("appsecret", 99)')
@@ -69,6 +70,7 @@ class TestInstanceStateIsolation:
 
     def test_memory_isolated_from_default_evaluator(self):
         from eggcalc import memory_clear, memory_recall
+
         memory_clear()
         app = EggCalcApp()
         app.calculate("store(123)")
@@ -76,6 +78,7 @@ class TestInstanceStateIsolation:
 
     def test_evaluator_direct_isolation(self):
         from eggcalc.evaluator import Evaluator
+
         ev1 = Evaluator()
         ev2 = Evaluator()
         ev1.evaluate('setvar("x", 100)')
@@ -84,6 +87,7 @@ class TestInstanceStateIsolation:
 
     def test_evaluator_direct_memory_isolation(self):
         from eggcalc.evaluator import Evaluator
+
         ev1 = Evaluator()
         ev2 = Evaluator()
         ev1.evaluate("store(7)")
@@ -92,6 +96,7 @@ class TestInstanceStateIsolation:
 
     def test_module_level_setvar_proxies_to_default(self):
         from eggcalc import clearvars, getvar, setvar
+
         clearvars()
         setvar("alpha", 11)
         assert getvar("alpha") == 11
@@ -213,6 +218,7 @@ class TestCustomUnitCategories:
 
     def test_custom_unit_with_explicit_category(self):
         import eggcalc.units as units_mod
+
         self._register_custom(units_mod, "xu", 0.1, "length")
         try:
             result = evaluate("1*m+10*xu")
@@ -224,6 +230,7 @@ class TestCustomUnitCategories:
 
     def test_custom_unit_inferred_category(self):
         import eggcalc.units as units_mod
+
         self._register_custom(units_mod, "yu", 0.05, "length")
         try:
             result = evaluate("1*m+10*yu")
@@ -368,30 +375,37 @@ class TestAreUnitsCompatible:
 
     def test_both_none(self):
         from eggcalc.units import are_units_compatible
+
         assert are_units_compatible(None, None) is True
 
     def test_first_none(self):
         from eggcalc.units import are_units_compatible
+
         assert are_units_compatible(None, "m") is True
 
     def test_second_none(self):
         from eggcalc.units import are_units_compatible
+
         assert are_units_compatible("m", None) is True
 
     def test_same_category(self):
         from eggcalc.units import are_units_compatible
+
         assert are_units_compatible("m", "ft") is True
 
     def test_different_category(self):
         from eggcalc.units import are_units_compatible
+
         assert are_units_compatible("m", "kg") is False
 
     def test_unknown_unknown(self):
         from eggcalc.units import are_units_compatible
+
         assert are_units_compatible("frob", "blarg") is False
 
     def test_known_unknown(self):
         from eggcalc.units import are_units_compatible
+
         assert are_units_compatible("m", "frob") is False
 
 
@@ -413,11 +427,11 @@ class TestUnitValueConversions:
 
     def test_complex_conversion(self):
         uv = UnitValue(3, "m")
-        assert complex(uv) == (3+0j)
+        assert complex(uv) == (3 + 0j)
 
     def test_complex_conversion_with_decimal(self):
         uv = UnitValue(3.5, "kg")
-        assert complex(uv) == (3.5+0j)
+        assert complex(uv) == (3.5 + 0j)
 
     def test_round_default(self):
         uv = UnitValue(3.14159, "m")
@@ -457,20 +471,24 @@ class TestGetAllUnits:
 
     def test_returns_list(self):
         from eggcalc.units import get_all_units
+
         result = get_all_units()
         assert isinstance(result, list)
 
     def test_sorted(self):
         from eggcalc.units import get_all_units
+
         result = get_all_units()
         assert result == sorted(result)
 
     def test_contains_common_units(self):
         from eggcalc.units import get_all_units
+
         result = get_all_units()
         for unit in ["m", "kg", "s", "L", "K", "C", "F", "Pa", "J", "W", "N", "V", "A", "Hz"]:
             assert unit in result
 
     def test_non_empty(self):
         from eggcalc.units import get_all_units
+
         assert len(get_all_units()) > 100

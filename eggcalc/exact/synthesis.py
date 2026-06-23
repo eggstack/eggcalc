@@ -65,6 +65,7 @@ MAX_DIFF_SPANS = 50
 
 class NormalizationState(TypedDict):
     """Unicode normalization state."""
+
     is_nfc: bool
     is_nfd: bool
     is_nfkc: bool
@@ -73,6 +74,7 @@ class NormalizationState(TypedDict):
 
 class UnicodeRisks(TypedDict):
     """Unicode risk signals."""
+
     contains_invisibles: bool
     contains_bidi_controls: bool
     mixed_scripts: bool
@@ -81,6 +83,7 @@ class UnicodeRisks(TypedDict):
 
 class MeasureTextResult(TypedDict):
     """Complete text measurement result."""
+
     bytes_utf8: int
     codepoints: int
     graphemes: int
@@ -110,6 +113,7 @@ class MeasureTextResult(TypedDict):
 
 class TextEqualResult(TypedDict):
     """Text equality comparison result."""
+
     equal: bool
     mode: dict[str, Any]
     raw_equal: bool
@@ -126,6 +130,7 @@ class TextEqualResult(TypedDict):
 
 class DiffInfo(TypedDict):
     """A single diff span with detailed information."""
+
     kind: str
     a_span: list[int]
     b_span: list[int]
@@ -140,6 +145,7 @@ class DiffInfo(TypedDict):
 
 class ExplainDiffResult(TypedDict):
     """Detailed diff explanation result."""
+
     equal: bool
     classification: str
     summary: dict[str, Any]
@@ -152,19 +158,24 @@ class ExplainDiffResult(TypedDict):
 
 class InspectTextNormalized(TypedDict):
     """Normalized text analysis."""
+
     form: str
     text: str
     safe_repr: str
     changed: bool
     diff: list[dict]
 
+
 class NormalizationFinding(TypedDict):
     """A finding from normalization analysis."""
+
     kind: str
     message: str
 
+
 class InspectTextResult(TypedDict):
     """Complete text inspection result."""
+
     safe_repr: str
     metrics: dict[str, Any]
     normalization: dict[str, bool]
@@ -185,6 +196,7 @@ class InspectTextResult(TypedDict):
 
 class CountCharsResult(TypedDict):
     """Character counting result."""
+
     target: str
     normalization: str
     count: int
@@ -194,33 +206,42 @@ class CountCharsResult(TypedDict):
 
 class ListCompareOrderedResult(TypedDict):
     """Ordered list comparison result."""
+
     equal: bool
     first_diff_index: int | None
     equal_prefix_length: int
     aligned: list[dict]
 
+
 class ListCompareSetResult(TypedDict):
     """Set-based list comparison result."""
+
     equal: bool
     only_in_a: list[str]
     only_in_b: list[str]
 
+
 class ListCompareMultisetResult(TypedDict):
     """Multiset-based list comparison result."""
+
     equal: bool
     count_deltas: dict[str, int]
     only_in_a: list[str]
     only_in_b: list[str]
 
+
 class ListCompareNearMatch(TypedDict):
     """A near match between list items."""
+
     a: str
     b: str
     distance: int
     classification: str
 
+
 class ListCompareResult(TypedDict):
     """List comparison result with near-match detection."""
+
     same_ordered: bool
     same_unordered: bool
     only_in_a: list[str]
@@ -290,15 +311,25 @@ def measure_text(text: str) -> MeasureTextResult:
 
     warnings: list[str] = []
     if special["combining_marks"] > 0:
-        warnings.append(f"Text contains {special['combining_marks']} combining mark(s) - codepoint count diverges from user-perceived characters")
+        warnings.append(
+            f"Text contains {special['combining_marks']} combining mark(s) - codepoint count diverges from user-perceived characters"
+        )
     if special["zwj_sequences"] > 0:
-        warnings.append(f"Text contains {special['zwj_sequences']} zero-width joiner sequence(s) - sequences may affect display")
+        warnings.append(
+            f"Text contains {special['zwj_sequences']} zero-width joiner sequence(s) - sequences may affect display"
+        )
     if special["variation_selectors"] > 0:
-        warnings.append(f"Text contains {special['variation_selectors']} variation selector(s) - display may differ")
+        warnings.append(
+            f"Text contains {special['variation_selectors']} variation selector(s) - display may differ"
+        )
     if special["regional_indicator_pairs"] > 0:
-        warnings.append(f"Text contains {special['regional_indicator_pairs']} regional indicator pair(s) - these render as flag emoji")
+        warnings.append(
+            f"Text contains {special['regional_indicator_pairs']} regional indicator pair(s) - these render as flag emoji"
+        )
     if special["emoji_modifiers"] > 0:
-        warnings.append(f"Text contains {special['emoji_modifiers']} emoji modifier(s) - modifies base emoji appearance")
+        warnings.append(
+            f"Text contains {special['emoji_modifiers']} emoji modifier(s) - modifies base emoji appearance"
+        )
 
     return MeasureTextResult(
         bytes_utf8=basic["bytes_utf8"],
@@ -406,16 +437,25 @@ def text_equal(
 
     first_difference = _first_diff(a_work, b_work)
     if first_difference:
-        first_difference["a_visible"] = _visible_repr(a_work[first_difference["a_index"]:first_difference["a_index"]+1])
-        first_difference["b_visible"] = _visible_repr(b_work[first_difference["b_index"]:first_difference["b_index"]+1])
+        first_difference["a_visible"] = _visible_repr(
+            a_work[first_difference["a_index"] : first_difference["a_index"] + 1]
+        )
+        first_difference["b_visible"] = _visible_repr(
+            b_work[first_difference["b_index"] : first_difference["b_index"] + 1]
+        )
 
     invisibles_a = _find_invisibles(a_work)
     invisibles_b = _find_invisibles(b_work)
     invisibles_detected = bool(invisibles_a or invisibles_b)
 
     classification = _classify_difference(
-        raw_equal, nfc_equal, casefold_equal, byte_equal,
-        len(a_work) != len(b_work), first_difference, invisibles_detected=invisibles_detected
+        raw_equal,
+        nfc_equal,
+        casefold_equal,
+        byte_equal,
+        len(a_work) != len(b_work),
+        first_difference,
+        invisibles_detected=invisibles_detected,
     )
 
     if casefold:
@@ -487,15 +527,19 @@ def _codepoint_details(s: str, start: int, end: int) -> list[dict]:
     result = []
     for i in range(start, min(end, len(s))):
         char = s[i]
-        result.append({
-            "char": char,
-            "codepoint": f"U+{ord(char):04X}",
-            "name": unicodedata.name(char, "<unknown>"),
-        })
+        result.append(
+            {
+                "char": char,
+                "codepoint": f"U+{ord(char):04X}",
+                "name": unicodedata.name(char, "<unknown>"),
+            }
+        )
     return result
 
 
-def _truncate_diff_spans(spans: list[DiffInfo], max_diffs: int, max_equal_context: int = 200) -> tuple[list[DiffInfo], bool, int]:
+def _truncate_diff_spans(
+    spans: list[DiffInfo], max_diffs: int, max_equal_context: int = 200
+) -> tuple[list[DiffInfo], bool, int]:
     """Truncate diff spans, limiting equal spans and marking truncation.
 
     Args:
@@ -591,8 +635,13 @@ def explain_diff(
     confusables_b = _detect_confusables(b)
 
     classification = _classify_difference(
-        raw_equal, nfc_equal, casefold_equal, byte_equal,
-        not same_length_codepoints, None, invisibles_detected
+        raw_equal,
+        nfc_equal,
+        casefold_equal,
+        byte_equal,
+        not same_length_codepoints,
+        None,
+        invisibles_detected,
     )
 
     if classification == "ordinary_text_difference" and nfkc_equal:
@@ -600,17 +649,21 @@ def explain_diff(
 
     security_findings: list[dict] = []
     if invisibles_a or invisibles_b:
-        security_findings.append({
-            "kind": "invisible_characters",
-            "a_count": len(invisibles_a),
-            "b_count": len(invisibles_b),
-        })
+        security_findings.append(
+            {
+                "kind": "invisible_characters",
+                "a_count": len(invisibles_a),
+                "b_count": len(invisibles_b),
+            }
+        )
     if confusables_a or confusables_b:
-        security_findings.append({
-            "kind": "confusables",
-            "a_count": len(confusables_a),
-            "b_count": len(confusables_b),
-        })
+        security_findings.append(
+            {
+                "kind": "confusables",
+                "a_count": len(confusables_a),
+                "b_count": len(confusables_b),
+            }
+        )
 
     for d in diffs_raw:
         a_start, a_end = d["a_span"]
@@ -647,9 +700,13 @@ def explain_diff(
             if d["kind"] == "replace":
                 classification = "ordinary_text_difference"
 
-    diffs, truncated, omitted_count = _truncate_diff_spans(diffs, max_diffs_to_use, max_equal_context)
+    diffs, truncated, omitted_count = _truncate_diff_spans(
+        diffs, max_diffs_to_use, max_equal_context
+    )
 
-    agent_instruction = _generate_agent_instruction(classification, raw_equal, nfc_equal, byte_equal)
+    agent_instruction = _generate_agent_instruction(
+        classification, raw_equal, nfc_equal, byte_equal
+    )
 
     limits_applied: list[str] = []
     if truncated:
@@ -679,14 +736,18 @@ def explain_diff(
     )
 
 
-def _generate_agent_instruction(classification: str, raw_equal: bool, nfc_equal: bool, byte_equal: bool) -> str:
+def _generate_agent_instruction(
+    classification: str, raw_equal: bool, nfc_equal: bool, byte_equal: bool
+) -> str:
     """Generate agent-facing instruction based on classification."""
     if raw_equal:
         return "Strings are identical."
     if classification == "unicode_normalization_only":
         return "Treat these strings as equivalent only if NFC normalization is acceptable. They are not byte-identical."
     if classification == "case_only":
-        return "Strings differ only by case. Case-insensitive comparison should treat them as equal."
+        return (
+            "Strings differ only by case. Case-insensitive comparison should treat them as equal."
+        )
     if classification == "accent_or_diacritic_difference":
         return "Strings differ by accents or diacritics only (same letters, different marks). NFC normalization will make them equal."
     if classification == "compatibility_normalization_only":
@@ -758,32 +819,40 @@ def inspect_text(
 
     warnings: list[dict] = []
     for inv in invisibles:
-        warnings.append({
-            "severity": "warning",
-            "kind": "invisible_character",
-            "message": f"Text contains {inv['name']} at index {inv['index']}",
-            "codepoint": inv["codepoint"],
-        })
+        warnings.append(
+            {
+                "severity": "warning",
+                "kind": "invisible_character",
+                "message": f"Text contains {inv['name']} at index {inv['index']}",
+                "codepoint": inv["codepoint"],
+            }
+        )
     for bc in bidi_controls:
-        warnings.append({
-            "severity": "danger",
-            "kind": "bidi_control",
-            "message": f"Text contains bidirectional control character {bc['name']} at index {bc['index']}",
-            "codepoint": bc["codepoint"],
-        })
+        warnings.append(
+            {
+                "severity": "danger",
+                "kind": "bidi_control",
+                "message": f"Text contains bidirectional control character {bc['name']} at index {bc['index']}",
+                "codepoint": bc["codepoint"],
+            }
+        )
     if metrics["unicode_risks"]["mixed_scripts"]:
-        warnings.append({
-            "severity": "info",
-            "kind": "mixed_scripts",
-            "message": f"Text contains mixed scripts: {', '.join(metrics['unicode_risks']['scripts'])}",
-        })
+        warnings.append(
+            {
+                "severity": "info",
+                "kind": "mixed_scripts",
+                "message": f"Text contains mixed scripts: {', '.join(metrics['unicode_risks']['scripts'])}",
+            }
+        )
     for conf in confusables:
-        warnings.append({
-            "severity": "warning",
-            "kind": "confusable",
-            "message": f"Text contains confusable character '{conf['char']}' (looks like '{conf['confusable_with']}')",
-            "codepoint": f"U+{ord(conf['char']):04X}",
-        })
+        warnings.append(
+            {
+                "severity": "warning",
+                "kind": "confusable",
+                "message": f"Text contains confusable character '{conf['char']}' (looks like '{conf['confusable_with']}')",
+                "codepoint": f"U+{ord(conf['char']):04X}",
+            }
+        )
 
     limits_applied_info: list[str] = []
     total_invisibles_omitted = len(all_invisibles) - len(invisibles)
@@ -796,11 +865,13 @@ def inspect_text(
 
     if limits_applied_info and detail == "summary":
         for msg in limits_applied_info:
-            warnings.append({
-                "severity": "info",
-                "kind": "limits_applied",
-                "message": msg,
-            })
+            warnings.append(
+                {
+                    "severity": "info",
+                    "kind": "limits_applied",
+                    "message": msg,
+                }
+            )
             limits_applied.append(msg)
 
     nfc_text = _normalize_unicode(text, "NFC")
@@ -824,36 +895,43 @@ def inspect_text(
         if norm_changed:
             for i, (c1, c2) in enumerate(zip(text, norm_text)):
                 if c1 != c2:
-                    diff_entries.append({
-                        "index": i,
-                        "original": c1,
-                        "normalized": c2,
-                        "original_codepoint": f"U+{ord(c1):04X}",
-                        "normalized_codepoint": f"U+{ord(c2):04X}",
-                    })
+                    diff_entries.append(
+                        {
+                            "index": i,
+                            "original": c1,
+                            "normalized": c2,
+                            "original_codepoint": f"U+{ord(c1):04X}",
+                            "normalized_codepoint": f"U+{ord(c2):04X}",
+                        }
+                    )
 
         if normalize == "NFKC":
-            normalization_findings.append(NormalizationFinding(
-                kind="compatibility_fold",
-                message="NFKC changes fullwidth character to ASCII"
-            ))
+            normalization_findings.append(
+                NormalizationFinding(
+                    kind="compatibility_fold", message="NFKC changes fullwidth character to ASCII"
+                )
+            )
         elif normalize == "NFC":
             if norm_changed:
-                normalization_findings.append(NormalizationFinding(
-                    kind="canonical_composition",
-                    message="NFC composes combining characters"
-                ))
+                normalization_findings.append(
+                    NormalizationFinding(
+                        kind="canonical_composition", message="NFC composes combining characters"
+                    )
+                )
         elif normalize == "NFD":
             if norm_changed:
-                normalization_findings.append(NormalizationFinding(
-                    kind="canonical_decomposition",
-                    message="NFD decomposes combined characters"
-                ))
+                normalization_findings.append(
+                    NormalizationFinding(
+                        kind="canonical_decomposition", message="NFD decomposes combined characters"
+                    )
+                )
         elif normalize == "NFKD":
-            normalization_findings.append(NormalizationFinding(
-                kind="compatibility_decomposition",
-                message="NFKD decomposes and converts compatibility characters"
-            ))
+            normalization_findings.append(
+                NormalizationFinding(
+                    kind="compatibility_decomposition",
+                    message="NFKD decomposes and converts compatibility characters",
+                )
+            )
 
         normalized_analysis = InspectTextNormalized(
             form=normalize,
@@ -924,7 +1002,11 @@ def count_chars(
             for byte_seq in set(text_bytes):
                 freq[chr(byte_seq)] = text_bytes.count(byte_seq)
             return freq
-        positions = [i for i in range(len(text_bytes)) if text_bytes[i:i+len(target_bytes)] == target_bytes]
+        positions = [
+            i
+            for i in range(len(text_bytes))
+            if text_bytes[i : i + len(target_bytes)] == target_bytes
+        ]
         return CountCharsResult(
             target=target,
             normalization=normalization,
@@ -1011,6 +1093,7 @@ def list_compare(
         ListCompareResult with same_ordered, same_unordered, only_in_a,
         only_in_b, duplicates_a, duplicates_b, near_matches.
     """
+
     def transform(s: str) -> str:
         result = s
         if trim:
@@ -1037,10 +1120,15 @@ def list_compare(
             a_counts[x] = a_counts.get(x, 0) + 1
         for x in b_transformed:
             b_counts[x] = b_counts.get(x, 0) + 1
-        only_in_a = [a[i] for i, x in enumerate(a_transformed) if a_counts.get(x, 0) > b_counts.get(x, 0)]
-        only_in_b = [b[i] for i, x in enumerate(b_transformed) if b_counts.get(x, 0) > a_counts.get(x, 0)]
+        only_in_a = [
+            a[i] for i, x in enumerate(a_transformed) if a_counts.get(x, 0) > b_counts.get(x, 0)
+        ]
+        only_in_b = [
+            b[i] for i, x in enumerate(b_transformed) if b_counts.get(x, 0) > a_counts.get(x, 0)
+        ]
 
     from collections import Counter
+
     a_counter = Counter(a_transformed)
     b_counter = Counter(b_transformed)
     duplicates_a = [x for x, c in a_counter.items() if c > 1]
@@ -1061,16 +1149,20 @@ def list_compare(
                     pair = (a_item, b_item) if a_item <= b_item else (b_item, a_item)
                     if pair not in seen_pairs:
                         seen_pairs.add(pair)
-                        near_matches.append(ListCompareNearMatch(
-                            a=a_item,
-                            b=b_item,
-                            distance=dist,
-                            classification="fuzzy",
-                        ))
+                        near_matches.append(
+                            ListCompareNearMatch(
+                                a=a_item,
+                                b=b_item,
+                                distance=dist,
+                                classification="fuzzy",
+                            )
+                        )
                     break
 
     same_ordered = ignore_order or (a_transformed == b_transformed)
-    same_unordered = (treat_as_multiset and a_set == b_set) or (not treat_as_multiset and a_counter == b_counter)
+    same_unordered = (treat_as_multiset and a_set == b_set) or (
+        not treat_as_multiset and a_counter == b_counter
+    )
 
     return ListCompareResult(
         same_ordered=same_ordered,
@@ -1085,6 +1177,7 @@ def list_compare(
 
 class TextWindowPosition(TypedDict):
     """Position information in text_window."""
+
     byte_offset: int
     codepoint_index: int
     grapheme_index: int
@@ -1094,6 +1187,7 @@ class TextWindowPosition(TypedDict):
 
 class TextWindowResult(TypedDict):
     """Result of text_window operation."""
+
     position: TextWindowPosition
     line_text: str
     line_visible_repr: str
@@ -1191,6 +1285,7 @@ def text_window(
             while i < n:
                 cp = ord(text[i])
                 from .primitives import _is_extend_char, _is_extended_pictographic
+
                 if _is_extend_char(text[i]):
                     i += 1
                     continue
@@ -1215,6 +1310,7 @@ def text_window(
         if line is None or column is None:
             raise ValueError("line_column position requires line and column")
         from .primitives import line_column_to_codepoint_index as _lc_to_cp
+
         try:
             codepoint_index = _lc_to_cp(text, line, column, line_base, column_base)
         except ValueError as e:
@@ -1234,6 +1330,7 @@ def text_window(
         i += 1
         while i < codepoint_index:
             from .primitives import _is_extend_char, _is_extended_pictographic
+
             if _is_extend_char(text[i]):
                 i += 1
                 continue
@@ -1266,6 +1363,7 @@ def text_window(
     if codepoint_index < len(text):
         char = text[codepoint_index]
         import unicodedata
+
         codepoint_str = f"U+{ord(char):04X}"
         name = unicodedata.name(char, "<unknown>")
         category = unicodedata.category(char)
@@ -1279,7 +1377,9 @@ def text_window(
     if byte_offset < len(_utf8_bytes(text)):
         b = text.encode("utf-8")[byte_offset]
         if b >= 0x80 and b < 0xC0:
-            warnings.append("Position falls in middle of multi-byte sequence (byte is continuation byte)")
+            warnings.append(
+                "Position falls in middle of multi-byte sequence (byte is continuation byte)"
+            )
 
     return TextWindowResult(
         position={
@@ -1308,6 +1408,7 @@ MAX_PREVIEW_CHARS = 2000
 
 class TextReplaceCheckResult(TypedDict):
     """Result of text_replace_check."""
+
     match_count: int
     unique_match: bool
     expected_count_met: bool
@@ -1357,7 +1458,9 @@ def text_replace_check(
 
     valid_newline = {"preserve", "normalize_lf", "normalize_crlf"}
     if newline_policy not in valid_newline:
-        raise ValueError(f"Invalid newline_policy: {newline_policy}. Use one of: {', '.join(valid_newline)}")
+        raise ValueError(
+            f"Invalid newline_policy: {newline_policy}. Use one of: {', '.join(valid_newline)}"
+        )
 
     if max_preview_chars < 0:
         raise ValueError("max_preview_chars must be non-negative")
@@ -1396,15 +1499,17 @@ def text_replace_check(
         if idx == -1:
             break
         byte_start = len(text[:idx].encode("utf-8"))
-        byte_end = len(text[:idx + len(old)].encode("utf-8"))
+        byte_end = len(text[: idx + len(old)].encode("utf-8"))
         cp_line, cp_col = _cp_to_line_col(text, idx, 1, 1)
-        positions.append({
-            "codepoint_index": idx,
-            "byte_start": byte_start,
-            "byte_end": byte_end,
-            "line": cp_line,
-            "column": cp_col,
-        })
+        positions.append(
+            {
+                "codepoint_index": idx,
+                "byte_start": byte_start,
+                "byte_end": byte_end,
+                "line": cp_line,
+                "column": cp_col,
+            }
+        )
         search_start = idx + len(old_norm) if len(old_norm) > 0 else idx + 1
 
     match_count = len(positions)
@@ -1417,32 +1522,44 @@ def text_replace_check(
         if match_count != expected_count:
             expected_count_met = False
             if match_count == 0:
-                findings.append({
-                    "kind": "no_match",
-                    "message": f"Expected {expected_count} match(es) but found 0",
-                })
+                findings.append(
+                    {
+                        "kind": "no_match",
+                        "message": f"Expected {expected_count} match(es) but found 0",
+                    }
+                )
             else:
-                findings.append({
-                    "kind": "count_mismatch",
-                    "message": f"Expected {expected_count} match(es) but found {match_count}",
-                })
+                findings.append(
+                    {
+                        "kind": "count_mismatch",
+                        "message": f"Expected {expected_count} match(es) but found {match_count}",
+                    }
+                )
 
     # Ambiguity warning
     if not allow_multiple and match_count > 1:
-        findings.append({
-            "kind": "ambiguous_replacement",
-            "message": f"Found {match_count} matches but allow_multiple is false; replacement is ambiguous",
-        })
+        findings.append(
+            {
+                "kind": "ambiguous_replacement",
+                "message": f"Found {match_count} matches but allow_multiple is false; replacement is ambiguous",
+            }
+        )
 
     if match_count == 0:
-        findings.append({
-            "kind": "no_match",
-            "message": "No matches found; replacement would not change text",
-        })
+        findings.append(
+            {
+                "kind": "no_match",
+                "message": "No matches found; replacement would not change text",
+            }
+        )
 
     # Build changed text for fingerprinting and preview
     if would_change:
-        changed_text = text_norm.replace(old_norm, new) if mode != "whitespace_collapse" else re.sub(r"\s+", " ", text).replace(re.sub(r"\s+", " ", old), new)
+        changed_text = (
+            text_norm.replace(old_norm, new)
+            if mode != "whitespace_collapse"
+            else re.sub(r"\s+", " ", text).replace(re.sub(r"\s+", " ", old), new)
+        )
         if mode in ("nfc", "nfkc", "casefold"):
             # Rebuild from original
             if mode == "casefold":
@@ -1450,7 +1567,7 @@ def text_replace_check(
                 parts = []
                 last = 0
                 for pos in positions:
-                    parts.append(text[last:pos["codepoint_index"]])
+                    parts.append(text[last : pos["codepoint_index"]])
                     parts.append(new)
                     last = pos["codepoint_index"] + len(old)
                 parts.append(text[last:])
@@ -1459,7 +1576,7 @@ def text_replace_check(
                 parts = []
                 last = 0
                 for pos in positions:
-                    parts.append(text[last:pos["codepoint_index"]])
+                    parts.append(text[last : pos["codepoint_index"]])
                     parts.append(new)
                     last = pos["codepoint_index"] + len(old)
                 parts.append(text[last:])
@@ -1483,15 +1600,19 @@ def text_replace_check(
         preview_before = text[:cap]
         preview_after = changed_text[:cap]
         if len(text) > cap:
-            findings.append({
-                "kind": "preview_truncated",
-                "message": f"Preview before truncated at {cap} characters",
-            })
+            findings.append(
+                {
+                    "kind": "preview_truncated",
+                    "message": f"Preview before truncated at {cap} characters",
+                }
+            )
         if len(changed_text) > cap:
-            findings.append({
-                "kind": "preview_truncated",
-                "message": f"Preview after truncated at {cap} characters",
-            })
+            findings.append(
+                {
+                    "kind": "preview_truncated",
+                    "message": f"Preview after truncated at {cap} characters",
+                }
+            )
 
     return TextReplaceCheckResult(
         match_count=match_count,
@@ -1512,8 +1633,10 @@ def text_replace_check(
 # line_range_extract
 # ---------------------------------------------------------------------------
 
+
 class LineRangeExtractResult(TypedDict):
     """Result of line_range_extract."""
+
     line_count_total: int
     start_line: int
     end_line: int
@@ -1583,16 +1706,20 @@ def line_range_extract(
     valid_range = True
     if start_1based < 1:
         valid_range = False
-        findings.append({
-            "kind": "out_of_range",
-            "message": f"start_line {start_line} is before the first line",
-        })
+        findings.append(
+            {
+                "kind": "out_of_range",
+                "message": f"start_line {start_line} is before the first line",
+            }
+        )
     if end_1based > total_lines:
         valid_range = False
-        findings.append({
-            "kind": "out_of_range",
-            "message": f"end_line {end_line} exceeds total lines ({total_lines})",
-        })
+        findings.append(
+            {
+                "kind": "out_of_range",
+                "message": f"end_line {end_line} exceeds total lines ({total_lines})",
+            }
+        )
 
     if not valid_range:
         # Clamp to valid range
@@ -1676,8 +1803,10 @@ def line_range_extract(
 # line_range_compare
 # ---------------------------------------------------------------------------
 
+
 class LineRangeCompareResult(TypedDict):
     """Result of line_range_compare."""
+
     equal: bool
     left_fingerprint: str
     right_fingerprint: str
@@ -1712,7 +1841,9 @@ def line_range_compare(
 
     valid_modes = {"exact", "ignore_trailing_whitespace", "normalize_newlines"}
     if comparison_mode not in valid_modes:
-        raise ValueError(f"Invalid comparison_mode: {comparison_mode}. Use one of: {', '.join(valid_modes)}")
+        raise ValueError(
+            f"Invalid comparison_mode: {comparison_mode}. Use one of: {', '.join(valid_modes)}"
+        )
 
     import hashlib
 
@@ -1732,8 +1863,8 @@ def line_range_compare(
     start_1based = start_line + (1 - line_base)
     end_1based = end_line + (1 - line_base)
 
-    left_slice = left_lines[max(0, start_1based - 1):end_1based]
-    right_slice = right_lines[max(0, start_1based - 1):end_1based]
+    left_slice = left_lines[max(0, start_1based - 1) : end_1based]
+    right_slice = right_lines[max(0, start_1based - 1) : end_1based]
 
     def _normalize_for_compare(s: str, mode: str) -> str:
         if mode == "ignore_trailing_whitespace":

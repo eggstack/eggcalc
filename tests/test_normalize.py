@@ -14,6 +14,7 @@ Covers the regression suite for production hardening of:
 - Group K: Dead code removal
 - Inch canonical (in -> inch)
 """
+
 import io
 import sys
 
@@ -64,13 +65,16 @@ def _val(result):
 class TestLeadingZeros:
     """Verify that leading zeros in fractional numbers are preserved."""
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("0.015", 0.015),
-        ("0.001", 0.001),
-        ("0.005", 0.005),
-        ("1.015", 1.015),
-        ("10.015", 10.015),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("0.015", 0.015),
+            ("0.001", 0.001),
+            ("0.005", 0.005),
+            ("1.015", 1.015),
+            ("10.015", 10.015),
+        ],
+    )
     def test_leading_zeros_preserved(self, expr, expected):
         result, code, _out, _err = _run(expr)
         assert code == 0
@@ -98,31 +102,39 @@ class TestLeadingZeros:
 class TestNFuncPatterns:
     """<digit> <func> should be interpreted as <func>(<digit>)."""
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("5 factorial", 120),       # 5!
-        ("5 sin", -0.9589242746631385),  # sin(5)
-        ("5 cos", 0.2836621854632263),   # cos(5)
-        ("5 log", 1.6094379124341003),   # ln(5)
-        ("2 sqrt 9", 6.0),               # 2 * sqrt(9)
-        ("2sqrt9", 6.0),                 # compact form of 2 * sqrt(9)
-        ("sqrt 144", 12.0),             # sqrt(144) - existing behavior preserved
-        ("sqrt144", 12.0),              # compact form of sqrt(144)
-        ("sin 0", 0.0),                 # sin(0) - existing behavior preserved
-        ("sin0", 0.0),                  # compact form of sin(0)
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("5 factorial", 120),  # 5!
+            ("5 sin", -0.9589242746631385),  # sin(5)
+            ("5 cos", 0.2836621854632263),  # cos(5)
+            ("5 log", 1.6094379124341003),  # ln(5)
+            ("2 sqrt 9", 6.0),  # 2 * sqrt(9)
+            ("2sqrt9", 6.0),  # compact form of 2 * sqrt(9)
+            ("sqrt 144", 12.0),  # sqrt(144) - existing behavior preserved
+            ("sqrt144", 12.0),  # compact form of sqrt(144)
+            ("sin 0", 0.0),  # sin(0) - existing behavior preserved
+            ("sin0", 0.0),  # compact form of sin(0)
+        ],
+    )
     def test_n_func(self, expr, expected):
         result, code, _out, _err = _run(expr)
         assert code == 0, f"Expected success for {expr!r}, got code={code}, err={_err!r}"
-        assert _val(result) == pytest.approx(expected), (
-            f"Expected {expected} for {expr!r}, got {_val(result)}"
-        )
+        assert _val(result) == pytest.approx(
+            expected
+        ), f"Expected {expected} for {expr!r}, got {_val(result)}"
 
-    @pytest.mark.parametrize("expr,expected_normalized,expected", [
-        ("log10(100)", "log10(100)", 2.0),
-        ("log2(8)", "log2(8)", 3.0),
-        ("expm1(1)", "expm1(1)", 1.718281828459045),
-    ])
-    def test_function_names_ending_in_digits_before_paren(self, expr, expected_normalized, expected):
+    @pytest.mark.parametrize(
+        "expr,expected_normalized,expected",
+        [
+            ("log10(100)", "log10(100)", 2.0),
+            ("log2(8)", "log2(8)", 3.0),
+            ("expm1(1)", "expm1(1)", 1.718281828459045),
+        ],
+    )
+    def test_function_names_ending_in_digits_before_paren(
+        self, expr, expected_normalized, expected
+    ):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
         assert normalized == expected_normalized
@@ -130,11 +142,14 @@ class TestNFuncPatterns:
         assert code == 0
         assert _val(result) == pytest.approx(expected)
 
-    @pytest.mark.parametrize("expr,expected_normalized,expected", [
-        ("sin30", "sin(30)", -0.9880316240928618),
-        ("sqrt9", "sqrt(9)", 3.0),
-        ("2sqrt9", "2*sqrt(9)", 6.0),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected_normalized,expected",
+        [
+            ("sin30", "sin(30)", -0.9880316240928618),
+            ("sqrt9", "sqrt(9)", 3.0),
+            ("2sqrt9", "2*sqrt(9)", 6.0),
+        ],
+    )
     def test_compact_function_number_spacing(self, expr, expected_normalized, expected):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
@@ -172,12 +187,15 @@ class TestXorVsPower:
 class TestBinaryWordErrors:
     """<value> not/in/to/as <value> should raise a clear error."""
 
-    @pytest.mark.parametrize("expr", [
-        "5 not 6",
-        "1 in 2",
-        "1 to 2",
-        "5 as 6",
-    ])
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "5 not 6",
+            "1 in 2",
+            "1 to 2",
+            "5 as 6",
+        ],
+    )
     def test_binary_word_raises(self, expr):
         # The pipeline surfaces a ValueError to the user via a non-zero exit
         # code; we don't expect a clean numeric result.
@@ -281,13 +299,16 @@ class TestAngleMode:
 class TestMultiWordNumbers:
     """Tens + ones + scale should combine to a single value."""
 
-    @pytest.mark.parametrize("expr,expected", [
-        ("twenty one hundred", 2100),
-        ("thirty two hundred", 3200),
-        ("fifty six thousand", 56000),
-        ("twelve hundred", 1200),
-        ("twenty one thousand", 21000),
-    ])
+    @pytest.mark.parametrize(
+        "expr,expected",
+        [
+            ("twenty one hundred", 2100),
+            ("thirty two hundred", 3200),
+            ("fifty six thousand", 56000),
+            ("twelve hundred", 1200),
+            ("twenty one thousand", 21000),
+        ],
+    )
     def test_tens_ones_scale(self, expr, expected):
         result, code, _out, _err = _run(expr)
         assert code == 0
@@ -327,6 +348,7 @@ class TestLengthAndValidation:
     def test_validation_rejects_bare_operators(self):
         """*/.3 (no leading digit) should be rejected by validation."""
         from eggcalc.normalize import validate_for_eval
+
         with pytest.raises(ValueError):
             validate_for_eval(["*/.3"], PATTERNS)
 
@@ -340,16 +362,19 @@ class TestDeadCodeRemoved:
 
     def test_no_inline_negative_handler(self):
         import eggcalc.normalize as m
-        assert not hasattr(m, "_handle_negative_token"), (
-            "_handle_negative_token should have been removed (dead code)"
-        )
+
+        assert not hasattr(
+            m, "_handle_negative_token"
+        ), "_handle_negative_token should have been removed (dead code)"
 
     def test_no_decimal_negative_handler(self):
         import eggcalc.normalize as m
+
         assert not hasattr(m, "_should_handle_decimal_negative")
 
     def test_no_inline_negative_check(self):
         import eggcalc.normalize as m
+
         assert not hasattr(m, "_should_handle_inline_negative")
 
     def test_normalize_handles_simple_subtraction(self):
@@ -432,22 +457,16 @@ class TestApplyMathFunctionsSwap:
     """5 factorial -> factorial(5); 5 sqrt(4) keeps sqrt(4)."""
 
     def test_five_factorial_swaps_to_factorial_5(self):
-        out = apply_math_functions(
-            ["5", "*", "factorial"], NORMALIZE, PATTERNS
-        )
+        out = apply_math_functions(["5", "*", "factorial"], NORMALIZE, PATTERNS)
         assert out == ["factorial", "(", "5", ")"]
 
     def test_five_sin_swaps_to_sin_5(self):
-        out = apply_math_functions(
-            ["5", "*", "sin"], NORMALIZE, PATTERNS
-        )
+        out = apply_math_functions(["5", "*", "sin"], NORMALIZE, PATTERNS)
         assert out == ["sin", "(", "5", ")"]
 
     def test_two_sqrt_nine_does_not_swap(self):
         """When there's a trailing value, the leading number is a multiplier."""
-        out = apply_math_functions(
-            ["2", "*", "sqrt", "*", "9"], NORMALIZE, PATTERNS
-        )
+        out = apply_math_functions(["2", "*", "sqrt", "*", "9"], NORMALIZE, PATTERNS)
         # Existing behavior preserved: 2 * sqrt(9)
         assert out == ["2", "*", "sqrt", "(", "9", ")"]
 
@@ -458,11 +477,13 @@ class TestShouldSplitNumberSequence:
     def test_returns_true_for_numeric_parts(self):
         """Function should return True when all parts are numeric."""
         from eggcalc.normalize import _should_split_number_sequence
+
         assert _should_split_number_sequence("1 2 3") is True
 
     def test_returns_false_for_non_numeric(self):
         """Function should return False when parts are not numeric."""
         from eggcalc.normalize import _should_split_number_sequence
+
         assert _should_split_number_sequence("1 abc 3") is False
 
 
@@ -616,14 +637,19 @@ class TestUnitSpacingProbes:
         assert result.value == pytest.approx(5)
         assert result.unit == "m"
 
-    @pytest.mark.parametrize("expr,expected_normalized,expected_unit", [
-        ("2min", "2*min", "min"),
-        ("2 min", "2*min", "min"),
-        ("2   min", "2*min", "min"),
-        ("2radians", "2*rad", "rad"),
-        ("2 radians", "2*rad", "rad"),
-    ])
-    def test_unit_suffix_function_name_collision_spacing(self, expr, expected_normalized, expected_unit):
+    @pytest.mark.parametrize(
+        "expr,expected_normalized,expected_unit",
+        [
+            ("2min", "2*min", "min"),
+            ("2 min", "2*min", "min"),
+            ("2   min", "2*min", "min"),
+            ("2radians", "2*rad", "rad"),
+            ("2 radians", "2*rad", "rad"),
+        ],
+    )
+    def test_unit_suffix_function_name_collision_spacing(
+        self, expr, expected_normalized, expected_unit
+    ):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
         assert normalized == expected_normalized
@@ -677,7 +703,9 @@ class TestUnitSpacingProbes:
         assert result.value == pytest.approx(12.7)
         assert result.unit == "cm"
 
-    @pytest.mark.parametrize("expr", ["30km/h in mph", "30 km/h in mph", "30 km / h in mph", "30km / h in mph"])
+    @pytest.mark.parametrize(
+        "expr", ["30km/h in mph", "30 km/h in mph", "30 km / h in mph", "30km / h in mph"]
+    )
     def test_compound_speed_conversion_spacing(self, expr):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
@@ -808,6 +836,7 @@ class TestNumberWordSubstringBoundary:
 
     def test_none_does_not_become_one(self):
         from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
+
         normalized, code = normalize_expression("None", NORMALIZE, PATTERNS)
         # "None" is not a recognized number word; it should not become "1".
         assert normalized != "1"
@@ -815,12 +844,14 @@ class TestNumberWordSubstringBoundary:
 
     def test_phone_does_not_become_one(self):
         from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
+
         normalized, code = normalize_expression("Phone", NORMALIZE, PATTERNS)
         assert normalized != "1"
         assert code != 0
 
     def test_stone_does_not_become_one(self):
         from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
+
         normalized, _code = normalize_expression("stone", NORMALIZE, PATTERNS)
         # The substring "one" inside "stone" must not be replaced.
         assert normalized != "1"
@@ -828,12 +859,14 @@ class TestNumberWordSubstringBoundary:
 
     def test_bare_one_still_converts(self):
         from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
+
         normalized, code = normalize_expression("one", NORMALIZE, PATTERNS)
         assert normalized == "1"
         assert code == 0
 
     def test_compound_number_word_still_converts(self):
         from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
+
         normalized, code = normalize_expression("twenty one", NORMALIZE, PATTERNS)
         # "twenty one" is now recognized as a compound number -> 21
         assert normalized == "21"

@@ -1,6 +1,5 @@
 """Tests for markdown_structure and code_fence_extract tools."""
 
-
 from eggcalc.exact.markdown import (
     code_fence_extract,
     markdown_structure,

@@ -18,6 +18,7 @@ MAX_RESULT_TEXT_LENGTH = 50_000
 
 class PatchHunk(TypedDict):
     """A single hunk parsed from a unified diff."""
+
     old_start: int
     old_count: int
     new_start: int
@@ -29,6 +30,7 @@ class PatchHunk(TypedDict):
 
 class PatchFile(TypedDict):
     """A single file parsed from a unified diff."""
+
     old_file: str
     new_file: str
     hunks: list[PatchHunk]
@@ -37,6 +39,7 @@ class PatchFile(TypedDict):
 
 class PatchParseResult(TypedDict):
     """Result of parsing a unified diff."""
+
     ok: bool
     files: list[PatchFile]
     error: str | None
@@ -44,6 +47,7 @@ class PatchParseResult(TypedDict):
 
 class FailedHunk(TypedDict):
     """Information about a hunk that failed to apply."""
+
     hunk_index: int
     old_start: int
     old_count: int
@@ -54,6 +58,7 @@ class FailedHunk(TypedDict):
 
 class PatchApplyCheckResult(TypedDict):
     """Result of checking whether a patch applies cleanly."""
+
     patch_parse_ok: bool
     applies: bool
     hunks_total: int
@@ -70,6 +75,7 @@ class PatchApplyCheckResult(TypedDict):
 
 class PatchSummaryResult(TypedDict):
     """Result of summarizing a unified diff."""
+
     files_changed: int
     hunks_total: int
     additions: int
@@ -135,13 +141,17 @@ def parse_unified_diff(patch_text: str) -> PatchParseResult:
             if in_hunk and current_hunk_info:
                 old_s, old_c, new_s, new_c = current_hunk_info
                 raw = current_hunk_header + "\n" + "\n".join(current_hunk_lines)
-                current_hunks.append(PatchHunk(
-                    old_start=old_s, old_count=old_c,
-                    new_start=new_s, new_count=new_c,
-                    header_line=current_hunk_header,
-                    lines=list(current_hunk_lines),
-                    raw=raw,
-                ))
+                current_hunks.append(
+                    PatchHunk(
+                        old_start=old_s,
+                        old_count=old_c,
+                        new_start=new_s,
+                        new_count=new_c,
+                        header_line=current_hunk_header,
+                        lines=list(current_hunk_lines),
+                        raw=raw,
+                    )
+                )
                 in_hunk = False
                 current_hunk_lines = []
                 current_hunk_info = None
@@ -168,13 +178,17 @@ def parse_unified_diff(patch_text: str) -> PatchParseResult:
             if in_hunk and current_hunk_info:
                 old_s, old_c, new_s, new_c = current_hunk_info
                 raw = current_hunk_header + "\n" + "\n".join(current_hunk_lines)
-                current_hunks.append(PatchHunk(
-                    old_start=old_s, old_count=old_c,
-                    new_start=new_s, new_count=new_c,
-                    header_line=current_hunk_header,
-                    lines=list(current_hunk_lines),
-                    raw=raw,
-                ))
+                current_hunks.append(
+                    PatchHunk(
+                        old_start=old_s,
+                        old_count=old_c,
+                        new_start=new_s,
+                        new_count=new_c,
+                        header_line=current_hunk_header,
+                        lines=list(current_hunk_lines),
+                        raw=raw,
+                    )
+                )
                 current_hunk_lines = []
 
             parsed = _parse_hunk_header(line)
@@ -183,12 +197,14 @@ def parse_unified_diff(patch_text: str) -> PatchParseResult:
                 current_hunk_header = line
                 in_hunk = True
             else:
-                files.append(PatchFile(
-                    old_file=current_old_file,
-                    new_file=current_new_file,
-                    hunks=list(current_hunks),
-                    raw=patch_text,
-                ))
+                files.append(
+                    PatchFile(
+                        old_file=current_old_file,
+                        new_file=current_new_file,
+                        hunks=list(current_hunks),
+                        raw=patch_text,
+                    )
+                )
                 current_old_file = ""
                 current_new_file = ""
                 current_hunks = []
@@ -201,21 +217,27 @@ def parse_unified_diff(patch_text: str) -> PatchParseResult:
     if in_hunk and current_hunk_info:
         old_s, old_c, new_s, new_c = current_hunk_info
         raw = current_hunk_header + "\n" + "\n".join(current_hunk_lines)
-        current_hunks.append(PatchHunk(
-            old_start=old_s, old_count=old_c,
-            new_start=new_s, new_count=new_c,
-            header_line=current_hunk_header,
-            lines=list(current_hunk_lines),
-            raw=raw,
-        ))
+        current_hunks.append(
+            PatchHunk(
+                old_start=old_s,
+                old_count=old_c,
+                new_start=new_s,
+                new_count=new_c,
+                header_line=current_hunk_header,
+                lines=list(current_hunk_lines),
+                raw=raw,
+            )
+        )
 
     if current_old_file or current_new_file or current_hunks:
-        files.append(PatchFile(
-            old_file=current_old_file,
-            new_file=current_new_file,
-            hunks=list(current_hunks),
-            raw=patch_text,
-        ))
+        files.append(
+            PatchFile(
+                old_file=current_old_file,
+                new_file=current_new_file,
+                hunks=list(current_hunks),
+                raw=patch_text,
+            )
+        )
 
     if not files:
         return PatchParseResult(
@@ -455,10 +477,12 @@ def patch_apply_check(
         if result is not None:
             current_lines = result
             hunks_applied += 1
-            affected_line_ranges.append({
-                "start": hunk["new_start"],
-                "end": hunk["new_start"] + hunk["new_count"] - 1,
-            })
+            affected_line_ranges.append(
+                {
+                    "start": hunk["new_start"],
+                    "end": hunk["new_start"] + hunk["new_count"] - 1,
+                }
+            )
         else:
             hunks_failed += 1
             expected_ctx = [
@@ -467,16 +491,22 @@ def patch_apply_check(
                 if _normalize_line(line).startswith(" ") or _normalize_line(line).startswith("-")
             ]
             actual_end = min(hunk["old_start"] - 1 + hunk["old_count"], len(current_lines))
-            actual_ctx = current_lines[hunk["old_start"] - 1:actual_end] if hunk["old_start"] - 1 < len(current_lines) else []
+            actual_ctx = (
+                current_lines[hunk["old_start"] - 1 : actual_end]
+                if hunk["old_start"] - 1 < len(current_lines)
+                else []
+            )
 
-            failed_hunks.append(FailedHunk(
-                hunk_index=hunk_idx,
-                old_start=hunk["old_start"],
-                old_count=hunk["old_count"],
-                expected_context=expected_ctx,
-                actual_context=actual_ctx,
-                reason=error or "Unknown error",
-            ))
+            failed_hunks.append(
+                FailedHunk(
+                    hunk_index=hunk_idx,
+                    old_start=hunk["old_start"],
+                    old_count=hunk["old_count"],
+                    expected_context=expected_ctx,
+                    actual_context=actual_ctx,
+                    reason=error or "Unknown error",
+                )
+            )
 
     applies = hunks_failed == 0
     result_text = _lines_to_text(current_lines) if return_result_text else None
@@ -485,7 +515,9 @@ def patch_apply_check(
     if hunks_failed > 0:
         findings.append(f"{hunks_failed} of {hunks_total} hunks failed to apply")
 
-    result_fingerprint = _fingerprint(result_text or original_text) if return_result_fingerprint else ""
+    result_fingerprint = (
+        _fingerprint(result_text or original_text) if return_result_fingerprint else ""
+    )
 
     return PatchApplyCheckResult(
         patch_parse_ok=True,
@@ -580,10 +612,12 @@ def patch_summary(patch_text: str) -> PatchSummaryResult:
             additions += hunk_additions
             deletions += hunk_deletions
 
-            file_ranges.append({
-                "start": hunk["new_start"],
-                "end": hunk["new_start"] + hunk["new_count"] - 1,
-            })
+            file_ranges.append(
+                {
+                    "start": hunk["new_start"],
+                    "end": hunk["new_start"] + hunk["new_count"] - 1,
+                }
+            )
 
         if file_key:
             line_ranges_by_file[file_key] = file_ranges

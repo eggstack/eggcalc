@@ -26,6 +26,7 @@ __all__ = [
 
 class FirstDiff(TypedDict):
     """Information about the first difference between two strings."""
+
     a_index: int
     b_index: int
     a_char: str
@@ -36,12 +37,14 @@ class FirstDiff(TypedDict):
 
 class CommonPrefixSuffix(TypedDict):
     """Common prefix and suffix lengths."""
+
     common_prefix_len: int
     common_suffix_len: int
 
 
 class DiffSpan(TypedDict):
     """A span of difference between two strings."""
+
     kind: str
     a_span: list[int]
     b_span: list[int]
@@ -117,8 +120,10 @@ def common_prefix_suffix(a: str, b: str) -> CommonPrefixSuffix:
 
     # Find common suffix (working backwards from end)
     suffix_len = 0
-    while (suffix_len < min_len - prefix_len and
-           a[len(a) - 1 - suffix_len] == b[len(b) - 1 - suffix_len]):
+    while (
+        suffix_len < min_len - prefix_len
+        and a[len(a) - 1 - suffix_len] == b[len(b) - 1 - suffix_len]
+    ):
         suffix_len += 1
 
     return CommonPrefixSuffix(
@@ -164,9 +169,9 @@ def levenshtein_distance(a: str, b: str, max_len: int = MAX_LEVENSHTEIN_LEN) -> 
                 curr_row[j] = prev_row[j - 1]
             else:
                 curr_row[j] = 1 + min(
-                    prev_row[j],      # deletion
-                    curr_row[j - 1], # insertion
-                    prev_row[j - 1], # substitution
+                    prev_row[j],  # deletion
+                    curr_row[j - 1],  # insertion
+                    prev_row[j - 1],  # substitution
                 )
         prev_row, curr_row = curr_row, prev_row
 
@@ -190,9 +195,7 @@ def longest_common_subsequence(a: str, b: str, max_len: int = MAX_LEVENSHTEIN_LE
     if not a or not b:
         return ""
     if len(a) > max_len or len(b) > max_len:
-        raise ValueError(
-            f"Input strings too long ({len(a)}, {len(b)}); max {max_len}"
-        )
+        raise ValueError(f"Input strings too long ({len(a)}, {len(b)}); max {max_len}")
 
     m, n = len(a), len(b)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
@@ -239,13 +242,15 @@ def diff_spans(a: str, b: str, max_diffs: int = 50) -> list[DiffSpan]:
             continue
 
         kind = tag  # 'replace', 'insert', or 'delete'
-        spans.append(DiffSpan(
-            kind=kind,
-            a_span=[i1, i2],
-            b_span=[j1, j2],
-            a_text=a[i1:i2],
-            b_text=b[j1:j2],
-        ))
+        spans.append(
+            DiffSpan(
+                kind=kind,
+                a_span=[i1, i2],
+                b_span=[j1, j2],
+                a_text=a[i1:i2],
+                b_text=b[j1:j2],
+            )
+        )
 
         if len(spans) >= max_diffs:
             break

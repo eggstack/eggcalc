@@ -17,6 +17,7 @@ MAX_INPUT_LENGTH = 100_000
 
 class DotenvEntry(TypedDict):
     """A single parsed .env entry."""
+
     key: str
     value: str
     value_present: bool
@@ -26,17 +27,20 @@ class DotenvEntry(TypedDict):
 
 class IniLine(TypedDict):
     """A single parsed INI line."""
+
     kind: str
     line: int
 
 
 class IniSectionLine(IniLine):
     """An INI section header line."""
+
     name: str
 
 
 class IniKeyValueLine(IniLine):
     """An INI key-value line."""
+
     section: str | None
     key: str
     value: str
@@ -44,6 +48,7 @@ class IniKeyValueLine(IniLine):
 
 class DotenvValidateResult(TypedDict):
     """Result of dotenv validation."""
+
     parse_ok: bool
     entries: list[DotenvEntry]
     duplicates: list[dict[str, object]]
@@ -55,6 +60,7 @@ class DotenvValidateResult(TypedDict):
 
 class IniValidateResult(TypedDict):
     """Result of INI validation."""
+
     parse_ok: bool
     sections: list[str]
     keys_by_section: dict[str, list[str]]
@@ -87,9 +93,7 @@ def dotenv_validate(
         ValueError: If text exceeds MAX_INPUT_LENGTH.
     """
     if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Input length {len(text)} exceeds maximum {MAX_INPUT_LENGTH}"
-        )
+        raise ValueError(f"Input length {len(text)} exceeds maximum {MAX_INPUT_LENGTH}")
     key_re = re.compile(key_pattern)
     seen_keys: dict[str, int] = {}
     entries: list[DotenvEntry] = []
@@ -109,35 +113,41 @@ def dotenv_validate(
         line = stripped
 
         if allow_export and line.startswith("export "):
-            line = line[len("export "):]
+            line = line[len("export ") :]
         elif line.startswith("export "):
-            invalid_lines.append({
-                "line": line_no,
-                "text": raw_line,
-                "reason": "export keyword not allowed",
-            })
+            invalid_lines.append(
+                {
+                    "line": line_no,
+                    "text": raw_line,
+                    "reason": "export keyword not allowed",
+                }
+            )
             parse_ok = False
             continue
 
         eq_pos = line.find("=")
         if eq_pos < 1:
-            invalid_lines.append({
-                "line": line_no,
-                "text": raw_line,
-                "reason": "missing '=' separator",
-            })
+            invalid_lines.append(
+                {
+                    "line": line_no,
+                    "text": raw_line,
+                    "reason": "missing '=' separator",
+                }
+            )
             parse_ok = False
             continue
 
         key = line[:eq_pos].strip()
-        raw_value = line[eq_pos + 1:]
+        raw_value = line[eq_pos + 1 :]
 
         if not key_re.match(key):
-            invalid_lines.append({
-                "line": line_no,
-                "text": raw_line,
-                "reason": f"key '{key}' does not match pattern {key_pattern}",
-            })
+            invalid_lines.append(
+                {
+                    "line": line_no,
+                    "text": raw_line,
+                    "reason": f"key '{key}' does not match pattern {key_pattern}",
+                }
+            )
             parse_ok = False
             continue
 
@@ -177,9 +187,13 @@ def dotenv_validate(
             duplicates.append(dup_info)
             if duplicate_policy == "error":
                 parse_ok = False
-                findings.append(f"Duplicate key '{key}' at line {line_no} (first at line {seen_keys[key]})")
+                findings.append(
+                    f"Duplicate key '{key}' at line {line_no} (first at line {seen_keys[key]})"
+                )
             elif duplicate_policy == "warn":
-                findings.append(f"Duplicate key '{key}' at line {line_no} (first at line {seen_keys[key]})")
+                findings.append(
+                    f"Duplicate key '{key}' at line {line_no} (first at line {seen_keys[key]})"
+                )
         else:
             seen_keys[key] = line_no
 
@@ -217,9 +231,7 @@ def ini_validate(
         ValueError: If text exceeds MAX_INPUT_LENGTH.
     """
     if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(
-            f"Input length {len(text)} exceeds maximum {MAX_INPUT_LENGTH}"
-        )
+        raise ValueError(f"Input length {len(text)} exceeds maximum {MAX_INPUT_LENGTH}")
     seen_keys: dict[tuple[str | None, str], int] = {}
     seen_sections: dict[str, int] = {}
     sections: list[str] = []
@@ -239,11 +251,13 @@ def ini_validate(
         if stripped.startswith("[") and stripped.endswith("]"):
             section_name = stripped[1:-1].strip()
             if not section_name:
-                invalid_lines.append({
-                    "line": line_no,
-                    "text": raw_line,
-                    "reason": "empty section name",
-                })
+                invalid_lines.append(
+                    {
+                        "line": line_no,
+                        "text": raw_line,
+                        "reason": "empty section name",
+                    }
+                )
                 parse_ok = False
                 continue
 
@@ -278,11 +292,13 @@ def ini_validate(
 
         eq_match = re.match(r"^([^=:\s]+)\s*[=:]\s*(.*)", stripped)
         if not eq_match:
-            invalid_lines.append({
-                "line": line_no,
-                "text": raw_line,
-                "reason": "not a valid key=value line or section header",
-            })
+            invalid_lines.append(
+                {
+                    "line": line_no,
+                    "text": raw_line,
+                    "reason": "not a valid key=value line or section header",
+                }
+            )
             parse_ok = False
             continue
 

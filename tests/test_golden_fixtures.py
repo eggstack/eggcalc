@@ -22,6 +22,7 @@ def get_value(result, key, default=None):
 # text_equal fixtures
 # ---------------------------------------------------------------------------
 
+
 class TestTextEqualFixtures:
     """Run all text_equal fixtures."""
 
@@ -61,6 +62,7 @@ class TestTextEqualFixtures:
 # measure_text fixtures
 # ---------------------------------------------------------------------------
 
+
 class TestMeasureTextFixtures:
     """Run all measure_text fixtures."""
 
@@ -99,6 +101,7 @@ class TestMeasureTextFixtures:
 # inspect_text fixtures
 # ---------------------------------------------------------------------------
 
+
 class TestInspectTextFixtures:
     """Run all inspect_text fixtures."""
 
@@ -122,18 +125,36 @@ class TestInspectTextFixtures:
                 if key == "has_bidi_controls":
                     # Bidi chars may show up in warnings or bidi_controls
                     # Bidi control names: RLO, LRO, RLE, LRE, RLI, LRI, FSI, PDF, LRM, RLM
-                    bidi_keywords = ("bidi", "right-to-left", "left-to-right",
-                                     "pop directional", "embedding", "override")
+                    bidi_keywords = (
+                        "bidi",
+                        "right-to-left",
+                        "left-to-right",
+                        "pop directional",
+                        "embedding",
+                        "override",
+                    )
                     warnings = result.get("warnings", [])
-                    bidi_warns = [w for w in warnings
-                                  if any(kw in w.get("message", "").lower() for kw in bidi_keywords)]
+                    bidi_warns = [
+                        w
+                        for w in warnings
+                        if any(kw in w.get("message", "").lower() for kw in bidi_keywords)
+                    ]
                     actual = len(result.get("bidi_controls", [])) > 0 or len(bidi_warns) > 0
                 elif key == "bidi_count":
-                    bidi_keywords = ("bidi", "right-to-left", "left-to-right",
-                                     "pop directional", "embedding", "override")
+                    bidi_keywords = (
+                        "bidi",
+                        "right-to-left",
+                        "left-to-right",
+                        "pop directional",
+                        "embedding",
+                        "override",
+                    )
                     warnings = result.get("warnings", [])
-                    bidi_warns = [w for w in warnings
-                                  if any(kw in w.get("message", "").lower() for kw in bidi_keywords)]
+                    bidi_warns = [
+                        w
+                        for w in warnings
+                        if any(kw in w.get("message", "").lower() for kw in bidi_keywords)
+                    ]
                     actual = len(result.get("bidi_controls", [])) + len(bidi_warns)
                 elif key == "mixed_scripts":
                     ms = result.get("mixed_scripts", {})
@@ -159,6 +180,7 @@ class TestInspectTextFixtures:
 # text_replace_check fixtures
 # ---------------------------------------------------------------------------
 
+
 class TestTextReplaceCheckFixtures:
     """Run all text_replace_check fixtures."""
 
@@ -177,8 +199,14 @@ class TestTextReplaceCheckFixtures:
             inp = case["input"]
             exp = case["expected"]
             kwargs = {}
-            for key in ("mode", "expected_count", "allow_multiple",
-                        "newline_policy", "return_preview", "max_preview_chars"):
+            for key in (
+                "mode",
+                "expected_count",
+                "allow_multiple",
+                "newline_policy",
+                "return_preview",
+                "max_preview_chars",
+            ):
                 if key in inp:
                     kwargs[key] = inp[key]
 
@@ -194,8 +222,7 @@ class TestTextReplaceCheckFixtures:
                     continue
                 elif key == "has_ambiguous_finding":
                     actual = any(
-                        f.get("kind") == "ambiguous_replacement"
-                        for f in result.get("findings", [])
+                        f.get("kind") == "ambiguous_replacement" for f in result.get("findings", [])
                     )
                     assert actual == expected_val, (
                         f"Fixture {rel_path} case '{case['name']}': "
@@ -211,7 +238,7 @@ class TestTextReplaceCheckFixtures:
                     continue
                 elif key.startswith("position_"):
                     # Handle nested position keys like position_line, position_column, position_codepoint_index
-                    pos_key = key[len("position_"):]
+                    pos_key = key[len("position_") :]
                     positions = result.get("positions", [])
                     if positions:
                         actual = positions[0].get(pos_key)
@@ -228,6 +255,7 @@ class TestTextReplaceCheckFixtures:
 # ---------------------------------------------------------------------------
 # line_range_extract fixtures
 # ---------------------------------------------------------------------------
+
 
 class TestLineRangeExtractFixtures:
     """Run all line_range_extract fixtures."""
@@ -251,9 +279,7 @@ class TestLineRangeExtractFixtures:
                 if key in inp:
                     kwargs[key] = inp[key]
 
-            result = line_range_extract(
-                inp["text"], inp["start_line"], inp["end_line"], **kwargs
-            )
+            result = line_range_extract(inp["text"], inp["start_line"], inp["end_line"], **kwargs)
 
             for key, expected_val in exp.items():
                 if key == "line_count":
@@ -280,6 +306,7 @@ class TestLineRangeExtractFixtures:
 # line_range_compare fixtures
 # ---------------------------------------------------------------------------
 
+
 class TestLineRangeCompareFixtures:
     """Run all line_range_compare fixtures."""
 
@@ -303,8 +330,7 @@ class TestLineRangeCompareFixtures:
                     kwargs[key] = inp[key]
 
             result = line_range_compare(
-                inp["left_text"], inp["right_text"],
-                inp["start_line"], inp["end_line"], **kwargs
+                inp["left_text"], inp["right_text"], inp["start_line"], inp["end_line"], **kwargs
             )
 
             for key, expected_val in exp.items():
@@ -336,6 +362,7 @@ class TestLineRangeCompareFixtures:
 # ---------------------------------------------------------------------------
 # path_analyze fixtures
 # ---------------------------------------------------------------------------
+
 
 class TestPathAnalyzeFixtures:
     """Run all path_analyze fixtures."""
@@ -382,6 +409,7 @@ class TestPathAnalyzeFixtures:
 # ---------------------------------------------------------------------------
 # path_normalize fixtures
 # ---------------------------------------------------------------------------
+
 
 class TestPathNormalizeFixtures:
     """Run all path_normalize fixtures."""

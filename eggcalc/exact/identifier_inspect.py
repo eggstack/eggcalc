@@ -18,12 +18,14 @@ from .unicode_tools import detect_confusables
 
 class IdentifierInspectResult(TypedDict):
     """Result of identifier inspection."""
+
     identifiers: list[IdentifierInfo]
     collisions: list[CollisionInfo]
 
 
 class IdentifierInfo(TypedDict):
     """Information about a single identifier."""
+
     raw: str
     normalized: str
     valid: bool
@@ -35,43 +37,79 @@ class IdentifierInfo(TypedDict):
 
 class CollisionInfo(TypedDict):
     """Information about a collision between two identifiers."""
+
     kind: str
     a: str
     b: str
 
 
-_JS_KEYWORDS: frozenset[str] = frozenset({
-    "break", "case", "catch", "const", "continue", "debugger", "default",
-    "delete", "do", "else", "enum", "export", "extends", "false", "finally",
-    "for", "function", "if", "import", "in", "instanceof", "let", "new",
-    "null", "return", "static", "super", "switch", "this", "throw", "true",
-    "try", "typeof", "var", "void", "while", "with", "yield",
-})
+_JS_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "break",
+        "case",
+        "catch",
+        "const",
+        "continue",
+        "debugger",
+        "default",
+        "delete",
+        "do",
+        "else",
+        "enum",
+        "export",
+        "extends",
+        "false",
+        "finally",
+        "for",
+        "function",
+        "if",
+        "import",
+        "in",
+        "instanceof",
+        "let",
+        "new",
+        "null",
+        "return",
+        "static",
+        "super",
+        "switch",
+        "this",
+        "throw",
+        "true",
+        "try",
+        "typeof",
+        "var",
+        "void",
+        "while",
+        "with",
+        "yield",
+    }
+)
 
 
 _SCRIPT_RANGES: list[tuple[int, int, str]] = [
-    (0x0041, 0x005a, "Latin"),
-    (0x0061, 0x007a, "Latin"),
-    (0x00c0, 0x00ff, "Latin"),
-    (0x0100, 0x017f, "Latin"),
-    (0x0180, 0x024f, "Latin"),
-    (0x0400, 0x04ff, "Cyrillic"),
-    (0x0500, 0x052f, "Cyrillic"),
-    (0x0370, 0x03ff, "Greek"),
-    (0x1f00, 0x1fff, "Greek"),
-    (0x4e00, 0x9fff, "Han"),
-    (0x3000, 0x303f, "CJK"),
-    (0x3040, 0x309f, "Hiragana"),
-    (0x30a0, 0x30ff, "Katakana"),
-    (0x0600, 0x06ff, "Arabic"),
-    (0x0590, 0x05ff, "Hebrew"),
-    (0x0900, 0x097f, "Devanagari"),
-    (0x0e00, 0x0e7f, "Thai"),
-    (0xac00, 0xd7af, "Hangul"),
-    (0x10a0, 0x10ff, "Georgian"),
-    (0x0530, 0x058f, "Armenian"),
-    (0x13a0, 0x13ff, "Cherokee"),
-    (0x1400, 0x167f, "Canadian_Aboriginal"),
+    (0x0041, 0x005A, "Latin"),
+    (0x0061, 0x007A, "Latin"),
+    (0x00C0, 0x00FF, "Latin"),
+    (0x0100, 0x017F, "Latin"),
+    (0x0180, 0x024F, "Latin"),
+    (0x0400, 0x04FF, "Cyrillic"),
+    (0x0500, 0x052F, "Cyrillic"),
+    (0x0370, 0x03FF, "Greek"),
+    (0x1F00, 0x1FFF, "Greek"),
+    (0x4E00, 0x9FFF, "Han"),
+    (0x3000, 0x303F, "CJK"),
+    (0x3040, 0x309F, "Hiragana"),
+    (0x30A0, 0x30FF, "Katakana"),
+    (0x0600, 0x06FF, "Arabic"),
+    (0x0590, 0x05FF, "Hebrew"),
+    (0x0900, 0x097F, "Devanagari"),
+    (0x0E00, 0x0E7F, "Thai"),
+    (0xAC00, 0xD7AF, "Hangul"),
+    (0x10A0, 0x10FF, "Georgian"),
+    (0x0530, 0x058F, "Armenian"),
+    (0x13A0, 0x13FF, "Cherokee"),
+    (0x1400, 0x167F, "Canadian_Aboriginal"),
 ]
 
 
@@ -102,10 +140,25 @@ def _casefold(text: str) -> str:
 def _has_invisibles(text: str) -> bool:
     """Check if text contains invisible characters."""
     invisible_chars = {
-        "\u200b", "\u200c", "\u200d", "\u200e", "\u200f",
-        "\ufeff", "\u00a0", "\u2028", "\u2029",
-        "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
-        "\u2066", "\u2067", "\u2068", "\u2069", "\u2060",
+        "\u200b",
+        "\u200c",
+        "\u200d",
+        "\u200e",
+        "\u200f",
+        "\ufeff",
+        "\u00a0",
+        "\u2028",
+        "\u2029",
+        "\u202a",
+        "\u202b",
+        "\u202c",
+        "\u202d",
+        "\u202e",
+        "\u2066",
+        "\u2067",
+        "\u2068",
+        "\u2069",
+        "\u2060",
     }
     for char in text:
         if char in invisible_chars:
@@ -212,15 +265,17 @@ def identifier_inspect(
         if len(scripts) > 1:
             warnings.append("Mixed script identifier")
 
-        id_infos.append(IdentifierInfo(
-            raw=raw_id,
-            normalized=normalized,
-            valid=valid,
-            scripts=scripts,
-            has_invisibles=has_invisibles,
-            has_confusables=has_confusables,
-            warnings=warnings,
-        ))
+        id_infos.append(
+            IdentifierInfo(
+                raw=raw_id,
+                normalized=normalized,
+                valid=valid,
+                scripts=scripts,
+                has_invisibles=has_invisibles,
+                has_confusables=has_confusables,
+                warnings=warnings,
+            )
+        )
         normalized_ids.append(normalized)
 
     collision_pairs: set[tuple[str, str]] = set()
@@ -245,11 +300,13 @@ def identifier_inspect(
                         pair = (a_raw, b_raw) if a_raw <= b_raw else (b_raw, a_raw)
                         if pair not in collision_pairs:
                             collision_pairs.add(pair)
-                            collisions.append(CollisionInfo(
-                                kind="confusable",
-                                a=a_raw,
-                                b=b_raw,
-                            ))
+                            collisions.append(
+                                CollisionInfo(
+                                    kind="confusable",
+                                    a=a_raw,
+                                    b=b_raw,
+                                )
+                            )
                         continue
 
                 for a_conf in a_confusables:
@@ -257,11 +314,13 @@ def identifier_inspect(
                         pair = (a_raw, b_raw) if a_raw <= b_raw else (b_raw, a_raw)
                         if pair not in collision_pairs:
                             collision_pairs.add(pair)
-                            collisions.append(CollisionInfo(
-                                kind="confusable",
-                                a=a_raw,
-                                b=b_raw,
-                            ))
+                            collisions.append(
+                                CollisionInfo(
+                                    kind="confusable",
+                                    a=a_raw,
+                                    b=b_raw,
+                                )
+                            )
                         break
 
                 for b_conf in b_confusables:
@@ -269,11 +328,13 @@ def identifier_inspect(
                         pair = (a_raw, b_raw) if a_raw <= b_raw else (b_raw, a_raw)
                         if pair not in collision_pairs:
                             collision_pairs.add(pair)
-                            collisions.append(CollisionInfo(
-                                kind="confusable",
-                                a=a_raw,
-                                b=b_raw,
-                            ))
+                            collisions.append(
+                                CollisionInfo(
+                                    kind="confusable",
+                                    a=a_raw,
+                                    b=b_raw,
+                                )
+                            )
                         break
 
     if casefold:
@@ -288,14 +349,18 @@ def identifier_inspect(
             if len(items) > 1:
                 for i in range(len(items)):
                     for j in range(i + 1, len(items)):
-                        pair = (items[i], items[j]) if items[i] <= items[j] else (items[j], items[i])
+                        pair = (
+                            (items[i], items[j]) if items[i] <= items[j] else (items[j], items[i])
+                        )
                         if pair not in collision_pairs:
                             collision_pairs.add(pair)
-                            collisions.append(CollisionInfo(
-                                kind="casefold",
-                                a=items[i],
-                                b=items[j],
-                            ))
+                            collisions.append(
+                                CollisionInfo(
+                                    kind="casefold",
+                                    a=items[i],
+                                    b=items[j],
+                                )
+                            )
 
     if normalization != "raw":
         norm_map: dict[str, list[str]] = {}
@@ -308,14 +373,18 @@ def identifier_inspect(
             if len(items) > 1:
                 for i in range(len(items)):
                     for j in range(i + 1, len(items)):
-                        pair = (items[i], items[j]) if items[i] <= items[j] else (items[j], items[i])
+                        pair = (
+                            (items[i], items[j]) if items[i] <= items[j] else (items[j], items[i])
+                        )
                         if pair not in collision_pairs:
                             collision_pairs.add(pair)
-                            collisions.append(CollisionInfo(
-                                kind="normalization",
-                                a=items[i],
-                                b=items[j],
-                            ))
+                            collisions.append(
+                                CollisionInfo(
+                                    kind="normalization",
+                                    a=items[i],
+                                    b=items[j],
+                                )
+                            )
 
     return IdentifierInspectResult(
         identifiers=id_infos,
@@ -325,6 +394,7 @@ def identifier_inspect(
 
 class TableIdentifierEntry(TypedDict, total=False):
     """An identifier entry in the table passed to identifier_table_inspect."""
+
     name: str
     kind: str
     file: str
@@ -333,6 +403,7 @@ class TableIdentifierEntry(TypedDict, total=False):
 
 class TableCollisionInfo(TypedDict):
     """Information about a collision between identifiers in a table."""
+
     kind: str
     names: list[str]
     detail: str
@@ -340,6 +411,7 @@ class TableCollisionInfo(TypedDict):
 
 class ReservedKeywordHit(TypedDict):
     """An identifier that is a reserved keyword in the target language."""
+
     name: str
     language: str
     file: str
@@ -348,6 +420,7 @@ class ReservedKeywordHit(TypedDict):
 
 class MixedStyleGroup(TypedDict):
     """A group of identifiers with the same stripped form but different styles."""
+
     stripped: str
     names: list[str]
     styles: list[str]
@@ -355,6 +428,7 @@ class MixedStyleGroup(TypedDict):
 
 class IdentifierTableInspectResult(TypedDict):
     """Result of identifier table inspection."""
+
     count: int
     collisions: list[TableCollisionInfo]
     reserved_keyword_hits: list[ReservedKeywordHit]
@@ -362,30 +436,128 @@ class IdentifierTableInspectResult(TypedDict):
     findings: list[str]
 
 
-_RUST_KEYWORDS: frozenset[str] = frozenset({
-    "as", "async", "await", "break", "const", "continue", "crate", "dyn",
-    "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in",
-    "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
-    "self", "Self", "static", "struct", "super", "trait", "true", "type",
-    "unsafe", "use", "where", "while",
-})
+_RUST_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "as",
+        "async",
+        "await",
+        "break",
+        "const",
+        "continue",
+        "crate",
+        "dyn",
+        "else",
+        "enum",
+        "extern",
+        "false",
+        "fn",
+        "for",
+        "if",
+        "impl",
+        "in",
+        "let",
+        "loop",
+        "match",
+        "mod",
+        "move",
+        "mut",
+        "pub",
+        "ref",
+        "return",
+        "self",
+        "Self",
+        "static",
+        "struct",
+        "super",
+        "trait",
+        "true",
+        "type",
+        "unsafe",
+        "use",
+        "where",
+        "while",
+    }
+)
 
-_JS_KEYWORDS: frozenset[str] = frozenset({
-    "break", "case", "catch", "const", "continue", "debugger", "default",
-    "delete", "do", "else", "enum", "export", "extends", "false", "finally",
-    "for", "function", "if", "import", "in", "instanceof", "let", "new",
-    "null", "return", "static", "super", "switch", "this", "throw", "true",
-    "try", "typeof", "var", "void", "while", "with", "yield",
-})
+_JS_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "break",
+        "case",
+        "catch",
+        "const",
+        "continue",
+        "debugger",
+        "default",
+        "delete",
+        "do",
+        "else",
+        "enum",
+        "export",
+        "extends",
+        "false",
+        "finally",
+        "for",
+        "function",
+        "if",
+        "import",
+        "in",
+        "instanceof",
+        "let",
+        "new",
+        "null",
+        "return",
+        "static",
+        "super",
+        "switch",
+        "this",
+        "throw",
+        "true",
+        "try",
+        "typeof",
+        "var",
+        "void",
+        "while",
+        "with",
+        "yield",
+    }
+)
 
-_TS_KEYWORDS: frozenset[str] = _JS_KEYWORDS | frozenset({
-    "any", "boolean", "constructor", "declare", "get", "module",
-    "require", "number", "set", "string", "symbol", "type",
-    "from", "of", "readonly", "abstract", "as", "async", "await",
-    "enum", "export", "implements", "interface", "is", "keyof",
-    "namespace", "package", "private", "protected", "public",
-    "static", "override",
-})
+_TS_KEYWORDS: frozenset[str] = _JS_KEYWORDS | frozenset(
+    {
+        "any",
+        "boolean",
+        "constructor",
+        "declare",
+        "get",
+        "module",
+        "require",
+        "number",
+        "set",
+        "string",
+        "symbol",
+        "type",
+        "from",
+        "of",
+        "readonly",
+        "abstract",
+        "as",
+        "async",
+        "await",
+        "enum",
+        "export",
+        "implements",
+        "interface",
+        "is",
+        "keyof",
+        "namespace",
+        "package",
+        "private",
+        "protected",
+        "public",
+        "static",
+        "override",
+    }
+)
 
 _LANG_KEYWORDS: dict[str, frozenset[str]] = {
     "python": frozenset(keyword.kwlist),
@@ -400,7 +572,12 @@ def _classify_style(name: str) -> str:
     if not name:
         return "invalid"
     if name[0].isupper():
-        if "_" not in name and "-" not in name and name.isidentifier() and any(c.isupper() for c in name):
+        if (
+            "_" not in name
+            and "-" not in name
+            and name.isidentifier()
+            and any(c.isupper() for c in name)
+        ):
             return "PascalCase"
     if "_" in name and "-" not in name:
         parts = name.split("_")
@@ -470,11 +647,13 @@ def identifier_table_inspect(
             cf_map.setdefault(cf_key, []).append(name)
         for cf_key, group in cf_map.items():
             if len(group) > 1:
-                collisions.append(TableCollisionInfo(
-                    kind="casefold",
-                    names=group,
-                    detail=f"Casefold collision: {', '.join(group)}",
-                ))
+                collisions.append(
+                    TableCollisionInfo(
+                        kind="casefold",
+                        names=group,
+                        detail=f"Casefold collision: {', '.join(group)}",
+                    )
+                )
         if cf_map and any(len(g) > 1 for g in cf_map.values()):
             findings.append("Casefold collisions detected")
 
@@ -486,11 +665,13 @@ def identifier_table_inspect(
         for nfc_key, group in nfc_map.items():
             originals = list(set(group))
             if len(originals) > 1:
-                collisions.append(TableCollisionInfo(
-                    kind="normalization",
-                    names=originals,
-                    detail=f"Normalization collision (NFC '{nfc_key}'): {', '.join(originals)}",
-                ))
+                collisions.append(
+                    TableCollisionInfo(
+                        kind="normalization",
+                        names=originals,
+                        detail=f"Normalization collision (NFC '{nfc_key}'): {', '.join(originals)}",
+                    )
+                )
         if nfc_map and any(len(set(g)) > 1 for g in nfc_map.values()):
             findings.append("Normalization collisions detected")
 
@@ -538,11 +719,13 @@ def identifier_table_inspect(
 
                 if is_confusable:
                     checked_pairs.add(pair)
-                    collisions.append(TableCollisionInfo(
-                        kind="confusable",
-                        names=[name_a, name_b],
-                        detail=f"Confusable/near-collision: '{name_a}' and '{name_b}'",
-                    ))
+                    collisions.append(
+                        TableCollisionInfo(
+                            kind="confusable",
+                            names=[name_a, name_b],
+                            detail=f"Confusable/near-collision: '{name_a}' and '{name_b}'",
+                        )
+                    )
         if checked_pairs:
             findings.append("Confusable characters or near-collisions detected")
 
@@ -558,11 +741,13 @@ def identifier_table_inspect(
             styles_present = list({s for _, s in entries})
             if len(styles_present) > 1:
                 group_names = [n for n, _ in entries]
-                collisions.append(TableCollisionInfo(
-                    kind="style_variant",
-                    names=group_names,
-                    detail=f"Style variants for '{stripped}': {', '.join(styles_present)}",
-                ))
+                collisions.append(
+                    TableCollisionInfo(
+                        kind="style_variant",
+                        names=group_names,
+                        detail=f"Style variants for '{stripped}': {', '.join(styles_present)}",
+                    )
+                )
         if any(len({s for _, s in e}) > 1 for e in style_map.values()):
             findings.append("Style variant collisions detected")
 
@@ -571,12 +756,14 @@ def identifier_table_inspect(
         for i, entry in enumerate(identifiers):
             name = names[i]
             if name in kw_set:
-                reserved_hits.append(ReservedKeywordHit(
-                    name=name,
-                    language=language,
-                    file=entry.get("file", ""),
-                    line=entry.get("line", 0),
-                ))
+                reserved_hits.append(
+                    ReservedKeywordHit(
+                        name=name,
+                        language=language,
+                        file=entry.get("file", ""),
+                        line=entry.get("line", 0),
+                    )
+                )
         if reserved_hits:
             findings.append(f"{len(reserved_hits)} reserved keyword hit(s) in {language}")
 
@@ -591,11 +778,13 @@ def identifier_table_inspect(
         for stripped, entries in style_map2.items():
             styles_present = list({s for _, s in entries})
             if len(styles_present) > 1:
-                mixed_style_groups.append(MixedStyleGroup(
-                    stripped=stripped,
-                    names=[n for n, _ in entries],
-                    styles=styles_present,
-                ))
+                mixed_style_groups.append(
+                    MixedStyleGroup(
+                        stripped=stripped,
+                        names=[n for n, _ in entries],
+                        styles=styles_present,
+                    )
+                )
         if mixed_style_groups:
             findings.append(f"{len(mixed_style_groups)} mixed-style group(s) detected")
 

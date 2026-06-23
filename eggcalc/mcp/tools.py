@@ -410,7 +410,8 @@ def _build_physical_constants() -> dict[str, dict[str, Any]]:
         else:
             logging.debug(
                 "constant_lookup: _CONSTANT_META key %r not found in "
-                "Evaluator.CONSTANTS (stale metadata entry)", key,
+                "Evaluator.CONSTANTS (stale metadata entry)",
+                key,
             )
     return result
 
@@ -431,13 +432,16 @@ def _regex_test_worker(
     """Run regex test in a child process. Must be top-level for pickling."""
     try:
         import resource
+
         resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
     except (ImportError, ValueError, OSError):
         # RLIMIT_AS may not be enforced on all platforms (e.g., macOS). Fall back to CPU time limit.
         try:
             import sys as _sys
+
             if _sys.platform == "darwin":
                 import resource
+
                 # Set CPU time limit as fallback (soft=5s, hard=10s)
                 resource.setrlimit(resource.RLIMIT_CPU, (5, 10))
         except (ImportError, ValueError, OSError):
@@ -461,19 +465,24 @@ def _regex_finditer_worker(
     """Run regex finditer in a child process. Must be top-level for pickling."""
     try:
         import resource
+
         resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
     except (ImportError, ValueError, OSError):
         # RLIMIT_AS may not be enforced on all platforms (e.g., macOS). Fall back to CPU time limit.
         try:
             import sys as _sys
+
             if _sys.platform == "darwin":
                 import resource
+
                 # Set CPU time limit as fallback (soft=5s, hard=10s)
                 resource.setrlimit(resource.RLIMIT_CPU, (5, 10))
         except (ImportError, ValueError, OSError):
             pass
     try:
-        result = _regex_finditer(pattern, text, flags, max_matches, include_line_column, include_groups)
+        result = _regex_finditer(
+            pattern, text, flags, max_matches, include_line_column, include_groups
+        )
         result_queue.put(("ok", result))
     except Exception as exc:
         result_queue.put(("error", f"{type(exc).__name__}: {exc}"))
@@ -490,23 +499,38 @@ def _sanitize_error(message: str) -> str:
     text = message[:8192]
     text = text.encode("ascii", "replace").decode("ascii")
     # Traceback File lines
-    text = re.sub(r'File\s+["\'][^"\']*["\'],\s*line\s+\d+', 'File "<redacted>", line <redacted>', text)
+    text = re.sub(
+        r'File\s+["\'][^"\']*["\'],\s*line\s+\d+', 'File "<redacted>", line <redacted>', text
+    )
     # Module/frame references
     text = re.sub(r'(?:in\s+)<[^>]+>', 'in <module>', text)
     # Variable assignments with string values
-    text = re.sub(r'^\s*[A-Za-z_]\w*\s*=\s*["\'][^"\']*["\']', '<var>=<redacted>', text, flags=re.MULTILINE)
+    text = re.sub(
+        r'^\s*[A-Za-z_]\w*\s*=\s*["\'][^"\']*["\']', '<var>=<redacted>', text, flags=re.MULTILINE
+    )
     # Bare absolute file paths (Unix /path/to/file.py or Windows C:\path\file.py)
     # Only matches absolute paths with 2+ directory components and a file extension
     text = re.sub(r'(?<![/\w.])(/[\w./-]+\.\w{1,10})(?![/\w])', '<path>', text)
     # Also match common system directory paths without file extensions
-    text = re.sub(r'(?:/(?:etc|proc|dev|sys|run|tmp|var|usr|lib|bin|sbin)(?:/[\w.-]+)+)', '<path>', text)
+    text = re.sub(
+        r'(?:/(?:etc|proc|dev|sys|run|tmp|var|usr|lib|bin|sbin)(?:/[\w.-]+)+)', '<path>', text
+    )
     text = re.sub(r'[A-Za-z]:\\(?:[\w.-]+\\)+\w+\.\w+', '<path>', text)
     # "No such file or directory" messages with paths
-    text = re.sub(r"No such file or directory:\s*['\"][^'\"]*['\"]", "No such file or directory: '<redacted>'", text)
+    text = re.sub(
+        r"No such file or directory:\s*['\"][^'\"]*['\"]",
+        "No such file or directory: '<redacted>'",
+        text,
+    )
     # Memory addresses (0x...)
     text = re.sub(r'0x[0-9a-fA-F]{8,}', '<address>', text)
     # JSON decode error positions (e.g., "line 5 column 10")
-    text = re.sub(r'\bline\s+(\d+)\s+column\s+(\d+)\b', r'line <redacted> column <redacted>', text, flags=re.IGNORECASE)
+    text = re.sub(
+        r'\bline\s+(\d+)\s+column\s+(\d+)\b',
+        r'line <redacted> column <redacted>',
+        text,
+        flags=re.IGNORECASE,
+    )
     return text
 
 
@@ -639,9 +663,17 @@ def math_eval(expression: str) -> dict:
         Success response with result, or error envelope.
     """
     if not isinstance(expression, str):
-        return _error_response("invalid_arguments", f"expression must be a string, got {type(expression).__name__}", tool="math_eval")
+        return _error_response(
+            "invalid_arguments",
+            f"expression must be a string, got {type(expression).__name__}",
+            tool="math_eval",
+        )
     if len(expression) > MAX_EXPRESSION_LENGTH:
-        return _error_response("input_too_large", f"Expression exceeds maximum length of {MAX_EXPRESSION_LENGTH}", tool="math_eval")
+        return _error_response(
+            "input_too_large",
+            f"Expression exceeds maximum length of {MAX_EXPRESSION_LENGTH}",
+            tool="math_eval",
+        )
     try:
         result = evaluate_with_timeout(expression, timeout=5.0)
         if hasattr(result, 'value') and hasattr(result, 'unit'):
@@ -656,9 +688,16 @@ def math_eval(expression: str) -> dict:
             response_data = {"value": str(result), "type": type(result).__name__}
         return _success_response(response_data, tool="math_eval")
     except TimeoutError:
-        return _error_response("timeout", "Expression evaluation timed out", ["Try a simpler expression"], tool="math_eval")
+        return _error_response(
+            "timeout",
+            "Expression evaluation timed out",
+            ["Try a simpler expression"],
+            tool="math_eval",
+        )
     except EvaluationError as e:
-        return _error_response("evaluation_error", str(e), ["Check expression syntax"], tool="math_eval")
+        return _error_response(
+            "evaluation_error", str(e), ["Check expression syntax"], tool="math_eval"
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="math_eval")
 
@@ -675,6 +714,7 @@ def unit_convert(value: float, from_unit: str, to_unit: str) -> dict:
         Success response with conversion result.
     """
     import math
+
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return _error_response(
             "invalid_arguments",
@@ -708,21 +748,28 @@ def unit_convert(value: float, from_unit: str, to_unit: str) -> dict:
         )
 
         if not is_unit(from_unit):
-            return _error_response("invalid_arguments", f"Unknown unit: {from_unit}", tool="unit_convert")
+            return _error_response(
+                "invalid_arguments", f"Unknown unit: {from_unit}", tool="unit_convert"
+            )
         if not is_unit(to_unit):
-            return _error_response("invalid_arguments", f"Unknown unit: {to_unit}", tool="unit_convert")
+            return _error_response(
+                "invalid_arguments", f"Unknown unit: {to_unit}", tool="unit_convert"
+            )
 
         from_cat = get_unit_category(from_unit)
         to_cat = get_unit_category(to_unit)
 
         if from_cat == "temperature" and to_cat == "temperature":
             result = convert_temperature(value, from_unit, to_unit)
-            return _success_response({
-                "value": result,
-                "from_unit": from_unit,
-                "to_unit": to_unit,
-                "factor": None,
-            }, tool="unit_convert")
+            return _success_response(
+                {
+                    "value": result,
+                    "from_unit": from_unit,
+                    "to_unit": to_unit,
+                    "factor": None,
+                },
+                tool="unit_convert",
+            )
         # Reject cross-category conversions (e.g., length -> mass) when
         # both categories are known. If either is None, let
         # get_conversion_factor attempt the conversion and fail naturally.
@@ -742,12 +789,15 @@ def unit_convert(value: float, from_unit: str, to_unit: str) -> dict:
                 tool="unit_convert",
             )
 
-        return _success_response({
-            "value": result,
-            "from_unit": from_unit,
-            "to_unit": to_unit,
-            "factor": factor,
-        }, tool="unit_convert")
+        return _success_response(
+            {
+                "value": result,
+                "from_unit": from_unit,
+                "to_unit": to_unit,
+                "factor": factor,
+            },
+            tool="unit_convert",
+        )
     except ValueError as e:
         return _error_response("conversion_error", str(e), tool="unit_convert")
     except Exception as e:
@@ -781,12 +831,15 @@ def unit_info(unit: str) -> dict:
                     category = base_unit
                     break
 
-        return _success_response({
-            "unit": unit,
-            "canonical": canonical,
-            "category": category,
-            "is_valid": True,
-        }, tool="unit_info")
+        return _success_response(
+            {
+                "unit": unit,
+                "canonical": canonical,
+                "category": category,
+                "is_valid": True,
+            },
+            tool="unit_info",
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="unit_info")
 
@@ -806,14 +859,19 @@ def constant_lookup(name: str) -> dict:
 
         key = name.lower()
         if key not in PHYSICAL_CONSTANTS:
-            return _error_response("invalid_arguments", f"Unknown constant: {name}", tool="constant_lookup")
+            return _error_response(
+                "invalid_arguments", f"Unknown constant: {name}", tool="constant_lookup"
+            )
 
-        return _success_response({
-            "name": name,
-            "value": PHYSICAL_CONSTANTS[key]["value"],
-            "symbol": PHYSICAL_CONSTANTS[key]["symbol"],
-            "display_name": PHYSICAL_CONSTANTS[key]["name"],
-        }, tool="constant_lookup")
+        return _success_response(
+            {
+                "name": name,
+                "value": PHYSICAL_CONSTANTS[key]["value"],
+                "symbol": PHYSICAL_CONSTANTS[key]["symbol"],
+                "display_name": PHYSICAL_CONSTANTS[key]["name"],
+            },
+            tool="constant_lookup",
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="constant_lookup")
 
@@ -903,8 +961,16 @@ def text_equal(
         return err
 
     try:
-        result = _text_equal(a, b, normalization, casefold, trim,
-                            ignore_newline_style, ignore_trailing_whitespace, ignore_final_newline)
+        result = _text_equal(
+            a,
+            b,
+            normalization,
+            casefold,
+            trim,
+            ignore_newline_style,
+            ignore_trailing_whitespace,
+            ignore_final_newline,
+        )
         return _success_response(result, tool="text_equal")
     except Exception as e:
         return _error_response("internal_error", str(e), tool="text_equal")
@@ -1011,33 +1077,53 @@ def text_inspect(
         )
 
     try:
-        result = _inspect_text(text, include_codepoints, include_confusables, detail, normalize, compare_normalized)
+        result = _inspect_text(
+            text, include_codepoints, include_confusables, detail, normalize, compare_normalized
+        )
 
         findings: list[dict] = []
         for inv in result.get("invisibles", []):
-            findings.append({
-                "code": "INVISIBLE_CHAR",
-                "severity": "warn",
-                "message": f"Invisible character: {inv.get('name', 'unknown')} at index {inv.get('index', '?')}",
-                "span": {"char_start": inv.get("index", 0), "char_end": inv.get("index", 0) + 1},
-                "details": {"codepoint": inv.get("codepoint"), "category": inv.get("category")},
-            })
+            findings.append(
+                {
+                    "code": "INVISIBLE_CHAR",
+                    "severity": "warn",
+                    "message": f"Invisible character: {inv.get('name', 'unknown')} at index {inv.get('index', '?')}",
+                    "span": {
+                        "char_start": inv.get("index", 0),
+                        "char_end": inv.get("index", 0) + 1,
+                    },
+                    "details": {"codepoint": inv.get("codepoint"), "category": inv.get("category")},
+                }
+            )
         for conf in result.get("confusables", []):
-            findings.append({
-                "code": "CONFUSABLE_CHAR",
-                "severity": "warn",
-                "message": f"Confusable character at index {conf.get('index', '?')}",
-                "span": {"char_start": conf.get("index", 0), "char_end": conf.get("index", 0) + 1},
-                "details": {"original": conf.get("char"), "confusable": conf.get("confusable_with")},
-            })
+            findings.append(
+                {
+                    "code": "CONFUSABLE_CHAR",
+                    "severity": "warn",
+                    "message": f"Confusable character at index {conf.get('index', '?')}",
+                    "span": {
+                        "char_start": conf.get("index", 0),
+                        "char_end": conf.get("index", 0) + 1,
+                    },
+                    "details": {
+                        "original": conf.get("char"),
+                        "confusable": conf.get("confusable_with"),
+                    },
+                }
+            )
         for bidi in result.get("bidi_controls", []):
-            findings.append({
-                "code": "BIDI_CONTROL",
-                "severity": "warn",
-                "message": f"Bidirectional control character: {bidi.get('name', 'unknown')} at index {bidi.get('index', '?')}",
-                "span": {"char_start": bidi.get("index", 0), "char_end": bidi.get("index", 0) + 1},
-                "details": {"codepoint": bidi.get("codepoint")},
-            })
+            findings.append(
+                {
+                    "code": "BIDI_CONTROL",
+                    "severity": "warn",
+                    "message": f"Bidirectional control character: {bidi.get('name', 'unknown')} at index {bidi.get('index', '?')}",
+                    "span": {
+                        "char_start": bidi.get("index", 0),
+                        "char_end": bidi.get("index", 0) + 1,
+                    },
+                    "details": {"codepoint": bidi.get("codepoint")},
+                }
+            )
 
         machine_code: str | None = None
         if findings:
@@ -1049,7 +1135,9 @@ def text_inspect(
             elif "INVISIBLE_CHAR" in codes:
                 machine_code = "INVISIBLES_DETECTED"
 
-        return _success_response(result, tool="text_inspect", findings=findings or None, machine_code=machine_code)
+        return _success_response(
+            result, tool="text_inspect", findings=findings or None, machine_code=machine_code
+        )
     except ValueError as e:
         return _error_response("invalid_arguments", str(e), tool="text_inspect")
     except Exception as e:
@@ -1212,19 +1300,23 @@ def validate_json(text: str) -> dict:
                 span["line"] = result["line"]
             if result.get("column") is not None:
                 span["column"] = result["column"]
-            findings.append({
-                "code": "JSON_PARSE_ERROR",
-                "severity": "error",
-                "message": result.get("error", "Invalid JSON"),
-                "span": span or None,
-                "details": {"position": result.get("position")},
-            })
+            findings.append(
+                {
+                    "code": "JSON_PARSE_ERROR",
+                    "severity": "error",
+                    "message": result.get("error", "Invalid JSON"),
+                    "span": span or None,
+                    "details": {"position": result.get("position")},
+                }
+            )
 
         machine_code: str | None = None
         if not result.get("valid", True):
             machine_code = "JSON_INVALID"
 
-        return _success_response(result, tool="validate_json", findings=findings or None, machine_code=machine_code)
+        return _success_response(
+            result, tool="validate_json", findings=findings or None, machine_code=machine_code
+        )
     except ValueError as e:
         return _error_response("invalid_arguments", str(e), tool="validate_json")
     except Exception as e:
@@ -1327,9 +1419,16 @@ def json_compare(
         )
 
     try:
-        result = _json_compare(a, b, ignore_object_order, ignore_array_order,
-                              numeric_string_equivalence, casefold_keys,
-                              treat_missing_null_as_equal, max_diffs)
+        result = _json_compare(
+            a,
+            b,
+            ignore_object_order,
+            ignore_array_order,
+            numeric_string_equivalence,
+            casefold_keys,
+            treat_missing_null_as_equal,
+            max_diffs,
+        )
 
         if detail == "summary":
             result = {
@@ -1583,11 +1682,14 @@ def json_extract(
         result = _json_extract(text, pointer, max_output_chars)
 
         if detail == "summary":
-            return _success_response({
-                "valid_json": result["valid_json"],
-                "found": result["found"],
-                "summary": result["summary"],
-            }, tool="json_extract")
+            return _success_response(
+                {
+                    "valid_json": result["valid_json"],
+                    "found": result["found"],
+                    "summary": result["summary"],
+                },
+                tool="json_extract",
+            )
         elif detail == "normal":
             return _success_response(result, tool="json_extract")
         else:
@@ -1598,7 +1700,9 @@ def json_extract(
         return _error_response("internal_error", str(e), tool="json_extract")
 
 
-def json_shape(text: str, max_depth: int = 4, max_keys: int = 100, max_array_items: int = 5) -> dict:
+def json_shape(
+    text: str, max_depth: int = 4, max_keys: int = 100, max_array_items: int = 5
+) -> dict:
     """Analyze the structure of a JSON document.
 
     Args:
@@ -1781,7 +1885,15 @@ def regex_finditer(
             try:
                 proc = ctx.Process(
                     target=_regex_finditer_worker,
-                    args=(pattern, text, flags, max_matches, include_line_column, include_groups, queue),
+                    args=(
+                        pattern,
+                        text,
+                        flags,
+                        max_matches,
+                        include_line_column,
+                        include_groups,
+                        queue,
+                    ),
                 )
                 proc.start()
             except Exception:
@@ -1830,18 +1942,22 @@ def regex_safety_check(pattern: str) -> dict:
 
         findings: list[dict] = []
         for risk in result.get("findings", []):
-            findings.append({
-                "code": risk.get("kind", "UNKNOWN_RISK").upper(),
-                "severity": risk.get("severity", "warn"),
-                "message": risk.get("message", risk.get("kind", "Unknown risk")),
-                "details": {"pattern_length": result.get("pattern_length", len(pattern))},
-            })
+            findings.append(
+                {
+                    "code": risk.get("kind", "UNKNOWN_RISK").upper(),
+                    "severity": risk.get("severity", "warn"),
+                    "message": risk.get("message", risk.get("kind", "Unknown risk")),
+                    "details": {"pattern_length": result.get("pattern_length", len(pattern))},
+                }
+            )
 
         machine_code: str | None = None
         if result.get("risk") in ("medium", "high"):
             machine_code = "REGEX_UNSAFE"
 
-        return _success_response(result, tool="regex_safety_check", findings=findings or None, machine_code=machine_code)
+        return _success_response(
+            result, tool="regex_safety_check", findings=findings or None, machine_code=machine_code
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="regex_safety_check")
 
@@ -1887,22 +2003,16 @@ def validate_schema_light(text: str, schema: dict, detail: str = "normal") -> di
     # bounded DFS.
     MAX_SCHEMA_DEPTH = 32
     try:
+
         def _depth(o: Any, d: int) -> int:
             if d > MAX_SCHEMA_DEPTH:
                 raise ValueError("schema too deeply nested")
             if isinstance(o, dict):
-                return (
-                    d
-                    if not o
-                    else max(_depth(v, d + 1) for v in o.values())
-                )
+                return d if not o else max(_depth(v, d + 1) for v in o.values())
             if isinstance(o, list):
-                return (
-                    d
-                    if not o
-                    else max(_depth(v, d + 1) for v in o)
-                )
+                return d if not o else max(_depth(v, d + 1) for v in o)
             return d
+
         _depth(schema, 0)
     except ValueError as e:
         return _error_response(
@@ -1934,10 +2044,13 @@ def validate_schema_light(text: str, schema: dict, detail: str = "normal") -> di
         result = _validate_schema_light(parsed, schema)
 
         if detail == "summary":
-            return _success_response({
-                "valid": result["valid"],
-                "summary": result["summary"],
-            }, tool="validate_schema_light")
+            return _success_response(
+                {
+                    "valid": result["valid"],
+                    "summary": result["summary"],
+                },
+                tool="validate_schema_light",
+            )
         else:
             return _success_response(result, tool="validate_schema_light")
     except Exception as e:
@@ -2039,18 +2152,31 @@ def list_compare(
             tool="list_compare",
         )
 
-    treat_as_multiset_val = treat_as_multiset if treat_as_multiset is not None else (mode == "multiset")
+    treat_as_multiset_val = (
+        treat_as_multiset if treat_as_multiset is not None else (mode == "multiset")
+    )
     ignore_order_val = ignore_order if ignore_order is not None else (mode != "ordered")
 
     try:
         raw_result = _list_compare(
-            a, b, ignore_order_val, casefold, normalization, trim,
-            treat_as_multiset_val, include_near_matches, near_match_threshold
+            a,
+            b,
+            ignore_order_val,
+            casefold,
+            normalization,
+            trim,
+            treat_as_multiset_val,
+            include_near_matches,
+            near_match_threshold,
         )
         if mode == "ordered":
             equal = raw_result["same_ordered"]
         elif mode == "set":
-            equal = raw_result["same_unordered"] and raw_result["only_in_a"] == [] and raw_result["only_in_b"] == []
+            equal = (
+                raw_result["same_unordered"]
+                and raw_result["only_in_a"] == []
+                and raw_result["only_in_b"] == []
+            )
         else:
             equal = raw_result["same_unordered"]
 
@@ -2075,9 +2201,13 @@ def list_compare(
                 elif i >= len(b):
                     aligned.append({"op": "delete", "a_index": i, "a": a[i]})
                 elif a[i] != b[i] and _transform_ordered(a[i]) != _transform_ordered(b[i]):
-                    aligned.append({"op": "replace", "a_index": i, "a": a[i], "b_index": i, "b": b[i]})
+                    aligned.append(
+                        {"op": "replace", "a_index": i, "a": a[i], "b_index": i, "b": b[i]}
+                    )
                 else:
-                    aligned.append({"op": "equal", "a_index": i, "a": a[i], "b_index": i, "b": b[i]})
+                    aligned.append(
+                        {"op": "equal", "a_index": i, "a": a[i], "b_index": i, "b": b[i]}
+                    )
 
             first_diff = None
             for i, al in enumerate(aligned):
@@ -2111,12 +2241,14 @@ def list_compare(
             }
         else:
             from collections import Counter
+
             def transform(s: str) -> str:
                 result = s
                 if trim:
                     result = result.strip()
                 if normalization != "raw":
                     import unicodedata
+
                     result = unicodedata.normalize(normalization, result)
                 if casefold:
                     result = result.casefold()
@@ -2171,20 +2303,26 @@ def text_truncate(text: str, max_graphemes: int) -> dict:
     try:
         original_graphemes = _count_graphemes(text)
         if original_graphemes <= max_graphemes:
-            return _success_response({
-                "original_graphemes": original_graphemes,
-                "truncated_graphemes": original_graphemes,
-                "truncated": False,
-                "text": text,
-            }, tool="text_truncate")
+            return _success_response(
+                {
+                    "original_graphemes": original_graphemes,
+                    "truncated_graphemes": original_graphemes,
+                    "truncated": False,
+                    "text": text,
+                },
+                tool="text_truncate",
+            )
 
         truncated_text = _truncate_to_grapheme(text, max_graphemes)
-        return _success_response({
-            "original_graphemes": original_graphemes,
-            "truncated_graphemes": max_graphemes,
-            "truncated": True,
-            "text": truncated_text,
-        }, tool="text_truncate")
+        return _success_response(
+            {
+                "original_graphemes": original_graphemes,
+                "truncated_graphemes": max_graphemes,
+                "truncated": True,
+                "text": truncated_text,
+            },
+            tool="text_truncate",
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="text_truncate")
 
@@ -2385,11 +2523,14 @@ def escape_text(text: str, mode: str, detail: str = "normal") -> dict:
         result = _escape_text(text, mode)
 
         if detail == "summary":
-            return _success_response({
-                "mode": result["mode"],
-                "changed": result["changed"],
-                "summary": result["summary"],
-            }, tool="escape_text")
+            return _success_response(
+                {
+                    "mode": result["mode"],
+                    "changed": result["changed"],
+                    "summary": result["summary"],
+                },
+                tool="escape_text",
+            )
         else:
             return _success_response(result, tool="escape_text")
     except Exception as e:
@@ -2438,12 +2579,15 @@ def unescape_text(text: str, mode: str, detail: str = "normal") -> dict:
         result = _unescape_text(text, mode)
 
         if detail == "summary":
-            return _success_response({
-                "mode": result["mode"],
-                "changed": result["changed"],
-                "error": result["error"],
-                "summary": result["summary"],
-            }, tool="unescape_text")
+            return _success_response(
+                {
+                    "mode": result["mode"],
+                    "changed": result["changed"],
+                    "error": result["error"],
+                    "summary": result["summary"],
+                },
+                tool="unescape_text",
+            )
         else:
             return _success_response(result, tool="unescape_text")
     except Exception as e:
@@ -2517,9 +2661,12 @@ def text_hash(
         return _error_response("internal_error", str(e), tool="text_hash")
 
     if detail == "summary":
-        return _success_response({
-            "summary": result["summary"],
-        }, tool="text_hash")
+        return _success_response(
+            {
+                "summary": result["summary"],
+            },
+            tool="text_hash",
+        )
     else:
         return _success_response(result, tool="text_hash")
 
@@ -2561,18 +2708,22 @@ def path_analyze_mcp(path: str, style: str = "auto", detail: str = "normal") -> 
 
         findings: list[dict] = []
         if result.get("has_traversal"):
-            findings.append({
-                "code": "PATH_TRAVERSAL",
-                "severity": "warn",
-                "message": "Path contains parent directory traversal (..)",
-                "details": {"normalized_lexical": result.get("normalized_lexical")},
-            })
+            findings.append(
+                {
+                    "code": "PATH_TRAVERSAL",
+                    "severity": "warn",
+                    "message": "Path contains parent directory traversal (..)",
+                    "details": {"normalized_lexical": result.get("normalized_lexical")},
+                }
+            )
         if result.get("hidden"):
-            findings.append({
-                "code": "PATH_HIDDEN",
-                "severity": "info",
-                "message": "Path starts with a dot (hidden file/directory)",
-            })
+            findings.append(
+                {
+                    "code": "PATH_HIDDEN",
+                    "severity": "info",
+                    "message": "Path starts with a dot (hidden file/directory)",
+                }
+            )
 
         machine_code: str | None = None
         if result.get("has_traversal"):
@@ -2592,7 +2743,12 @@ def path_analyze_mcp(path: str, style: str = "auto", detail: str = "normal") -> 
         else:
             summary_result = dict(result)
 
-        return _success_response(summary_result, tool="path_analyze", findings=findings or None, machine_code=machine_code)
+        return _success_response(
+            summary_result,
+            tool="path_analyze",
+            findings=findings or None,
+            machine_code=machine_code,
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="path_analyze")
 
@@ -2669,7 +2825,9 @@ def path_compare_mcp(
         )
 
     try:
-        result = _path_compare(left, right, platform, case_sensitive, normalize_separators, collapse_dot_segments)
+        result = _path_compare(
+            left, right, platform, case_sensitive, normalize_separators, collapse_dot_segments
+        )
         return _success_response(result, tool="path_compare")
     except Exception as e:
         return _error_response("internal_error", str(e), tool="path_compare")
@@ -2833,8 +2991,7 @@ def text_window(
     # are defense-in-depth. A negative or absurdly large value would be slow
     # in downstream _text_position / _text_window math.
     _MAX_POS = MAX_TEXT_LENGTH * 16
-    for key in ("value", "byte_offset", "codepoint_index", "grapheme_index",
-                "line", "column"):
+    for key in ("value", "byte_offset", "codepoint_index", "grapheme_index", "line", "column"):
         if key in position:
             v = position[key]
             if not isinstance(v, int) or isinstance(v, bool):
@@ -3101,27 +3258,33 @@ def identifier_inspect_mcp(
         )
 
     try:
-        result = _identifier_inspect(identifiers, language, normalization, casefold, check_confusables)
+        result = _identifier_inspect(
+            identifiers, language, normalization, casefold, check_confusables
+        )
 
         findings: list[dict] = []
         for ident_info in result.get("identifiers", []):
             for warning in ident_info.get("warnings", []):
-                findings.append({
-                    "code": "IDENT_WARNING",
-                    "severity": "warn",
-                    "message": warning,
-                    "details": {"identifier": ident_info.get("raw", "")},
-                })
+                findings.append(
+                    {
+                        "code": "IDENT_WARNING",
+                        "severity": "warn",
+                        "message": warning,
+                        "details": {"identifier": ident_info.get("raw", "")},
+                    }
+                )
         for collision in result.get("collisions", []):
             kind = collision.get("kind", "unknown")
             a = collision.get("a", "")
             b = collision.get("b", "")
-            findings.append({
-                "code": "IDENT_COLLISION",
-                "severity": "warn",
-                "message": f"{kind}: '{a}' collides with '{b}'",
-                "details": collision,
-            })
+            findings.append(
+                {
+                    "code": "IDENT_COLLISION",
+                    "severity": "warn",
+                    "message": f"{kind}: '{a}' collides with '{b}'",
+                    "details": collision,
+                }
+            )
 
         machine_code: str | None = None
         if result.get("collisions"):
@@ -3129,7 +3292,9 @@ def identifier_inspect_mcp(
         elif any(f.get("severity") == "error" for f in findings):
             machine_code = "IDENT_INVALID"
 
-        return _success_response(result, tool="identifier_inspect", findings=findings or None, machine_code=machine_code)
+        return _success_response(
+            result, tool="identifier_inspect", findings=findings or None, machine_code=machine_code
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="identifier_inspect")
 
@@ -3324,12 +3489,15 @@ def list_dedupe_mcp(
 
     try:
         result = _list_dedupe(items, normalization, casefold, stable)
-        return _success_response({
-            "items": result,
-            "original_count": len(items),
-            "deduped_count": len(result),
-            "duplicates_removed": len(items) - len(result),
-        }, tool="list_dedupe")
+        return _success_response(
+            {
+                "items": result,
+                "original_count": len(items),
+                "deduped_count": len(result),
+                "duplicates_removed": len(items) - len(result),
+            },
+            tool="list_dedupe",
+        )
     except ValueError as e:
         return _error_response("invalid_arguments", str(e), tool="list_dedupe")
     except Exception as e:
@@ -3369,11 +3537,14 @@ def list_sort_mcp(
 
     try:
         result = _list_sort(items, normalization, casefold, reverse, stable)
-        return _success_response({
-            "items": result,
-            "original_count": len(items),
-            "sorted_count": len(result),
-        }, tool="list_sort")
+        return _success_response(
+            {
+                "items": result,
+                "original_count": len(items),
+                "sorted_count": len(result),
+            },
+            tool="list_sort",
+        )
     except ValueError as e:
         return _error_response("invalid_arguments", str(e), tool="list_sort")
     except Exception as e:
@@ -3449,8 +3620,15 @@ def text_replace_check(
 
     try:
         result = _text_replace_check(
-            text, old, new, mode, expected_count, allow_multiple,
-            newline_policy, return_preview, max_preview_chars,
+            text,
+            old,
+            new,
+            mode,
+            expected_count,
+            allow_multiple,
+            newline_policy,
+            return_preview,
+            max_preview_chars,
         )
         return _success_response(result, tool="text_replace_check")
     except ValueError as e:
@@ -3516,8 +3694,12 @@ def line_range_extract(
 
     try:
         result = _line_range_extract(
-            text, start_line, end_line, line_base,
-            include_line_numbers, include_fingerprint,
+            text,
+            start_line,
+            end_line,
+            line_base,
+            include_line_numbers,
+            include_fingerprint,
         )
         return _success_response(result, tool="line_range_extract")
     except ValueError as e:
@@ -3605,8 +3787,12 @@ def line_range_compare(
 
     try:
         result = _line_range_compare(
-            left_text, right_text, start_line, end_line,
-            line_base, comparison_mode,
+            left_text,
+            right_text,
+            start_line,
+            end_line,
+            line_base,
+            comparison_mode,
         )
         return _success_response(result, tool="line_range_compare")
     except ValueError as e:
@@ -3730,13 +3916,15 @@ def shell_argv_compare(
             tool="argv_compare",
         )
 
-    if left_argv is not None and (
-        err := _validate_str_list(left_argv, "left_argv", "argv_compare")
-    ) is not None:
+    if (
+        left_argv is not None
+        and (err := _validate_str_list(left_argv, "left_argv", "argv_compare")) is not None
+    ):
         return err
-    if right_argv is not None and (
-        err := _validate_str_list(right_argv, "right_argv", "argv_compare")
-    ) is not None:
+    if (
+        right_argv is not None
+        and (err := _validate_str_list(right_argv, "right_argv", "argv_compare")) is not None
+    ):
         return err
 
     if left_command is not None and len(left_command) > MAX_TEXT_LENGTH:
@@ -3783,13 +3971,16 @@ def _dotenv_validate_worker(
     """
     try:
         import resource
+
         resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
     except (ImportError, ValueError, OSError):
         # RLIMIT_AS may not be enforced on all platforms (e.g., macOS). Fall back to CPU time limit.
         try:
             import sys as _sys
+
             if _sys.platform == "darwin":
                 import resource
+
                 resource.setrlimit(resource.RLIMIT_CPU, (5, 10))
         except (ImportError, ValueError, OSError):
             pass
@@ -4086,8 +4277,12 @@ def unicode_policy_check_mcp(
         return err
 
     valid_policies = {
-        "identifier_strict", "filename_safe", "source_code",
-        "human_text", "json_key", "domain_like",
+        "identifier_strict",
+        "filename_safe",
+        "source_code",
+        "human_text",
+        "json_key",
+        "domain_like",
     }
     if policy not in valid_policies:
         return _error_response(
@@ -4134,8 +4329,11 @@ def canonicalize_text_mcp(
         return err
 
     valid_profiles = {
-        "source_file_identity", "identifier_compare", "human_label_compare",
-        "json_key_compare", "path_segment_compare",
+        "source_file_identity",
+        "identifier_compare",
+        "human_label_compare",
+        "json_key_compare",
+        "path_segment_compare",
     }
     if profile not in valid_profiles:
         return _error_response(
@@ -4192,7 +4390,9 @@ def identifier_table_inspect_mcp(
         elif not isinstance(entry["name"], str):
             bad_entries.append(f"[{i}] 'name' must be a string, got {type(entry['name']).__name__}")
         elif len(entry["name"]) > MAX_TEXT_LENGTH:
-            bad_entries.append(f"[{i}] 'name' length {len(entry['name'])} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}")
+            bad_entries.append(
+                f"[{i}] 'name' length {len(entry['name'])} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}"
+            )
         else:
             # Optional fields have bounded types.
             kind = entry.get("kind")
@@ -4205,10 +4405,14 @@ def identifier_table_inspect_mcp(
             if line is not None and (
                 not isinstance(line, int) or isinstance(line, bool) or line < 0
             ):
-                bad_entries.append(f"[{i}] 'line' must be a non-negative integer, got {type(line).__name__}")
+                bad_entries.append(
+                    f"[{i}] 'line' must be a non-negative integer, got {type(line).__name__}"
+                )
             entry_lang = entry.get("language")
             if entry_lang is not None and not isinstance(entry_lang, str):
-                bad_entries.append(f"[{i}] 'language' must be a string, got {type(entry_lang).__name__}")
+                bad_entries.append(
+                    f"[{i}] 'language' must be a string, got {type(entry_lang).__name__}"
+                )
     if bad_entries:
         return _error_response(
             "invalid_arguments",
@@ -4242,26 +4446,32 @@ def identifier_table_inspect_mcp(
 
         findings: list[dict] = []
         for collision in result.get("collisions", []):
-            findings.append({
-                "code": f"COLLISION_{collision['kind'].upper()}",
-                "severity": "warn",
-                "message": collision.get("detail", "Collision detected"),
-                "details": {"names": collision.get("names", [])},
-            })
+            findings.append(
+                {
+                    "code": f"COLLISION_{collision['kind'].upper()}",
+                    "severity": "warn",
+                    "message": collision.get("detail", "Collision detected"),
+                    "details": {"names": collision.get("names", [])},
+                }
+            )
         for hit in result.get("reserved_keyword_hits", []):
-            findings.append({
-                "code": "RESERVED_KEYWORD",
-                "severity": "warn",
-                "message": f"'{hit['name']}' is a reserved keyword in {hit['language']}",
-                "details": {"file": hit.get("file"), "line": hit.get("line")},
-            })
+            findings.append(
+                {
+                    "code": "RESERVED_KEYWORD",
+                    "severity": "warn",
+                    "message": f"'{hit['name']}' is a reserved keyword in {hit['language']}",
+                    "details": {"file": hit.get("file"), "line": hit.get("line")},
+                }
+            )
         for group in result.get("mixed_style_groups", []):
-            findings.append({
-                "code": "MIXED_STYLE",
-                "severity": "info",
-                "message": f"Mixed styles for '{group['stripped']}': {', '.join(group['styles'])}",
-                "details": {"names": group.get("names", [])},
-            })
+            findings.append(
+                {
+                    "code": "MIXED_STYLE",
+                    "severity": "info",
+                    "message": f"Mixed styles for '{group['stripped']}': {', '.join(group['styles'])}",
+                    "details": {"names": group.get("names", [])},
+                }
+            )
 
         machine_code: str | None = None
         if result.get("reserved_keyword_hits"):
@@ -4269,7 +4479,12 @@ def identifier_table_inspect_mcp(
         elif result.get("collisions"):
             machine_code = "IDENT_COLLISIONS"
 
-        return _success_response(result, tool="identifier_table_inspect", findings=findings or None, machine_code=machine_code)
+        return _success_response(
+            result,
+            tool="identifier_table_inspect",
+            findings=findings or None,
+            machine_code=machine_code,
+        )
     except Exception as e:
         return _error_response("internal_error", str(e), tool="identifier_table_inspect")
 
@@ -4346,11 +4561,13 @@ def version_constraint_check_mcp(
 
         findings: list[dict] = []
         for msg in result.get("findings", []):
-            findings.append({
-                "code": "CONSTRAINT_NOTE",
-                "severity": "info",
-                "message": msg,
-            })
+            findings.append(
+                {
+                    "code": "CONSTRAINT_NOTE",
+                    "severity": "info",
+                    "message": msg,
+                }
+            )
 
         machine_code: str | None = None
         if not result.get("satisfies"):
@@ -4409,11 +4626,13 @@ def cargo_toml_inspect_mcp(
             else:
                 severity = "info"
                 code = "CARGO_NOTE"
-            findings.append({
-                "code": code,
-                "severity": severity,
-                "message": msg,
-            })
+            findings.append(
+                {
+                    "code": code,
+                    "severity": severity,
+                    "message": msg,
+                }
+            )
 
         machine_code: str | None = None
         if not result.get("parse_ok"):
@@ -4472,9 +4691,15 @@ def prompt_input_inspect_mcp(
             )
 
     valid_checks = {
-        "unicode_hidden", "bidi", "html_comments", "markdown_links",
-        "ansi_escapes", "terminal_controls", "base64_like_blobs",
-        "instruction_phrases", "long_minified_lines",
+        "unicode_hidden",
+        "bidi",
+        "html_comments",
+        "markdown_links",
+        "ansi_escapes",
+        "terminal_controls",
+        "base64_like_blobs",
+        "instruction_phrases",
+        "long_minified_lines",
     }
     if checks is not None:
         invalid = [c for c in checks if c not in valid_checks]
@@ -4491,13 +4716,15 @@ def prompt_input_inspect_mcp(
 
         findings: list[dict] = []
         for f in result.get("findings", []):
-            findings.append({
-                "code": f.get("code", "UNKNOWN"),
-                "severity": f.get("severity", "info"),
-                "message": f.get("message", ""),
-                "span": f.get("span"),
-                "details": f.get("details"),
-            })
+            findings.append(
+                {
+                    "code": f.get("code", "UNKNOWN"),
+                    "severity": f.get("severity", "info"),
+                    "message": f.get("message", ""),
+                    "span": f.get("span"),
+                    "details": f.get("details"),
+                }
+            )
 
         machine_code: str | None = None
         if findings:
@@ -4523,6 +4750,7 @@ def prompt_input_inspect_mcp(
 # ---------------------------------------------------------------------------
 # Composite tool: text_security_inspect
 # ---------------------------------------------------------------------------
+
 
 def text_security_inspect(
     text: str,
@@ -4554,34 +4782,41 @@ def text_security_inspect(
 
     # 1. text_inspect (always)
     try:
-        ti = text_inspect(text, detail=detail, normalize=normalize,
-                          compare_normalized=compare_normalized)
+        ti = text_inspect(
+            text, detail=detail, normalize=normalize, compare_normalized=compare_normalized
+        )
         if ti.get("ok") is False:
             subresults["text_inspect"] = {"error": ti.get("error")}
         else:
             subresults["text_inspect"] = ti.get("result", {})
             for w in ti.get("result", {}).get("warnings", []):
-                all_findings.append({
-                    "code": "TEXT_INSPECT_WARNING",
-                    "severity": "warn",
-                    "message": w,
-                })
+                all_findings.append(
+                    {
+                        "code": "TEXT_INSPECT_WARNING",
+                        "severity": "warn",
+                        "message": w,
+                    }
+                )
             inv = ti.get("result", {}).get("invisibles", [])
             if inv:
                 machine_codes.append("UNICODE_RISK")
-                all_findings.append({
-                    "code": "HIDDEN_CHARS",
-                    "severity": "warn",
-                    "message": f"Found {len(inv)} invisible character(s)",
-                })
+                all_findings.append(
+                    {
+                        "code": "HIDDEN_CHARS",
+                        "severity": "warn",
+                        "message": f"Found {len(inv)} invisible character(s)",
+                    }
+                )
             conf = ti.get("result", {}).get("confusables", [])
             if conf:
                 machine_codes.append("UNICODE_RISK")
-                all_findings.append({
-                    "code": "CONFUSABLES",
-                    "severity": "warn",
-                    "message": f"Found {len(conf)} confusable character(s)",
-                })
+                all_findings.append(
+                    {
+                        "code": "CONFUSABLES",
+                        "severity": "warn",
+                        "message": f"Found {len(conf)} confusable character(s)",
+                    }
+                )
     except Exception as e:
         subresults["text_inspect"] = {"error": str(e)}
 
@@ -4593,11 +4828,13 @@ def text_security_inspect(
             up_findings = up.get("result", {}).get("findings", [])
             for f in up_findings:
                 sev = f.get("severity", "info")
-                all_findings.append({
-                    "code": f.get("code", "UNICODE_POLICY"),
-                    "severity": sev,
-                    "message": f.get("message", ""),
-                })
+                all_findings.append(
+                    {
+                        "code": f.get("code", "UNICODE_POLICY"),
+                        "severity": sev,
+                        "message": f.get("message", ""),
+                    }
+                )
             if any(f.get("severity") == "error" for f in up_findings):
                 machine_codes.append("UNICODE_RISK")
             subresults["unicode_policy_check"] = {
@@ -4613,6 +4850,7 @@ def text_security_inspect(
     if normalize != "none":
         try:
             import unicodedata
+
             normalized = unicodedata.normalize(normalize, text)
             changed = normalized != text
             subresults["canonicalize_text"] = {"changed": changed, "form": normalize}
@@ -4628,11 +4866,13 @@ def text_security_inspect(
             if pi.get("ok") is not False:
                 pi_findings = pi.get("result", {}).get("findings", [])
                 for f in pi_findings:
-                    all_findings.append({
-                        "code": f.get("code", "PROMPT_RISK"),
-                        "severity": f.get("severity", "warn"),
-                        "message": f.get("message", ""),
-                    })
+                    all_findings.append(
+                        {
+                            "code": f.get("code", "PROMPT_RISK"),
+                            "severity": f.get("severity", "warn"),
+                            "message": f.get("message", ""),
+                        }
+                    )
                 if any(f.get("severity") in ("warn", "error") for f in pi_findings):
                     machine_codes.append("PROMPT_INJECTION_RISK")
                 subresults["prompt_input_inspect"] = {
@@ -4655,11 +4895,13 @@ def text_security_inspect(
             if ii.get("ok") is not False:
                 ii_findings = ii.get("findings", [])
                 for f in ii_findings:
-                    all_findings.append({
-                        "code": f.get("code", "IDENTIFIER_RISK"),
-                        "severity": f.get("severity", "warn"),
-                        "message": f.get("message", ""),
-                    })
+                    all_findings.append(
+                        {
+                            "code": f.get("code", "IDENTIFIER_RISK"),
+                            "severity": f.get("severity", "warn"),
+                            "message": f.get("message", ""),
+                        }
+                    )
                 if ii_findings:
                     machine_codes.append("IDENTIFIER_COLLISION_RISK")
                 subresults["identifier_inspect"] = {
@@ -4699,9 +4941,13 @@ def text_security_inspect(
         "machine_code": primary_machine_code,
         "normalized_changed": subresults.get("canonicalize_text", {}).get("changed", False),
         "recommended_action": (
-            "allow" if verdict == "allow"
-            else "review content for hidden instructions" if verdict == "review"
-            else "do not trust this text without manual inspection"
+            "allow"
+            if verdict == "allow"
+            else (
+                "review content for hidden instructions"
+                if verdict == "review"
+                else "do not trust this text without manual inspection"
+            )
         ),
         "summary": summary,
     }
@@ -4776,24 +5022,30 @@ def edit_preflight(
             matches = result.get("match_count", 0)
             if matches == 0:
                 machine_codes.append("AMBIGUOUS_REPLACEMENT")
-                all_findings.append({
-                    "code": "NO_MATCH",
-                    "severity": "error",
-                    "message": "old text not found in original",
-                })
+                all_findings.append(
+                    {
+                        "code": "NO_MATCH",
+                        "severity": "error",
+                        "message": "old text not found in original",
+                    }
+                )
             elif matches > 1:
                 machine_codes.append("AMBIGUOUS_REPLACEMENT")
-                all_findings.append({
-                    "code": "MULTIPLE_MATCHES",
-                    "severity": "warn",
-                    "message": f"Found {matches} matches; use allow_multiple=true",
-                })
+                all_findings.append(
+                    {
+                        "code": "MULTIPLE_MATCHES",
+                        "severity": "warn",
+                        "message": f"Found {matches} matches; use allow_multiple=true",
+                    }
+                )
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     # --- Mode: patch (unified diff) ---
     elif replacement_mode == "patch":
@@ -4807,39 +5059,47 @@ def edit_preflight(
             pr = patch_apply_check_mcp(original, patch, strict=strict)
             if pr.get("ok") is False:
                 machine_codes.append("PATCH_FAILED")
-                all_findings.append({
-                    "code": "PATCH_ERROR",
-                    "severity": "error",
-                    "message": pr.get("error", "patch_apply_check failed"),
-                })
+                all_findings.append(
+                    {
+                        "code": "PATCH_ERROR",
+                        "severity": "error",
+                        "message": pr.get("error", "patch_apply_check failed"),
+                    }
+                )
             else:
                 result = pr.get("result", {})
                 subresults["patch_apply_check"] = result
                 if not result.get("applies", True):
                     machine_codes.append("PATCH_FAILED")
-                    all_findings.append({
-                        "code": "PATCH_FAILED",
-                        "severity": "error",
-                        "message": "Patch does not apply cleanly",
-                    })
+                    all_findings.append(
+                        {
+                            "code": "PATCH_FAILED",
+                            "severity": "error",
+                            "message": "Patch does not apply cleanly",
+                        }
+                    )
                 # Check fingerprint if expected
                 if expected_fingerprint and result.get("result_fingerprint"):
                     if result["result_fingerprint"] != expected_fingerprint:
                         machine_codes.append("FINGERPRINT_MISMATCH")
-                        all_findings.append({
-                            "code": "FINGERPRINT_MISMATCH",
-                            "severity": "warn",
-                            "message": (
-                                f"Expected {expected_fingerprint}, "
-                                f"got {result['result_fingerprint']}"
-                            ),
-                        })
+                        all_findings.append(
+                            {
+                                "code": "FINGERPRINT_MISMATCH",
+                                "severity": "warn",
+                                "message": (
+                                    f"Expected {expected_fingerprint}, "
+                                    f"got {result['result_fingerprint']}"
+                                ),
+                            }
+                        )
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     # --- Mode: line_range ---
     elif replacement_mode == "line_range":
@@ -4851,54 +5111,64 @@ def edit_preflight(
             )
         try:
             lr = line_range_extract(
-                original, start_line, end_line,
+                original,
+                start_line,
+                end_line,
                 include_fingerprint=True,
             )
             if lr.get("ok") is False:
                 machine_codes.append("LINE_RANGE_INVALID")
-                all_findings.append({
-                    "code": "LINE_RANGE_ERROR",
-                    "severity": "error",
-                    "message": lr.get("error", "line_range_extract failed"),
-                })
+                all_findings.append(
+                    {
+                        "code": "LINE_RANGE_ERROR",
+                        "severity": "error",
+                        "message": lr.get("error", "line_range_extract failed"),
+                    }
+                )
             else:
                 result = lr.get("result", {})
                 subresults["line_range_extract"] = result
                 if expected_fingerprint and result.get("fingerprint"):
                     if result["fingerprint"] != expected_fingerprint:
                         machine_codes.append("FINGERPRINT_MISMATCH")
-                        all_findings.append({
-                            "code": "FINGERPRINT_MISMATCH",
-                            "severity": "warn",
-                            "message": (
-                                f"Expected {expected_fingerprint}, "
-                                f"got {result['fingerprint']}"
-                            ),
-                        })
+                        all_findings.append(
+                            {
+                                "code": "FINGERPRINT_MISMATCH",
+                                "severity": "warn",
+                                "message": (
+                                    f"Expected {expected_fingerprint}, "
+                                    f"got {result['fingerprint']}"
+                                ),
+                            }
+                        )
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     # --- Fingerprint check (if expected_fingerprint given and not already checked) ---
-    if (expected_fingerprint and replacement_mode == "literal"
-            and "FINGERPRINT_MISMATCH" not in [c for c in machine_codes]):
+    if (
+        expected_fingerprint
+        and replacement_mode == "literal"
+        and "FINGERPRINT_MISMATCH" not in [c for c in machine_codes]
+    ):
         try:
             fp = text_fingerprint_mcp(original)
             if fp.get("ok") is not False:
                 result_fp = fp.get("result", {}).get("sha256", "")
                 if result_fp != expected_fingerprint:
                     machine_codes.append("FINGERPRINT_MISMATCH")
-                    all_findings.append({
-                        "code": "FINGERPRINT_MISMATCH",
-                        "severity": "warn",
-                        "message": (
-                            f"Expected {expected_fingerprint}, "
-                            f"got {result_fp}"
-                        ),
-                    })
+                    all_findings.append(
+                        {
+                            "code": "FINGERPRINT_MISMATCH",
+                            "severity": "warn",
+                            "message": (f"Expected {expected_fingerprint}, " f"got {result_fp}"),
+                        }
+                    )
         except Exception:
             pass
 
@@ -4989,11 +5259,13 @@ def command_preflight(
         ss = shell_split(command, shell=shell)
         if ss.get("ok") is False:
             machine_codes.append("SHELL_PARSE_ERROR")
-            all_findings.append({
-                "code": "SHELL_PARSE_ERROR",
-                "severity": "error",
-                "message": ss.get("error", "shell_split failed"),
-            })
+            all_findings.append(
+                {
+                    "code": "SHELL_PARSE_ERROR",
+                    "severity": "error",
+                    "message": ss.get("error", "shell_split failed"),
+                }
+            )
         else:
             result = ss.get("result", {})
             subresults["shell_split"] = {
@@ -5005,24 +5277,27 @@ def command_preflight(
             risky = [k for k, v in features.items() if v]
             for rf in risky:
                 sev = "error" if policy == "strict" else "warn"
-                all_findings.append({
-                    "code": "RISKY_SHELL_FEATURE",
-                    "severity": sev,
-                    "message": rf,
-                })
+                all_findings.append(
+                    {
+                        "code": "RISKY_SHELL_FEATURE",
+                        "severity": sev,
+                        "message": rf,
+                    }
+                )
             if risky:
                 machine_codes.append("SHELL_RISK")
     except Exception as e:
-        all_findings.append({
-            "code": "INTERNAL_ERROR",
-            "severity": "error",
-            "message": str(e),
-        })
+        all_findings.append(
+            {
+                "code": "INTERNAL_ERROR",
+                "severity": "error",
+                "message": str(e),
+            }
+        )
 
     # 2. regex_safety_check if command looks like it contains a regex
     looks_like_regex = (
-        "grep" in command or "sed" in command or "awk" in command
-        or "regex" in command.lower()
+        "grep" in command or "sed" in command or "awk" in command or "regex" in command.lower()
     )
     if looks_like_regex:
         try:
@@ -5031,7 +5306,8 @@ def command_preflight(
             argv = subresults.get("shell_split", {}).get("argv", [])
             _regex_metachars = set(r".*+?[]|()^$\{}")
             regex_args = [
-                arg for arg in argv
+                arg
+                for arg in argv
                 if not arg.startswith("-") and any(c in _regex_metachars for c in arg)
             ]
             for pattern in regex_args:
@@ -5042,18 +5318,22 @@ def command_preflight(
                     risk = rs_result.get("risk", "none")
                     for f in rs_findings:
                         sev = "warn" if risk != "none" else "info"
-                        all_findings.append({
-                            "code": f.get("kind", "REGEX_RISK").upper(),
-                            "severity": sev,
-                            "message": f.get("message", ""),
-                        })
+                        all_findings.append(
+                            {
+                                "code": f.get("kind", "REGEX_RISK").upper(),
+                                "severity": sev,
+                                "message": f.get("message", ""),
+                            }
+                        )
                     if rs_findings and risk != "none":
                         machine_codes.append("REGEX_RISK")
-                    subresults.setdefault("regex_safety_check", []).append({
-                        "pattern": pattern,
-                        "findings_count": len(rs_findings),
-                        "risk": risk,
-                    })
+                    subresults.setdefault("regex_safety_check", []).append(
+                        {
+                            "pattern": pattern,
+                            "findings_count": len(rs_findings),
+                            "risk": risk,
+                        }
+                    )
         except Exception:
             pass
 
@@ -5069,10 +5349,7 @@ def command_preflight(
     unique_codes = list(dict.fromkeys(machine_codes))
     primary_code = unique_codes[0] if unique_codes else "COMMAND_OK"
 
-    summary = (
-        f"Command {verdict}"
-        f" ({len(all_findings)} finding(s))"
-    )
+    summary = f"Command {verdict}" f" ({len(all_findings)} finding(s))"
 
     result: dict[str, Any] = {
         "verdict": verdict,
@@ -5152,22 +5429,26 @@ def config_preflight(
             jr = validate_json(text)
             if jr.get("ok") is False:
                 machine_codes.append("CONFIG_PARSE_FAILED")
-                all_findings.append({
-                    "code": "CONFIG_ERROR",
-                    "severity": "error",
-                    "message": jr.get("error", "validate_json failed"),
-                })
+                all_findings.append(
+                    {
+                        "code": "CONFIG_ERROR",
+                        "severity": "error",
+                        "message": jr.get("error", "validate_json failed"),
+                    }
+                )
             else:
                 result = jr.get("result", {})
                 subresults["validate_json"] = result
                 parse_ok = result.get("valid", False)
                 if not parse_ok:
                     machine_codes.append("CONFIG_PARSE_FAILED")
-                    all_findings.append({
-                        "code": "JSON_PARSE_ERROR",
-                        "severity": "error",
-                        "message": result.get("error", "Invalid JSON"),
-                    })
+                    all_findings.append(
+                        {
+                            "code": "JSON_PARSE_ERROR",
+                            "severity": "error",
+                            "message": result.get("error", "Invalid JSON"),
+                        }
+                    )
                 elif schema:
                     try:
                         sr = validate_schema_light(text, schema)
@@ -5177,11 +5458,17 @@ def config_preflight(
                             if not sr_result.get("valid", True):
                                 machine_codes.append("CONFIG_SCHEMA_MISMATCH")
                                 for err in sr_result.get("violations", []):
-                                    all_findings.append({
-                                        "code": "SCHEMA_ERROR",
-                                        "severity": "error" if strict else "warn",
-                                        "message": err.get("message", str(err)) if isinstance(err, dict) else str(err),
-                                    })
+                                    all_findings.append(
+                                        {
+                                            "code": "SCHEMA_ERROR",
+                                            "severity": "error" if strict else "warn",
+                                            "message": (
+                                                err.get("message", str(err))
+                                                if isinstance(err, dict)
+                                                else str(err)
+                                            ),
+                                        }
+                                    )
                     except Exception:
                         pass
                 if parse_ok and not all_findings:
@@ -5197,33 +5484,39 @@ def config_preflight(
                     except Exception:
                         pass
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     elif detected_format == "toml":
         try:
             tr = validate_toml(text)
             if tr.get("ok") is False:
                 machine_codes.append("CONFIG_PARSE_FAILED")
-                all_findings.append({
-                    "code": "CONFIG_ERROR",
-                    "severity": "error",
-                    "message": tr.get("error", "validate_toml failed"),
-                })
+                all_findings.append(
+                    {
+                        "code": "CONFIG_ERROR",
+                        "severity": "error",
+                        "message": tr.get("error", "validate_toml failed"),
+                    }
+                )
             else:
                 result = tr.get("result", {})
                 subresults["validate_toml"] = result
                 parse_ok = result.get("valid", False)
                 if not parse_ok:
                     machine_codes.append("CONFIG_PARSE_FAILED")
-                    all_findings.append({
-                        "code": "TOML_PARSE_ERROR",
-                        "severity": "error",
-                        "message": result.get("error", "Invalid TOML"),
-                    })
+                    all_findings.append(
+                        {
+                            "code": "TOML_PARSE_ERROR",
+                            "severity": "error",
+                            "message": result.get("error", "Invalid TOML"),
+                        }
+                    )
                 else:
                     try:
                         ts = toml_shape_mcp(text)
@@ -5232,22 +5525,26 @@ def config_preflight(
                     except Exception:
                         pass
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     elif detected_format == "dotenv":
         try:
             dr = dotenv_validate_mcp(text)
             if dr.get("ok") is False:
                 machine_codes.append("CONFIG_PARSE_FAILED")
-                all_findings.append({
-                    "code": "CONFIG_ERROR",
-                    "severity": "error",
-                    "message": dr.get("error", "dotenv_validate failed"),
-                })
+                all_findings.append(
+                    {
+                        "code": "CONFIG_ERROR",
+                        "severity": "error",
+                        "message": dr.get("error", "dotenv_validate failed"),
+                    }
+                )
             else:
                 result = dr.get("result", {})
                 subresults["dotenv_validate"] = result
@@ -5255,28 +5552,34 @@ def config_preflight(
                 if not parse_ok:
                     machine_codes.append("CONFIG_PARSE_FAILED")
                     for err in result.get("findings", []):
-                        all_findings.append({
-                            "code": "DOTENV_ERROR",
-                            "severity": "error",
-                            "message": err,
-                        })
+                        all_findings.append(
+                            {
+                                "code": "DOTENV_ERROR",
+                                "severity": "error",
+                                "message": err,
+                            }
+                        )
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     elif detected_format == "ini":
         try:
             ir = ini_validate_mcp(text)
             if ir.get("ok") is False:
                 machine_codes.append("CONFIG_PARSE_FAILED")
-                all_findings.append({
-                    "code": "CONFIG_ERROR",
-                    "severity": "error",
-                    "message": ir.get("error", "ini_validate failed"),
-                })
+                all_findings.append(
+                    {
+                        "code": "CONFIG_ERROR",
+                        "severity": "error",
+                        "message": ir.get("error", "ini_validate failed"),
+                    }
+                )
             else:
                 result = ir.get("result", {})
                 subresults["ini_validate"] = result
@@ -5284,52 +5587,64 @@ def config_preflight(
                 if not parse_ok:
                     machine_codes.append("CONFIG_PARSE_FAILED")
                     for err in result.get("findings", []):
-                        all_findings.append({
-                            "code": "INI_ERROR",
-                            "severity": "error",
-                            "message": err,
-                        })
+                        all_findings.append(
+                            {
+                                "code": "INI_ERROR",
+                                "severity": "error",
+                                "message": err,
+                            }
+                        )
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     elif detected_format == "cargo_toml":
         try:
             cr = cargo_toml_inspect_mcp(text)
             if cr.get("ok") is False:
                 machine_codes.append("CONFIG_PARSE_FAILED")
-                all_findings.append({
-                    "code": "CONFIG_ERROR",
-                    "severity": "error",
-                    "message": cr.get("error", "cargo_toml_inspect failed"),
-                })
+                all_findings.append(
+                    {
+                        "code": "CONFIG_ERROR",
+                        "severity": "error",
+                        "message": cr.get("error", "cargo_toml_inspect failed"),
+                    }
+                )
             else:
                 result = cr.get("result", {})
                 subresults["cargo_toml_inspect"] = result
                 parse_ok = result.get("parse_ok", False)
                 if not parse_ok:
                     machine_codes.append("CONFIG_PARSE_FAILED")
-                    all_findings.append({
-                        "code": "CARGO_PARSE_ERROR",
-                        "severity": "error",
-                        "message": "Cargo.toml parse failed",
-                    })
+                    all_findings.append(
+                        {
+                            "code": "CARGO_PARSE_ERROR",
+                            "severity": "error",
+                            "message": "Cargo.toml parse failed",
+                        }
+                    )
                 else:
                     for f in cr.get("findings", []):
-                        all_findings.append({
-                            "code": f.get("code", "CARGO_NOTE"),
-                            "severity": f.get("severity", "info"),
-                            "message": f.get("message", ""),
-                        })
+                        all_findings.append(
+                            {
+                                "code": f.get("code", "CARGO_NOTE"),
+                                "severity": f.get("severity", "info"),
+                                "message": f.get("message", ""),
+                            }
+                        )
         except Exception as e:
-            all_findings.append({
-                "code": "INTERNAL_ERROR",
-                "severity": "error",
-                "message": str(e),
-            })
+            all_findings.append(
+                {
+                    "code": "INTERNAL_ERROR",
+                    "severity": "error",
+                    "message": str(e),
+                }
+            )
 
     # --- Verdict ---
     if not parse_ok:
@@ -5342,10 +5657,7 @@ def config_preflight(
         machine_code = "CONFIG_OK"
         verdict = "valid"
 
-    summary = (
-        f"{detected_format} config: {verdict}"
-        f" ({len(all_findings)} finding(s))"
-    )
+    summary = f"{detected_format} config: {verdict}" f" ({len(all_findings)} finding(s))"
 
     result: dict[str, Any] = {
         "valid": parse_ok,
@@ -5409,23 +5721,29 @@ def structured_data_compare(
         subresults["validate_a"] = {"valid": valid_a}
         subresults["validate_b"] = {"valid": valid_b}
         if not valid_a:
-            all_findings.append({
-                "code": "INVALID_JSON_A",
-                "severity": "error",
-                "message": va.get("result", {}).get("error", "Invalid JSON in a"),
-            })
+            all_findings.append(
+                {
+                    "code": "INVALID_JSON_A",
+                    "severity": "error",
+                    "message": va.get("result", {}).get("error", "Invalid JSON in a"),
+                }
+            )
         if not valid_b:
-            all_findings.append({
-                "code": "INVALID_JSON_B",
-                "severity": "error",
-                "message": vb.get("result", {}).get("error", "Invalid JSON in b"),
-            })
+            all_findings.append(
+                {
+                    "code": "INVALID_JSON_B",
+                    "severity": "error",
+                    "message": vb.get("result", {}).get("error", "Invalid JSON in b"),
+                }
+            )
     except Exception as e:
-        all_findings.append({
-            "code": "INTERNAL_ERROR",
-            "severity": "error",
-            "message": str(e),
-        })
+        all_findings.append(
+            {
+                "code": "INTERNAL_ERROR",
+                "severity": "error",
+                "message": str(e),
+            }
+        )
 
     if not valid_a or not valid_b:
         return _success_response(
@@ -5445,7 +5763,8 @@ def structured_data_compare(
     # 2. json_compare
     try:
         jc = json_compare(
-            a, b,
+            a,
+            b,
             ignore_object_order=ignore_object_order,
             ignore_array_order=ignore_array_order,
             max_diffs=max_diffs,
@@ -5459,23 +5778,29 @@ def structured_data_compare(
             if not result.get("equal", False):
                 diffs = result.get("diffs", [])
                 for d in diffs[:max_diffs]:
-                    all_findings.append({
-                        "code": "VALUE_DIFF",
-                        "severity": "info",
-                        "message": f"{d.get('path', '/')}: {d.get('kind', 'unknown')}",
-                    })
+                    all_findings.append(
+                        {
+                            "code": "VALUE_DIFF",
+                            "severity": "info",
+                            "message": f"{d.get('path', '/')}: {d.get('kind', 'unknown')}",
+                        }
+                    )
         else:
-            all_findings.append({
-                "code": "COMPARE_ERROR",
-                "severity": "error",
-                "message": jc.get("error", "json_compare failed"),
-            })
+            all_findings.append(
+                {
+                    "code": "COMPARE_ERROR",
+                    "severity": "error",
+                    "message": jc.get("error", "json_compare failed"),
+                }
+            )
     except Exception as e:
-        all_findings.append({
-            "code": "INTERNAL_ERROR",
-            "severity": "error",
-            "message": str(e),
-        })
+        all_findings.append(
+            {
+                "code": "INTERNAL_ERROR",
+                "severity": "error",
+                "message": str(e),
+            }
+        )
 
     # 3. Shape comparison
     try:
@@ -5487,14 +5812,15 @@ def structured_data_compare(
             subresults["shape_a"] = shape_a
             subresults["shape_b"] = shape_b
             if shape_a.get("type") != shape_b.get("type"):
-                all_findings.append({
-                    "code": "TYPE_MISMATCH",
-                    "severity": "warn",
-                    "message": (
-                        f"Type mismatch: a={shape_a.get('type')}, "
-                        f"b={shape_b.get('type')}"
-                    ),
-                })
+                all_findings.append(
+                    {
+                        "code": "TYPE_MISMATCH",
+                        "severity": "warn",
+                        "message": (
+                            f"Type mismatch: a={shape_a.get('type')}, " f"b={shape_b.get('type')}"
+                        ),
+                    }
+                )
     except Exception:
         pass
 
@@ -5511,8 +5837,7 @@ def structured_data_compare(
 
     diff_count = sum(1 for f in all_findings if f["code"] == "VALUE_DIFF")
     summary = (
-        "Equal" if equal
-        else f"Different ({diff_count} diff(s), {len(all_findings)} finding(s))"
+        "Equal" if equal else f"Different ({diff_count} diff(s), {len(all_findings)} finding(s))"
     )
 
     result: dict[str, Any] = {

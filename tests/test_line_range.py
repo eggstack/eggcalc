@@ -206,6 +206,7 @@ class TestLineRangeCompareValidation:
 
     def _call_compare(self, left_text, right_text, start_line, end_line):
         from eggcalc.mcp.tools import line_range_compare
+
         return line_range_compare(left_text, right_text, start_line, end_line)
 
     def test_reject_bool_start_line(self):

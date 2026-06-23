@@ -25,6 +25,7 @@ except ImportError:
 
 class EscapeTextResult(TypedDict):
     """Result of escape_text operation."""
+
     mode: str
     escaped: str
     changed: bool
@@ -33,6 +34,7 @@ class EscapeTextResult(TypedDict):
 
 class UnescapeTextResult(TypedDict):
     """Result of unescape_text operation."""
+
     mode: str
     unescaped: str
     changed: bool
@@ -42,6 +44,7 @@ class UnescapeTextResult(TypedDict):
 
 class RemovedChar(TypedDict):
     """A character that was removed during transformation."""
+
     index: int
     char: str
     codepoint: str
@@ -50,6 +53,7 @@ class RemovedChar(TypedDict):
 
 class TextTransformResult(TypedDict):
     """Result of text transformation."""
+
     changed: bool
     text: str
     operations_applied: list[str]
@@ -122,12 +126,14 @@ def _remove_chars(
 
     for index, char in enumerate(text):
         if char in chars_to_remove:
-            removed.append(RemovedChar(
-                index=index,
-                char=char,
-                codepoint=f"U+{ord(char):04X}",
-                name=chars_to_remove[char],
-            ))
+            removed.append(
+                RemovedChar(
+                    index=index,
+                    char=char,
+                    codepoint=f"U+{ord(char):04X}",
+                    name=chars_to_remove[char],
+                )
+            )
         else:
             result.append(char)
 
@@ -269,6 +275,7 @@ def text_transform(
 
         elif op_lower == "visible_repr":
             from .primitives import visible_repr as _visible_repr_impl
+
             current_text = _visible_repr_impl(current_text)
             operations_applied.append("visible_repr")
 
@@ -341,7 +348,13 @@ def _escape_python_string(text: str) -> str:
 
 def _escape_rust_string(text: str) -> str:
     """Escape text as Rust string literal."""
-    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+    escaped = (
+        text.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+    )
     return '"' + escaped + '"'
 
 
@@ -402,7 +415,9 @@ def escape_text(text: str, mode: str) -> EscapeTextResult:
         ValueError: If mode is not supported.
     """
     if mode not in _VALID_ESCAPE_MODES:
-        raise ValueError(f"Unsupported escape mode: {mode}. Valid modes: {', '.join(sorted(_VALID_ESCAPE_MODES))}")
+        raise ValueError(
+            f"Unsupported escape mode: {mode}. Valid modes: {', '.join(sorted(_VALID_ESCAPE_MODES))}"
+        )
 
     original_text = text
 
@@ -467,6 +482,7 @@ def _unescape_python_string(text: str) -> str:
 
 def _unescape_unicode_escape(text: str) -> str:
     """Unescape Unicode escape sequences (\\\\uXXXX, \\\\UXXXXXXXX)."""
+
     def replace_unicode(match):
         code = match.group(1)
         return chr(int(code, 16))
@@ -498,7 +514,9 @@ def unescape_text(text: str, mode: str) -> UnescapeTextResult:
         ValueError: If mode is not supported or unescape fails.
     """
     if mode not in _VALID_UNESCAPE_MODES:
-        raise ValueError(f"Unsupported unescape mode: {mode}. Valid modes: {', '.join(sorted(_VALID_UNESCAPE_MODES))}")
+        raise ValueError(
+            f"Unsupported unescape mode: {mode}. Valid modes: {', '.join(sorted(_VALID_UNESCAPE_MODES))}"
+        )
 
     original_text = text
     error: str | None = None
@@ -541,6 +559,7 @@ def unescape_text(text: str, mode: str) -> UnescapeTextResult:
 
 class TextHashResult(TypedDict):
     """Result of text hashing."""
+
     encoding: str
     bytes: int
     codepoints: int
@@ -551,6 +570,7 @@ class TextHashResult(TypedDict):
 
 class TextFingerprintResult(TypedDict):
     """Result of text fingerprinting."""
+
     sha256: str
     bytes_utf8: int
     codepoints: int
@@ -661,6 +681,7 @@ def text_fingerprint(
         canonical = canonical.casefold()
 
     import hashlib
+
     sha256_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     from .primitives import count_graphemes as _count_graphemes

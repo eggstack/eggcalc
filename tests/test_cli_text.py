@@ -148,7 +148,9 @@ class TestCLIReplaceCheck:
 
     def test_multiple_matches(self):
         """Multiple matches should report ambiguity."""
-        code, stdout, stderr = run_calc(["replace-check", "foo", "|||", "bar", "|||", "foo baz foo"])
+        code, stdout, stderr = run_calc(
+            ["replace-check", "foo", "|||", "bar", "|||", "foo baz foo"]
+        )
         assert code == 0
         assert "ambiguous" in stdout
         assert "2 matches" in stdout
@@ -161,7 +163,9 @@ class TestCLIReplaceCheck:
 
     def test_json_output(self):
         """JSON output should be valid JSON."""
-        code, stdout, stderr = run_calc(["--json", "replace-check", "foo", "|||", "bar", "|||", "foo baz"])
+        code, stdout, stderr = run_calc(
+            ["--json", "replace-check", "foo", "|||", "bar", "|||", "foo baz"]
+        )
         assert code == 0
         data = json.loads(stdout)
         assert data["match_count"] == 1
@@ -264,14 +268,18 @@ class TestCLIMdStructure:
 
     def test_headings_and_links(self):
         """Headings and links should be detected."""
-        code, stdout, stderr = run_calc(["-e", 'md-structure # Hello\n\nA [link](http://example.com)'])
+        code, stdout, stderr = run_calc(
+            ["-e", 'md-structure # Hello\n\nA [link](http://example.com)']
+        )
         assert code == 0
         assert "heading" in stdout.lower()
         assert "link" in stdout.lower()
 
     def test_code_fence(self):
         """Code fences should be detected."""
-        code, stdout, stderr = run_calc(["-e", 'md-structure # Title\n\n```python\nprint(\'hi\')\n```\n'])
+        code, stdout, stderr = run_calc(
+            ["-e", 'md-structure # Title\n\n```python\nprint(\'hi\')\n```\n']
+        )
         assert code == 0
         assert "code fence" in stdout.lower()
 
@@ -288,7 +296,9 @@ class TestCLIMdStructure:
 
     def test_json_output(self):
         """JSON output should be valid JSON."""
-        code, stdout, stderr = run_calc(["--json", "-e", 'md-structure # Hello\n\nA [link](http://x.com)'])
+        code, stdout, stderr = run_calc(
+            ["--json", "-e", 'md-structure # Hello\n\nA [link](http://x.com)']
+        )
         assert code == 0
         data = json.loads(stdout)
         assert len(data["headings"]) == 1

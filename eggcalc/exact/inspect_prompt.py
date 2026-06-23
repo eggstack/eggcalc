@@ -32,17 +32,19 @@ from .primitives import find_invisibles as _find_invisibles
 MAX_TEXT_LENGTH = 100_000
 MAX_FINDINGS = 1_000
 
-ALL_CHECKS = frozenset({
-    "unicode_hidden",
-    "bidi",
-    "html_comments",
-    "markdown_links",
-    "ansi_escapes",
-    "terminal_controls",
-    "base64_like_blobs",
-    "instruction_phrases",
-    "long_minified_lines",
-})
+ALL_CHECKS = frozenset(
+    {
+        "unicode_hidden",
+        "bidi",
+        "html_comments",
+        "markdown_links",
+        "ansi_escapes",
+        "terminal_controls",
+        "base64_like_blobs",
+        "instruction_phrases",
+        "long_minified_lines",
+    }
+)
 
 DEFAULT_CHECKS = frozenset(ALL_CHECKS)
 
@@ -81,14 +83,14 @@ DEFAULT_INSTRUCTION_PHRASES = [
 
 # Regex patterns
 _ANSI_ESCAPE_RE = re.compile(
-    r"\x1b\["           # ESC [
-    r"[0-9;]*"          # parameters
-    r"[A-Za-z]"         # final byte
+    r"\x1b\["  # ESC [
+    r"[0-9;]*"  # parameters
+    r"[A-Za-z]"  # final byte
 )
 
 _ANSI_OSC_RE = re.compile(
-    r"\x1b\]"           # ESC ]
-    r".*?"              # any content
+    r"\x1b\]"  # ESC ]
+    r".*?"  # any content
     r"(?:\x07|\x1b\\)",  # ST (BEL or ESC \)
 )
 
@@ -96,9 +98,9 @@ _ANSI_OSC_RE = re.compile(
 _TERMINAL_CONTROL_RE = re.compile(
     r"[\x00-\x08\x0e-\x1f\x7f]"  # C0 + DEL + some C1
     r"|"
-    r"\x1b[()][AB012]"            # charset selection
+    r"\x1b[()][AB012]"  # charset selection
     r"|"
-    r"\x1b[=>78]"                  # cursor keys, etc.
+    r"\x1b[=>78]"  # cursor keys, etc.
 )
 
 # Base64-like blob detection: 64+ chars of [A-Za-z0-9+/=] with no whitespace
@@ -109,9 +111,7 @@ _BASE64_LIKE_RE = re.compile(
 )
 
 # Markdown link: [text](url)
-_MARKDOWN_LINK_RE = re.compile(
-    r"\[([^\]]{1,2000})\]\(([^)]{1,2000})\)"
-)
+_MARKDOWN_LINK_RE = re.compile(r"\[([^\]]{1,2000})\]\(([^)]{1,2000})\)")
 
 # HTML comment: <!-- ... -->
 _HTML_COMMENT_RE = re.compile(
@@ -122,6 +122,7 @@ _HTML_COMMENT_RE = re.compile(
 
 class PromptInspectionFinding(TypedDict, total=False):
     """A single finding from prompt inspection."""
+
     code: str
     severity: str  # "info" | "warn" | "error"
     message: str
@@ -131,6 +132,7 @@ class PromptInspectionFinding(TypedDict, total=False):
 
 class PromptInspectionResult(TypedDict, total=False):
     """Result of prompt/input inspection."""
+
     findings: list[PromptInspectionFinding]
     summary: str
     risk_score: int
@@ -143,6 +145,7 @@ class PromptInspectionResult(TypedDict, total=False):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 @functools.lru_cache(maxsize=64)
 def _build_instruction_regex(phrase_patterns: tuple[str, ...] | None) -> re.Pattern[str]:
@@ -179,28 +182,30 @@ def _find_bidi_controls(text: str) -> list[PromptInspectionFinding]:
     """Find bidirectional control characters."""
     findings: list[PromptInspectionFinding] = []
     bidi_names = {
-        0x202a: "LEFT-TO-RIGHT EMBEDDING (LRE)",
-        0x202b: "RIGHT-TO-LEFT EMBEDDING (RLE)",
-        0x202c: "POP DIRECTIONAL FORMATTING (PDF)",
-        0x202d: "LEFT-TO-RIGHT OVERRIDE (LRO)",
-        0x202e: "RIGHT-TO-LEFT OVERRIDE (RLO)",
+        0x202A: "LEFT-TO-RIGHT EMBEDDING (LRE)",
+        0x202B: "RIGHT-TO-LEFT EMBEDDING (RLE)",
+        0x202C: "POP DIRECTIONAL FORMATTING (PDF)",
+        0x202D: "LEFT-TO-RIGHT OVERRIDE (LRO)",
+        0x202E: "RIGHT-TO-LEFT OVERRIDE (RLO)",
         0x2066: "LEFT-TO-RIGHT ISOLATE (LRI)",
         0x2067: "RIGHT-TO-LEFT ISOLATE (RLI)",
         0x2068: "FIRST STRONG ISOLATE (FSI)",
         0x2069: "POP DIRECTIONAL ISOLATE (PDI)",
-        0x200e: "LEFT-TO-RIGHT MARK (LRM)",
-        0x200f: "RIGHT-TO-LEFT MARK (RLM)",
+        0x200E: "LEFT-TO-RIGHT MARK (LRM)",
+        0x200F: "RIGHT-TO-LEFT MARK (RLM)",
     }
     for index, char in enumerate(text):
         cp = ord(char)
         if cp in bidi_names:
-            findings.append(PromptInspectionFinding(
-                code="BIDI_CONTROL",
-                severity="warn",
-                message=f"Bidi control character: {bidi_names[cp]} at position {index}",
-                span=_char_span(index),
-                details={"codepoint": f"U+{cp:04X}", "name": bidi_names[cp]},
-            ))
+            findings.append(
+                PromptInspectionFinding(
+                    code="BIDI_CONTROL",
+                    severity="warn",
+                    message=f"Bidi control character: {bidi_names[cp]} at position {index}",
+                    span=_char_span(index),
+                    details={"codepoint": f"U+{cp:04X}", "name": bidi_names[cp]},
+                )
+            )
     return findings
 
 
@@ -214,18 +219,20 @@ def _find_unicode_hidden(text: str) -> list[PromptInspectionFinding]:
         # prompt injection to hide instructions from human reviewers
         if inv["codepoint"] in ("U+200B", "U+200C", "U+200D", "U+2060", "U+FEFF"):
             severity = "error"
-        findings.append(PromptInspectionFinding(
-            code="HIDDEN_CHAR",
-            severity=severity,
-            message=f"Hidden character: {inv['name']} ({inv['codepoint']}) at position {inv['index']}",
-            span=_char_span(inv["index"]),
-            details={
-                "codepoint": inv["codepoint"],
-                "name": inv["name"],
-                "category": inv["category"],
-                "display": inv["display"],
-            },
-        ))
+        findings.append(
+            PromptInspectionFinding(
+                code="HIDDEN_CHAR",
+                severity=severity,
+                message=f"Hidden character: {inv['name']} ({inv['codepoint']}) at position {inv['index']}",
+                span=_char_span(inv["index"]),
+                details={
+                    "codepoint": inv["codepoint"],
+                    "name": inv["name"],
+                    "category": inv["category"],
+                    "display": inv["display"],
+                },
+            )
+        )
     return findings
 
 
@@ -238,13 +245,15 @@ def _find_html_comments(text: str) -> list[PromptInspectionFinding]:
         message = f"HTML comment at position {match.start()}"
         if content:
             message += f": {content[:100]}{'...' if len(content) > 100 else ''}"
-        findings.append(PromptInspectionFinding(
-            code="HTML_COMMENT",
-            severity=severity,
-            message=message,
-            span={"char_start": match.start(), "char_end": match.end()},
-            details={"content": content[:500]},
-        ))
+        findings.append(
+            PromptInspectionFinding(
+                code="HTML_COMMENT",
+                severity=severity,
+                message=message,
+                span={"char_start": match.start(), "char_end": match.end()},
+                details={"content": content[:500]},
+            )
+        )
     return findings
 
 
@@ -268,13 +277,15 @@ def _find_markdown_links(text: str) -> list[PromptInspectionFinding]:
             severity = "warn"
             details["mismatch"] = "data URI target"
 
-        findings.append(PromptInspectionFinding(
-            code="MARKDOWN_LINK",
-            severity=severity,
-            message=f"Markdown link at position {match.start()}: [{link_text[:50]}]({link_target[:80]})",
-            span={"char_start": match.start(), "char_end": match.end()},
-            details=details,
-        ))
+        findings.append(
+            PromptInspectionFinding(
+                code="MARKDOWN_LINK",
+                severity=severity,
+                message=f"Markdown link at position {match.start()}: [{link_text[:50]}]({link_target[:80]})",
+                span={"char_start": match.start(), "char_end": match.end()},
+                details=details,
+            )
+        )
     return findings
 
 
@@ -282,13 +293,15 @@ def _find_ansi_escapes(text: str) -> list[PromptInspectionFinding]:
     """Find ANSI escape sequences."""
     findings: list[PromptInspectionFinding] = []
     for match in _ANSI_ESCAPE_RE.finditer(text):
-        findings.append(PromptInspectionFinding(
-            code="ANSI_ESCAPE",
-            severity="warn",
-            message=f"ANSI escape sequence at position {match.start()}",
-            span={"char_start": match.start(), "char_end": match.end()},
-            details={"sequence": repr(match.group())},
-        ))
+        findings.append(
+            PromptInspectionFinding(
+                code="ANSI_ESCAPE",
+                severity="warn",
+                message=f"ANSI escape sequence at position {match.start()}",
+                span={"char_start": match.start(), "char_end": match.end()},
+                details={"sequence": repr(match.group())},
+            )
+        )
     return findings
 
 
@@ -299,13 +312,15 @@ def _find_terminal_controls(text: str) -> list[PromptInspectionFinding]:
         char = match.group()
         cp = f"U+{ord(char):04X}"
         name = unicodedata.name(char, "CONTROL")
-        findings.append(PromptInspectionFinding(
-            code="TERMINAL_CONTROL",
-            severity="info",
-            message=f"Terminal control character {name} ({cp}) at position {match.start()}",
-            span={"char_start": match.start(), "char_end": match.end()},
-            details={"codepoint": cp, "name": name},
-        ))
+        findings.append(
+            PromptInspectionFinding(
+                code="TERMINAL_CONTROL",
+                severity="info",
+                message=f"Terminal control character {name} ({cp}) at position {match.start()}",
+                span={"char_start": match.start(), "char_end": match.end()},
+                details={"codepoint": cp, "name": name},
+            )
+        )
     return findings
 
 
@@ -322,13 +337,15 @@ def _find_base64_blobs(text: str) -> list[PromptInspectionFinding]:
         has_lower = any(c.islower() for c in blob)
         has_digit = any(c.isdigit() for c in blob)
         if has_upper and has_lower and has_digit:
-            findings.append(PromptInspectionFinding(
-                code="BASE64_BLOB",
-                severity="warn",
-                message=f"Base64-like blob ({len(blob)} chars) at position {match.start()}",
-                span={"char_start": match.start(), "char_end": match.end()},
-                details={"length": len(blob), "preview": blob[:100]},
-            ))
+            findings.append(
+                PromptInspectionFinding(
+                    code="BASE64_BLOB",
+                    severity="warn",
+                    message=f"Base64-like blob ({len(blob)} chars) at position {match.start()}",
+                    span={"char_start": match.start(), "char_end": match.end()},
+                    details={"length": len(blob), "preview": blob[:100]},
+                )
+            )
     return findings
 
 
@@ -350,13 +367,15 @@ def _find_instruction_phrases(
     regex = _get_instruction_re(phrase_patterns)
     for match in regex.finditer(text):
         matched = match.group()
-        findings.append(PromptInspectionFinding(
-            code="INSTRUCTION_PHRASE",
-            severity="warn",
-            message=f"Instruction-like phrase at position {match.start()}: '{matched}'",
-            span={"char_start": match.start(), "char_end": match.end()},
-            details={"phrase": matched},
-        ))
+        findings.append(
+            PromptInspectionFinding(
+                code="INSTRUCTION_PHRASE",
+                severity="warn",
+                message=f"Instruction-like phrase at position {match.start()}: '{matched}'",
+                span={"char_start": match.start(), "char_end": match.end()},
+                details={"phrase": matched},
+            )
+        )
     return findings
 
 
@@ -367,13 +386,15 @@ def _find_long_minified_lines(text: str) -> list[PromptInspectionFinding]:
     offset = 0
     for line in lines:
         if len(line) > 1000:
-            findings.append(PromptInspectionFinding(
-                code="LONG_LINE",
-                severity="info",
-                message=f"Very long line ({len(line)} chars) at position {offset}",
-                span={"char_start": offset, "char_end": offset + len(line)},
-                details={"length": len(line)},
-            ))
+            findings.append(
+                PromptInspectionFinding(
+                    code="LONG_LINE",
+                    severity="info",
+                    message=f"Very long line ({len(line)} chars) at position {offset}",
+                    span={"char_start": offset, "char_end": offset + len(line)},
+                    details={"length": len(line)},
+                )
+            )
         offset += len(line) + 1  # +1 for \n
     return findings
 
@@ -444,6 +465,7 @@ def _recommend_next_tool(findings: list[PromptInspectionFinding]) -> str | list[
 # Main function
 # ---------------------------------------------------------------------------
 
+
 def prompt_input_inspect(
     text: str,
     checks: list[str] | None = None,
@@ -469,9 +491,7 @@ def prompt_input_inspect(
         ValueError: If text exceeds MAX_TEXT_LENGTH or checks are invalid.
     """
     if len(text) > MAX_TEXT_LENGTH:
-        raise ValueError(
-            f"Input length {len(text)} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}"
-        )
+        raise ValueError(f"Input length {len(text)} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}")
 
     active_checks = set(checks) if checks is not None else set(ALL_CHECKS)
     invalid = active_checks - ALL_CHECKS

@@ -206,7 +206,7 @@ def path_analyze(path: str, style: str = "auto") -> PathAnalyzeResult:
         suffix = suffixes[-1] if suffixes else None
         if suffixes:
             full_suffix = suffixes[0]
-            stem = name[:-len(full_suffix)] if len(full_suffix) > 0 else name
+            stem = name[: -len(full_suffix)] if len(full_suffix) > 0 else name
         else:
             stem = name
     else:
@@ -369,12 +369,8 @@ def path_normalize(
         elif platform == "windows" and is_unc_track:
             normalized = "\\\\"
 
-    is_absolute = (
-        (platform == "posix" and path.startswith("/")) or
-        (platform == "windows" and (
-            (len(path) >= 2 and path[1] == ":") or
-            is_unc_track
-        ))
+    is_absolute = (platform == "posix" and path.startswith("/")) or (
+        platform == "windows" and ((len(path) >= 2 and path[1] == ":") or is_unc_track)
     )
 
     if has_dot and not collapse_dot_segments:
@@ -541,9 +537,9 @@ def path_scope_check(
     relative_path = ""
     if inside_root:
         if platform == "posix":
-            relative_path = target_cmp[len(root_prefix):]
+            relative_path = target_cmp[len(root_prefix) :]
         else:
-            relative_path = target_cmp[len(root_prefix):]
+            relative_path = target_cmp[len(root_prefix) :]
         if not relative_path:
             relative_path = "."
 

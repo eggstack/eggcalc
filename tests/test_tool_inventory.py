@@ -116,19 +116,19 @@ class TestSourceOfTruthConsistency:
         )
 
     def test_fixture_is_alphabetically_sorted(self):
-        assert EXPECTED_TOOLS == sorted(EXPECTED_TOOLS), (
-            "Fixture tools list is not alphabetically sorted"
-        )
+        assert EXPECTED_TOOLS == sorted(
+            EXPECTED_TOOLS
+        ), "Fixture tools list is not alphabetically sorted"
 
     def test_fixture_count_matches_handlers(self):
-        assert len(EXPECTED_TOOLS) == len(TOOL_HANDLERS), (
-            f"Fixture has {len(EXPECTED_TOOLS)} tools, handlers has {len(TOOL_HANDLERS)}"
-        )
+        assert len(EXPECTED_TOOLS) == len(
+            TOOL_HANDLERS
+        ), f"Fixture has {len(EXPECTED_TOOLS)} tools, handlers has {len(TOOL_HANDLERS)}"
 
     def test_fixture_count_matches_schemas(self):
-        assert len(EXPECTED_TOOLS) == len(TOOL_SCHEMAS), (
-            f"Fixture has {len(EXPECTED_TOOLS)} tools, schemas has {len(TOOL_SCHEMAS)}"
-        )
+        assert len(EXPECTED_TOOLS) == len(
+            TOOL_SCHEMAS
+        ), f"Fixture has {len(EXPECTED_TOOLS)} tools, schemas has {len(TOOL_SCHEMAS)}"
 
     def test_inventory_doc_tool_count_matches(self):
         """Verify the inventory doc's total count matches the actual count."""
@@ -138,9 +138,9 @@ class TestSourceOfTruthConsistency:
         match = re.search(r"\*\*Total:\s*(\d+)\s*tools\*\*", content)
         assert match, "Could not find total tool count in inventory doc"
         doc_count = int(match.group(1))
-        assert doc_count == len(TOOL_HANDLERS), (
-            f"Inventory doc says {doc_count} tools, but TOOL_HANDLERS has {len(TOOL_HANDLERS)}"
-        )
+        assert doc_count == len(
+            TOOL_HANDLERS
+        ), f"Inventory doc says {doc_count} tools, but TOOL_HANDLERS has {len(TOOL_HANDLERS)}"
 
     def test_inventory_doc_table_row_count_matches(self):
         """Verify the number of rows in the inventory table matches the tool count."""
@@ -149,14 +149,17 @@ class TestSourceOfTruthConsistency:
         content = _INVENTORY_DOC.read_text()
         # Count rows that start with | and have a tool name
         rows = re.findall(r"^\|\s*\d+\s*\|", content, re.MULTILINE)
-        assert len(rows) == len(TOOL_HANDLERS), (
-            f"Inventory table has {len(rows)} rows, but TOOL_HANDLERS has {len(TOOL_HANDLERS)}"
-        )
+        assert len(rows) == len(
+            TOOL_HANDLERS
+        ), f"Inventory table has {len(rows)} rows, but TOOL_HANDLERS has {len(TOOL_HANDLERS)}"
 
 
 HARNESS_TASK_PROFILES = {
-    "codegg_preflight", "codegg_patch", "codegg_config",
-    "codegg_shell", "codegg_unicode_security",
+    "codegg_preflight",
+    "codegg_patch",
+    "codegg_config",
+    "codegg_shell",
+    "codegg_unicode_security",
 }
 
 MODEL_FACING_PROFILES = {"default", "codegg_core", "codegg_core_min"}
@@ -168,8 +171,22 @@ class TestToolMetadata:
     """Verify TOOL_METADATA is complete and consistent."""
 
     VALID_CATEGORIES = {
-        "math", "text", "json", "toml", "config", "regex", "path", "shell",
-        "patch", "identifier", "markdown", "version", "cargo", "list", "validation", "unicode",
+        "math",
+        "text",
+        "json",
+        "toml",
+        "config",
+        "regex",
+        "path",
+        "shell",
+        "patch",
+        "identifier",
+        "markdown",
+        "version",
+        "cargo",
+        "list",
+        "validation",
+        "unicode",
     }
     VALID_TIERS = {0, 1, 2, 3}
     VALID_LLM_EXPOSURE = {"default", "contextual", "expert_only", "harness_only", "hidden"}
@@ -198,63 +215,55 @@ class TestToolMetadata:
         for name, meta in TOOL_METADATA.items():
             schema_tier = TOOL_SCHEMAS.get(name, {}).get("tier")
             if schema_tier is not None:
-                assert meta["tier"] == schema_tier, (
-                    f"Tier mismatch for '{name}': metadata={meta['tier']}, schema={schema_tier}"
-                )
+                assert (
+                    meta["tier"] == schema_tier
+                ), f"Tier mismatch for '{name}': metadata={meta['tier']}, schema={schema_tier}"
 
     def test_metadata_categories_are_valid(self):
         for name, meta in TOOL_METADATA.items():
-            assert meta["category"] in self.VALID_CATEGORIES, (
-                f"Invalid category '{meta['category']}' for tool '{name}'"
-            )
+            assert (
+                meta["category"] in self.VALID_CATEGORIES
+            ), f"Invalid category '{meta['category']}' for tool '{name}'"
 
     def test_metadata_tiers_are_valid(self):
         for name, meta in TOOL_METADATA.items():
-            assert meta["tier"] in self.VALID_TIERS, (
-                f"Invalid tier {meta['tier']} for tool '{name}'"
-            )
+            assert (
+                meta["tier"] in self.VALID_TIERS
+            ), f"Invalid tier {meta['tier']} for tool '{name}'"
 
     def test_metadata_llm_exposure_is_valid(self):
         for name, meta in TOOL_METADATA.items():
-            assert meta["llm_exposure"] in self.VALID_LLM_EXPOSURE, (
-                f"Invalid llm_exposure '{meta['llm_exposure']}' for tool '{name}'"
-            )
+            assert (
+                meta["llm_exposure"] in self.VALID_LLM_EXPOSURE
+            ), f"Invalid llm_exposure '{meta['llm_exposure']}' for tool '{name}'"
 
     def test_metadata_cost_is_valid(self):
         for name, meta in TOOL_METADATA.items():
-            assert meta["cost"] in self.VALID_COST, (
-                f"Invalid cost '{meta['cost']}' for tool '{name}'"
-            )
+            assert (
+                meta["cost"] in self.VALID_COST
+            ), f"Invalid cost '{meta['cost']}' for tool '{name}'"
 
     def test_metadata_stability_is_valid(self):
         for name, meta in TOOL_METADATA.items():
-            assert meta["stability"] in self.VALID_STABILITY, (
-                f"Invalid stability '{meta['stability']}' for tool '{name}'"
-            )
+            assert (
+                meta["stability"] in self.VALID_STABILITY
+            ), f"Invalid stability '{meta['stability']}' for tool '{name}'"
 
     def test_metadata_profiles_are_lists(self):
         for name, meta in TOOL_METADATA.items():
-            assert isinstance(meta["profiles"], list), (
-                f"Profiles for '{name}' must be a list"
-            )
+            assert isinstance(meta["profiles"], list), f"Profiles for '{name}' must be a list"
 
     def test_metadata_aliases_are_lists(self):
         for name, meta in TOOL_METADATA.items():
-            assert isinstance(meta["aliases"], list), (
-                f"Aliases for '{name}' must be a list"
-            )
+            assert isinstance(meta["aliases"], list), f"Aliases for '{name}' must be a list"
 
     def test_metadata_harness_use_are_lists(self):
         for name, meta in TOOL_METADATA.items():
-            assert isinstance(meta["harness_use"], list), (
-                f"harness_use for '{name}' must be a list"
-            )
+            assert isinstance(meta["harness_use"], list), f"harness_use for '{name}' must be a list"
 
     def test_metadata_composite_is_bool(self):
         for name, meta in TOOL_METADATA.items():
-            assert isinstance(meta["composite"], bool), (
-                f"composite for '{name}' must be bool"
-            )
+            assert isinstance(meta["composite"], bool), f"composite for '{name}' must be bool"
 
 
 class TestToolProfiles:
@@ -269,27 +278,28 @@ class TestToolProfiles:
         for meta in TOOL_METADATA.values():
             all_profile_names.update(meta.get("profiles", []))
         for name in all_profile_names:
-            assert name in TOOL_PROFILES, f"Profile '{name}' referenced in metadata but not in TOOL_PROFILES"
+            assert (
+                name in TOOL_PROFILES
+            ), f"Profile '{name}' referenced in metadata but not in TOOL_PROFILES"
 
     def test_profile_tool_lists_are_sorted(self):
         for profile_name, tool_list in TOOL_PROFILES.items():
-            assert tool_list == sorted(tool_list), (
-                f"Profile '{profile_name}' tool list is not sorted"
-            )
+            assert tool_list == sorted(
+                tool_list
+            ), f"Profile '{profile_name}' tool list is not sorted"
 
     def test_profile_tool_lists_only_contain_known_tools(self):
         known_tools = set(TOOL_HANDLERS.keys())
         for profile_name, tool_list in TOOL_PROFILES.items():
             unknown = set(tool_list) - known_tools
-            assert not unknown, (
-                f"Profile '{profile_name}' contains unknown tools: {sorted(unknown)}"
-            )
+            assert (
+                not unknown
+            ), f"Profile '{profile_name}' contains unknown tools: {sorted(unknown)}"
 
     def test_full_profile_contains_all_non_hidden_tools(self):
         full_tools = set(TOOL_PROFILES.get("full", []))
         expected = {
-            name for name, meta in TOOL_METADATA.items()
-            if meta.get("llm_exposure") != "hidden"
+            name for name, meta in TOOL_METADATA.items() if meta.get("llm_exposure") != "hidden"
         }
         assert full_tools == expected, (
             f"Full profile mismatch.\n"
@@ -307,10 +317,12 @@ class TestToolProfiles:
 
     def test_profile_names_constant(self):
         from eggcalc.mcp.schemas import PROFILE_NAMES
+
         assert isinstance(PROFILE_NAMES, list)
         assert len(PROFILE_NAMES) > 0
         # All names should be in TOOL_PROFILES
         from eggcalc.mcp.schemas import TOOL_PROFILES
+
         for name in PROFILE_NAMES:
             assert name in TOOL_PROFILES, f"PROFILE_NAMES contains '{name}' not in TOOL_PROFILES"
 
@@ -347,7 +359,8 @@ class TestProfileInvariants:
     def test_harness_only_tools_covered_by_harness_profiles(self):
         """Invariant 3: every harness_only tool appears in at least one harness/task profile."""
         harness_only_tools = {
-            name for name, meta in TOOL_METADATA.items()
+            name
+            for name, meta in TOOL_METADATA.items()
             if meta.get("llm_exposure") == "harness_only"
         }
         uncovered = []
@@ -363,7 +376,8 @@ class TestProfileInvariants:
     def test_default_composite_tools_in_model_facing_profile(self):
         """Invariant 4: composite tools with default exposure appear in a model-facing profile."""
         default_composites = {
-            name for name, meta in TOOL_METADATA.items()
+            name
+            for name, meta in TOOL_METADATA.items()
             if meta.get("composite") and meta.get("llm_exposure") == "default"
         }
         uncovered = []
@@ -384,16 +398,17 @@ class TestProfileInvariants:
             meta = TOOL_METADATA.get(tool, {})
             if meta.get("category") not in MATH_CATEGORIES:
                 non_math.append((tool, meta.get("category")))
-        assert not non_math, (
-            f"non-math tools in human_math profile: {sorted(non_math)}"
-        )
+        assert not non_math, f"non-math tools in human_math profile: {sorted(non_math)}"
 
     def test_human_math_excludes_preflight_and_composite(self):
         """Invariant 6b: human_math excludes codegg preflight and composite tools."""
         human_math_tools = set(TOOL_PROFILES.get("human_math", []))
         preflight_composites = {
-            name for name in human_math_tools
-            if name.startswith(("edit_preflight", "command_preflight", "config_preflight", "text_security_inspect"))
+            name
+            for name in human_math_tools
+            if name.startswith(
+                ("edit_preflight", "command_preflight", "config_preflight", "text_security_inspect")
+            )
             or TOOL_METADATA.get(name, {}).get("composite")
             or name in {"patch_apply_check", "path_scope_check"}
         }
@@ -401,13 +416,16 @@ class TestProfileInvariants:
         codegg_preflight_tools = set()
         for profile in HARNESS_TASK_PROFILES:
             codegg_preflight_tools.update(TOOL_PROFILES.get(profile, []))
-        violations = human_math_tools.intersection(codegg_preflight_tools).union(preflight_composites)
+        violations = human_math_tools.intersection(codegg_preflight_tools).union(
+            preflight_composites
+        )
         # Filter to only tools that are composite or in a harness profile
         actual_violations = {
-            t for t in violations
+            t
+            for t in violations
             if TOOL_METADATA.get(t, {}).get("composite")
             or TOOL_METADATA.get(t, {}).get("llm_exposure") == "harness_only"
         }
-        assert not actual_violations, (
-            f"composite/harness_only tools in human_math profile: {sorted(actual_violations)}"
-        )
+        assert (
+            not actual_violations
+        ), f"composite/harness_only tools in human_math profile: {sorted(actual_violations)}"
