@@ -216,8 +216,12 @@ def find_invisibles(s: str) -> list[InvisibleCharInfo]:
         elif codepoint_val in _VARIATION_SELECTORS:
             name = "VARIATION SELECTOR"
             display = "VS"
-        # Check bidi control characters (U+2060 to U+206F)
-        elif 0x2060 <= codepoint_val <= 0x206f:
+        # Check format characters in U+2061-U+2065 range
+        elif 0x2061 <= codepoint_val <= 0x2065:
+            name = unicodedata.name(char, "<unknown>")
+            display = f"FORMAT:{name.split()[-1]}" if name else "FORMAT"
+        # Check bidi control characters (U+2066 to U+206F)
+        elif 0x2066 <= codepoint_val <= 0x206f:
             name = unicodedata.name(char, "<unknown>")
             display = f"BIDI:{name.split()[-1]}" if name else "BIDI"
         # Check combining marks (category M*)
@@ -274,7 +278,11 @@ def visible_repr(s: str) -> str:
             result.append("⟦VS⟧")
         elif unicodedata.category(char).startswith("M"):
             result.append(f"◌{char}")
-        elif 0x2060 <= ord(char) <= 0x206f:
+        elif 0x2061 <= ord(char) <= 0x2065:
+            name = unicodedata.name(char, "<unknown>")
+            label = name.split()[-1] if name else "FORMAT"
+            result.append(f"⟦FORMAT:{label}⟧")
+        elif 0x2066 <= ord(char) <= 0x206f:
             bidi_names = {
                 0x2066: "LRI", 0x2067: "RLI", 0x2068: "FSI", 0x2069: "PDI",
                 0x202a: "LRE", 0x202b: "RLE", 0x202c: "PDF",
@@ -362,7 +370,7 @@ def _is_extend_char(char: str) -> bool:
     # Also: ZWNJ (U+200C), Variation Selectors (U+FE00-U+FE0F)
     if cat.startswith('M'):
         return True
-    if cp == 0x200C or cp == 0x200B:  # ZWNJ and ZWSP
+    if cp == 0x200C:  # ZWNJ
         return True
     if 0xFE00 <= cp <= 0xFE0F:  # Variation selectors
         return True

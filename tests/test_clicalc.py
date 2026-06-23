@@ -1029,6 +1029,98 @@ class TestCompoundUnitDivision:
         assert abs(result.value - 50.0) < 1e-10
 
 
+class TestCompoundUnitPipeline:
+    """Integration tests for compound unit expressions through run() pipeline."""
+
+    def test_addition_with_unit_conversion(self):
+        """5m + 3km should convert km to m and add."""
+        result, code = run("5m + 3km", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m"
+        assert abs(result.value - 3005.0) < 1e-10
+
+    def test_addition_length_conversion_other_order(self):
+        """100ft + 30m should convert and add, result in ft."""
+        result, code = run("100ft + 30m", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "ft"
+        assert abs(result.value - 198.4251968503937) < 1e-6
+
+    def test_unit_power_suffix(self):
+        """5m ** 2 applies power to unit only (m2)."""
+        result, code = run("5m ** 2", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m2"
+        assert abs(result.value - 5.0) < 1e-10
+
+    def test_unit_power_suffix_three(self):
+        """3m ** 3 applies power to unit only (m3)."""
+        result, code = run("3m ** 3", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m3"
+        assert abs(result.value - 3.0) < 1e-10
+
+    def test_unit_division_different_units(self):
+        """10m / 2s should produce 5.0 m/s."""
+        result, code = run("10m / 2s", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m/s"
+        assert abs(result.value - 5.0) < 1e-10
+
+    def test_unit_division_same_category(self):
+        """100km / 2h should produce 50.0 km/h."""
+        result, code = run("100km / 2h", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "km/h"
+        assert abs(result.value - 50.0) < 1e-10
+
+    def test_same_unit_multiplication(self):
+        """5m * 5m should produce 25.0 m**2."""
+        result, code = run("5m * 5m", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m**2"
+        assert abs(result.value - 25.0) < 1e-10
+
+    def test_mixed_operations_with_conversion(self):
+        """(5m + 3km) / 2 should convert, add, then divide."""
+        result, code = run("(5m + 3km) / 2", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m"
+        assert abs(result.value - 1502.5) < 1e-10
+
+    def test_unit_division_by_number(self):
+        """10m / 2 should produce 5.0 m."""
+        result, code = run("10m / 2", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m"
+        assert abs(result.value - 5.0) < 1e-10
+
+    def test_number_times_unit(self):
+        """3 * 5m should produce 15.0 m."""
+        result, code = run("3 * 5m", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m"
+        assert abs(result.value - 15.0) < 1e-10
+
+    def test_unit_power_of_kilometer(self):
+        """2km ** 2 applies power to unit only (km2)."""
+        result, code = run("2km ** 2", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.unit == "km2"
+        assert abs(result.value - 2.0) < 1e-10
+
+
 class TestUppercaseOperators:
     """Tests for uppercase operator words (Fix #3)."""
 

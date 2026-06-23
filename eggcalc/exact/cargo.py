@@ -259,17 +259,18 @@ def cargo_toml_inspect(
     # --- Workspace section ---
     workspace: CargoWorkspaceInfo = {"present": False, "members": [], "exclude": []}
     if check_workspace:
-        ws_raw = parsed.get("workspace", {})
-        if isinstance(ws_raw, dict):
-            workspace["present"] = True
-            members = ws_raw.get("members", [])
-            if isinstance(members, list):
-                workspace["members"] = [str(m) for m in members]
-            exclude = ws_raw.get("exclude", [])
-            if isinstance(exclude, list):
-                workspace["exclude"] = [str(e) for e in exclude]
-        elif "workspace" in parsed:
-            findings.append("'[workspace]' is not a table")
+        if "workspace" in parsed:
+            ws_raw = parsed["workspace"]
+            if isinstance(ws_raw, dict):
+                workspace["present"] = True
+                members = ws_raw.get("members", [])
+                if isinstance(members, list):
+                    workspace["members"] = [str(m) for m in members]
+                exclude = ws_raw.get("exclude", [])
+                if isinstance(exclude, list):
+                    workspace["exclude"] = [str(e) for e in exclude]
+            else:
+                findings.append("'[workspace]' is not a table")
 
     # --- Dependencies ---
     dep_section = CargoDepSection(

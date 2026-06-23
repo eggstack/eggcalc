@@ -196,7 +196,7 @@ class TestPrimitives:
 
     def test_is_extend_char_zwsp(self):
         from eggcalc.exact.primitives import _is_extend_char
-        assert _is_extend_char('\u200b')  # ZWSP
+        assert not _is_extend_char('\u200b')  # ZWSP (Grapheme_Break=Control per UAX #29)
         assert _is_extend_char('\u200c')  # ZWNJ
         assert not _is_extend_char('\u200d')  # ZWJ (not included)
         assert not _is_extend_char('\u200e')  # LRM (not included)
