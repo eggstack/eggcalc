@@ -4800,7 +4800,7 @@ class TestRateLimiting:
 
         # Exhaust the rate limit
         for i in range(MAX_REQUESTS_PER_SECOND + 1):
-            response = handle_request({
+            handle_request({
                 "jsonrpc": "2.0",
                 "id": i + 1000,
                 "method": "tools/call",
@@ -6799,7 +6799,7 @@ for expr in ['fact(5m)', 'ceil(3.7m)', 'floor(3.7m)', 'abs(3.7m)', 'gcd(5m, 3m)'
 """],
             capture_output=True, text=True,
         )
-        lines = [l for l in result.stdout.splitlines() if l.startswith("OK:")]
+        lines = [line for line in result.stdout.splitlines() if line.startswith("OK:")]
         assert len(lines) == 6, f"Expected 6 OK lines, got: {result.stdout!r}"
 
     def test_dimensionless_math_still_works(self):
@@ -7637,7 +7637,6 @@ class TestCompactSchemaMode:
         for name in compact_tools:
             if name not in full_tools:
                 continue
-            ft = full_tools[name]
             ct = compact_tools[name]
             # Descriptions should be <= 120 chars in compact
             assert len(ct.get("description", "")) <= 120
@@ -8921,7 +8920,6 @@ class TestMCPSecurityGuards:
 
     def test_random_functions_rejected_in_mcp_mode(self):
         """Functions like random() and seed() should be rejected when allow_random=False."""
-        from eggcalc import evaluator as ev_module
         from eggcalc import get_default_evaluator
 
         evaluator = get_default_evaluator()

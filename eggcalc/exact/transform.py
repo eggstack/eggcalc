@@ -134,7 +134,7 @@ def _remove_chars(
     warnings: list[str] = []
     if removed:
         count = len(removed)
-        names = ", ".join(set(r["name"] for r in removed))
+        names = ", ".join({r["name"] for r in removed})
         warnings.append(f"Removed {count} invisible/{operation_name} character(s): {names}")
 
     return "".join(result), removed, warnings

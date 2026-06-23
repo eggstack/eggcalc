@@ -21,16 +21,15 @@ import pytest
 
 from eggcalc import UnitValue
 from eggcalc.normalize import (
-    NORMALIZE,
-    PATTERNS,
-    _binary_word_check,
     _IMPLICIT_MUL_FUNCS,
     _MULTI_ARG_OF_FUNCS,
     _SINGLE_ARG_IMPLICIT_MUL,
     MAX_NORMALIZED_LENGTH,
+    NORMALIZE,
+    PATTERNS,
+    _binary_word_check,
     apply_math_functions,
     check_if_number,
-    normalize,
     normalize_expression,
     run,
 )

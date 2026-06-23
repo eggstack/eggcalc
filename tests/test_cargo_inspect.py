@@ -11,16 +11,13 @@ Tests for:
 - Invalid TOML input
 """
 
-import pytest
 
 from eggcalc.exact.cargo import (
-    CargoInspectResult,
     _detect_duplicates,
     _normalize_ident,
     cargo_toml_inspect,
 )
 from eggcalc.mcp.tools import cargo_toml_inspect_mcp
-
 
 BASIC_CARGO_TOML = """\
 [package]

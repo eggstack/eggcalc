@@ -2,7 +2,7 @@
 
 import pytest
 
-from eggcalc import UnitValue, evaluate, evaluate_raw
+from eggcalc import UnitValue, evaluate
 from eggcalc.normalize import NORMALIZE, PATTERNS
 
 

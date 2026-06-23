@@ -401,7 +401,6 @@ class TestConstantLookupMCP:
 
     def test_all_aliases(self):
         """Test all aliases for a constant return the same value."""
-        from eggcalc.mcp.tools import PHYSICAL_CONSTANTS
         aliases = ["na", "avogadro", "avogadros"]
         values = set()
         for alias in aliases:

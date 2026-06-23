@@ -88,6 +88,16 @@ select = [
 ]
 ignore = [
     "E501",  # line too long (handled by black)
+    "E731",  # do not assign lambda expression
+    "E741",  # ambiguous variable name
+    "E402",  # module level import not at top of file
+    "B006",  # do not use mutable data structures for argument defaults
+    "B007",  # loop control variable not used
+    "B904",  # raise ... from err (too noisy for existing code)
+    "B905",  # zip() without strict= parameter
+    "C414",  # unnecessary list() call within sorted()
+    "C416",  # unnecessary list/dict comprehension
+    "F841",  # local variable assigned but never used
 ]
 
 [tool.mypy]

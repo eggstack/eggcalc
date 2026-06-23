@@ -472,8 +472,9 @@ class TestUnicodeFuzzing:
 
     def test_unicode_random_mix(self):
         """Test random mixes of Unicode characters in expressions."""
-        from eggcalc import EvaluationError, evaluate_raw
         import random
+
+        from eggcalc import EvaluationError, evaluate_raw
 
         random.seed(2024)
         unicode_chars = [
@@ -582,7 +583,7 @@ class TestMemorySafety:
         tracemalloc.reset_peak()
 
         # Run many evaluations
-        for i in range(1000):
+        for _i in range(1000):
             try:
                 evaluate_raw("5 + 3")
             except Exception:
@@ -675,6 +676,7 @@ class TestASTAllowlist:
     def test_match_value_rejected(self):
         """match/case AST nodes must be rejected."""
         import ast
+
         from eggcalc.evaluator import EvaluationError as EE
 
         node = ast.MatchValue(value=ast.Constant(value=1))
@@ -686,7 +688,8 @@ class TestASTAllowlist:
         """Walk every ast.expr subclass; verify it's rejected unless allowed."""
         import ast
 
-        from eggcalc.evaluator import _ALLOWED_AST_TYPES, EvaluationError as EE
+        from eggcalc.evaluator import _ALLOWED_AST_TYPES
+        from eggcalc.evaluator import EvaluationError as EE
 
         expr_classes = {
             getattr(ast, name)

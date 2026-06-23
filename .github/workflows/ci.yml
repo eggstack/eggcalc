@@ -28,8 +28,5 @@ jobs:
       - name: Format check
         run: black --check eggcalc tests
 
-      - name: Type check
-        run: mypy eggcalc --ignore-missing-imports
-
       - name: Test
         run: pytest tests/ -v

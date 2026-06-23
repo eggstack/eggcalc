@@ -156,8 +156,8 @@ class TestSetvarPublicAPICap:
     """evaluator.py: public setvar() must respect the documented cap."""
 
     def test_cap_enforced(self):
-        from eggcalc import setvar, clearvars
-        from eggcalc.evaluator import _default_evaluator, MAX_USER_VARIABLES
+        from eggcalc import clearvars, setvar
+        from eggcalc.evaluator import MAX_USER_VARIABLES, _default_evaluator
 
         clearvars()
         # Setting more than the cap should still work but evict the oldest
@@ -180,12 +180,12 @@ class TestSetvarPublicAPICap:
         clearvars()
 
     def test_name_must_be_identifier(self):
-        from eggcalc import setvar
-        with pytest.raises(Exception):
+        from eggcalc import EvaluationError, setvar
+        with pytest.raises(EvaluationError):
             setvar("", 5)
-        with pytest.raises(Exception):
+        with pytest.raises(EvaluationError):
             setvar("123abc", 5)
-        with pytest.raises(Exception):
+        with pytest.raises(EvaluationError):
             setvar("with space", 5)
 
 

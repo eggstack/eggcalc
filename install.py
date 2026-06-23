@@ -29,8 +29,10 @@ def get_calc_path(install_dir: str) -> str:
 
 
 def is_installed(install_dir: str) -> bool:
-    """Check if calc is currently installed."""
-    return os.path.exists(get_calc_path(install_dir))
+    """Check if calc is currently installed (via install script or pip)."""
+    if os.path.exists(get_calc_path(install_dir)):
+        return True
+    return _is_pip_entry_point(_find_calc_on_path())
 
 
 def build_single_file():
@@ -229,8 +231,45 @@ def install_calc(install_dir: str, no_path: bool = False) -> bool:
     return True
 
 
+def _find_calc_on_path() -> str | None:
+    """Return the full path of the first 'calc' on PATH, or None."""
+    for dir_entry in os.environ.get("PATH", "").split(os.pathsep):
+        candidate = os.path.join(dir_entry, "calc")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _is_pip_entry_point(path: str) -> bool:
+    """Return True if *path* is a pip-generated console_scripts entry point."""
+    if not path:
+        return False
+    try:
+        with open(path, "r") as f:
+            head = f.read(512)
+    except OSError:
+        return False
+    return "from eggcalc" in head or "import eggcalc" in head
+
+
 def update_calc(install_dir: str) -> bool:
     """Update an existing calc installation. Returns True if successful."""
+    calc_on_path = _find_calc_on_path()
+
+    if _is_pip_entry_point(calc_on_path):
+        print(f"Detected pip-installed calc at: {calc_on_path}")
+        print("Updating via pip...")
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--upgrade", "eggcalc"],
+        )
+        if result.returncode == 0:
+            print("Updated successfully via pip.")
+            return True
+        else:
+            print("pip update failed. You can try manually:")
+            print(f"  {sys.executable} -m pip install --upgrade eggcalc")
+            return False
+
     if not is_installed(install_dir):
         print("calc is not installed.")
         print("Use --install to install it first.")
@@ -244,7 +283,6 @@ def update_calc(install_dir: str) -> bool:
     with open(single_file, "r") as f:
         new_content = f.read()
 
-    # Write to a temp file first, then rename atomically
     import tempfile
     fd, tmp_path = tempfile.mkstemp(dir=install_dir, prefix=".calc_tmp_")
     try:

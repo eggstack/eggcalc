@@ -14,7 +14,6 @@ SINGLE_HUNK_PATCH = """\
 -    print("hello")
 +    print("hello world")
      return True
- 
  def goodbye():
 """
 
@@ -26,7 +25,6 @@ MULTI_HUNK_PATCH = """\
 -    print("hello")
 +    print("hello world")
      return True
- 
  def goodbye():
 @@ -8,3 +8,3 @@
  def add(a, b):
@@ -43,7 +41,6 @@ WRONG_CONTEXT_PATCH = """\
 -    print("wrong context")
 +    print("hello world")
      return True
- 
  def goodbye():
 """
 

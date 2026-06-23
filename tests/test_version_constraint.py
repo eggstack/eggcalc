@@ -11,10 +11,8 @@ Tests for:
 - MCP wrapper integration
 """
 
-import pytest
 
 from eggcalc.exact.version import (
-    ParsedVersion,
     check_version_constraint,
     parse_version,
     version_equal,

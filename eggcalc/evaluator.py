@@ -283,7 +283,7 @@ def load_user_config() -> None:
         _config_loaded = True
         return
     try:
-        import eggcalc.normalize as normalize_mod
+        import eggcalc.normalize as normalize_mod  # noqa: F401
         import eggcalc_config as config
 
         for name, value in getattr(config, "CUSTOM_CONSTANTS", {}).items():
@@ -452,7 +452,7 @@ async def evaluate_async(expression: str) -> Any:
 def load_user_config_extended() -> None:
     """Load user-defined configuration including normalize (call after normalize is loaded)."""
     try:
-        import eggcalc.normalize as normalize_mod
+        import eggcalc.normalize as normalize_mod  # noqa: F401
         import eggcalc_config as config
 
         for word, num in getattr(config, "CUSTOM_NUMBER_WORDS", {}).items():

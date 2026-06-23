@@ -16,7 +16,8 @@ import sys
 import threading
 import time
 from collections import deque
-from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any
 
 # Disable any user-supplied config loading at import time, before any
@@ -28,8 +29,12 @@ os.environ.setdefault("EGGCALC_NO_CONFIG", "1")
 from .. import __version__
 from .. import evaluator as _evaluator
 from .schemas import (
-    TOOL_SCHEMAS, TOOL_METADATA, TOOL_PROFILES, PROFILE_NAMES,
-    compact_schema, SCHEMA_DETAIL_FULL,
+    PROFILE_NAMES,
+    SCHEMA_DETAIL_FULL,
+    TOOL_METADATA,
+    TOOL_PROFILES,
+    TOOL_SCHEMAS,
+    compact_schema,
 )
 
 # Flag set the first time handle_request() runs to ensure MCP-safe defaults
@@ -298,7 +303,11 @@ def _cleanup_orphaned_processes() -> None:
     with _orphaned_lock:
         # Also check evaluator and regex tool orphan sets
         try:
-            from ..evaluator import _orphaned_eval_processes, _orphaned_eval_order, _orphaned_eval_lock
+            from ..evaluator import (
+                _orphaned_eval_lock,
+                _orphaned_eval_order,
+                _orphaned_eval_processes,
+            )
             with _orphaned_eval_lock:
                 _orphaned_processes.update(_orphaned_eval_processes)
                 _orphaned_eval_processes.clear()
@@ -306,7 +315,11 @@ def _cleanup_orphaned_processes() -> None:
         except Exception:
             pass
         try:
-            from .tools import _orphaned_regex_processes, _orphaned_regex_order, _orphaned_regex_lock
+            from .tools import (
+                _orphaned_regex_lock,
+                _orphaned_regex_order,
+                _orphaned_regex_processes,
+            )
             with _orphaned_regex_lock:
                 _orphaned_processes.update(_orphaned_regex_processes)
                 _orphaned_regex_processes.clear()

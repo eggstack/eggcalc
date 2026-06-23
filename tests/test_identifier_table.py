@@ -1,6 +1,5 @@
 """Tests for identifier_table_inspect function."""
 
-import pytest
 
 from eggcalc.exact.identifier_inspect import (
     identifier_table_inspect,

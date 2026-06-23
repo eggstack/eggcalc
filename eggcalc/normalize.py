@@ -429,6 +429,7 @@ def _build_config() -> tuple[dict, dict]:
     }
 
     # Compile regex patterns
+    _wb = r"\b"
     compiled_patterns: dict[str, re.Pattern[str]] = {
         "space": re.compile(r"\s+"),
         "point": re.compile(r"\."),
@@ -437,7 +438,7 @@ def _build_config() -> tuple[dict, dict]:
         "parenthesis": re.compile(r"\(|\)"),
         "operators": re.compile(f"^({'|'.join([re.escape(s) for s in symbols])}){{1}}$"),
         # Handle stripped_chars: literals get escaped, but regex patterns like \bof\b are preserved
-        "stripped_chars": re.compile(f"({'|'.join([re.escape(p) if not (p.startswith(r'\b') or r'\b' in p) else p for p in sorted(STRIPPED_PHRASES, key=len, reverse=True)])})"),
+        "stripped_chars": re.compile(f"({'|'.join([re.escape(p) if not (p.startswith(_wb) or _wb in p) else p for p in sorted(STRIPPED_PHRASES, key=len, reverse=True)])})"),
         "int": re.compile(r"^[-+]?[0-9]\d*$"),
         # Float regex accepts a trailing decimal point ("5." -> 5.0) so
         # users can write Python-style shorthand. Both ".5" and "5." are
@@ -3224,6 +3225,7 @@ def main() -> int:
     """Main entry point for CLI."""
     import os
     import signal
+
     import eggcalc
 
     try:

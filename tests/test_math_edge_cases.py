@@ -5,8 +5,6 @@ import math
 import pytest
 
 from eggcalc.evaluator import EvaluationError, evaluate
-from eggcalc.units import UnitValue
-
 
 # ---------------------------------------------------------------------------
 # Hyperbolic function tests

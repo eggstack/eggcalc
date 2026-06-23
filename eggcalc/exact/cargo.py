@@ -331,9 +331,9 @@ def cargo_toml_inspect(
                         dep_section["target_specific"][target_key] = target_deps
 
     # --- Suspicious names ---
-    suspicious = sorted(set(
+    suspicious = sorted({
         name for name in all_dep_names if _detect_suspicious_name(name)
-    ))
+    })
 
     # --- Duplicate/confusable names ---
     dupes = _detect_duplicates(all_dep_names)

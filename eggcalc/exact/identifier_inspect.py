@@ -555,7 +555,7 @@ def identifier_table_inspect(
             style = _classify_style(name)
             style_map.setdefault(stripped, []).append((name, style))
         for stripped, entries in style_map.items():
-            styles_present = list(set(s for _, s in entries))
+            styles_present = list({s for _, s in entries})
             if len(styles_present) > 1:
                 group_names = [n for n, _ in entries]
                 collisions.append(TableCollisionInfo(
@@ -563,7 +563,7 @@ def identifier_table_inspect(
                     names=group_names,
                     detail=f"Style variants for '{stripped}': {', '.join(styles_present)}",
                 ))
-        if any(len(set(s for _, s in e)) > 1 for e in style_map.values()):
+        if any(len({s for _, s in e}) > 1 for e in style_map.values()):
             findings.append("Style variant collisions detected")
 
     if "reserved" in active_checks:
@@ -589,7 +589,7 @@ def identifier_table_inspect(
             style = _classify_style(name)
             style_map2.setdefault(stripped, []).append((name, style))
         for stripped, entries in style_map2.items():
-            styles_present = list(set(s for _, s in entries))
+            styles_present = list({s for _, s in entries})
             if len(styles_present) > 1:
                 mixed_style_groups.append(MixedStyleGroup(
                     stripped=stripped,

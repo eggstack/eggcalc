@@ -8,6 +8,8 @@ import json
 import subprocess
 import sys
 
+import pytest
+
 
 def run_calc(args: list[str]) -> tuple[int, str, str]:
     """Run calc command and return (returncode, stdout, stderr)."""

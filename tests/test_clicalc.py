@@ -176,6 +176,7 @@ class TestCLI:
         """Help text should list pi/e/tau but not inf/nan."""
         import io
         import sys
+
         from eggcalc.normalize import print_help
         buf = io.StringIO()
         old_stdout = sys.stdout
@@ -635,8 +636,8 @@ class TestPrimes:
         """Test prime check."""
         from eggcalc import evaluate_raw
 
-        assert evaluate_raw("isprime(17)") == True
-        assert evaluate_raw("isprime(18)") == False
+        assert evaluate_raw("isprime(17)") is True
+        assert evaluate_raw("isprime(18)") is False
 
     def test_primefactors(self):
         """Test prime factorization."""
@@ -1373,7 +1374,7 @@ class TestCacheByteCap:
     def test_cache_caps_at_default_size(self):
         """Adding more than DEFAULT_CACHE_SIZE entries should evict oldest."""
         import eggcalc.evaluator as ev
-        from eggcalc.evaluator import _cache, DEFAULT_CACHE_SIZE, _entry_size, _cache_lock
+        from eggcalc.evaluator import DEFAULT_CACHE_SIZE, _cache, _cache_lock, _entry_size
 
         test_keys = []
         with _cache_lock:
@@ -1395,9 +1396,8 @@ class TestCacheByteCap:
 
     def test_cache_under_byte_cap(self):
         """Total cache bytes should stay under MAX_CACHE_BYTES."""
-        from eggcalc.evaluator import _cache, _cache_bytes, MAX_CACHE_BYTES
-
         from eggcalc import evaluate_cached
+        from eggcalc.evaluator import MAX_CACHE_BYTES, _cache_bytes
 
         for i in range(50):
             evaluate_cached(f"{i}+1")
@@ -1638,8 +1638,8 @@ class TestEvaluatorEdgeCases:
 
     def test_large_int_unitvalue_no_crash(self):
         """UnitValue with very large int doesn't crash _check_result_size."""
-        from eggcalc.units import UnitValue
         from eggcalc.evaluator import _check_result_size
+        from eggcalc.units import UnitValue
         try:
             _check_result_size(UnitValue(10**100001, "m"))
         except EvaluationError:
@@ -1856,7 +1856,6 @@ class TestReviewerEdgeCases:
 
     def test_degrees_function(self):
         """degrees function should convert radians to degrees."""
-        import math
         result = evaluate("degrees(pi)")
         assert abs(result - 180.0) < 1e-10
 

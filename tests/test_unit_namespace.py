@@ -19,8 +19,8 @@ import threading
 import pytest
 
 from eggcalc import (
-    EvaluationError,
     EggCalcApp,
+    EvaluationError,
     UnitValue,
     evaluate,
     evaluate_raw,
@@ -33,7 +33,6 @@ from eggcalc.units import (
     is_unit,
     normalize_unit,
 )
-
 
 # ---------------------------------------------------------------------------
 # Group A: per-instance state isolation

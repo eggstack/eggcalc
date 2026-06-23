@@ -1,15 +1,11 @@
 """Tests for REPL mode and CLI flags."""
 
-import io
 import json
 import subprocess
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from eggcalc.normalize import NORMALIZE, PATTERNS, _run_repl, main, run
-
+from eggcalc.normalize import _run_repl, run
 
 # ---------------------------------------------------------------------------
 # Helpers

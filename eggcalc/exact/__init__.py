@@ -7,6 +7,16 @@ perform semantic interpretation or call LLMs.
 
 from __future__ import annotations
 
+# Re-export cargo
+from .cargo import (
+    CargoDependencyForm,
+    CargoDepSection,
+    CargoInspectResult,
+    CargoPackageInfo,
+    CargoWorkspaceInfo,
+    cargo_toml_inspect,
+)
+
 # Re-export config
 from .config import (
     DotenvEntry,
@@ -54,6 +64,13 @@ from .identifier_inspect import (
     TableIdentifierEntry,
     identifier_inspect,
     identifier_table_inspect,
+)
+
+# Re-export inspect_prompt
+from .inspect_prompt import (
+    PromptInspectionFinding,
+    PromptInspectionResult,
+    prompt_input_inspect,
 )
 
 # Re-export markdown
@@ -198,33 +215,6 @@ from .unicode_tools import (
     unicode_scripts,
 )
 
-# Re-export inspect_prompt
-from .inspect_prompt import (
-    PromptInspectionFinding,
-    PromptInspectionResult,
-    prompt_input_inspect,
-)
-
-# Re-export cargo
-from .cargo import (
-    CargoDepSection,
-    CargoDependencyForm,
-    CargoInspectResult,
-    CargoPackageInfo,
-    CargoWorkspaceInfo,
-    cargo_toml_inspect,
-)
-
-# Re-export version
-from .version import (
-    ParsedConstraint,
-    ParsedConstraintComponent,
-    ParsedVersion,
-    VersionConstraintResult,
-    check_version_constraint,
-    parse_version,
-)
-
 # Re-export validate
 from .validate import (
     CheckBracketsResult,
@@ -257,6 +247,16 @@ from .validate import (
     validate_schema_light,
     validate_toml_text,
     version_compare,
+)
+
+# Re-export version
+from .version import (
+    ParsedConstraint,
+    ParsedConstraintComponent,
+    ParsedVersion,
+    VersionConstraintResult,
+    check_version_constraint,
+    parse_version,
 )
 
 __all__ = [
