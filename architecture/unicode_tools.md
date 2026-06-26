@@ -190,15 +190,7 @@ def detect_potential_homoglyph_attack(domain: str) -> bool:
     return len(confusables) > 0
 ```
 
-### `check_domain_safety(domain: str) -> bool`
-
-```python
-def check_domain_safety(domain: str) -> bool:
-    """Check for mixed scripts in domain (common attack vector)."""
-    mixed = detect_mixed_scripts(domain)
-    # Normal domains should be single-script
-    return not mixed["mixed_scripts"]
-```
+Note: `check_domain_safety()` is not an exported function. Use `detect_mixed_scripts()` directly for domain safety checks.
 
 ## Usage Example
 

@@ -273,8 +273,8 @@ calc inspect "emoji\x200Dtest"
 
 ```bash
 # Cyrillic 'а' (U+0430) looks exactly like Latin 'a' (U+0041)
-calc inspect "p\xe0ypal"
-# ✗ CONFUSABLE: Text contains confusable character '\xe0' (U+0430 CYRILLIC SMALL LETTER A)
+calc inspect "p$'\u0430'ypal"
+# ✗ CONFUSABLE: Text contains confusable character 'а' (U+0430 CYRILLIC SMALL LETTER A)
 #   This looks like Latin 'a' (U+0061) at index 1.
 ```
 
@@ -282,7 +282,7 @@ calc inspect "p\xe0ypal"
 
 ```bash
 # Latin and Cyrillic mixed
-calc inspect "Hello\x041c\x0438\x0440"
+calc inspect "Hello$'\u041c\u0438\u0440'"
 # ✗ MIXED SCRIPTS: Latin and Cyrillic
 ```
 

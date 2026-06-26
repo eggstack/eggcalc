@@ -232,10 +232,11 @@ Returns an empty list if no characters confusable-map to the input.
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `measure_basic(s)` | MeasureBasic | Basic metrics |
 | `char_category_metrics(s)` | CharCategoryMetrics | Metrics by Unicode category |
 | `line_metrics(s)` | LineMetrics | Line count and newline style |
 | `word_metrics(s)` | WordMetrics | Word count and boundaries |
+
+Note: `measure_basic()` is defined in `primitives.py`, not `measure.py`.
 
 ### CharCategoryMetrics
 
@@ -527,9 +528,10 @@ ListCompareResult(
 
 ```python
 NormalizationState(
-    form=str,           # NFC, NFD, NFKC, NFKD, or "raw"
-    casefolded=bool,
-    trimmed=bool,
+    is_nfc=bool,
+    is_nfd=bool,
+    is_nfkc=bool,
+    is_nfkd=bool,
 )
 ```
 
@@ -537,12 +539,10 @@ NormalizationState(
 
 ```python
 UnicodeRisks(
-    has_zwsp=bool,      # Zero-width space
-    has_zwnj=bool,      # Zero-width non-joiner
-    has_zwj=bool,       # Zero-width joiner
-    has_bidi=bool,      # Bidirectional controls
-    has_confusables=bool,
+    contains_invisibles=bool,
+    contains_bidi_controls=bool,
     mixed_scripts=bool,
+    scripts=list[str],
 )
 ```
 

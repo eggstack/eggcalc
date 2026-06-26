@@ -113,7 +113,7 @@ For text analysis needs (security, Unicode handling):
 
 ```bash
 # Inspect text for hidden characters and confusables
-calc inspect "p\xe2ypal"  # Cyrillic confusable detection
+calc inspect "p$'\u0430'ypal"  # Cyrillic confusable detection
 
 # Character counting
 calc count "hello world" l  # 'l' appears 3 time(s)

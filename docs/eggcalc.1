@@ -111,7 +111,7 @@ Check text for invisible characters and confusables:
   $ calc inspect \e"user\x00name\e"
   \(bu HIDDEN: Text contains NULL (U+0000) at index 5.
 
-  $ calc inspect \e"p\xe2ypal\e"   # Cyrillic 'а' looks like Latin 'a'
+  $ calc inspect \e"p$'\u0430'ypal\e"   # Cyrillic 'а' looks like Latin 'a'
   \(bu CONFUSABLE: Text contains confusable character '\(e2' (looks like 'a') at index 1.
 .fi
 .PP

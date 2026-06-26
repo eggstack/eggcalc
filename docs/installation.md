@@ -71,7 +71,7 @@ python install.py
 
 ```bash
 calc --version
-# calc 1.1.2
+# calc 1.1.3
 
 calc "one plus one"
 # 2

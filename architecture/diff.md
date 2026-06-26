@@ -45,7 +45,7 @@ FirstDiff(a_index=1, b_index=1, a_char='e', b_char='a',
 None
 ```
 
-### `common_prefix_suffix(a: str, b: str) -> dict`
+### `common_prefix_suffix(a: str, b: str) -> CommonPrefixSuffix`
 
 Find common prefix and suffix lengths between two strings.
 

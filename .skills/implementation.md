@@ -76,7 +76,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 ### Always Run Tests
 After any change:
 ```bash
-python3 build_single.py && python3 -m pytest tests/ -x -q
+.venv/bin/python build_single.py && .venv/bin/python -m pytest tests/ -x -q
 ```
 
 ### Build Single File Notes

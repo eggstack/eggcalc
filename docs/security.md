@@ -108,15 +108,12 @@ x[0]                       # Blocked
 ### Example: Secure Endpoint
 
 ```python
-from eggcalc import EggCalcApp, EvaluationError, TimeoutError
-
-app = EggCalcApp()
+from eggcalc import evaluate_with_timeout, EvaluationError, TimeoutError
 
 def handle_user_input(expression: str):
-    """Safely evaluate user-provided expression."""
+    """Safely evaluate user-provided expression with timeout."""
     try:
-        # Use evaluate_with_timeout for untrusted input
-        result = app.calculate(expression)
+        result = evaluate_with_timeout(expression, timeout=5.0)
         return {"success": True, "result": str(result)}
     except EvaluationError as e:
         return {"success": False, "error": str(e)}
@@ -249,7 +246,7 @@ def validate_user_text(text: str) -> tuple[bool, list[str]]:
     return len(warnings) == 0, warnings
 
 # Usage
-safe, warnings = validate_user_text("p\xe0ypal")  # Cyrillic confusable
+safe, warnings = validate_user_text("p\u0430ypal")  # Cyrillic confusable
 ```
 
 See [Exact Module](exact.md) for comprehensive text processing documentation.

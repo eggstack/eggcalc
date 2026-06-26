@@ -193,8 +193,8 @@ def calculate(ip: str, expression: str):
 
 | Method | Input | Performance |
 |--------|-------|-------------|
-| `evaluate()` | Pre-normalized | ~29 μs |
-| `evaluate_raw()` | Raw input | ~50 μs |
+| `evaluate()` | Pre-normalized | ~10 μs |
+| `evaluate_raw()` | Raw input | ~155 μs |
 | `evaluate_cached()` | With cache | O(1) after first |
 | `EggCalcApp.calculate()` | With cache | O(1) after first |
 

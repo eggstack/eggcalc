@@ -1,0 +1,80 @@
+# Build & Release Skill
+
+## Purpose
+Guide agents through building, testing, and releasing eggcalc.
+
+## Build Pipeline
+
+### Single-File Build
+```bash
+.venv/bin/python build_single.py
+```
+Assembles `eggcalc/` into a single portable `eggcalc.py`. The build script:
+- Concatenates core modules (normalize.py, evaluator.py, units.py, __main__.py)
+- Concatenates exact/ and mcp/ sub-packages
+- Renames `main()` → `normalize_main()` and `mcp_main()` to avoid conflicts
+- Handles aliased imports (e.g., `count_graphemes as _count_graphemes`)
+
+### Verification After Build
+```bash
+# Run full test suite
+.venv/bin/python -m pytest tests/ -v
+
+# Verify single-file works
+.venv/bin/python eggcalc.py "five plus three"
+```
+
+## CI Pipeline Order
+```
+ruff → black --check → build_single.py → pytest → mypy
+```
+- mypy only runs on Python 3.12
+- All checks must pass before merge
+
+## Commands Reference
+
+```bash
+# Lint
+ruff check eggcalc tests
+
+# Format check
+black --check eggcalc tests
+
+# Format (auto-fix)
+black eggcalc tests
+
+# Type check
+mypy eggcalc --ignore-missing-imports
+
+# All checks at once
+make check
+
+# Build single-file
+python build_single.py
+
+# Install to ~/.local/bin/calc
+python install.py --install
+```
+
+## Version Bumping
+
+When releasing a new version:
+1. Update version in `pyproject.toml`
+2. Update `__version__` in `eggcalc/__init__.py`
+3. Update `docs/installation.md` version examples
+4. Add entry to `docs/changelog.md`
+5. Run full test suite to verify
+
+## Constraints
+
+- **Standard library only** — no pip packages in `eggcalc/`
+- **Python >=3.10** — CI tests 3.10–3.14
+- **build_single.py compatibility** — all runtime code must be in core modules, exact/, or mcp/
+- **Import limits** — only these are allowed: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`
+
+## Common Build Issues
+
+1. **Import outside allowed set** — will break `build_single.py`. Check allowed imports above.
+2. **Aliased imports** — synthesis.py uses `count_graphemes as _count_graphemes`. Build script must de-alias these.
+3. **Name conflicts** — `main()` and `mcp_main()` are renamed by build script. Don't reference `normalize_main` in source tests.
+4. **Circular imports** — Core modules import each other in specific order: normalize → evaluator → units

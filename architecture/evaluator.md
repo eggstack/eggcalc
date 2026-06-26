@@ -1,6 +1,6 @@
 # evaluator.py — AST-Based Expression Evaluation
 
-2765 lines. Provides a **secure** way to evaluate mathematical expressions without using `eval()`. Uses Python's `ast` module to parse and evaluate expressions safely.
+2847 lines. Provides a **secure** way to evaluate mathematical expressions without using `eval()`. Uses Python's `ast` module to parse and evaluate expressions safely.
 
 ## Overview
 
@@ -87,7 +87,7 @@ Built-in functions available in expressions:
 
 ### Trigonometric
 - `sin(x)`, `cos(x)`, `tan(x)`
-- `asin(x)`, `acos(x)`, `atan(x)`
+- `asin(x)`, `acos(x)`, `atan(x)`, `atan2(y, x)`
 - `sinh(x)`, `cosh(x)`, `tanh(x)`
 - `asinh(x)`, `acosh(x)`, `atanh(x)`
 
@@ -95,8 +95,9 @@ Built-in functions available in expressions:
 - `log(x)` / `ln(x)` — natural log
 - `log10(x)` — base 10
 - `log2(x)` — base 2
+- `log1p(x)` — log(1+x) for small x
 - `exp(x)` — e^x
-- `sqrt(x)`, `cbrt(x)`
+- `expm1(x)` — exp(x)-1 for small x
 
 ### Statistical
 - `mean(*args)`, `median(*args)`
@@ -133,18 +134,6 @@ Built-in functions available in expressions:
 - `primefactors(n)` / `prime_factors(n)` — prime factorization
 - `nextprime(n)` / `next_prime(n)` — next prime
 - `prevprime(n)` / `prev_prime(n)` — previous prime
-
-### Trigonometric
-- `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
-- `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
-
-### Logarithmic/Exponential
-- `log(x)` / `ln(x)` — natural log
-- `log10(x)` — base 10
-- `log2(x)` — base 2
-- `exp(x)` — e^x
-- `log1p(x)` — log(1+x) for small x
-- `expm1(x)` — exp(x)-1 for small x
 
 ### Power/Root
 - `sqrt(x)` — square root

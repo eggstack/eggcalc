@@ -1,6 +1,6 @@
 # normalize.py — Natural Language Processing Module
 
-3291 lines. Converts mathematical expressions written in natural language into executable mathematical expressions.
+3567 lines. Converts mathematical expressions written in natural language into executable mathematical expressions.
 
 ## Overview
 

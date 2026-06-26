@@ -2,7 +2,7 @@
 
 A natural language math expression calculator that parses expressions in English (like "five plus three") and converts them to numeric results, with support for unit conversions. The system also includes a comprehensive suite of Unicode text analysis tools exposed via an MCP (Model Context Protocol) server.
 
-**All 2163 tests pass.**
+**All 2251 tests pass.**
 
 ---
 
@@ -61,7 +61,7 @@ eggcalc is a dual-purpose tool:
 
 ### [normalize.py](normalize.md) — Natural Language Processing Pipeline
 
-**Location:** `eggcalc/normalize.py` (3291 lines)
+**Location:** `eggcalc/normalize.py` (3567 lines)
 
 Converts natural language expressions into Python syntax through a multi-stage pipeline:
 
@@ -84,7 +84,7 @@ Unit parsing is spacing-tolerant, including compound units with spaces around `/
 
 ### [evaluator.py](evaluator.md) — Safe AST-Based Expression Evaluation
 
-**Location:** `eggcalc/evaluator.py` (2765 lines)
+**Location:** `eggcalc/evaluator.py` (2847 lines)
 
 Safely evaluates mathematical expressions using Python's AST module — **not `eval()`**. Provides full protection against code injection.
 
@@ -112,7 +112,7 @@ Safely evaluates mathematical expressions using Python's AST module — **not `e
 
 ### [units.py](units.md) — Unit Definitions and Conversions
 
-**Location:** `eggcalc/units.py` (2086 lines)
+**Location:** `eggcalc/units.py` (2090 lines)
 
 Comprehensive unit conversion system with 20+ unit categories and proper temperature offset handling.
 
@@ -141,7 +141,7 @@ Comprehensive unit conversion system with 20+ unit categories and proper tempera
 
 ### [CLI Entry Point](cli.md) — Command-Line Interface
 
-**Location:** `eggcalc/__main__.py` (18 lines)
+**Location:** `eggcalc/__main__.py` (19 lines)
 
 Entry point for `python -m eggcalc`. Delegates to `normalize.main()` which handles:
 - Single expression mode: `calc "5 + 3"`
@@ -276,7 +276,10 @@ eggcalc/exact/
     ├── identifier.py
     ├── identifier_inspect.py
     ├── glob.py
-    └── unicode_policy.py
+    ├── unicode_policy.py
+    ├── cargo.py
+    ├── version.py
+    └── inspect_prompt.py
 
 eggcalc/mcp/
     ├── schemas.py (no dependencies)
@@ -294,10 +297,10 @@ Each module has a dedicated architecture document for focused review:
 
 | Module | Document | Lines | Purpose |
 |--------|----------|-------|---------|
-| normalize.py | [normalize.md](normalize.md) | 3291 | NL → Python expression pipeline |
-| evaluator.py | [evaluator.md](evaluator.md) | 2765 | Safe AST-based evaluation |
-| units.py | [units.md](units.md) | 2086 | Unit definitions & conversions |
-| CLI | [cli.md](cli.md) | 18 | Command-line interface |
+| normalize.py | [normalize.md](normalize.md) | 3567 | NL → Python expression pipeline |
+| evaluator.py | [evaluator.md](evaluator.md) | 2847 | Safe AST-based evaluation |
+| units.py | [units.md](units.md) | 2090 | Unit definitions & conversions |
+| CLI | [cli.md](cli.md) | 19 | Command-line interface |
 
 ### exact/ — Unicode Text Primitives
 
@@ -305,22 +308,25 @@ The `exact/` package provides low-level deterministic text analysis tools.
 
 | Module | Document | Lines | Purpose |
 |--------|----------|-------|---------|
-| primitives.py | [primitives.md](primitives.md) | 702 | UTF-8, codepoints, normalization, invisibles |
-| unicode_tools.py | [unicode_tools.md](unicode_tools.md) | ~400 | Script detection, confusables |
-| measure.py | [measure.md](measure.md) | ~500 | Text metrics (words, lines, categories) |
-| diff.py | [diff.md](diff.md) | ~300 | String diffing algorithms |
-| validate.py | [validate.md](validate.md) | 2592 | JSON/bracket/regex validation |
-| synthesis.py | [synthesis.md](synthesis.md) | 1788 | Higher-level text analysis |
+| primitives.py | [primitives.md](primitives.md) | 733 | UTF-8, codepoints, normalization, invisibles |
+| unicode_tools.py | [unicode_tools.md](unicode_tools.md) | 310 | Script detection, confusables |
+| measure.py | [measure.md](measure.md) | 265 | Text metrics (words, lines, categories) |
+| diff.py | [diff.md](diff.md) | 258 | String diffing algorithms |
+| validate.py | [validate.md](validate.md) | 2887 | JSON/bracket/regex validation |
+| synthesis.py | [synthesis.md](synthesis.md) | 1935 | Higher-level text analysis |
 | confusables.py | [confusables.md](confusables.md) | ~6580 | Homoglyph identification (auto-generated data) |
+| cargo.py | — | 356 | Cargo.toml inspection |
+| version.py | — | 657 | Semver/PEP440 version parsing |
+| inspect_prompt.py | — | 560 | Prompt injection detection |
 | exact (overview) | [exact.md](exact.md) | — | Package-level overview |
 
 ### mcp/ — Model Context Protocol Server
 
 | Module | Document | Lines | Purpose |
 |--------|----------|-------|---------|
-| schemas.py | [mcp.md](mcp.md#schemaspy) | ~300 | Tool JSON schemas |
-| tools.py | [mcp.md](mcp.md#toolspy) | ~400 | Tool implementations |
-| server.py | [mcp.md](mcp.md#serverpy) | ~300 | stdio-based JSON-RPC server |
+| schemas.py | [mcp.md](mcp.md#schemaspy) | 3994 | Tool JSON schemas |
+| tools.py | [mcp.md](mcp.md#toolspy) | 5872 | Tool implementations |
+| server.py | [mcp.md](mcp.md#serverpy) | 1277 | stdio-based JSON-RPC server |
 
 ### Supporting Documentation
 
