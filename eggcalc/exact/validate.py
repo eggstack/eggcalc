@@ -10,7 +10,7 @@ import hashlib
 import json
 import re
 import unicodedata
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 MAX_INPUT_LENGTH = 100_000
 MAX_LIST_ITEMS = 10_000
@@ -676,7 +676,9 @@ def list_dedupe(
             compare_val = item
 
         if normalization != "raw":
-            compare_val = unicodedata.normalize(normalization, compare_val)
+            compare_val = unicodedata.normalize(
+                cast(Literal["NFC", "NFD", "NFKC", "NFKD"], normalization), compare_val
+            )
 
         if compare_val not in seen:
             seen.add(compare_val)
@@ -715,7 +717,7 @@ def list_sort(
         if casefold:
             s = s.casefold()
         if normalization != "raw":
-            s = unicodedata.normalize(normalization, s)
+            s = unicodedata.normalize(cast(Literal["NFC", "NFD", "NFKC", "NFKD"], normalization), s)
         return s
 
     return sorted(items, key=transform, reverse=reverse)
@@ -966,6 +968,7 @@ def regex_test(
     return RegexTestResult(
         valid_pattern=True,
         results=results,
+        error=None,
         flags_used=RegexFlags(
             ignore_case=ignore_case,
             multiline=multiline,

@@ -50,7 +50,7 @@ class UnitValue:
         # For int results, skip magnitude check — digit count is the correct
         # limit for arbitrary-precision ints (enforced by _check_result_size).
 
-    def __init__(self, value: float, unit: str | None = None) -> None:
+    def __init__(self, value: float | complex, unit: str | None = None) -> None:
         # Normalize complex values with zero imaginary part to float
         # to maintain hash contract (complex(5,0) == 5.0 but different hashes)
         if isinstance(value, complex) and value.imag == 0:
@@ -219,7 +219,7 @@ class UnitValue:
         else:
             if other == 0:
                 raise ZeroDivisionError("Cannot divide UnitValue by zero")
-            result = self.value // other
+            result = self.value // other  # type: ignore[operator]
             unit = self.unit
         UnitValue._check_overflow(result)
         return UnitValue(result, unit)
@@ -231,7 +231,7 @@ class UnitValue:
             raise ValueError(f"Cannot floor-divide a number by a unit value ('{self.unit}')")
         if self.value == 0:
             raise ZeroDivisionError("Cannot divide by zero UnitValue")
-        return UnitValue(other // self.value, None)
+        return UnitValue(other // self.value, None)  # type: ignore[operator]
 
     def __mod__(self, other: Numeric) -> UnitValue:
         if isinstance(other, UnitValue):
@@ -253,7 +253,7 @@ class UnitValue:
         else:
             if other == 0:
                 raise ZeroDivisionError("Cannot mod UnitValue by zero")
-            result = self.value % other
+            result = self.value % other  # type: ignore[operator]
             unit = self.unit
         UnitValue._check_overflow(result)
         return UnitValue(result, unit)
@@ -265,7 +265,7 @@ class UnitValue:
             raise ValueError(f"Cannot take modulo by a unit value ('{self.unit}')")
         if self.value == 0:
             raise ZeroDivisionError("Cannot mod by zero UnitValue")
-        return UnitValue(other % self.value, None)
+        return UnitValue(other % self.value, None)  # type: ignore[operator]
 
     def __rtruediv__(self, other: Numeric) -> UnitValue:
         if self.unit:
@@ -297,7 +297,7 @@ class UnitValue:
                 raise ValueError(f"Cannot raise unit '{self.unit}' to non-integer power")
         else:
             result = self.value**other
-            unit = self.unit
+            unit = self.unit  # type: ignore[assignment]
         UnitValue._check_overflow(result)
         return UnitValue(result, unit)
 
@@ -311,16 +311,16 @@ class UnitValue:
         return UnitValue(abs(self.value), self.unit)
 
     def __round__(self, ndigits: int = 0) -> UnitValue:
-        return UnitValue(round(self.value, ndigits), self.unit)
+        return UnitValue(round(self.value, ndigits), self.unit)  # type: ignore[arg-type]
 
     def __complex__(self) -> complex:
         return complex(self.value)
 
     def __int__(self) -> int:
-        return int(self.value)
+        return int(self.value)  # type: ignore[arg-type]
 
     def __float__(self) -> float:
-        return float(self.value)
+        return float(self.value)  # type: ignore[arg-type]
 
     def convert_to(self, target_unit: str) -> UnitValue:
         """Convert to a different unit of the same type."""
@@ -337,7 +337,7 @@ class UnitValue:
         cat = get_unit_category(self.unit)
         target_cat = get_unit_category(target_unit)
         if cat == "temperature" and target_cat == "temperature":
-            converted = convert_temperature(self.value, self.unit, target_unit)
+            converted = convert_temperature(self.value, self.unit, target_unit)  # type: ignore[arg-type]
             return UnitValue(converted, target_unit)
         if cat == "temperature" and target_cat != "temperature":
             raise ValueError(
@@ -1885,7 +1885,7 @@ def _parse_atom_signature(atom: str) -> tuple[tuple[str, int], ...] | None:
         else:
             exp = 1
         parts.append((base, exp))
-    return _merge_signatures(parts, ())
+    return _merge_signatures(tuple(parts), ())
 
 
 def _merge_signatures(

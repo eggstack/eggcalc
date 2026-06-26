@@ -368,7 +368,7 @@ def _levenshtein_distance(s1: str, s2: str) -> int:
     if len(s2) == 0:
         return len(s1)
 
-    prev_row = range(len(s2) + 1)
+    prev_row: list[int] = list(range(len(s2) + 1))
     for i, c1 in enumerate(s1):
         curr_row = [i + 1]
         for j, c2 in enumerate(s2):
@@ -1180,6 +1180,7 @@ def main() -> int:
             if not line:
                 continue
 
+            response: dict[str, Any] | None = None
             if len(line.encode('utf-8')) > MAX_REQUEST_BYTES:
                 response = {
                     "jsonrpc": "2.0",

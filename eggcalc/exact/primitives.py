@@ -10,13 +10,13 @@ All modules in exact/ build on these primitives.
 from __future__ import annotations
 
 import unicodedata
-from typing import NamedTuple, TypedDict
+from typing import Literal, NamedTuple, TypedDict, cast
 
 
 class CodepointInfo(NamedTuple):
     """Information about a single codepoint."""
 
-    index: int
+    idx: int
     char: str
     codepoint: str
     name: str
@@ -125,7 +125,7 @@ def normalize_unicode(s: str, form: str) -> str:
         raise ValueError(
             f"Unsupported normalization form: {form}. Use one of: {', '.join(valid_forms)}"
         )
-    return unicodedata.normalize(form_upper, s)
+    return unicodedata.normalize(cast(Literal["NFC", "NFD", "NFKC", "NFKD"], form_upper), s)
 
 
 def casefold_text(s: str) -> str:

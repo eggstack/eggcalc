@@ -244,7 +244,7 @@ def cargo_toml_inspect(
     for field in _CARGO_PACKAGE_FIELDS:
         val = pkg_raw.get(field)
         if val is not None:
-            package[field] = str(val)  # type: ignore[assignment]
+            package[field] = str(val)  # type: ignore[literal-required]
 
     if not package.get("name"):
         findings.append("Missing or empty 'name' in [package]")
@@ -315,7 +315,7 @@ def cargo_toml_inspect(
                 if form.get("git") and _detect_suspicious_name(str(dep_name)):
                     findings.append(f"Git dependency '{dep_name}' has suspicious name pattern")
 
-            dep_section[section_key] = parsed_deps  # type: ignore[assignment]
+            dep_section[section_key] = parsed_deps  # type: ignore[literal-required]
 
         # Target-specific dependencies: [target.'cfg(...)'.dependencies]
         target_section = parsed.get("target", {})

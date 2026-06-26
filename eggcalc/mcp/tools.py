@@ -14,7 +14,7 @@ import multiprocessing
 import re
 import threading
 from collections import deque
-from typing import Any
+from typing import Any, Literal, cast
 
 from .. import EvaluationError
 from ..evaluator import evaluate_with_timeout
@@ -536,7 +536,7 @@ def _sanitize_error(message: str) -> str:
 
 def _get_tool_tier(name: str) -> int:
     """Get the tier for a tool (1, 2, or 3)."""
-    return TOOL_SCHEMAS.get(name, {}).get("tier", 3)
+    return int(TOOL_SCHEMAS.get(name, {}).get("tier", 3))
 
 
 def _require_str(value: Any, name: str, tool: str) -> dict | None:
@@ -608,15 +608,18 @@ def _error_response(
     error: str,
     hints: list[str] | None = None,
     tool: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Create a standardized error envelope."""
-    return ErrorEnvelope(
-        ok=False,
-        tool=tool,
-        error_type=error_type,
-        error=_sanitize_error(error),
-        hints=[_sanitize_error(h) for h in (hints or [])],
-        warnings=[],
+    return cast(
+        dict[str, Any],
+        ErrorEnvelope(
+            ok=False,
+            tool=tool,
+            error_type=error_type,
+            error=_sanitize_error(error),
+            hints=[_sanitize_error(h) for h in (hints or [])],
+            warnings=[],
+        ),
     )
 
 
@@ -1346,15 +1349,17 @@ def validate_toml(text: str, detail: str = "normal") -> dict:
         )
 
     try:
-        result = _validate_toml_text(text)
+        full_result = _validate_toml_text(text)
 
         if detail == "summary":
-            result = {
-                "valid": result["valid"],
-                "error": result["error"],
+            result: dict[str, Any] = {
+                "valid": full_result["valid"],
+                "error": full_result["error"],
             }
         elif detail == "full":
-            pass
+            result = cast(dict[str, Any], full_result)
+        else:
+            result = cast(dict[str, Any], full_result)
 
         return _success_response(result, tool="validate_toml")
     except ValueError as e:
@@ -1419,7 +1424,7 @@ def json_compare(
         )
 
     try:
-        result = _json_compare(
+        full_result = _json_compare(
             a,
             b,
             ignore_object_order,
@@ -1431,14 +1436,16 @@ def json_compare(
         )
 
         if detail == "summary":
-            result = {
-                "equal": result["equal"],
-                "valid_json_a": result["valid_json_a"],
-                "valid_json_b": result["valid_json_b"],
-                "same_type": result["same_type"],
-                "diff_count": result["diff_count"],
-                "summary": result["summary"],
+            result: dict[str, Any] = {
+                "equal": full_result["equal"],
+                "valid_json_a": full_result["valid_json_a"],
+                "valid_json_b": full_result["valid_json_b"],
+                "same_type": full_result["same_type"],
+                "diff_count": full_result["diff_count"],
+                "summary": full_result["summary"],
             }
+        else:
+            result = cast(dict[str, Any], full_result)
 
         return _success_response(result, tool="json_compare")
     except ValueError as e:
@@ -1573,7 +1580,7 @@ def validate_regex(
 
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
-    proc: multiprocessing.Process | None = None
+    proc: Any = None
     # RAII permit for the spawn slot. Acquire (with timeout) returns a guard
     # whose __exit__ guarantees release even on exception, cancellation, or
     # early return. This replaces manual acquired/released flags and paired
@@ -1869,7 +1876,7 @@ def regex_finditer(
     # Run regex in a subprocess with timeout to prevent ReDoS from hanging server
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
-    proc: multiprocessing.Process | None = None
+    proc: Any = None
     # RAII permit: use _try_acquire_spawn_permit + context manager so that
     # cancellation or exceptions during the (blocking) spawn path or queue.get
     # cannot leak a semaphore count. The permit owns release.
@@ -2188,7 +2195,9 @@ def list_compare(
                 if trim:
                     result = result.strip()
                 if normalization != "raw":
-                    result = unicodedata.normalize(normalization, result)
+                    result = unicodedata.normalize(
+                        cast(Literal['NFC', 'NFD', 'NFKC', 'NFKD'], normalization), result
+                    )
                 if casefold:
                     result = result.casefold()
                 return result
@@ -2217,7 +2226,7 @@ def list_compare(
 
             equal_prefix_len = first_diff if first_diff is not None else len(a)
 
-            result = {
+            ordered_result: dict[str, Any] = {
                 "equal": equal,
                 "first_diff_index": first_diff,
                 "equal_prefix_length": equal_prefix_len,
@@ -2231,7 +2240,7 @@ def list_compare(
                 "near_matches": raw_result["near_matches"],
             }
         elif mode == "set":
-            result = {
+            ordered_result = {
                 "equal": equal,
                 "only_in_a": raw_result["only_in_a"],
                 "only_in_b": raw_result["only_in_b"],
@@ -2249,7 +2258,9 @@ def list_compare(
                 if normalization != "raw":
                     import unicodedata
 
-                    result = unicodedata.normalize(normalization, result)
+                    result = unicodedata.normalize(
+                        cast(Literal['NFC', 'NFD', 'NFKC', 'NFKD'], normalization), result
+                    )
                 if casefold:
                     result = result.casefold()
                 return result
@@ -2263,7 +2274,7 @@ def list_compare(
                 if delta != 0:
                     count_deltas[k] = delta
 
-            result = {
+            ordered_result = {
                 "equal": equal,
                 "count_deltas": count_deltas,
                 "missing_in_a": raw_result["only_in_b"],
@@ -2274,7 +2285,7 @@ def list_compare(
                 "only_in_b": raw_result["only_in_b"],
                 "near_matches": raw_result["near_matches"],
             }
-        return _success_response(result, tool="list_compare")
+        return _success_response(ordered_result, tool="list_compare")
     except Exception as e:
         return _error_response("internal_error", str(e), tool="list_compare")
 
@@ -2466,9 +2477,9 @@ def text_position(
                 "summary": result["summary"],
             }
         elif detail == "full":
-            summary_result = dict(result)
+            summary_result = cast(dict[str, Any], result)
         else:
-            summary_result = dict(result)
+            summary_result = cast(dict[str, Any], result)
 
         return _success_response(summary_result, tool="text_position")
     except Exception as e:
@@ -4076,7 +4087,7 @@ def dotenv_validate_mcp(
     # main process without this isolation.
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
-    proc: multiprocessing.Process | None = None
+    proc: Any = None
     # RAII permit for the spawn slot. Use the non-raising try variant so we
     # can return a clean error envelope on timeout without having taken a slot.
     permit = _try_acquire_spawn_permit()
@@ -4851,7 +4862,9 @@ def text_security_inspect(
         try:
             import unicodedata
 
-            normalized = unicodedata.normalize(normalize, text)
+            normalized = unicodedata.normalize(
+                cast(Literal['NFC', 'NFD', 'NFKC', 'NFKD'], normalize), text
+            )
             changed = normalized != text
             subresults["canonicalize_text"] = {"changed": changed, "form": normalize}
             if changed:
@@ -5193,7 +5206,7 @@ def edit_preflight(
     if all_findings:
         summary_parts.append(f"{len(all_findings)} finding(s)")
 
-    result: dict[str, Any] = {
+    output: dict[str, Any] = {
         "ok_to_apply": ok_to_apply,
         "mode": replacement_mode,
         "findings": all_findings,
@@ -5202,10 +5215,10 @@ def edit_preflight(
         "summary": "; ".join(summary_parts),
     }
     if subresults:
-        result["subresults"] = subresults
+        output["subresults"] = subresults
 
     return _success_response(
-        result,
+        output,
         tool="edit_preflight",
         findings=all_findings or None,
         machine_code=machine_code,
@@ -5351,7 +5364,7 @@ def command_preflight(
 
     summary = f"Command {verdict}" f" ({len(all_findings)} finding(s))"
 
-    result: dict[str, Any] = {
+    output: dict[str, Any] = {
         "verdict": verdict,
         "command": command,
         "platform": platform,
@@ -5361,12 +5374,12 @@ def command_preflight(
         "summary": summary,
     }
     if working_directory:
-        result["working_directory"] = working_directory
+        output["working_directory"] = working_directory
     if subresults:
-        result["subresults"] = subresults
+        output["subresults"] = subresults
 
     return _success_response(
-        result,
+        output,
         tool="command_preflight",
         findings=all_findings or None,
         machine_code=primary_code,
@@ -5659,7 +5672,7 @@ def config_preflight(
 
     summary = f"{detected_format} config: {verdict}" f" ({len(all_findings)} finding(s))"
 
-    result: dict[str, Any] = {
+    output: dict[str, Any] = {
         "valid": parse_ok,
         "verdict": verdict,
         "format": detected_format,
@@ -5668,10 +5681,10 @@ def config_preflight(
         "summary": summary,
     }
     if subresults:
-        result["subresults"] = subresults
+        output["subresults"] = subresults
 
     return _success_response(
-        result,
+        output,
         tool="config_preflight",
         findings=all_findings or None,
         machine_code=machine_code,
@@ -5840,7 +5853,7 @@ def structured_data_compare(
         "Equal" if equal else f"Different ({diff_count} diff(s), {len(all_findings)} finding(s))"
     )
 
-    result: dict[str, Any] = {
+    output: dict[str, Any] = {
         "equal": equal,
         "valid_a": valid_a,
         "valid_b": valid_b,
@@ -5849,10 +5862,10 @@ def structured_data_compare(
         "summary": summary,
     }
     if subresults:
-        result["subresults"] = subresults
+        output["subresults"] = subresults
 
     return _success_response(
-        result,
+        output,
         tool="structured_data_compare",
         findings=all_findings or None,
         machine_code=machine_code,

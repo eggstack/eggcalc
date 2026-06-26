@@ -32,6 +32,7 @@ from .measure import (
 from .measure import (
     word_metrics as _word_metrics,
 )
+from .primitives import InvisibleCharInfo
 from .primitives import casefold_text as _casefold_text
 from .primitives import (
     count_graphemes as _count_graphemes,
@@ -52,6 +53,7 @@ from .primitives import (
 from .primitives import (
     visible_repr as _visible_repr,
 )
+from .unicode_tools import ConfusableInfo, MixedScriptsResult
 from .unicode_tools import (
     detect_confusables as _detect_confusables,
 )
@@ -177,14 +179,14 @@ class InspectTextResult(TypedDict):
     """Complete text inspection result."""
 
     safe_repr: str
-    metrics: dict[str, Any]
+    metrics: MeasureTextResult
     normalization: dict[str, bool]
     normalization_diff: bool
     normals_repr: str | None
-    invisibles: list[dict]
-    bidi_controls: list[dict]
-    mixed_scripts: dict[str, Any]
-    confusables: list[dict]
+    invisibles: list[InvisibleCharInfo]
+    bidi_controls: list[InvisibleCharInfo]
+    mixed_scripts: MixedScriptsResult
+    confusables: list[ConfusableInfo]
     warnings: list[dict]
     limits_applied: list[str]
     normalize: str
@@ -435,8 +437,11 @@ def text_equal(
         "b_bytes_utf8": len(b_work.encode("utf-8")),
     }
 
-    first_difference = _first_diff(a_work, b_work)
-    if first_difference:
+    first_diff_raw = _first_diff(a_work, b_work)
+    first_difference: dict[str, Any] | None = (
+        dict(first_diff_raw) if first_diff_raw is not None else None
+    )
+    if first_difference is not None:
         first_difference["a_visible"] = _visible_repr(
             a_work[first_difference["a_index"] : first_difference["a_index"] + 1]
         )
@@ -561,6 +566,8 @@ def _truncate_diff_spans(
                         b_span=sp["b_span"],
                         a_text=sp["a_text"][:max_equal_context] + "...",
                         b_text=sp["b_text"][:max_equal_context] + "...",
+                        a_visible=sp["a_visible"],
+                        b_visible=sp["b_visible"],
                         a_codepoints=sp["a_codepoints"],
                         b_codepoints=sp["b_codepoints"],
                         note=f"(truncated from {len(sp['a_text'])} chars)",
@@ -794,8 +801,8 @@ def inspect_text(
     metrics = measure_text(text)
     all_invisibles = _find_invisibles(text)
 
-    bidi_controls: list[dict] = []
-    invisibles_truncated: list[dict] = []
+    bidi_controls: list[InvisibleCharInfo] = []
+    invisibles_truncated: list[InvisibleCharInfo] = []
     for inv in all_invisibles:
         if "BIDI" in inv.get("display", ""):
             bidi_controls.append(inv)
@@ -1002,6 +1009,7 @@ def count_chars(
             for byte_seq in set(text_bytes):
                 freq[chr(byte_seq)] = text_bytes.count(byte_seq)
             return freq
+        assert target_bytes is not None
         positions = [
             i
             for i in range(len(text_bytes))
@@ -1017,10 +1025,10 @@ def count_chars(
     elif count_mode == "grapheme":
         grapheme_text = list(text)
         if target is None:
-            freq: dict[str, int] = {}
+            freq_grapheme: dict[str, int] = {}
             for g in grapheme_text:
-                freq[g] = freq.get(g, 0) + 1
-            return freq
+                freq_grapheme[g] = freq_grapheme.get(g, 0) + 1
+            return freq_grapheme
         target_grapheme = list(target)[0] if target else None
         positions = [i for i, g in enumerate(grapheme_text) if g == target_grapheme]
         return CountCharsResult(
@@ -1048,10 +1056,10 @@ def count_chars(
         )
     else:
         if target is None:
-            freq: dict[str, int] = {}
+            freq_char: dict[str, int] = {}
             for char in text:
-                freq[char] = freq.get(char, 0) + 1
-            return freq
+                freq_char[char] = freq_char.get(char, 0) + 1
+            return freq_char
 
         positions = [i for i, c in enumerate(text) if c == target]
 
@@ -1258,6 +1266,8 @@ def text_window(
 
     if kind == "byte_offset":
         byte_offset = position.get("value", position.get("byte_offset"))
+        if not isinstance(byte_offset, int):
+            raise ValueError(f"Invalid byte offset: {byte_offset}")
         try:
             codepoint_index = _byte_to_cp(text, byte_offset)
         except ValueError as e:
@@ -1265,11 +1275,15 @@ def text_window(
 
     elif kind == "codepoint_index":
         codepoint_index = position.get("value", position.get("codepoint_index"))
+        if not isinstance(codepoint_index, int):
+            raise ValueError(f"Invalid codepoint index: {codepoint_index}")
         if codepoint_index < 0 or codepoint_index > len(text):
             raise ValueError(f"Codepoint index {codepoint_index} out of range (0-{len(text)})")
 
     elif kind == "grapheme_index":
         grapheme_index = position.get("value", position.get("grapheme_index"))
+        if not isinstance(grapheme_index, int):
+            raise ValueError(f"Invalid grapheme index: {grapheme_index}")
         grapheme_count = _count_graphemes(text)
         if grapheme_index < 0 or grapheme_index > grapheme_count:
             raise ValueError(f"Grapheme index {grapheme_index} out of range (0-{grapheme_count})")
@@ -1318,6 +1332,8 @@ def text_window(
 
     else:
         raise ValueError(f"Unknown position kind: {kind}")
+
+    assert codepoint_index is not None
 
     line_num, column_num = _cp_to_line_col(text, codepoint_index, 1, 1)
 

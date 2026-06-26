@@ -98,6 +98,7 @@ ignore = [
     "C414",  # unnecessary list() call within sorted()
     "C416",  # unnecessary list/dict comprehension
     "F841",  # local variable assigned but never used
+    "W293",  # blank line contains whitespace (intentional in patch fixtures)
 ]
 
 [tool.mypy]

@@ -707,7 +707,7 @@ def _is_tens(value: int) -> bool:
 def convert_numbers(number_info: list, patterns: Mapping[str, Pattern[str]]) -> str:
     """Convert a token that may contain number words to a numeric expression."""
     if number_info[1]["bool"]:
-        return number_info[0]
+        return str(number_info[0])
 
     split_tokens = number_info[0].split("@")
     number_parts = []
@@ -728,10 +728,10 @@ def convert_numbers(number_info: list, patterns: Mapping[str, Pattern[str]]) -> 
                     return str(result.value)
                 return str(result)
             except EvaluationError:
-                return number_info[0]
-        return number_info[0]
+                return str(number_info[0])
+        return str(number_info[0])
 
-    return number_info[0]
+    return str(number_info[0])
 
 
 def apply_math_functions(
@@ -769,7 +769,7 @@ def apply_math_functions(
             or prev.lower() in UNIT_ALIASES
         )
 
-    output_tokens = []
+    output_tokens: list[str] = []
     i = 0
     while i < len(tokens):
         token = tokens[i]
@@ -1044,10 +1044,10 @@ def _finish_number_group(group: list, patterns: Mapping[str, Pattern[str]]) -> l
         return []
 
     # Only use combine_number_parts for real numbers (int or float), not complex
-    def is_real(n) -> bool:
+    def is_real(n: Any) -> bool:
         return isinstance(n, (int, float)) and not isinstance(n, complex)
 
-    def is_compound_real(n) -> bool:
+    def is_compound_real(n: Any) -> bool:
         return is_real(n) and (n >= 100 or (20 <= n < 100))
 
     has_compound = any(is_compound_real(n) for n in numbers_only)
@@ -1759,7 +1759,7 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # so "3(4+5)" parses as "3*(4+5)" = 27 instead of a syntax error.
     # Do not split function names ending in digits, such as log10(100).
     def _implicit_digit_paren(m: re.Match) -> str:
-        token = m.group(1)
+        token = str(m.group(1))
         if token in operators["functions"]:
             return token
         return token + "*"
@@ -2068,7 +2068,7 @@ def normalize(expression: str, operators: dict, patterns: Mapping[str, Pattern[s
     # Preserve whitespace inside parentheses to separate function args
     # Also insert * between function names and following digits (e.g., "sqrt 144" -> "sqrt*144")
     # And between a digit/`) and a function name (e.g., "5 sin" -> "5*sin", "2 sqrt 9" -> "2*sqrt 9")
-    result = []
+    result: list[str] = []
     depth = 0
     prev_was_func_end = False
     i = 0
@@ -2281,15 +2281,15 @@ def _join_number_parts(expression: str) -> str:
 
         suffixes: list[str] = []
         while rest:
-            match = None
+            op_match: str | None = None
             for op in ("**", "//", "<<", ">>", "+", "-", "*", "/", "%", "&", "|", "^"):
                 if rest.endswith(op) and len(rest) > len(op):
-                    match = op
+                    op_match = op
                     break
-            if match is None:
+            if op_match is None:
                 break
-            suffixes.append(match)
-            rest = rest[: -len(match)]
+            suffixes.append(op_match)
+            rest = rest[: -len(op_match)]
 
         if rest:
             parts.append(rest)
@@ -2912,7 +2912,7 @@ def _run_repl(show_expression: bool = True) -> int:
 
         def _save_history() -> None:
             try:
-                readline.write_history_file(history_path)  # type: ignore[union-attr]
+                readline.write_history_file(history_path)
                 os.chmod(history_path, 0o600)
             except OSError:
                 pass
@@ -3074,7 +3074,7 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
             return 1
         text = " ".join(parts[1:])
         try:
-            result = inspect_text(text, include_codepoints=False, include_confusables=True)
+            result: Any = inspect_text(text, include_codepoints=False, include_confusables=True)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1

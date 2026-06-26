@@ -10,7 +10,7 @@ from __future__ import annotations
 import keyword
 import re
 import unicodedata
-from typing import TypedDict
+from typing import Literal, TypedDict, cast
 
 from .diff import levenshtein_distance
 from .unicode_tools import detect_confusables
@@ -233,7 +233,9 @@ def identifier_inspect(
     for raw_id in identifiers:
         normalized = raw_id
         if normalization != "raw":
-            normalized = unicodedata.normalize(normalization, raw_id)
+            normalized = unicodedata.normalize(
+                cast(Literal["NFC", "NFD", "NFKC", "NFKD"], normalization), raw_id
+            )
 
         scripts = _get_scripts(normalized)
         has_invisibles = _has_invisibles(raw_id)
@@ -476,49 +478,6 @@ _RUST_KEYWORDS: frozenset[str] = frozenset(
         "use",
         "where",
         "while",
-    }
-)
-
-_JS_KEYWORDS: frozenset[str] = frozenset(
-    {
-        "break",
-        "case",
-        "catch",
-        "const",
-        "continue",
-        "debugger",
-        "default",
-        "delete",
-        "do",
-        "else",
-        "enum",
-        "export",
-        "extends",
-        "false",
-        "finally",
-        "for",
-        "function",
-        "if",
-        "import",
-        "in",
-        "instanceof",
-        "let",
-        "new",
-        "null",
-        "return",
-        "static",
-        "super",
-        "switch",
-        "this",
-        "throw",
-        "true",
-        "try",
-        "typeof",
-        "var",
-        "void",
-        "while",
-        "with",
-        "yield",
     }
 )
 

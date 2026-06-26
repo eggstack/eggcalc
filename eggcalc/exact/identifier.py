@@ -158,7 +158,7 @@ def _classify(text: str) -> str:
 
 
 def _to_snake_case(text: str) -> str:
-    result = []
+    result: list[str] = []
     prev_upper = False
     prev_underscore = False
     for i, char in enumerate(text):

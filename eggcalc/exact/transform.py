@@ -13,14 +13,14 @@ import json
 import re
 import unicodedata
 import zlib
-from typing import TypedDict
+from typing import Literal, TypedDict, cast
 
 try:
     from urllib.parse import quote as _url_quote
     from urllib.parse import unquote as _url_unquote
 except ImportError:
-    _url_quote = None
-    _url_unquote = None
+    _url_quote = None  # type: ignore[assignment]
+    _url_unquote = None  # type: ignore[assignment]
 
 
 class EscapeTextResult(TypedDict):
@@ -469,13 +469,13 @@ def _unescape_json_string(text: str) -> str:
     if not text.startswith('"') or not text.endswith('"'):
         raise ValueError("Invalid JSON string literal: must be wrapped in double quotes")
     parsed = json.loads(text)
-    return parsed
+    return cast(str, parsed)
 
 
 def _unescape_python_string(text: str) -> str:
     """Unescape Python string literal using ast.literal_eval."""
     try:
-        return ast.literal_eval(text)
+        return cast(str, ast.literal_eval(text))
     except (ValueError, SyntaxError) as e:
         raise ValueError(f"Invalid Python string literal: {e}")
 
@@ -483,7 +483,7 @@ def _unescape_python_string(text: str) -> str:
 def _unescape_unicode_escape(text: str) -> str:
     """Unescape Unicode escape sequences (\\\\uXXXX, \\\\UXXXXXXXX)."""
 
-    def replace_unicode(match):
+    def replace_unicode(match: re.Match[str]) -> str:
         code = match.group(1)
         return chr(int(code, 16))
 
@@ -669,7 +669,9 @@ def text_fingerprint(
     canonical = text
 
     if unicode != "raw":
-        canonical = unicodedata.normalize(unicode, canonical)
+        canonical = unicodedata.normalize(
+            cast(Literal["NFC", "NFD", "NFKC", "NFKD"], unicode), canonical
+        )
 
     if newline == "LF":
         canonical = canonical.replace("\r\n", "\n").replace("\r", "\n")

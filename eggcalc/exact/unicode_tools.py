@@ -97,7 +97,7 @@ def _get_script_heuristic(char: str) -> str:
     """
     # Try unicodedata.script() first (Python 3.14+)
     try:
-        script = unicodedata.script(char)
+        script: str = unicodedata.script(char)  # type: ignore[attr-defined]
         if script != "Unknown":
             return script
     except (AttributeError, ValueError):

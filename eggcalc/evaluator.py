@@ -19,7 +19,7 @@ import random
 import threading
 from collections import OrderedDict
 from queue import Empty as _QueueEmpty
-from typing import Any
+from typing import Any, cast
 
 from .units import (
     UNIT_ALIASES,
@@ -225,10 +225,10 @@ def _check_constant_unit_collisions() -> None:
 
     if getattr(warnings, "_eggcalc_collision_warned", False):
         return
-    warnings._eggcalc_collision_warned = True
+    warnings._eggcalc_collision_warned = True  # type: ignore[attr-defined]
     # In assembled single-file mode, UNIT_ALIASES is inlined at the top.
     # In package mode, _IS_ASSEMBLED is False and we use the imported name.
-    aliases = UNIT_ALIASES  # type: ignore[name-defined]
+    aliases = UNIT_ALIASES
     collisions: list[str] = []
     for c in Evaluator.CONSTANTS:
         if c in aliases:
@@ -503,7 +503,7 @@ async def evaluate_async(expression: str) -> Any:
     """
     import asyncio
 
-    def _eval() -> float:
+    def _eval() -> Any:
         return evaluate_raw(expression)
 
     loop = asyncio.get_running_loop()
@@ -580,7 +580,7 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
     # MAX_RESULT_DIGITS which is the correct limit for arbitrary-precision ints.
     if not isinstance(result, int) and abs(result) > MAX_RESULT_VALUE:
         raise EvaluationError("Result too large")
-    return result
+    return cast(float | int | complex, result)
 
 
 def _require_int(value: Any, name: str) -> int:
@@ -746,7 +746,7 @@ def _convert(value: Any, to_unit: str | Any) -> Any:
             # Check for temperature conversions (special handling needed)
             cat = get_unit_category(value.unit) if value.unit else None
             if cat == "temperature" and value.unit:
-                converted_val = convert_temperature(value.value, value.unit, to_unit)
+                converted_val = convert_temperature(cast(float, value.value), value.unit, to_unit)
                 return UnitValue(converted_val, to_unit)
             return value.convert_to(to_unit)
         # If it's just a number without units, assume it's a dimensionless value
@@ -1195,8 +1195,12 @@ def _hypot(*args: float) -> float:
 
 
 def _complex_aware(
-    real_func, cmplx_func=None, *, use_complex_for_negative=False, use_complex_for_abs_gt_one=False
-):
+    real_func: Any,
+    cmplx_func: Any = None,
+    *,
+    use_complex_for_negative: bool = False,
+    use_complex_for_abs_gt_one: bool = False,
+) -> Any:
     """Create a function that handles both real and complex inputs.
 
     Args:
@@ -1211,7 +1215,7 @@ def _complex_aware(
     if cmplx_func is None:
         cmplx_func = getattr(cmath, real_func.__name__, real_func)
 
-    def wrapper(x, *args):
+    def wrapper(x: Any, *args: Any) -> Any:
         if isinstance(x, complex):
             return cmplx_func(x, *args)
         if use_complex_for_negative and x < 0:
@@ -1232,7 +1236,7 @@ _log10_complex = _complex_aware(math.log10, cmath.log10, use_complex_for_negativ
 _log2_complex = _complex_aware(math.log2, lambda x: cmath.log(x, 2), use_complex_for_negative=True)
 
 
-def _safe_log(*args):
+def _safe_log(*args: Any) -> Any:
     try:
         return _log_complex(*args)
     except ValueError:
@@ -1241,7 +1245,7 @@ def _safe_log(*args):
         raise
 
 
-def _safe_log10(*args):
+def _safe_log10(*args: Any) -> Any:
     try:
         return _log10_complex(*args)
     except ValueError:
@@ -1250,7 +1254,7 @@ def _safe_log10(*args):
         raise
 
 
-def _safe_log2(*args):
+def _safe_log2(*args: Any) -> Any:
     try:
         return _log2_complex(*args)
     except ValueError:
@@ -1275,7 +1279,7 @@ _tanh = _complex_aware(math.tanh, cmath.tanh)
 _asinh = _complex_aware(math.asinh, cmath.asinh)
 
 
-def _acosh(x):
+def _acosh(x: Any) -> Any:
     """acosh that handles complex numbers for out-of-domain real inputs."""
     if isinstance(x, complex):
         return cmath.acosh(x)
@@ -1288,7 +1292,7 @@ _atanh = _complex_aware(math.atanh, cmath.atanh, use_complex_for_abs_gt_one=True
 
 
 def _cbrt_impl(x: float) -> float:
-    return math.cbrt(x)
+    return math.cbrt(x)  # type: ignore[no-any-return,attr-defined]
 
 
 def _cbrt_complex(x: complex) -> complex:
@@ -1465,7 +1469,7 @@ class Memory:
 
 
 # Global memory instance (default evaluator; replaced by per-instance below)
-_memory: Memory = Memory()  # type: ignore[assignment]
+_memory: Memory = Memory()
 
 
 def memory_store(value: float, register: str = "M") -> float:
@@ -1959,8 +1963,9 @@ class Evaluator(ast.NodeVisitor):
         """
         import sys
 
+        _units: Any = None
         try:
-            from . import units as _units  # type: ignore[import-not-found]
+            from . import units as _units
         except ImportError:
             # Assembled single-file mode: try sys.modules
             if "." in __name__:
@@ -2021,6 +2026,8 @@ class Evaluator(ast.NodeVisitor):
                             pass
             # Return plain string as-is (for function arguments like setvar("x", 10))
             return node.value
+        if isinstance(node.value, bytes):
+            raise EvaluationError(f"Unsupported constant: {node.value!r}")
         raise EvaluationError(f"Unsupported constant: '{node.value}'")
 
     def visit_Name(self, node: ast.Name) -> Any:
@@ -2099,7 +2106,7 @@ class Evaluator(ast.NodeVisitor):
             right_cat = get_unit_category(right_unit)
             if left_cat == "temperature" and right_cat == "temperature":
                 try:
-                    right_val = convert_temperature(right_val, right_unit, left_unit)
+                    right_val = convert_temperature(cast(float, right_val), right_unit, left_unit)
                     right_unit = left_unit
                 except Exception as e:
                     raise EvaluationError(
@@ -2323,34 +2330,34 @@ class Evaluator(ast.NodeVisitor):
 
         # Special handling for temp function to preserve unit names
         if func_name == "temp":
-            args = []
+            temp_args: list[Any] = []
             for i, arg in enumerate(node.args):
                 result = self.visit(arg)
                 if i > 0 and isinstance(result, UnitValue):
-                    args.append(result.unit or "K")
+                    temp_args.append(result.unit or "K")
                 elif isinstance(result, str):
-                    args.append(result)
+                    temp_args.append(result)
                 else:
-                    args.append(result)
+                    temp_args.append(result)
             try:
-                return self.FUNCTIONS[func_name](*args)
+                return self.FUNCTIONS[func_name](*temp_args)
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 
         # Special handling for convert function to preserve UnitValue arguments
         if func_name == "convert":
-            args = []
+            convert_args: list[Any] = []
             for i, arg in enumerate(node.args):
                 result = self.visit(arg)
                 # Pass the full UnitValue, not just the value
-                args.append(result)
+                convert_args.append(result)
             try:
-                return self.FUNCTIONS[func_name](*args)
+                return self.FUNCTIONS[func_name](*convert_args)
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 
         # Extract values from arguments, handling UnitValues
-        args = []
+        args: list[Any] = []
         for arg in node.args:
             result = self.visit(arg)
             # Reject UnitValue-with-unit for functions that semantically
@@ -2394,13 +2401,14 @@ class Evaluator(ast.NodeVisitor):
             if node_type is ast.Attribute:
                 # Only allow attribute access on math module and
                 # real/imag/conjugate on complex numbers
-                if isinstance(node.value, ast.Name) and node.value.id == "math":
+                attr_node = cast(ast.Attribute, node)
+                if isinstance(attr_node.value, ast.Name) and attr_node.value.id == "math":
                     # Allow math.* - validated at call time
                     pass
-                elif node.attr in ("real", "imag", "conjugate"):
+                elif attr_node.attr in ("real", "imag", "conjugate"):
                     pass
                 else:
-                    raise EvaluationError(f"Attribute access '{node.attr}' is not allowed")
+                    raise EvaluationError(f"Attribute access '{attr_node.attr}' is not allowed")
             return
 
         # Explicit forbidden types with helpful error messages
@@ -2604,7 +2612,7 @@ def evaluate_with_timeout(
         allow_side_effects = _default_evaluator._allow_side_effects
     ctx = multiprocessing.get_context("spawn")
     queue: multiprocessing.Queue = ctx.Queue()
-    proc: multiprocessing.Process | None = None
+    proc: Any = None
     # RAII permit for the eval spawn semaphore. Acquire (with timeout) or raise.
     # The permit's __exit__ guarantees release even if the worker is cancelled,
     # panics, or returns early before we reach the end of the block.
@@ -2788,7 +2796,7 @@ class EggCalcApp:
         """
         import asyncio
 
-        def _eval() -> float:
+        def _eval() -> Any:
             return self.calculate(expression)
 
         loop = asyncio.get_running_loop()

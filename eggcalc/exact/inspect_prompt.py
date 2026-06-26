@@ -412,13 +412,13 @@ def _build_summary(findings: list[PromptInspectionFinding], risk_score: int) -> 
     if not findings:
         return "No red flags detected in the input text."
 
-    codes = {}
+    codes: dict[str, int] = {}
     for f in findings:
         code = f.get("code", "UNKNOWN")
         codes[code] = codes.get(code, 0) + 1
 
     parts = [f"{count} {code}" for code, count in sorted(codes.items())]
-    severity_counts = {}
+    severity_counts: dict[str, int] = {}
     for f in findings:
         sev = f.get("severity", "info")
         severity_counts[sev] = severity_counts.get(sev, 0) + 1

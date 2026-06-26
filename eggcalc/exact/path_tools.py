@@ -101,7 +101,7 @@ def _split_windows_components(path: str) -> tuple[list[str], str | None]:
         return [], None
 
     if len(path) >= 2 and path[1] == ":":
-        root = path[:2]
+        root: str | None = path[:2]
         rest = path[2:]
         if rest:
             parts = re.split(r"[/\\]", rest)
