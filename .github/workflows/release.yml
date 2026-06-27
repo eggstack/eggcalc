@@ -67,7 +67,7 @@ jobs:
           path: dist/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@9d8a8e365a39549795b2c3fcbffba3f1d3e7c7d4
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
