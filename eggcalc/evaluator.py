@@ -16,6 +16,7 @@ import math
 import multiprocessing
 import os
 import random
+import re
 import threading
 from collections import OrderedDict
 from queue import Empty as _QueueEmpty
@@ -435,12 +436,9 @@ def _evict_until_under_cap() -> None:
 def _cached_normalize_and_evaluate(expression: str) -> Any:
     """Cache for normalized and evaluated expressions."""
     global _cache_bytes
-    # Bypass the cache for non-deterministic expressions so that repeated
-    # calls (e.g. random(), randint) don't return stale results. Match the
-    # function name only when followed by '(' so we don't false-positive
-    # on the word "random" inside a larger identifier or comment.
-    lowered = expression.lower()
-    if any(f"{name}(" in lowered for name in _RANDOM_FUNCTIONS):
+    # Bypass the cache for non-deterministic or stateful expressions so
+    # repeated calls execute instead of returning stale results.
+    if _expression_bypasses_cache(expression):
         return _normalize_and_evaluate_uncached(expression)
     with _cache_lock:
         if expression in _cache:
@@ -478,6 +476,16 @@ def _normalize_and_evaluate_uncached(expression: str) -> Any:
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
     return _default_evaluator.evaluate(normalized)
+
+
+def _expression_bypasses_cache(expression: str) -> bool:
+    """Return True for expressions whose calls must execute every time."""
+    uncacheable = _RANDOM_FUNCTIONS | _SIDE_EFFECT_FUNCTIONS
+    return any(
+        re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}\s*\(", expression, re.IGNORECASE)
+        is not None
+        for name in uncacheable
+    )
 
 
 def evaluate_cached(expression: str) -> Any:
@@ -2009,6 +2017,8 @@ class Evaluator(ast.NodeVisitor):
 
     def visit_Constant(self, node: ast.Constant) -> Any:
         """Visit a constant node."""
+        if isinstance(node.value, bool):
+            raise EvaluationError("Boolean literals are not supported")
         if isinstance(node.value, (int, float, complex)):
             return node.value
         if isinstance(node.value, str):
@@ -2769,16 +2779,20 @@ class EggCalcApp:
         Raises:
             EvaluationError: If expression is invalid
         """
-        if self._cache is not None:
+        use_cache = self._cache is not None and not _expression_bypasses_cache(expression)
+
+        if use_cache:
             with self._lock:
+                assert self._cache is not None
                 if expression in self._cache:
                     self._cache.move_to_end(expression)
                     return self._cache[expression]
 
         result = self._evaluate_internal(expression)
 
-        if self._cache is not None:
+        if use_cache:
             with self._lock:
+                assert self._cache is not None
                 if len(self._cache) >= self._cache_max_size:
                     self._cache.popitem(last=False)
                 self._cache[expression] = result

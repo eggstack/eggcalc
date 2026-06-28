@@ -335,6 +335,23 @@ class TestSecurityFuzz:
             with pytest.raises(EvaluationError):
                 evaluate(test_input)
 
+    def test_boolean_literals_blocked(self):
+        """Test that bool constants cannot be used as numeric values."""
+        from eggcalc import EvaluationError, evaluate
+
+        bool_inputs = [
+            "True",
+            "False",
+            "True + 1",
+            "~True",
+            "2**True",
+            "True*m",
+        ]
+
+        for test_input in bool_inputs:
+            with pytest.raises(EvaluationError):
+                evaluate(test_input)
+
     def test_subscription_blocked(self):
         """Test that subscripting is blocked."""
         from eggcalc import EvaluationError, evaluate

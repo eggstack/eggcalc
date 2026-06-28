@@ -342,6 +342,16 @@ class TestEggCalcApp:
         assert app.cache_size == 1
         assert self._get_value(result1) == self._get_value(result2)
 
+    def test_cache_bypasses_side_effects(self):
+        """Stateful memory calls should execute on repeated calls."""
+        from eggcalc import EggCalcApp
+
+        app = EggCalcApp(cache_size=10)
+
+        assert app.calculate("Mplus(1)") == 1
+        assert app.calculate("Mplus(1)") == 2
+        assert app.cache_size == 0
+
     def test_cache_clear(self):
         """Test cache clearing."""
         from eggcalc import EggCalcApp
@@ -485,6 +495,18 @@ class TestCaching:
 
         result = evaluate_cached("five plus three")
         assert self._get_value(result) == 8
+
+    def test_evaluate_cached_bypasses_side_effects(self):
+        """Stateful default-evaluator calls should execute on repeated calls."""
+        from eggcalc import evaluate_cached, memory_clear, memory_recall
+
+        memory_clear()
+        try:
+            assert evaluate_cached("Mplus(1)") == 1
+            assert evaluate_cached("Mplus(1)") == 2
+            assert memory_recall() == 2
+        finally:
+            memory_clear()
 
 
 class TestTimeout:
