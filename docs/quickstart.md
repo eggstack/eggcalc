@@ -86,9 +86,9 @@ calc "5 * planck"
 | Option | Description |
 |--------|-------------|
 | `-e` | Quiet mode, output result only |
-| `-s` | Show expression in output (reserved for future use) |
+| `-s` | Accepted for compatibility; plain output remains result-only |
 | `-q` | Suppress expression in output |
-| `--json` | Output as JSON |
+| `--json` | Output result and normalized expression as JSON |
 | `-i` | Interactive REPL mode |
 
 ### Interactive Mode

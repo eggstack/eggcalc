@@ -296,11 +296,10 @@ class TestCliVerboseFlag:
     """Test --verbose flag."""
 
     def test_cli_verbose_flag(self):
-        """--verbose shows expression in output."""
+        """--verbose is accepted but plain output remains result-only."""
         result = _run_cli("--verbose", "-e", "5+3")
         assert result.returncode == 0
-        output = result.stdout
-        assert "8" in output
+        assert result.stdout == "8\n"
 
 
 class TestCliJsonFlag:
@@ -321,6 +320,7 @@ class TestCliJsonFlag:
         assert result.returncode == 0
         data = json.loads(result.stdout)
         assert data["result"] == "8"
+        assert data["expression"] == "5+3"
 
 
 class TestCliInteractiveFlag:

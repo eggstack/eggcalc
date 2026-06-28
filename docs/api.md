@@ -42,7 +42,7 @@ result = evaluate("10")       # 10
 **Does NOT work with:**
 - Natural language: `evaluate("five plus three")` → `EvaluationError`
 - Spaces: `evaluate("5 + 3")` → 8 (works but wasteful, use evaluate_raw)
-- Units attached: `evaluate("30m")` → May not parse correctly
+- Units attached: `evaluate("30m")` → `EvaluationError`
 
 ### `evaluate_raw(expression: str) -> Any`
 

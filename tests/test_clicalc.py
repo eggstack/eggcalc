@@ -238,6 +238,11 @@ class TestUnitValue:
         uv = UnitValue(5, "m")
         assert repr(uv) == "5 m"
 
+    def test_repr_hides_float_noise(self):
+        """Unit display should not expose binary floating-point artifacts."""
+        uv = UnitValue(60.480000000000004, "m")
+        assert repr(uv) == "60.48 m"
+
     def test_addition_same_unit(self):
         """Test adding same units."""
         uv1 = UnitValue(5, "m")

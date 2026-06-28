@@ -308,7 +308,7 @@ result = app.calculate("five plus two")
 When expressions contain units, evaluation returns `UnitValue` objects:
 
 ```python
-result = evaluate("30m + 100ft")
+result = evaluate_raw("30m + 100ft")
 # → UnitValue(60.48, "m")
 
 result.value      # → 60.48

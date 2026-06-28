@@ -105,8 +105,8 @@ calc -i
 | `-v`, `--version` | Show version information |
 | `-e`, `--expression` | Evaluate a single expression (quiet mode by default) |
 | `-q`, `--quiet` | Suppress expression in output |
-| `-s`, `--show` | Show expression in output (currently unused, reserved for future use) |
-| `--json` | Output result as JSON |
+| `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
+| `--json` | Output result and normalized expression as JSON |
 | `-i`, `--interactive` | Start interactive REPL mode |
 | `--mcp` | Run as MCP server for math, text, and validation tools |
 

@@ -21,11 +21,11 @@ python -m eggcalc "five plus two"
 | `-v`, `--version` | Show version information |
 | `-e`, `--expression` | Evaluate single expression (quiet mode) |
 | `-q`, `--quiet` | Suppress expression in output |
-| `-s`, `--show` | Show expression in output |
+| `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
 | `--json` | Output result as JSON |
 | `-i`, `--interactive` | Start interactive REPL mode |
 | `--mcp` | Run as MCP server for exact text tools |
-| `--verbose` | Show expression in output |
+| `--verbose` | Accepted for compatibility; plain output remains result-only |
 
 ## Text Commands
 
@@ -125,4 +125,4 @@ Errors are printed to stderr with user-friendly messages:
 - `Evaluation error: ...`
 - `Error: ...`
 
-Verbose mode (`--verbose`) shows expression in output.
+`--verbose` and `--show` are accepted for compatibility, but plain output remains result-only.

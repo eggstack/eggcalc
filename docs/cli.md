@@ -36,8 +36,8 @@ When you pipe input, the same full pipeline is used.
 | `-v`, `--version` | Show version information |
 | `-e`, `--expression` | Evaluate a single expression (quiet mode by default) |
 | `-q`, `--quiet` | Suppress expression in output (alias for `-e`) |
-| `-s`, `--show` | Show expression in output (reserved for future use) |
-| `--json` | Output result as JSON with `result` and `expression` fields |
+| `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
+| `--json` | Output result and normalized expression as JSON |
 | `-i`, `--interactive` | Start interactive REPL mode |
 | `--mcp` | Run as MCP server for math, text, and validation tools |
 
@@ -45,7 +45,7 @@ When you pipe input, the same full pipeline is used.
 
 **`-e` vs `-q`**: Both produce quiet output, but `-e` explicitly marks the input as an expression to evaluate. Use `-e` when piping or providing a single expression.
 
-**`-s` (show)**: Reserved for future use. Currently, output is always the result only.
+**`-s` (show)**: Accepted for compatibility. Plain output is always the result only.
 
 **`--json`**: Useful for programmatic consumption:
 
@@ -142,15 +142,7 @@ calc "x = 5; x * 2"
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CLICALC_MAX_INPUT_LENGTH` | Override max input length | 10000 |
-| `CLICALC_CACHE_SIZE` | Set default cache size | 1024 |
-
-```bash
-export CLICALC_MAX_INPUT_LENGTH=50000
-calc "long expression..."
-```
+The CLI does not expose environment variable overrides for calculator input length or cache size. MCP mode reads `EGGCALC_MCP_PROFILE` and `EGGCALC_MCP_SCHEMA_DETAIL`; see [MCP Server](mcp.md) for those options.
 
 ## Examples
 

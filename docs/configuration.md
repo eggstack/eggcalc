@@ -108,15 +108,7 @@ CUSTOM_TEMP_CONVERSIONS = {
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CLICALC_MAX_INPUT_LENGTH` | Max input length | 10000 |
-| `CLICALC_CACHE_SIZE` | Default cache size | 1024 |
-
-```bash
-export CLICALC_MAX_INPUT_LENGTH=50000
-calc "long expression..."
-```
+eggcalc does not read environment variables for calculator input length or cache size. MCP server mode supports `EGGCALC_MCP_PROFILE` and `EGGCALC_MCP_SCHEMA_DETAIL`; see [MCP Server](mcp.md) for those settings.
 
 ## Python Configuration
 

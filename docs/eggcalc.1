@@ -46,7 +46,7 @@ Suppress the expression in output, showing only the numeric result.
 
 .TP
 \fB\-s\fR, \fB--show\fR
-Reserved for future use.
+Accepted for compatibility. Plain output remains result-only.
 
 .TP
 \fB--json\fR
@@ -595,13 +595,8 @@ All trig functions handle complex arguments.
 
 .SH ENVIRONMENT VARIABLES
 
-.TP
-\fBEGGCALC_MAX_INPUT_LENGTH\fR
-Override maximum input length (default: 10000 characters).
-
-.TP
-\fBEGGCALC_CACHE_SIZE\fR
-Set default LRU cache size (default: 1024).
+.PP
+The CLI does not expose environment variable overrides for calculator input length or cache size. MCP mode reads \fBEGGCALC_MCP_PROFILE\fR and \fBEGGCALC_MCP_SCHEMA_DETAIL\fR.
 
 .SH EXIT STATUS
 

@@ -2915,7 +2915,7 @@ def run(
         if output_format == "json":
             import json
 
-            print(json.dumps({"expression": original, "result": display}))
+            print(json.dumps({"expression": joined, "result": display}))
         else:
             print(display)
         return result, 0
@@ -3498,7 +3498,11 @@ def main() -> int:
     )
     parser.add_argument("-v", "--version", action="store_true", help="Show version information")
     parser.add_argument("-q", "--quiet", action="store_true", help="Suppress expression in output")
-    parser.add_argument("--verbose", action="store_true", help="Show expression in output")
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Accepted for compatibility; plain output remains result-only",
+    )
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
     parser.add_argument(
         "-e",
@@ -3514,7 +3518,7 @@ def main() -> int:
         "-s",
         "--show",
         action="store_true",
-        help="Show expression in output (default for interactive)",
+        help="Accepted for compatibility; plain output remains result-only",
     )
     parser.add_argument("--mcp", action="store_true", help="Run as MCP server for exact text tools")
     parser.add_argument(

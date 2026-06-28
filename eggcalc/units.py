@@ -27,8 +27,11 @@ MAX_RESULT_VALUE = 1e308
 
 def _display_value(v: float | int | complex) -> str:
     """Format a value for display, showing whole-number floats as integers."""
-    if isinstance(v, float) and v.is_integer():
-        return str(int(v))
+    if isinstance(v, float):
+        if v.is_integer():
+            return str(int(v))
+        if math.isfinite(v):
+            return f"{v:.15g}"
     return str(v)
 
 
