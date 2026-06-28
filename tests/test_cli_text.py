@@ -14,7 +14,7 @@ import pytest
 def run_calc(args: list[str]) -> tuple[int, str, str]:
     """Run calc command and return (returncode, stdout, stderr)."""
     result = subprocess.run(
-        [sys.executable, "eggcalc.py"] + args,
+        [sys.executable, "-m", "eggcalc"] + args,
         capture_output=True,
         text=True,
     )

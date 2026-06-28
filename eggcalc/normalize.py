@@ -2646,10 +2646,19 @@ def _add_same_unit_division_parens(expression: str) -> str:
     units cancel and the result is dimensionless.
     """
 
-    def _replace(match: re.Match) -> str:
+    unit_token = r"(?:[^\W\d]\w*)(?:/(?:[^\W\d]\w*))*"
+    number_token = r"\d+(?:\.\d+)?"
+    canonical_units = set(UNIT_ALIASES.values())
+
+    def _is_known_unit(unit: str) -> bool:
+        return unit in canonical_units or unit in UNIT_ALIASES
+
+    def _replace_unit_left(match: re.Match) -> str:
         left_unit = match.group(1)
         denom = match.group(2)
         right_unit = match.group(3)
+        if not (_is_known_unit(left_unit) and _is_known_unit(right_unit)):
+            return match.group(0)
         # Always wrap the denominator in parens so the trailing unit
         # is bound to the right operand, not pulled out as a
         # postfix multiplication. This makes "5*m/3*s" evaluate as
@@ -2657,7 +2666,24 @@ def _add_same_unit_division_parens(expression: str) -> str:
         # "((5*m)/3)*s" = "1.666... m*s".
         return f"{left_unit}/({denom}*{right_unit})"
 
-    return re.sub(r'\b([a-zA-Z]+)/(\d+(?:\.\d+)?)\*([a-zA-Z]+)\b', _replace, expression)
+    def _replace_scalar_left(match: re.Match) -> str:
+        numerator = match.group(1)
+        denom = match.group(2)
+        right_unit = match.group(3)
+        if not _is_known_unit(right_unit):
+            return match.group(0)
+        return f"{numerator}/({denom}*{right_unit})"
+
+    expression = re.sub(
+        rf"(?<!\w)({unit_token})/({number_token})\*({unit_token})(?!\w)",
+        _replace_unit_left,
+        expression,
+    )
+    return re.sub(
+        rf"(?<![\w.])({number_token})/({number_token})\*({unit_token})(?!\w)",
+        _replace_scalar_left,
+        expression,
+    )
 
 
 def _handle_unit_conversion_from_tokens(tokens: list) -> list:

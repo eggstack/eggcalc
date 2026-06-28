@@ -681,6 +681,36 @@ class TestUnitSpacingProbes:
         assert result.value == pytest.approx(2.5)
         assert result.unit == "m/s"
 
+    @pytest.mark.parametrize("expr", ["1/1m", "1 / 1m", "1 / 1 m"])
+    def test_scalar_division_by_unit_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "1/(1*m)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(1)
+        assert result.unit == "1/m"
+
+    @pytest.mark.parametrize("expr", ["5m2 / 100cm2", "5 m2 / 100 cm2"])
+    def test_digit_unit_division_spacing(self, expr):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m2/(100*cm2)"
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(0.05)
+        assert result.unit == "m2/cm2"
+
+    def test_same_digit_unit_division_spacing_cancels(self):
+        normalized, code = normalize_expression("5m2 / 100m2", NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == "5*m2/(100*m2)"
+        result, code, _out, _err = _run("5m2 / 100m2")
+        assert code == 0
+        assert result == pytest.approx(0.05)
+
     @pytest.mark.parametrize("expr", ["1kg in g", "1 kg in g", "1 kg  in   g"])
     def test_simple_unit_conversion_spacing(self, expr):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
