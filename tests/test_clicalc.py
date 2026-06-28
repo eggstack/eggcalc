@@ -2107,11 +2107,25 @@ class TestDeferredD5D6UnitSimplification:
         assert result.unit == "m/s**2"
         assert result.value == 7.0
 
+    def test_evaluator_floordiv_simplifies_compound_units(self):
+        """Evaluator floor division should match UnitValue compound-unit semantics."""
+        result = evaluate("(7*m/s)//(1*s)")
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m/s**2"
+        assert result.value == 7.0
+
     def test_mod_simplifies_compound_units(self):
         """Modulo of compound units should also be simplified."""
         from eggcalc.units import UnitValue
 
         result = UnitValue(7.0, "m/s") % UnitValue(2.0, "s")
+        assert result.unit == "m/s**2"
+        assert result.value == 1.0
+
+    def test_evaluator_mod_simplifies_compound_units(self):
+        """Evaluator modulo should match UnitValue compound-unit semantics."""
+        result = evaluate("(7*m/s)%(2*s)")
+        assert isinstance(result, UnitValue)
         assert result.unit == "m/s**2"
         assert result.value == 1.0
 

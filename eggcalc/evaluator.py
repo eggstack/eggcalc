@@ -2235,15 +2235,14 @@ class Evaluator(ast.NodeVisitor):
 
         # Compound unit detection for floor division and modulo:
         # Same-unit -> dimensionless (e.g., 6m // 3m -> 2, 7m % 3m -> 1)
-        # Different units -> rejected (physically meaningless for // and %)
+        # Different units follow UnitValue semantics and form a compound unit.
         if op_class in (ast.FloorDiv, ast.Mod) and isinstance(left, UnitValue) and left.unit:
             if isinstance(right, UnitValue) and right.unit:
                 if left.unit == right.unit:
                     return result  # dimensionless
-                raise EvaluationError(
-                    f"Floor division and modulo with different units "
-                    f"('{left.unit}' and '{right.unit}') are not supported"
-                )
+                operator = "//" if op_class is ast.FloorDiv else "%"
+                compound = _simplify_unit_string(f"{left.unit}{operator}{right.unit}")
+                return UnitValue(result, compound)
             if op_class is ast.FloorDiv and not isinstance(right, UnitValue) and right_unit_name:
                 compound = _simplify_unit_string(f"{left.unit}//{right_unit_name}")
                 return UnitValue(result, compound)
@@ -2571,6 +2570,13 @@ def _evaluate_with_timeout_worker(
         result_queue.put(("error", f"{type(exc).__name__}: {exc}"))
 
 
+def _get_eval_multiprocessing_context() -> multiprocessing.context.BaseContext:
+    """Return the multiprocessing context for timeout evaluation workers."""
+    if os.name != "nt" and "fork" in multiprocessing.get_all_start_methods():
+        return multiprocessing.get_context("fork")
+    return multiprocessing.get_context("spawn")
+
+
 def evaluate_with_timeout(
     expression: str,
     timeout: float = 5.0,
@@ -2582,8 +2588,8 @@ def evaluate_with_timeout(
     This is the recommended function for evaluating expressions from
     untrusted sources (web requests, user input, etc.).
 
-    Uses multiprocessing.Process with the 'spawn' start method to run
-    evaluation in a separate process that can be reliably terminated.
+    Uses multiprocessing.Process to run evaluation in a separate process
+    that can be reliably terminated.
     A ThreadPoolExecutor's future.cancel() does NOT stop a running thread.
 
     Concurrency is bounded by _EVAL_SPAWN_SEMAPHORE to prevent fork-bomb
@@ -2620,7 +2626,7 @@ def evaluate_with_timeout(
         allow_random = _default_evaluator._allow_random
     if allow_side_effects is None:
         allow_side_effects = _default_evaluator._allow_side_effects
-    ctx = multiprocessing.get_context("spawn")
+    ctx = _get_eval_multiprocessing_context()
     queue: multiprocessing.Queue = ctx.Queue()
     proc: Any = None
     # RAII permit for the eval spawn semaphore. Acquire (with timeout) or raise.
@@ -2648,6 +2654,12 @@ def evaluate_with_timeout(
         try:
             status, value = queue.get(timeout=timeout)
         except _QueueEmpty:
+            if proc is not None and not proc.is_alive():
+                exitcode = proc.exitcode
+                raise EvaluationError(
+                    "Evaluation worker exited before returning a result"
+                    + (f" (exit code {exitcode})" if exitcode is not None else "")
+                )
             raise TimeoutError(f"Evaluation timed out after {timeout} seconds")
         except Exception as exc:
             logging.warning(

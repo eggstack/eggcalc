@@ -2686,6 +2686,31 @@ def _add_same_unit_division_parens(expression: str) -> str:
     )
 
 
+def _add_unit_floor_mod_parens(expression: str) -> str:
+    """Wrap unit operands around floor division and modulo.
+
+    After unit preprocessing, "7m/s//1s" becomes "7*m/s//1*s". Python parses
+    that as "((7*m)/s)//1*s", which incorrectly multiplies the result by the
+    trailing "s". Wrapping both operands preserves the intended unit grouping.
+    """
+
+    number_token = r"(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*|\d[\d_]*\.)(?:[eE][+-]?\d[\d_]*)?"
+    unit_atom = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\*\*-?\d+)?"
+    unit_expr = rf"{unit_atom}(?:(?:\*(?!\*)|/){unit_atom})*"
+    unit_operand = rf"{number_token}\*{unit_expr}"
+
+    chain = rf"{unit_operand}(?:(?://|%){unit_operand})+"
+
+    def _replace(match: re.Match) -> str:
+        parts = re.split(r"(//|%)", match.group(0))
+        grouped = f"({parts[0]}){parts[1]}({parts[2]})"
+        for i in range(3, len(parts), 2):
+            grouped = f"({grouped}){parts[i]}({parts[i + 1]})"
+        return grouped
+
+    return re.sub(rf"(?<![\w.])({chain})(?![\w.])", _replace, expression)
+
+
 def _handle_unit_conversion_from_tokens(tokens: list) -> list:
     """Handle unit conversion patterns from tokens like ['2 meters', 'in', 'feet'].
 
@@ -2846,15 +2871,7 @@ def normalize_expression(
 
     joined = _preprocess_units(joined)
 
-    # Fix operator precedence for floor division and modulo with units.
-    # After _preprocess_units, "6m//3m" becomes "6*m//3*m", which Python
-    # parses as "((6*m)//3)*m" due to left-to-right associativity.
-    # Wrap both sides in parens to get "(6*m)//(3*m)".
-    joined = re.sub(
-        r"(\d+(?:\.\d+)?\*[a-zA-Z_][a-zA-Z0-9_]*)(//|%)(\d+(?:\.\d+)?\*[a-zA-Z_][a-zA-Z0-9_]*)",
-        r"(\1)\2(\3)",
-        joined,
-    )
+    joined = _add_unit_floor_mod_parens(joined)
 
     if not skip_validation:
         try:
