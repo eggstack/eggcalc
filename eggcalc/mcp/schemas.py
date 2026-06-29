@@ -1726,7 +1726,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "stable": {
                     "type": "boolean",
                     "default": True,
-                    "description": "Preserve first occurrence order",
+                    "description": "Accepted for compatibility; deduplication keeps first occurrence order",
                 },
             },
             "required": ["items"],
@@ -1772,7 +1772,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "stable": {
                     "type": "boolean",
                     "default": True,
-                    "description": "Preserve original order for equal elements",
+                    "description": "Accepted for compatibility; Python sorting is always stable",
                 },
             },
             "required": ["items"],

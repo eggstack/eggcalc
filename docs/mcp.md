@@ -1652,23 +1652,23 @@ Remove duplicates from a list with optional normalization and casefolding.
 
 **Arguments:**
 - `items` (array): List of strings to deduplicate
-- `normalization` (string, optional): "NFC", "NFD", "NFKC", "NFKD", or "raw" (default "raw")
+- `normalization` (string, optional): "NFC", "NFD", "NFKC", "NFKD", or "raw" (default "NFC")
 - `casefold` (boolean, optional): Case-insensitive deduplication (default false)
-- `preserve_order` (boolean, optional): Keep first occurrence order (default true)
+- `stable` (boolean, optional): Accepted for compatibility; deduplication keeps first occurrence order
 
 **Tier:** 1
 **Tags:** `text`, `list`, `deduplication`, `normalization`
 
 **Returns:**
 - `items`: Deduplicated list
-- `count_original`: Original count
-- `count_dedupe`: After deduplication
-- `removed`: Array of removed items (if preserve_order is false)
+- `original_count`: Original count
+- `deduped_count`: After deduplication
+- `duplicates_removed`: Number of removed duplicate entries
 
 **Example:**
 ```json
 {"name": "list_dedupe", "arguments": {"items": ["a", "A", "b", "a"], "casefold": true}}
-// Returns: {"ok": true, "result": {"items": ["a", "b"], "count_original": 4, "count_dedupe": 2}}
+// Returns: {"ok": true, "result": {"items": ["a", "b"], "original_count": 4, "deduped_count": 2, "duplicates_removed": 2}}
 ```
 
 ---
@@ -1679,22 +1679,23 @@ Sort a list of strings with optional normalization and casefolding.
 
 **Arguments:**
 - `items` (array): List of strings to sort
-- `normalization` (string, optional): "NFC", "NFD", "NFKC", "NFKD", or "raw" (default "raw")
+- `normalization` (string, optional): "NFC", "NFD", "NFKC", "NFKD", or "raw" (default "NFC")
 - `casefold` (boolean, optional): Case-insensitive sorting (default false)
 - `reverse` (boolean, optional): Descending order (default false)
-- `stable` (boolean, optional): Preserve relative order of equal elements (default true)
+- `stable` (boolean, optional): Accepted for compatibility; Python sorting is always stable
 
 **Tier:** 1
 **Tags:** `text`, `list`, `sorting`, `normalization`
 
 **Returns:**
 - `items`: Sorted list
-- `count`: Number of items
+- `original_count`: Original count
+- `sorted_count`: Number of sorted items
 
 **Example:**
 ```json
 {"name": "list_sort", "arguments": {"items": ["b", "A", "c"], "casefold": true}}
-// Returns: {"ok": true, "result": {"items": ["A", "b", "c"], "count": 3}}
+// Returns: {"ok": true, "result": {"items": ["A", "b", "c"], "original_count": 3, "sorted_count": 3}}
 ```
 
 ---

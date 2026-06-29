@@ -656,7 +656,7 @@ def list_dedupe(
         items: List of strings to dedupe.
         normalization: Unicode normalization form.
         casefold: Apply casefolding before comparison.
-        stable: If True, preserve first occurrence order.
+        stable: Accepted for API compatibility; deduplication preserves first occurrence order.
 
     Returns:
         List with duplicates removed.

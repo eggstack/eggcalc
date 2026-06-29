@@ -3481,7 +3481,7 @@ def list_dedupe_mcp(
         items: List of strings to dedupe.
         normalization: Unicode normalization form ("raw", "NFC", "NFD", "NFKC", "NFKD").
         casefold: Apply casefolding before comparison.
-        stable: If True, preserve first occurrence order.
+        stable: Accepted for API compatibility; deduplication preserves first occurrence order.
 
     Returns:
         Success envelope with deduped list, or error envelope.
@@ -3529,7 +3529,7 @@ def list_sort_mcp(
         normalization: Unicode normalization form ("raw", "NFC", "NFD", "NFKC", "NFKD").
         casefold: Apply casefolding for sorting.
         reverse: Sort in descending order.
-        stable: If True, preserve original order for equal elements.
+        stable: Accepted for API compatibility; Python's sorted() is always stable.
 
     Returns:
         Success envelope with sorted list, or error envelope.

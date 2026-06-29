@@ -404,9 +404,10 @@ Remove duplicates from list while preserving order.
 ['a', 'b', 'c']
 ```
 
-### `list_sort(items: list[str], normalization: str = "NFC", casefold: bool = False, reverse: bool = False) -> list[str]`
+### `list_sort(items: list[str], normalization: str = "NFC", casefold: bool = False, reverse: bool = False, stable: bool = True) -> list[str]`
 
 Sort list of strings with normalization support.
+The `stable` parameter is accepted for API compatibility; Python sorting is always stable.
 
 ```python
 >>> list_sort(["banana", "Apple", "cherry"])
