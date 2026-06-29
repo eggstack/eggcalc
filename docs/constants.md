@@ -11,8 +11,6 @@ eggcalc includes mathematical and physical constants.
 | `tau` | 6.28318... | 2π |
 | `i` | 1j | Imaginary unit |
 | `j` | 1j | Imaginary unit (alias for `i`) |
-| `inf` | infinity | Positive infinity |
-| `nan` | NaN | Not a number |
 
 ```bash
 calc "pi"             # 3.14159...
@@ -36,7 +34,7 @@ calc "e^(i*pi)"       # -1+0j
 | `epsilon0` | ε₀ | 8.854e-12 | F/m |
 | `mu0` | μ₀ | 1.257e-6 | H/m |
 | `G` | G | 6.674e-11 | m³/(kg·s²) |
-| `g` | g | 9.80665 | m/s² |
+| `standardgravity` | gₙ | 9.80665 | m/s² |
 | `r` | R | 8.314462618 | J/(mol·K) |
 | `faraday` | F | 96485 | C/mol |
 | `stefan` | σ | 5.670e-8 | W/(m²·K⁴) |
@@ -61,7 +59,7 @@ calc "e^(i*pi)"       # -1+0j
 | `epsilon0` | vacuum permittivity, permittivity of free space |
 | `mu0` | vacuum permeability, permeability of free space, magnetic constant |
 | `G` | gravitational constant, newton constant, big g |
-| `g` | gravity, standard gravity, earth gravity |
+| `standardgravity` | gravity, standard gravity, earth gravity |
 | `r` | gas constant, ideal gas constant, molar gas constant, gasconstant, idealgasconstant |
 | `faraday` | f, faraday constant, faradayconstant |
 | `hbar` | planckbar, reducedplanck |

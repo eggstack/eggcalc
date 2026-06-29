@@ -2,7 +2,7 @@
 
 A natural language math expression calculator that parses expressions in English (like "five plus three") and converts them to numeric results, with support for unit conversions. The system also includes a comprehensive suite of Unicode text analysis tools exposed via an MCP (Model Context Protocol) server.
 
-**All 2251 tests pass.**
+**All 2278 tests pass.**
 
 ---
 
@@ -61,7 +61,7 @@ eggcalc is a dual-purpose tool:
 
 ### [normalize.py](normalize.md) — Natural Language Processing Pipeline
 
-**Location:** `eggcalc/normalize.py` (3567 lines)
+**Location:** `eggcalc/normalize.py` (3669 lines)
 
 Converts natural language expressions into Python syntax through a multi-stage pipeline:
 
@@ -84,7 +84,7 @@ Unit parsing is spacing-tolerant, including compound units with spaces around `/
 
 ### [evaluator.py](evaluator.md) — Safe AST-Based Expression Evaluation
 
-**Location:** `eggcalc/evaluator.py` (2847 lines)
+**Location:** `eggcalc/evaluator.py` (2873 lines)
 
 Safely evaluates mathematical expressions using Python's AST module — **not `eval()`**. Provides full protection against code injection.
 
@@ -112,7 +112,7 @@ Safely evaluates mathematical expressions using Python's AST module — **not `e
 
 ### [units.py](units.md) — Unit Definitions and Conversions
 
-**Location:** `eggcalc/units.py` (2090 lines)
+**Location:** `eggcalc/units.py` (2093 lines)
 
 Comprehensive unit conversion system with 20+ unit categories and proper temperature offset handling.
 
@@ -297,9 +297,9 @@ Each module has a dedicated architecture document for focused review:
 
 | Module | Document | Lines | Purpose |
 |--------|----------|-------|---------|
-| normalize.py | [normalize.md](normalize.md) | 3567 | NL → Python expression pipeline |
-| evaluator.py | [evaluator.md](evaluator.md) | 2847 | Safe AST-based evaluation |
-| units.py | [units.md](units.md) | 2090 | Unit definitions & conversions |
+| normalize.py | [normalize.md](normalize.md) | 3669 | NL → Python expression pipeline |
+| evaluator.py | [evaluator.md](evaluator.md) | 2873 | Safe AST-based evaluation |
+| units.py | [units.md](units.md) | 2093 | Unit definitions & conversions |
 | CLI | [cli.md](cli.md) | 19 | Command-line interface |
 
 ### exact/ — Unicode Text Primitives
@@ -325,7 +325,7 @@ The `exact/` package provides low-level deterministic text analysis tools.
 | Module | Document | Lines | Purpose |
 |--------|----------|-------|---------|
 | schemas.py | [mcp.md](mcp.md#schemaspy) | 3994 | Tool JSON schemas |
-| tools.py | [mcp.md](mcp.md#toolspy) | 5872 | Tool implementations |
+| tools.py | [mcp.md](mcp.md#toolspy) | 5882 | Tool implementations |
 | server.py | [mcp.md](mcp.md#serverpy) | 1277 | stdio-based JSON-RPC server |
 
 ### Supporting Documentation

@@ -75,25 +75,11 @@ For each module, examine:
 - Data structure field mismatches (verify against actual code)
 - Parameter name alignment (docs sometimes use different names than code)
 
-**Note:** The architecture review has been completed. All 15 module reviews were performed and findings incorporated into the documentation. Test count: 2251 (as of 2026-06-26).
+**Note:** The architecture review has been completed. All 15 module reviews were performed and findings incorporated into the documentation. Test count: 2278 (as of 2026-06-29).
 
 ## Architecture Review Findings (2026-05-28 through 2026-05-29)
 
 The architecture review identified issues across all modules. **All 35 actionable items implemented/fixed.**
-
-### HIGH Priority Bugs (FIXED)
-- `units.py:146-164` - Temperature-to-non-temperature conversion crash → now raises clear ValueError
-- `synthesis.py:704-714` - `unicode_normalization_only` near_match unreachable → code removed
-- `normalize.py:368` - Float regex `[-|+]?` → fixed to `[-+]?`
-
-### HIGH Priority Documentation Issues (FIXED)
-- `normalize_expression()` documented as returning `str` but actually returns `tuple[str, int]`
-- Missing constants `g`/`standardgravity` and `wien`/`wienconstant` in constants table
-- All `common_prefix_suffix` examples returned wrong values
-- `FirstDiff` TypedDict showed 3 fields but code has 6
-- `normalize_main` alias documented but doesn't exist in source
-- `reverse_confusables()` undocumented public function
-- `UnitValue` public methods not documented
 
 ### Review Process Notes
 - All modules reviewed with improvement plans generated
@@ -101,13 +87,8 @@ The architecture review identified issues across all modules. **All 35 actionabl
 - 35 actionable items across 5 waves implemented and verified
 - All items resolved
 
-### Known Documentation Discrepancies (2026-05-29)
-- CLI output format: docs describe `expression -> result`, code only outputs `result`
-- `validate.py` `list_sort` `stable` parameter has no effect (Python's `sorted()` is always stable)
-- `normalize_expression()` documented as returning `str` but actually returns `tuple[str, int]`
-
 ## Architecture Files Location
-- `architecture/` - Module-level documentation
+- `architecture/` - Module-level documentation (15 module docs + overview)
 - `docs/exact.md` - exact/ module documentation
 
 ## Documentation Maintenance

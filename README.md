@@ -792,14 +792,11 @@ eggcalc/
 │   ├── units.py         # Unit definitions and conversions
 │   ├── evaluator.py     # AST-based expression evaluator
 │   ├── normalize.py     # Main parsing and normalization
-│   ├── exact/           # Deterministic text analysis tools
+│   ├── exact/           # Deterministic text analysis tools (22 modules)
 │   └── mcp/             # MCP server for AI agent access
-├── tests/
-│   ├── test_clicalc.py  # Core functional tests
-│   ├── test_security_fuzz.py  # Security fuzz tests
-│   ├── test_exact.py    # Exact module tests
-│   ├── test_mcp_server.py # MCP server tests
-│   └── ...              # Additional test files
+├── tests/               # 30 test files, 2278 tests
+├── architecture/        # Module-level developer docs
+├── docs/                # User documentation (MkDocs site)
 ├── pyproject.toml       # Package configuration
 └── README.md            # This file
 ```

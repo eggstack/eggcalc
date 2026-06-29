@@ -1268,7 +1268,7 @@ A `profiles/list` request returns all available profile names, their tool lists,
   "result": {
     "active": "full",
     "profiles": {
-      "full": {"tools": ["math_eval", ...], "tool_count": 63},
+      "full": {"tools": ["math_eval", ...], "tool_count": 64},
       "codegg_core": {"tools": ["canonicalize_text", ...], "tool_count": 18},
       ...
     }
