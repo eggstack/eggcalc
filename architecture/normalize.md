@@ -142,13 +142,13 @@ Tokenizes and normalizes input text.
 5. Convert function names to canonical forms
 6. Parse unit suffixes
 
-### `normalize_expression(expression: str, operators: dict, patterns: Mapping[str, Pattern[str]], skip_validation: bool = False) -> tuple[str, int]`
-Converts natural language to Python syntax string.
+### `normalize_expression(expression: str, operators: dict | None = None, patterns: Mapping[str, Pattern[str]] | None = None, skip_validation: bool = False) -> tuple[str, int]`
+Converts natural language to an evaluator-ready Python syntax string.
 
 **Parameters:**
 - `expression`: The raw expression to normalize
-- `operators`: The operators configuration dict
-- `patterns`: The compiled regex patterns dict
+- `operators`: Optional operators configuration dict; defaults to `NORMALIZE`
+- `patterns`: Optional compiled regex patterns dict; defaults to `PATTERNS`
 - `skip_validation`: If True, skip token validation (for custom evaluators)
 
 **Returns:** `(normalized_string, exit_code)`

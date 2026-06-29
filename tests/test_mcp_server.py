@@ -7955,6 +7955,27 @@ class TestDeferredD7SemaphoreCleanup:
         assert hasattr(tools, "_close_spawn_semaphore")
         assert callable(tools._close_spawn_semaphore)
 
+    def test_abandoned_spawn_permit_releases_on_finalize(self):
+        """Dropped spawn permits should not permanently consume a slot."""
+        import gc
+
+        from eggcalc.mcp.tools import _SPAWN_SEMAPHORE, _try_acquire_spawn_permit
+
+        permit = _try_acquire_spawn_permit()
+        assert permit is not None
+        del permit
+        gc.collect()
+
+        acquired = 0
+        while _SPAWN_SEMAPHORE.acquire(block=False):
+            acquired += 1
+        for _ in range(acquired):
+            _SPAWN_SEMAPHORE.release()
+
+        from eggcalc.mcp.tools import MAX_CONCURRENT_SPAWNED
+
+        assert acquired >= MAX_CONCURRENT_SPAWNED
+
     def test_close_spawn_semaphore_is_idempotent(self):
         """Calling _close_spawn_semaphore should not raise on a healthy semaphore."""
         from eggcalc.mcp.tools import _close_spawn_semaphore

@@ -347,7 +347,7 @@ common_prefix_suffix("abc123", "abc456")
 | `json_query(json_str, pointer)` | JsonQueryResult | RFC 6901 JSON Pointer query |
 | `version_compare(v1, v2)` | VersionCompareResult | Compare version strings |
 | `list_dedupe(lst)` | list | Remove duplicate items preserving order |
-| `list_sort(lst, normalization, casefold, reverse, stable)` | list | Sort list with normalization |
+| `list_sort(lst, normalization, casefold, reverse, stable)` | list | Sort list with normalization; `stable` is accepted for compatibility because Python sorting is always stable |
 
 ### CheckBracketsResult
 

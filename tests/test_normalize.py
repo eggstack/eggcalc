@@ -65,6 +65,18 @@ def _val(result):
 class TestLeadingZeros:
     """Verify that leading zeros in fractional numbers are preserved."""
 
+    def test_normalize_expression_uses_default_config(self):
+        """Public normalize_expression() works without passing internals."""
+        normalized, code = normalize_expression("five plus three")
+        assert code == 0
+        assert normalized == "5+3"
+
+    def test_normalize_expression_default_config_handles_units(self):
+        """Default config path includes unit preprocessing."""
+        normalized, code = normalize_expression("30m + 100ft")
+        assert code == 0
+        assert normalized == "30*m+100*ft"
+
     @pytest.mark.parametrize(
         "expr,expected",
         [

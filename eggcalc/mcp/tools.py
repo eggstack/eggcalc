@@ -212,15 +212,25 @@ class _SpawnPermit:
 
     def __init__(self, sem: Any) -> None:
         self._sem = sem
+        self._released = False
 
     def __enter__(self) -> _SpawnPermit:
         return self
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        self.release()
+
+    def release(self) -> None:
+        if self._released:
+            return
+        self._released = True
         try:
             self._sem.release()
         except Exception:
             pass
+
+    def __del__(self) -> None:
+        self.release()
 
 
 def _acquire_spawn_permit() -> _SpawnPermit:

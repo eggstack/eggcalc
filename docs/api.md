@@ -61,6 +61,20 @@ result = evaluate_raw("sqrt(144)")     # 12
 result = evaluate_raw("what is five plus three")  # 8
 ```
 
+### `normalize_expression(expression: str, operators: dict | None = None, patterns: Mapping | None = None, skip_validation: bool = False) -> tuple[str, int]`
+
+Normalize input without evaluating it. Public callers can pass only the expression; the built-in operator and pattern tables are used by default.
+
+```python
+from eggcalc import normalize_expression
+
+normalized, exit_code = normalize_expression("five plus three")
+# normalized == "5+3", exit_code == 0
+
+normalized, exit_code = normalize_expression("30m + 100ft")
+# normalized == "30*m+100*ft", exit_code == 0
+```
+
 ### `evaluate_cached(expression: str) -> Any`
 
 Like `evaluate_raw()` but with LRU caching (1024 entries). Best for repeated identical queries.

@@ -141,15 +141,15 @@ User-defined variables:
 
 ## Normalization Functions
 
-### `normalize_expression(expression: str) -> tuple[str, int]`
+### `normalize_expression(expression: str, operators: dict | None = None, patterns: Mapping[str, Pattern[str]] | None = None, skip_validation: bool = False) -> tuple[str, int]`
 
-Normalize a natural language or mathematical expression into a canonical form. Returns a tuple of (normalized_expression, exit_code) where exit_code is 0 on success.
+Normalize a natural language or mathematical expression into evaluator-ready Python syntax. `operators` and `patterns` default to the built-in `NORMALIZE` and `PATTERNS` configuration, so public callers can pass only the expression. Returns `(normalized_expression, exit_code)` where `exit_code` is 0 on success.
 
 ```python
 normalized, exit_code = normalize_expression("five plus three")
 # normalized = "5+3", exit_code = 0
 normalized, exit_code = normalize_expression("30m + 100ft")
-# normalized = "30 m+100 ft", exit_code = 0
+# normalized = "30*m+100*ft", exit_code = 0
 normalized, exit_code = normalize_expression("30 km / h in mph")
 # normalized = "convert(30*km/h,mph)", exit_code = 0
 ```

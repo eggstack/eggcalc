@@ -2879,8 +2879,8 @@ def _handle_unit_conversion_from_tokens(tokens: list) -> list:
 
 def normalize_expression(
     expression: str,
-    operators: dict,
-    patterns: Mapping[str, Pattern[str]],
+    operators: dict | None = None,
+    patterns: Mapping[str, Pattern[str]] | None = None,
     skip_validation: bool = False,
 ) -> tuple[str, int]:
     """Normalize an expression without evaluating it.
@@ -2897,6 +2897,11 @@ def normalize_expression(
         tuple: (normalized_expression, exit_code) - normalized_expression is the
                normalized string, exit_code is 0 on success, non-zero on error
     """
+    if operators is None:
+        operators = NORMALIZE
+    if patterns is None:
+        patterns = PATTERNS
+
     if not expression or not expression.strip():
         return "", 1
     if len(expression) > MAX_INPUT_LENGTH:
