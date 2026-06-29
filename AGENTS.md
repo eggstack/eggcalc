@@ -70,13 +70,13 @@ CI order: `ruff → black --check → build_single.py → pytest → mypy` (mypy
 
 | Module | Lines | Role |
 |--------|-------|------|
-| `eggcalc/normalize.py` | ~3567 | NL tokenization, number words, expression normalization, CLI main |
-| `eggcalc/evaluator.py` | ~2847 | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
-| `eggcalc/units.py` | ~2090 | Unit definitions, conversions, `UnitValue` class |
+| `eggcalc/normalize.py` | ~3669 | NL tokenization, number words, expression normalization, CLI main |
+| `eggcalc/evaluator.py` | ~2873 | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
+| `eggcalc/units.py` | ~2093 | Unit definitions, conversions, `UnitValue` class |
 | `eggcalc/__main__.py` | 19 | Module entry, delegates to `normalize.main()` |
-| `eggcalc/exact/` | ~15700 | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
-| `eggcalc/mcp/` | ~11200 | MCP server: schemas (3994), tools (5872), server (1277) |
-| `build_single.py` | ~842 | Assembles everything into `eggcalc.py` |
+| `eggcalc/exact/` | ~20843 | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
+| `eggcalc/mcp/` | ~11166 | MCP server: schemas (3994), tools (5872), server (1277) |
+| `build_single.py` | 842 | Assembles everything into `eggcalc.py` |
 
 ## Unit Conventions
 
