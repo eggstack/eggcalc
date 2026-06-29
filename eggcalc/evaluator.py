@@ -2642,7 +2642,7 @@ def evaluate_with_timeout(
     permit = _EvalSpawnPermit(_EVAL_SPAWN_SEMAPHORE)
     with permit:
         try:
-            proc = ctx.Process(
+            proc = ctx.Process(  # type: ignore[attr-defined]
                 target=_evaluate_with_timeout_worker,
                 args=(expression, queue, allow_random, allow_side_effects),
             )

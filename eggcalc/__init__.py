@@ -59,8 +59,8 @@ from .normalize import (
     NORMALIZE,
     PATTERNS,
     main,
-    normalize,
     normalize_expression,
+    normalize_text,
     print_help,
     run,
 )
@@ -94,7 +94,7 @@ __all__ = [
     # CLI
     "main",
     "run",
-    "normalize",
+    "normalize_text",
     "normalize_expression",
     "print_help",
     # Constants
