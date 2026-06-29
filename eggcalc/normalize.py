@@ -55,6 +55,13 @@ MAX_INPUT_LENGTH = 10000
 MAX_NORMALIZED_LENGTH = 20000
 MAX_NESTING_DEPTH = 100
 
+# Decimal Python numeric literal subset used after unit preprocessing. It
+# intentionally excludes non-decimal prefixes because 0x/0b/0o literals are
+# passed through before suffix-unit handling.
+_DECIMAL_NUMBER_TOKEN_RE = (
+    r"(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*|\d[\d_]*\.)(?:[eE][+-]?\d[\d_]*)?"
+)
+
 # Pre-computed sorted units list for performance (avoid re-sorting each call)
 _UNITS_BY_LENGTH: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
 
@@ -2647,7 +2654,7 @@ def _add_same_unit_division_parens(expression: str) -> str:
     """
 
     unit_token = r"(?:[^\W\d]\w*)(?:/(?:[^\W\d]\w*))*"
-    number_token = r"\d+(?:\.\d+)?"
+    number_token = _DECIMAL_NUMBER_TOKEN_RE
     canonical_units = set(UNIT_ALIASES.values())
 
     def _is_known_unit(unit: str) -> bool:
@@ -2694,7 +2701,7 @@ def _add_unit_floor_mod_parens(expression: str) -> str:
     trailing "s". Wrapping both operands preserves the intended unit grouping.
     """
 
-    number_token = r"(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*|\d[\d_]*\.)(?:[eE][+-]?\d[\d_]*)?"
+    number_token = _DECIMAL_NUMBER_TOKEN_RE
     unit_atom = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\*\*-?\d+)?"
     unit_expr = rf"{unit_atom}(?:(?:\*(?!\*)|/){unit_atom})*"
     unit_operand = rf"{number_token}\*{unit_expr}"

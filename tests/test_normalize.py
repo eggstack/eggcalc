@@ -681,6 +681,29 @@ class TestUnitSpacingProbes:
         assert result.value == pytest.approx(2.5)
         assert result.unit == "m/s"
 
+    @pytest.mark.parametrize(
+        ("expr", "expected_normalized", "expected_value"),
+        [
+            ("1m / 2e3s", "1*m/(2e3*s)", 0.0005),
+            ("1m / 2.5e3s", "1*m/(2.5e3*s)", 0.0004),
+            ("1m / 2_000s", "1*m/(2_000*s)", 0.0005),
+            ("1m / .5s", "1*m/(.5*s)", 2),
+            ("1m / 2e-3s", "1*m/(2e-3*s)", 500),
+            ("1m / 2e+3s", "1*m/(2e+3*s)", 0.0005),
+        ],
+    )
+    def test_unit_division_denominator_python_number_literals(
+        self, expr, expected_normalized, expected_value
+    ):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == expected_normalized
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(expected_value)
+        assert result.unit == "m/s"
+
     @pytest.mark.parametrize("expr", ["1/1m", "1 / 1m", "1 / 1 m"])
     def test_scalar_division_by_unit_spacing(self, expr):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
@@ -691,6 +714,26 @@ class TestUnitSpacingProbes:
         assert isinstance(result, UnitValue)
         assert result.value == pytest.approx(1)
         assert result.unit == "1/m"
+
+    @pytest.mark.parametrize(
+        ("expr", "expected_normalized", "expected_value"),
+        [
+            ("1 / 2e3s", "1/(2e3*s)", 0.0005),
+            ("1 / .5s", "1/(.5*s)", 2),
+            ("1 / 2_000s", "1/(2_000*s)", 0.0005),
+        ],
+    )
+    def test_scalar_division_by_unit_python_number_literals(
+        self, expr, expected_normalized, expected_value
+    ):
+        normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
+        assert code == 0
+        assert normalized == expected_normalized
+        result, code, _out, _err = _run(expr)
+        assert code == 0
+        assert isinstance(result, UnitValue)
+        assert result.value == pytest.approx(expected_value)
+        assert result.unit == "1/s"
 
     @pytest.mark.parametrize("expr", ["5m2 / 100cm2", "5 m2 / 100 cm2"])
     def test_digit_unit_division_spacing(self, expr):
