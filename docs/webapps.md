@@ -124,6 +124,7 @@ from eggcalc import EggCalcApp
 
 # LRU cache with 1000 entries
 app = EggCalcApp(cache_size=1000)
+app_without_storage = EggCalcApp(cache_size=0)  # Computes without caching
 
 # First call computes
 result = app.calculate("complex expression")
@@ -137,6 +138,9 @@ print(app.cache_size)  # 1
 # Clear cache
 app.clear_cache()
 ```
+
+Registering or re-registering an instance constant/function clears that
+instance's cache, preventing stale values after runtime configuration changes.
 
 ## Timeout Protection
 

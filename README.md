@@ -193,6 +193,10 @@ print(app.cache_size)   # 3
 app.clear_cache()
 ```
 
+Use `EggCalcApp(cache_size=0)` to compute normally without storing results.
+Registering or re-registering an instance constant/function clears that
+instance's cache so repeated queries cannot return stale values.
+
 ### Full API Reference
 
 ```python
@@ -286,6 +290,9 @@ from eggcalc import evaluate_cached
 result = evaluate_cached("5 + 3")  # Cached after first call
 ```
 
+The module-level cache is cleared when global constants or functions are
+registered so cached expressions reflect the current evaluator state.
+
 #### `evaluate_async(expression: str) -> Awaitable[Any]`
 Async version of `evaluate_raw()`. For async web frameworks.
 
@@ -314,6 +321,7 @@ Thread-safe wrapper optimized for webapps with caching and instance isolation.
 from eggcalc import EggCalcApp
 
 app = EggCalcApp(cache_size=1000)  # LRU cache with 1000 entries
+app_without_storage = EggCalcApp(cache_size=0)  # Computes without caching
 
 # Evaluate expressions
 result = app.calculate("5 + 3")
@@ -324,6 +332,7 @@ result = await app.calculate_async("5 + 3")
 # Register instance-specific constants/functions
 app.register_constant("myconst", 42)
 app.register_function("double", lambda x: x * 2)
+# Re-registering constants/functions clears this app's cache.
 
 # Cache management
 app.clear_cache()

@@ -375,6 +375,16 @@ class TestEggCalcApp:
         app.calculate("5 + 3")
         assert app.cache_size == 0
 
+    def test_zero_cache_size_disables_storage(self):
+        """A zero-sized cache should compute normally without storing entries."""
+        from eggcalc import EggCalcApp
+
+        app = EggCalcApp(cache_size=0)
+
+        assert self._get_value(app.calculate("5 + 3")) == 8
+        assert self._get_value(app.calculate("5 + 3")) == 8
+        assert app.cache_size == 0
+
     def test_register_constant(self):
         """Test registering custom constant."""
         from eggcalc import EggCalcApp
@@ -392,6 +402,34 @@ class TestEggCalcApp:
         app.register_function("double", lambda x: x * 2)
         result = app.calculate("double(5)")
         assert self._get_value(result) == 10
+
+    def test_register_constant_clears_instance_cache(self):
+        """Changing an instance constant should not return a stale cached result."""
+        from eggcalc import EggCalcApp
+
+        app = EggCalcApp()
+        app.register_constant("cache_probe_const", 10)
+        assert self._get_value(app.calculate("cache_probe_const")) == 10
+        assert app.cache_size == 1
+
+        app.register_constant("cache_probe_const", 20)
+
+        assert app.cache_size == 0
+        assert self._get_value(app.calculate("cache_probe_const")) == 20
+
+    def test_register_function_clears_instance_cache(self):
+        """Changing an instance function should not return a stale cached result."""
+        from eggcalc import EggCalcApp
+
+        app = EggCalcApp()
+        app.register_function("cache_probe_func", lambda: 10)
+        assert self._get_value(app.calculate("cache_probe_func()")) == 10
+        assert app.cache_size == 1
+
+        app.register_function("cache_probe_func", lambda: 20)
+
+        assert app.cache_size == 0
+        assert self._get_value(app.calculate("cache_probe_func()")) == 20
 
     def test_instance_isolation_constants(self):
         """Test that instances have isolated constants."""
@@ -512,6 +550,28 @@ class TestCaching:
             assert memory_recall() == 2
         finally:
             memory_clear()
+
+    def test_register_constant_clears_global_cache(self):
+        """Changing a global constant should not return stale evaluate_cached results."""
+        from eggcalc import evaluate_cached, register_constant
+
+        register_constant("global_cache_probe_const", 10)
+        assert self._get_value(evaluate_cached("global_cache_probe_const")) == 10
+
+        register_constant("global_cache_probe_const", 20)
+
+        assert self._get_value(evaluate_cached("global_cache_probe_const")) == 20
+
+    def test_register_function_clears_global_cache(self):
+        """Changing a global function should not return stale evaluate_cached results."""
+        from eggcalc import evaluate_cached, register_function
+
+        register_function("globalcacheprobefunc", lambda: 10)
+        assert self._get_value(evaluate_cached("globalcacheprobefunc()")) == 10
+
+        register_function("globalcacheprobefunc", lambda: 20)
+
+        assert self._get_value(evaluate_cached("globalcacheprobefunc()")) == 20
 
 
 class TestTimeout:

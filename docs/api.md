@@ -78,6 +78,8 @@ normalized, exit_code = normalize_expression("30m + 100ft")
 ### `evaluate_cached(expression: str) -> Any`
 
 Like `evaluate_raw()` but with LRU caching (1024 entries). Best for repeated identical queries.
+The cache is cleared when global constants or functions are registered, so
+custom evaluator changes are visible to subsequent cached evaluations.
 
 ```python
 from eggcalc import evaluate_cached
@@ -111,6 +113,7 @@ Thread-safe wrapper optimized for web applications. Each instance has isolated c
 from eggcalc import EggCalcApp
 
 app = EggCalcApp(cache_size=1000, enable_cache=True)
+app_without_storage = EggCalcApp(cache_size=0)  # Computes without storing results
 
 # Basic usage - natural language works
 result = app.calculate("five plus three")  # 8
@@ -126,6 +129,8 @@ result = app.calculate("myconst + 8")  # 50
 # Instance-specific functions
 app.register_function("double", lambda x: x * 2)
 result = app.calculate("double(5)")  # 10
+
+# Re-registering constants/functions clears this instance's cache.
 
 # Cache management
 print(app.cache_size)  # Number of cached entries

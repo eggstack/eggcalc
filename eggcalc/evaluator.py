@@ -296,6 +296,7 @@ def register_constant(name: str, value: float) -> None:
     """Register a user-defined constant (thread-safe)."""
     with _lock:
         _default_evaluator.CONSTANTS[name] = value
+    _clear_global_cache()
 
 
 def register_function(name: str, func: Any) -> None:
@@ -315,6 +316,7 @@ def register_function(name: str, func: Any) -> None:
         raise ValueError(f"name must be a valid identifier, got {name!r}")
     with _lock:
         _default_evaluator.FUNCTIONS[name] = func
+    _clear_global_cache()
 
 
 def load_user_config() -> None:
@@ -344,20 +346,24 @@ def load_user_config() -> None:
     if os.environ.get("EGGCALC_NO_CONFIG", ""):
         _config_loaded = True
         return
+    config_changed = False
     try:
         import eggcalc.normalize as normalize_mod  # noqa: F401
         import eggcalc_config as config
 
         for name, value in getattr(config, "CUSTOM_CONSTANTS", {}).items():
             _default_evaluator.CONSTANTS[name] = value
+            config_changed = True
 
         for name, func in getattr(config, "CUSTOM_FUNCTIONS", {}).items():
             _default_evaluator.FUNCTIONS[name] = func
+            config_changed = True
 
         from . import units
 
         with units._UNITS_LOCK:
             for base, unit_dict in getattr(config, "CUSTOM_UNITS", {}).items():
+                config_changed = True
                 if base in units.UNIT_BASE:
                     units.UNIT_BASE[base].update(unit_dict)
                 else:
@@ -381,9 +387,11 @@ def load_user_config() -> None:
 
             for unit, canonical in getattr(config, "CUSTOM_ALIASES", {}).items():
                 units.UNIT_ALIASES[unit] = canonical
+                config_changed = True
 
             for key, (mult, offset) in getattr(config, "CUSTOM_TEMP_CONVERSIONS", {}).items():
                 units.TEMPERATURE_CONVERSIONS[key] = (mult, offset)
+                config_changed = True
 
         units._rebuild_conversions()
 
@@ -391,6 +399,8 @@ def load_user_config() -> None:
         pass
 
     _config_loaded = True
+    if config_changed:
+        _clear_global_cache()
 
 
 def _ensure_config_loaded() -> None:
@@ -433,9 +443,46 @@ def _evict_until_under_cap() -> None:
         _cache_bytes = 0
 
 
+def _remove_cache_entry(expression: str) -> None:
+    """Remove one global cache entry and keep byte accounting in sync."""
+    global _cache_bytes
+    with _cache_lock:
+        old_value = _cache.pop(expression, None)
+        if old_value is not None:
+            _cache_bytes -= _entry_size(expression, old_value)
+        if _cache_bytes < 0:
+            _cache_bytes = 0
+
+
+def _clear_global_cache() -> None:
+    """Clear the module-level evaluation cache after evaluator state changes."""
+    global _cache_bytes
+    cache = globals().get("_cache")
+    cache_lock = globals().get("_cache_lock")
+    if cache is None or cache_lock is None:
+        return
+    with cache_lock:
+        cache.clear()
+        _cache_bytes = 0
+
+
+def _store_cache_entry(expression: str, result: Any) -> None:
+    """Store one result in the global LRU cache with consistent accounting."""
+    global _cache_bytes
+    with _cache_lock:
+        old_value = _cache.pop(expression, None)
+        if old_value is not None:
+            _cache_bytes -= _entry_size(expression, old_value)
+        while len(_cache) >= DEFAULT_CACHE_SIZE:
+            old_key, old_value = _cache.popitem(last=False)
+            _cache_bytes -= _entry_size(old_key, old_value)
+        _cache[expression] = result
+        _cache_bytes += _entry_size(expression, result)
+        _evict_until_under_cap()
+
+
 def _cached_normalize_and_evaluate(expression: str) -> Any:
     """Cache for normalized and evaluated expressions."""
-    global _cache_bytes
     # Bypass the cache for non-deterministic or stateful expressions so
     # repeated calls execute instead of returning stale results.
     if _expression_bypasses_cache(expression):
@@ -448,21 +495,15 @@ def _cached_normalize_and_evaluate(expression: str) -> Any:
     _ensure_config_loaded()
     from .normalize import NORMALIZE, PATTERNS, normalize_expression
 
-    normalized, exit_code = normalize_expression(expression, NORMALIZE, PATTERNS)
+    normalized, exit_code = normalize_expression(
+        expression, NORMALIZE, PATTERNS, skip_validation=True
+    )
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
 
     result = _default_evaluator.evaluate(normalized)
 
-    with _cache_lock:
-        # Hard cap on entry count
-        if len(_cache) >= DEFAULT_CACHE_SIZE:
-            old_key, old_value = _cache.popitem(last=False)
-            _cache_bytes -= _entry_size(old_key, old_value)
-        _cache[expression] = result
-        _cache_bytes += _entry_size(expression, result)
-        # Soft cap on total bytes
-        _evict_until_under_cap()
+    _store_cache_entry(expression, result)
 
     return result
 
@@ -472,7 +513,9 @@ def _normalize_and_evaluate_uncached(expression: str) -> Any:
     _ensure_config_loaded()
     from .normalize import NORMALIZE, PATTERNS, normalize_expression
 
-    normalized, exit_code = normalize_expression(expression, NORMALIZE, PATTERNS)
+    normalized, exit_code = normalize_expression(
+        expression, NORMALIZE, PATTERNS, skip_validation=True
+    )
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
     return _default_evaluator.evaluate(normalized)
@@ -499,7 +542,7 @@ def evaluate_cached(expression: str) -> Any:
     except EvaluationError:
         raise
     except (ValueError, SyntaxError, RecursionError):
-        _cache.pop(expression, None)
+        _remove_cache_entry(expression)
         raise
 
 
@@ -2777,7 +2820,7 @@ class EggCalcApp:
         self._enable_cache = enable_cache
         self._cache: OrderedDict[str, Any] | None = OrderedDict() if enable_cache else None
         self._lock = threading.Lock()
-        self._cache_max_size = cache_size
+        self._cache_max_size = max(0, cache_size)
 
     def calculate(self, expression: str) -> Any:
         """Evaluate an expression (thread-safe).
@@ -2805,7 +2848,9 @@ class EggCalcApp:
         if use_cache:
             with self._lock:
                 assert self._cache is not None
-                if len(self._cache) >= self._cache_max_size:
+                if self._cache_max_size == 0:
+                    return result
+                while len(self._cache) >= self._cache_max_size:
                     self._cache.popitem(last=False)
                 self._cache[expression] = result
 
@@ -2848,6 +2893,7 @@ class EggCalcApp:
         """
         with self._lock:
             self._evaluator.CONSTANTS[name] = value
+        self.clear_cache()
 
     def register_function(self, name: str, func: Any) -> None:
         """Register a custom function on this instance (thread-safe).
@@ -2857,6 +2903,7 @@ class EggCalcApp:
         """
         with self._lock:
             self._evaluator.FUNCTIONS[name] = func
+        self.clear_cache()
 
     def clear_cache(self) -> None:
         """Clear the evaluation cache."""
