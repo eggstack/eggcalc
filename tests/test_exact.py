@@ -42,6 +42,7 @@ from eggcalc.exact import (
     visible_repr,
     word_metrics,
 )
+from eggcalc.exact.validate import MAX_LIST_ITEMS
 
 
 class TestPrimitives:
@@ -502,6 +503,36 @@ class TestRegexTest:
         result = regex_test(r"^a+$", [long_sample])
         assert result["results"] == []
         assert "MAX_SAMPLE_LENGTH" in result["error"]
+
+    def test_regex_test_sample_count_limit(self):
+        result = regex_test(r"^a+$", ["a"] * (MAX_LIST_ITEMS + 1))
+        assert result["valid_pattern"] is False
+        assert result["results"] == []
+        assert "Samples count" in result["error"]
+
+    def test_regex_test_rejects_non_string_samples(self):
+        result = regex_test(r"^a+$", ["a", 123])  # type: ignore[list-item]
+        assert result["valid_pattern"] is False
+        assert result["results"] == []
+        assert "All samples must be strings" in result["error"]
+
+    def test_regex_test_rejects_non_list_samples(self):
+        result = regex_test(r"^a+$", "a")  # type: ignore[arg-type]
+        assert result["valid_pattern"] is False
+        assert result["results"] == []
+        assert "Samples must be a list" in result["error"]
+
+    def test_regex_test_rejects_non_list_flags(self):
+        result = regex_test(r"^a+$", ["a"], flags="IGNORECASE")  # type: ignore[arg-type]
+        assert result["valid_pattern"] is False
+        assert result["results"] == []
+        assert "Flags must be a list" in result["error"]
+
+    def test_regex_test_rejects_non_string_flags(self):
+        result = regex_test(r"^a+$", ["a"], flags=["IGNORECASE", 123])  # type: ignore[list-item]
+        assert result["valid_pattern"] is False
+        assert result["results"] == []
+        assert "All flags must be strings" in result["error"]
 
 
 class TestMeasure:

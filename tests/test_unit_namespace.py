@@ -381,12 +381,12 @@ class TestAreUnitsCompatible:
     def test_first_none(self):
         from eggcalc.units import are_units_compatible
 
-        assert are_units_compatible(None, "m") is True
+        assert are_units_compatible(None, "m") is False
 
     def test_second_none(self):
         from eggcalc.units import are_units_compatible
 
-        assert are_units_compatible("m", None) is True
+        assert are_units_compatible("m", None) is False
 
     def test_same_category(self):
         from eggcalc.units import are_units_compatible

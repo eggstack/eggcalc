@@ -870,18 +870,76 @@ def regex_test(
     Returns:
         Dictionary with valid_pattern (bool), results, and flags_used.
     """
+    flags_used = RegexFlags(
+        ignore_case=ignore_case,
+        multiline=multiline,
+        dotall=dotall,
+        ascii=ascii,
+    )
+    if not isinstance(pattern, str):
+        return RegexTestResult(
+            valid_pattern=False,
+            results=[],
+            error=f"Pattern must be a string, got {type(pattern).__name__}",
+            flags_used=flags_used,
+        )
+    if not isinstance(samples, list):
+        return RegexTestResult(
+            valid_pattern=False,
+            results=[],
+            error=f"Samples must be a list, got {type(samples).__name__}",
+            flags_used=flags_used,
+        )
+    if flags is not None and not isinstance(flags, list):
+        return RegexTestResult(
+            valid_pattern=False,
+            results=[],
+            error=f"Flags must be a list, got {type(flags).__name__}",
+            flags_used=flags_used,
+        )
+    non_str_flags = (
+        [] if flags is None else [i for i, flag in enumerate(flags) if not isinstance(flag, str)]
+    )
+    if non_str_flags:
+        return RegexTestResult(
+            valid_pattern=False,
+            results=[],
+            error=f"All flags must be strings; non-string items at indices {non_str_flags[:5]}",
+            flags_used=flags_used,
+        )
+    if len(samples) > MAX_LIST_ITEMS:
+        return RegexTestResult(
+            valid_pattern=False,
+            results=[],
+            error=f"Samples count {len(samples)} exceeds maximum {MAX_LIST_ITEMS}",
+            flags_used=flags_used,
+        )
+    non_str_samples = [i for i, sample in enumerate(samples) if not isinstance(sample, str)]
+    if non_str_samples:
+        return RegexTestResult(
+            valid_pattern=False,
+            results=[],
+            error=f"All samples must be strings; non-string items at indices {non_str_samples[:5]}",
+            flags_used=flags_used,
+        )
+    long_samples = [
+        i for i, sample in enumerate(samples) if len(sample) > MAX_SAMPLE_LENGTH
+    ]
+    if long_samples:
+        return RegexTestResult(
+            valid_pattern=False,
+            results=[],
+            error=f"Sample(s) at indices {long_samples[:5]} exceed MAX_SAMPLE_LENGTH {MAX_SAMPLE_LENGTH}",
+            flags_used=flags_used,
+        )
+
     is_safe, error_msg = _check_pattern_complexity(pattern)
     if not is_safe:
         return RegexTestResult(
             valid_pattern=False,
             results=[],
             error=error_msg,
-            flags_used=RegexFlags(
-                ignore_case=ignore_case,
-                multiline=multiline,
-                dotall=dotall,
-                ascii=ascii,
-            ),
+            flags_used=flags_used,
         )
 
     flag_values = 0
@@ -913,29 +971,11 @@ def regex_test(
             valid_pattern=False,
             results=[],
             error=str(e),
-            flags_used=RegexFlags(
-                ignore_case=ignore_case,
-                multiline=multiline,
-                dotall=dotall,
-                ascii=ascii,
-            ),
+            flags_used=flags_used,
         )
 
     results: list[RegexMatch] = []
-
     for sample in samples:
-        if len(sample) > MAX_SAMPLE_LENGTH:
-            return RegexTestResult(
-                valid_pattern=True,
-                results=[],
-                error=f"Sample length {len(sample)} exceeds MAX_SAMPLE_LENGTH {MAX_SAMPLE_LENGTH}",
-                flags_used=RegexFlags(
-                    ignore_case=ignore_case,
-                    multiline=multiline,
-                    dotall=dotall,
-                    ascii=ascii,
-                ),
-            )
         match = compiled.search(sample)
         if match is None:
             results.append(
@@ -969,12 +1009,7 @@ def regex_test(
         valid_pattern=True,
         results=results,
         error=None,
-        flags_used=RegexFlags(
-            ignore_case=ignore_case,
-            multiline=multiline,
-            dotall=dotall,
-            ascii=ascii,
-        ),
+        flags_used=flags_used,
     )
 
 

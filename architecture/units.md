@@ -86,18 +86,22 @@ UnitValue(value: float, unit: str | None = None)
 
 ### Scalar + UnitValue Operations
 
-Adding or subtracting scalars from UnitValues is **not allowed** and raises `ValueError`:
+Adding or subtracting scalars from dimensional UnitValues is **not allowed** and raises
+`ValueError`. Dimensionless `UnitValue` instances can be added to scalars or other
+dimensionless `UnitValue` instances.
 
 ```python
-UnitValue(3, "m") + 5     # → ValueError: Cannot add scalar to dimensional value: m
-5 + UnitValue(3, "m")      # → ValueError: Cannot add scalar to dimensional value: m
-UnitValue(3, None) + 5     # → ValueError: Cannot add scalar to dimensional value: None
+UnitValue(3, "m") + 5                  # → ValueError
+5 + UnitValue(3, "m")                  # → ValueError
+UnitValue(3, "m") + UnitValue(5, None) # → ValueError
+UnitValue(3, None) + 5                 # → UnitValue(8, None)
 ```
 
-This behavior is intentional — mixing dimensionless scalars with dimensional values (like meters) is physically meaningless. Use `convert_to()` to explicitly convert to a dimensionless value first if needed:
+This behavior is intentional — mixing dimensionless values with dimensional values
+(like meters) is physically meaningless. Make both operands dimensional when the
+quantity should have a unit:
 
 ```python
-# To add a scalar to a UnitValue, make the scalar dimensional first
 uv = UnitValue(3, "m")
 uv + UnitValue(5, "m")     # → UnitValue(8.0, "m") — both have same unit
 ```
@@ -232,12 +236,13 @@ get_conversion_factor("km", "m")   # → 1000.0
 get_conversion_factor("m", "km")   # → 0.001
 ```
 
-### `are_units_compatible(unit1: str, unit2: str) -> bool`
+### `are_units_compatible(unit1: str | None, unit2: str | None) -> bool`
 Checks if two units can be converted (same category):
 ```python
 are_units_compatible("m", "ft")     # → True (both length)
 are_units_compatible("m", "kg")     # → False (length vs mass)
-are_units_compatible("m", None)     # → True (dimensionless)
+are_units_compatible(None, None)    # → True (both dimensionless)
+are_units_compatible("m", None)     # → False (dimensional vs dimensionless)
 ```
 
 ### `get_unit_category(unit: str) -> str | None`

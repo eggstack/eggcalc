@@ -276,6 +276,7 @@ Units must be from the same category for addition/subtraction:
 
 ```bash
 calc "30m + 5kg"          # Error - length + mass incompatible
+calc "30m + 5"            # Error - dimensional + dimensionless incompatible
 ```
 
 ### Temperature Conversions

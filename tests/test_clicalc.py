@@ -1883,11 +1883,24 @@ class TestUnitValueScalarArithmetic:
             UnitValue(5, "m") + 10
 
     def test_unitless_add_dimensioned(self):
-        """UnitValue(5, None) + UnitValue(10, 'm') returns UnitValue(15, 'm')."""
-        result = UnitValue(5, None) + UnitValue(10, "m")
-        assert isinstance(result, UnitValue)
-        assert result.value == 15
-        assert result.unit == "m"
+        """UnitValue(5, None) + UnitValue(10, 'm') should raise ValueError."""
+        with pytest.raises(ValueError):
+            UnitValue(5, None) + UnitValue(10, "m")
+
+    def test_dimensioned_add_unitless_unitvalue_raises(self):
+        """UnitValue(5, 'm') + UnitValue(10, None) should raise ValueError."""
+        with pytest.raises(ValueError):
+            UnitValue(5, "m") + UnitValue(10, None)
+
+    def test_unitless_sub_dimensioned_unitvalue_raises(self):
+        """UnitValue(5, None) - UnitValue(10, 'm') should raise ValueError."""
+        with pytest.raises(ValueError):
+            UnitValue(5, None) - UnitValue(10, "m")
+
+    def test_dimensioned_sub_unitless_unitvalue_raises(self):
+        """UnitValue(5, 'm') - UnitValue(10, None) should raise ValueError."""
+        with pytest.raises(ValueError):
+            UnitValue(5, "m") - UnitValue(10, None)
 
 
 class TestReviewerEdgeCases:

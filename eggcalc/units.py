@@ -2062,15 +2062,17 @@ def are_units_compatible(unit1: str | None, unit2: str | None) -> bool:
 
     Returns True if:
     - Both units are None (dimensionless)
-    - Either unit is None (dimensionless is compatible with any unit)
     - Both units belong to the same category (e.g., both length)
 
     Returns False if:
+    - Exactly one unit is None (dimensionless cannot be added to dimensional)
     - Units are from different categories
     - One category is known but the other is unknown
     """
-    if unit1 is None or unit2 is None:
+    if unit1 is None and unit2 is None:
         return True
+    if unit1 is None or unit2 is None:
+        return False
 
     cat1 = get_unit_category(unit1)
     cat2 = get_unit_category(unit2)

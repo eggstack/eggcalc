@@ -202,6 +202,9 @@ if isinstance(result, UnitValue):
 uv1 = UnitValue(30, "m")
 uv2 = UnitValue(100, "ft")
 result = uv1 + uv2  # UnitValue(60.48, "m")
+
+# Dimensionless values cannot be added to dimensional values
+# UnitValue(30, "m") + UnitValue(5, None) raises ValueError
 ```
 
 ### `Memory`
