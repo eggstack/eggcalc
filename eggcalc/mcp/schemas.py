@@ -2686,7 +2686,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
     },
     "version_constraint_check": {
-        "description": "Check whether a version satisfies a constraint under a declared versioning scheme (semver or cargo). Supports comparison operators, caret, tilde, wildcard, range, and comma-separated constraints.",
+        "description": "Check whether a version satisfies a constraint under a declared versioning scheme. Supports semver exact/comparison/range constraints and cargo caret, tilde, and wildcard constraints.",
         "tier": 3,
         "tags": ["version", "semver", "cargo", "constraint", "satisfiability"],
         "inputSchema": {

@@ -39,6 +39,11 @@ class TestParseVersion:
         assert v is not None
         assert v["pre_release"] == ["alpha", "1"]
 
+    def test_prerelease_identifier_may_contain_hyphen(self):
+        v = parse_version("1.2.3-alpha-beta.1")
+        assert v is not None
+        assert v["pre_release"] == ["alpha-beta", "1"]
+
     def test_with_build(self):
         v = parse_version("1.2.3+build.42")
         assert v is not None
@@ -55,6 +60,12 @@ class TestParseVersion:
         assert parse_version("not-a-version") is None
         assert parse_version("") is None
         assert parse_version("1.2") is None
+        assert parse_version("01.2.3") is None
+        assert parse_version("1.02.3") is None
+        assert parse_version("1.2.03") is None
+        assert parse_version("1.2.3-alpha..1") is None
+        assert parse_version("1.2.3-alpha.01") is None
+        assert parse_version("1.2.3+build..42") is None
 
     def test_whitespace(self):
         v = parse_version("  1.2.3  ")
@@ -118,6 +129,11 @@ class TestVersionComparison:
     def test_prerelease_numeric_lexical_mix(self):
         a = parse_version("1.0.0-alpha.1")
         b = parse_version("1.0.0-alpha.2")
+        assert version_less_than(a, b)
+
+    def test_prerelease_hyphenated_identifier_ordering(self):
+        a = parse_version("1.0.0-alpha")
+        b = parse_version("1.0.0-alpha-beta")
         assert version_less_than(a, b)
 
     def test_gte(self):

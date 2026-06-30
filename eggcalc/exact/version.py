@@ -62,18 +62,48 @@ _PRE_RELEASE_ORDER: dict[str, int] = {
     "c": 2,
 }
 
+_NUMERIC_IDENTIFIER = r'(?:0|[1-9]\d*)'
+_PRE_RELEASE_IDENTIFIER = (
+    r'(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)'
+)
+_PRE_RELEASE = rf'(?:{_PRE_RELEASE_IDENTIFIER})(?:\.(?:{_PRE_RELEASE_IDENTIFIER}))*'
+_BUILD = r'(?:[0-9A-Za-z-]+)(?:\.(?:[0-9A-Za-z-]+))*'
+
 _SEMVER_RE = re.compile(
-    r'^(\d+)\.(\d+)\.(\d+)' r'(?:-([0-9A-Za-z\.\-]+))?' r'(?:\+([0-9A-Za-z\.\-]+))?$'
+    rf'^({_NUMERIC_IDENTIFIER})\.({_NUMERIC_IDENTIFIER})\.({_NUMERIC_IDENTIFIER})'
+    rf'(?:-({_PRE_RELEASE}))?'
+    rf'(?:\+({_BUILD}))?$'
 )
 
 _SEMVER_LAX_RE = re.compile(
-    r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?' r'(?:-([0-9A-Za-z\.\-]+))?' r'(?:\+([0-9A-Za-z\.\-]+))?$'
+    rf'^({_NUMERIC_IDENTIFIER})(?:\.({_NUMERIC_IDENTIFIER}))?(?:\.({_NUMERIC_IDENTIFIER}))?'
+    rf'(?:-({_PRE_RELEASE}))?'
+    rf'(?:\+({_BUILD}))?$'
 )
 
 
+def _make_version(
+    major: int,
+    minor: int = 0,
+    patch: int = 0,
+    pre_release: list[str] | None = None,
+    build: str = "",
+    raw: str = "",
+) -> ParsedVersion:
+    """Build a ParsedVersion with copied mutable fields."""
+    return ParsedVersion(
+        major=major,
+        minor=minor,
+        patch=patch,
+        pre_release=list(pre_release or []),
+        build=build,
+        raw=raw,
+    )
+
+
 def _parse_pre_release_identifiers(ident: str) -> list[str]:
-    """Split a pre-release string into identifiers."""
-    return [p for p in re.split(r'[.\-]', ident) if p]
+    """Split a semver pre-release string into dot-separated identifiers."""
+    return ident.split(".")
 
 
 def _compare_pre_release(a: list[str], b: list[str]) -> int:
@@ -175,10 +205,10 @@ def parse_version(version: str) -> ParsedVersion | None:
         return None
     pre_release = _parse_pre_release_identifiers(m.group(4)) if m.group(4) else []
     build = m.group(5) or ""
-    return ParsedVersion(
-        major=int(m.group(1)),
-        minor=int(m.group(2)),
-        patch=int(m.group(3)),
+    return _make_version(
+        int(m.group(1)),
+        int(m.group(2)),
+        int(m.group(3)),
         pre_release=pre_release,
         build=build,
         raw=version,
@@ -196,10 +226,10 @@ def _parse_version_lax(version: str) -> ParsedVersion | None:
         return None
     pre_release = _parse_pre_release_identifiers(m.group(4)) if m.group(4) else []
     build = m.group(5) or ""
-    return ParsedVersion(
-        major=int(m.group(1)),
-        minor=int(m.group(2) or 0),
-        patch=int(m.group(3) or 0),
+    return _make_version(
+        int(m.group(1)),
+        int(m.group(2) or 0),
+        int(m.group(3) or 0),
         pre_release=pre_release,
         build=build,
         raw=version,
@@ -236,48 +266,18 @@ def _cargo_caret_range(version: ParsedVersion) -> tuple[ParsedVersion, ParsedVer
     the lower bound includes those identifiers so that the same pre-release satisfies.
     """
     if version["major"] != 0:
-        upper = ParsedVersion(
-            major=version["major"] + 1,
-            minor=0,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        upper = _make_version(version["major"] + 1)
     elif version["minor"] != 0:
-        upper = ParsedVersion(
-            major=0,
-            minor=version["minor"] + 1,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        upper = _make_version(0, version["minor"] + 1)
     elif version["patch"] != 0:
-        upper = ParsedVersion(
-            major=0,
-            minor=0,
-            patch=version["patch"] + 1,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        upper = _make_version(0, 0, version["patch"] + 1)
     else:
-        upper = ParsedVersion(
-            major=0,
-            minor=0,
-            patch=1,
-            pre_release=[],
-            build="",
-            raw="",
-        )
-    lower = ParsedVersion(
-        major=version["major"],
-        minor=version["minor"],
-        patch=version["patch"],
+        upper = _make_version(0, 0, 1)
+    lower = _make_version(
+        version["major"],
+        version["minor"],
+        version["patch"],
         pre_release=list(version["pre_release"]),
-        build="",
-        raw="",
     )
     return lower, upper
 
@@ -291,41 +291,13 @@ def _cargo_tilde_range(version: ParsedVersion) -> tuple[ParsedVersion, ParsedVer
     - ~1 => >=1.0.0, <2.0.0
     """
     if version["minor"] == 0 and version["patch"] == 0 and version["pre_release"]:
-        upper = ParsedVersion(
-            major=version["major"],
-            minor=version["minor"] + 1,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        upper = _make_version(version["major"], version["minor"] + 1)
     elif version["minor"] == 0 and version["patch"] == 0:
-        upper = ParsedVersion(
-            major=version["major"] + 1,
-            minor=0,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        upper = _make_version(version["major"] + 1)
     elif version["patch"] == 0:
-        upper = ParsedVersion(
-            major=version["major"],
-            minor=version["minor"] + 1,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        upper = _make_version(version["major"], version["minor"] + 1)
     else:
-        upper = ParsedVersion(
-            major=version["major"],
-            minor=version["minor"] + 1,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        upper = _make_version(version["major"], version["minor"] + 1)
     return version, upper
 
 
@@ -338,39 +310,11 @@ def _cargo_wildcard_range(constraint: str) -> tuple[ParsedVersion | None, Parsed
     parts = constraint.strip().rstrip(".*").split(".")
     nums = [int(p) for p in parts if p]
     if len(nums) == 1:
-        lower = ParsedVersion(
-            major=nums[0],
-            minor=0,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw=constraint,
-        )
-        upper = ParsedVersion(
-            major=nums[0] + 1,
-            minor=0,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        lower = _make_version(nums[0], raw=constraint)
+        upper = _make_version(nums[0] + 1)
     elif len(nums) == 2:
-        lower = ParsedVersion(
-            major=nums[0],
-            minor=nums[1],
-            patch=0,
-            pre_release=[],
-            build="",
-            raw=constraint,
-        )
-        upper = ParsedVersion(
-            major=nums[0],
-            minor=nums[1] + 1,
-            patch=0,
-            pre_release=[],
-            build="",
-            raw="",
-        )
+        lower = _make_version(nums[0], nums[1], raw=constraint)
+        upper = _make_version(nums[0], nums[1] + 1)
     else:
         return None, None
     return lower, upper
@@ -391,6 +335,41 @@ def _evaluate_component(ver: ParsedVersion, op: str, bound: ParsedVersion) -> bo
     elif op == "!=":
         return not version_equal(ver, bound)
     return False
+
+
+def _range_constraint_result(
+    version: str,
+    constraint: str,
+    parsed_ver: ParsedVersion,
+    lower: ParsedVersion,
+    upper: ParsedVersion,
+    scheme: str,
+    constraint_type: str,
+    findings: list[str],
+) -> VersionConstraintResult:
+    """Build a standard >= lower, < upper constraint result."""
+    satisfies = version_gte(parsed_ver, lower) and version_less_than(parsed_ver, upper)
+    pc: ParsedConstraint = {
+        "raw": constraint,
+        "scheme": scheme,
+        "components": [
+            {"operator": ">=", "version": lower},
+            {"operator": "<", "version": upper},
+        ],
+        "type": constraint_type,
+    }
+    return VersionConstraintResult(
+        satisfies=satisfies,
+        parsed_version=parsed_ver,
+        parsed_constraint=pc,
+        scheme=scheme,
+        explanation=(
+            f"{version} satisfies {constraint}"
+            if satisfies
+            else f"{version} does not satisfy {constraint}"
+        ),
+        findings=findings,
+    )
 
 
 def check_version_constraint(
@@ -438,38 +417,6 @@ def check_version_constraint(
     if "*" in constraint:
         if scheme != "cargo":
             findings.append("Wildcard constraints are only supported with cargo scheme")
-            lower, upper = _cargo_wildcard_range(constraint)
-            if lower is None or upper is None:
-                return VersionConstraintResult(
-                    satisfies=False,
-                    parsed_version=parsed_ver,
-                    parsed_constraint=None,
-                    scheme=scheme,
-                    explanation=f"Invalid wildcard constraint: '{constraint}'",
-                    findings=findings,
-                )
-            satisfies = version_gte(parsed_ver, lower) and version_less_than(parsed_ver, upper)
-            pc: ParsedConstraint = {
-                "raw": constraint,
-                "scheme": scheme,
-                "components": [
-                    {"operator": ">=", "version": lower},
-                    {"operator": "<", "version": upper},
-                ],
-                "type": "wildcard",
-            }
-            return VersionConstraintResult(
-                satisfies=satisfies,
-                parsed_version=parsed_ver,
-                parsed_constraint=pc,
-                scheme=scheme,
-                explanation=(
-                    f"{version} satisfies {constraint}"
-                    if satisfies
-                    else f"{version} does not satisfy {constraint}"
-                ),
-                findings=findings,
-            )
         lower, upper = _cargo_wildcard_range(constraint)
         if lower is None or upper is None:
             return VersionConstraintResult(
@@ -480,27 +427,8 @@ def check_version_constraint(
                 explanation=f"Invalid wildcard constraint: '{constraint}'",
                 findings=findings,
             )
-        satisfies = version_gte(parsed_ver, lower) and version_less_than(parsed_ver, upper)
-        pc = {
-            "raw": constraint,
-            "scheme": scheme,
-            "components": [
-                {"operator": ">=", "version": lower},
-                {"operator": "<", "version": upper},
-            ],
-            "type": "wildcard",
-        }
-        return VersionConstraintResult(
-            satisfies=satisfies,
-            parsed_version=parsed_ver,
-            parsed_constraint=pc,
-            scheme=scheme,
-            explanation=(
-                f"{version} satisfies {constraint}"
-                if satisfies
-                else f"{version} does not satisfy {constraint}"
-            ),
-            findings=findings,
+        return _range_constraint_result(
+            version, constraint, parsed_ver, lower, upper, scheme, "wildcard", findings
         )
 
     # Handle caret constraints (cargo scheme)
@@ -519,27 +447,8 @@ def check_version_constraint(
         if parsed_bound["major"] == 0 and parsed_bound["minor"] == 0 and parsed_bound["patch"] == 0:
             findings.append("Caret constraint ^0.0.0 matches only 0.0.0")
         lower, upper = _cargo_caret_range(parsed_bound)
-        satisfies = version_gte(parsed_ver, lower) and version_less_than(parsed_ver, upper)
-        pc = {
-            "raw": constraint,
-            "scheme": "cargo",
-            "components": [
-                {"operator": ">=", "version": lower},
-                {"operator": "<", "version": upper},
-            ],
-            "type": "caret",
-        }
-        return VersionConstraintResult(
-            satisfies=satisfies,
-            parsed_version=parsed_ver,
-            parsed_constraint=pc,
-            scheme="cargo",
-            explanation=(
-                f"{version} satisfies {constraint}"
-                if satisfies
-                else f"{version} does not satisfy {constraint}"
-            ),
-            findings=findings,
+        return _range_constraint_result(
+            version, constraint, parsed_ver, lower, upper, "cargo", "caret", findings
         )
 
     # Handle tilde constraints (cargo scheme)
@@ -556,27 +465,8 @@ def check_version_constraint(
                 findings=[f"Could not parse version '{ver_str}' in tilde constraint"],
             )
         lower, upper = _cargo_tilde_range(parsed_bound)
-        satisfies = version_gte(parsed_ver, lower) and version_less_than(parsed_ver, upper)
-        pc = {
-            "raw": constraint,
-            "scheme": "cargo",
-            "components": [
-                {"operator": ">=", "version": lower},
-                {"operator": "<", "version": upper},
-            ],
-            "type": "tilde",
-        }
-        return VersionConstraintResult(
-            satisfies=satisfies,
-            parsed_version=parsed_ver,
-            parsed_constraint=pc,
-            scheme="cargo",
-            explanation=(
-                f"{version} satisfies {constraint}"
-                if satisfies
-                else f"{version} does not satisfy {constraint}"
-            ),
-            findings=findings,
+        return _range_constraint_result(
+            version, constraint, parsed_ver, lower, upper, "cargo", "tilde", findings
         )
 
     # Handle comma-separated constraints
@@ -602,7 +492,7 @@ def check_version_constraint(
             if not _evaluate_component(parsed_ver, op, parsed_bound):
                 all_satisfy = False
 
-        pc = {
+        range_constraint: ParsedConstraint = {
             "raw": constraint,
             "scheme": scheme,
             "components": components,
@@ -611,7 +501,7 @@ def check_version_constraint(
         return VersionConstraintResult(
             satisfies=all_satisfy,
             parsed_version=parsed_ver,
-            parsed_constraint=pc,
+            parsed_constraint=range_constraint,
             scheme=scheme,
             explanation=(
                 f"{version} satisfies {constraint}"
@@ -637,7 +527,7 @@ def check_version_constraint(
         )
 
     satisfies = _evaluate_component(parsed_ver, op, parsed_bound)
-    pc = {
+    comparison_constraint: ParsedConstraint = {
         "raw": constraint,
         "scheme": scheme,
         "components": [{"operator": op, "version": parsed_bound}],
@@ -646,7 +536,7 @@ def check_version_constraint(
     return VersionConstraintResult(
         satisfies=satisfies,
         parsed_version=parsed_ver,
-        parsed_constraint=pc,
+        parsed_constraint=comparison_constraint,
         scheme=scheme,
         explanation=(
             f"{version} satisfies {constraint}"

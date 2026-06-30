@@ -1575,12 +1575,12 @@ Check whether a version satisfies a constraint under a declared versioning schem
 - `findings`: Analysis notes and warnings
 
 **Supported constraint forms:**
-- Exact: `1.2.3`
-- Comparison: `>=1.2.3`, `<2.0`, `!=1.0`
-- Comma-separated ranges: `>=1.2,<2.0`
+- Semver exact: `1.2.3`
+- Semver comparison: `>=1.2.3`, `<2.0`, `!=1.0`
+- Semver comma-separated ranges: `>=1.2,<2.0`
 - Cargo caret: `^1.2.3`
 - Cargo tilde: `~1.2.3`
-- Wildcard: `1.*`, `1.2.*`
+- Cargo wildcard: `1.*`, `1.2.*`
 
 **Example:**
 ```json

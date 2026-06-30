@@ -2,6 +2,16 @@
 
 All notable changes to eggcalc are documented here.
 
+## [1.1.4] - 2026-06-30
+
+### Fixed
+- Semver parsing now preserves hyphenated pre-release identifiers such as `alpha-beta` instead of splitting them at the hyphen.
+- Semver parsing now rejects leading-zero numeric identifiers and empty pre-release/build identifiers.
+
+### Changed
+- Version constraint range result construction was consolidated for easier maintenance.
+- Release documentation updated to match package version `1.1.4`.
+
 ## [1.1.3] - 2026-06-10
 
 ### Fixed
