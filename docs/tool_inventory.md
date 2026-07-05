@@ -57,7 +57,7 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 47 | `text_position` | text | 2 | yes | no | yes | yes | Position conversion (byte/cp/line/UTF-16) |
 | 48 | `text_replace_check` | text | 1 | yes | no | yes | yes | Pre-edit replacement safety check |
 | 49 | `text_security_inspect` | text | 1 | yes | no | yes | yes | Composite security text hygiene (verdict, findings, machine codes) |
-| 50 | `text_truncate` | text | 3 | yes | no | yes | yes | Grapheme-aware truncation |
+| 50 | `text_truncate` | text | 3 | yes | no | yes | yes | Best-effort grapheme-aware truncation |
 | 51 | `text_transform` | text | 2 | yes | no | yes | yes | Unicode normalization, casefold, trim, etc. |
 | 52 | `text_window` | text | 1 | yes | no | yes | yes | Context window around a text position |
 | 53 | `toml_shape` | toml | 2 | yes | no | yes | yes | TOML structure analysis |
@@ -70,7 +70,7 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 60 | `validate_regex` | regex | 1 | yes | yes | yes | yes | Regex pattern testing against samples |
 | 61 | `validate_schema_light` | validation | 3 | yes | no | yes | yes | Light JSON schema validation |
 | 62 | `validate_toml` | validation | 1 | yes | no | yes | yes | TOML parsing validation |
-| 63 | `version_compare` | version | 2 | yes | no | yes | no | Version string comparison (semver/pep440/loose) |
+| 63 | `version_compare` | version | 2 | yes | no | yes | yes | Version string comparison (semver/pep440/loose) |
 | 64 | `version_constraint_check` | version | 3 | yes | no | yes | yes | Check if version satisfies constraint (semver/cargo) |
 
 ## Legend

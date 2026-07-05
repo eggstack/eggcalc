@@ -161,7 +161,8 @@ def remove_from_path(install_dir: str) -> bool:
                 i += 1  # skip the export line
             continue
         # Legacy: export line without preceding marker
-        if export_line in line and not found_export:
+        # Remove all exact matches for this install_dir, not just the first.
+        if export_line in line:
             found_export = True
             i += 1
             continue

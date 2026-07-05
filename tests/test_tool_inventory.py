@@ -153,6 +153,33 @@ class TestSourceOfTruthConsistency:
             TOOL_HANDLERS
         ), f"Inventory table has {len(rows)} rows, but TOOL_HANDLERS has {len(TOOL_HANDLERS)}"
 
+    def test_inventory_doc_summary_counts_match_table(self):
+        """Verify the summary stats match the actual table row data."""
+        if not _INVENTORY_DOC.exists():
+            return
+        content = _INVENTORY_DOC.read_text()
+        # Parse table rows: each row has fields separated by |
+        table_rows = re.findall(
+            r"^\|\s*\d+\s*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|\s*(yes|no)\s*\|",
+            content,
+            re.MULTILINE,
+        )
+        have_tests = sum(1 for row in table_rows if row.strip() == "yes")
+        missing_tests = sum(1 for row in table_rows if row.strip() == "no")
+        # Find summary counts
+        have_match = re.search(r"\|\s*Have tests\s*\|\s*(\d+)\s*\|", content)
+        missing_match = re.search(r"\|\s*Missing tests\s*\|\s*(\d+)\s*\|", content)
+        assert have_match, "Could not find 'Have tests' summary in inventory doc"
+        assert missing_match, "Could not find 'Missing tests' summary in inventory doc"
+        assert have_tests == int(have_match.group(1)), (
+            f"Inventory 'Have tests' says {have_match.group(1)}, "
+            f"but table has {have_tests} rows with 'yes'"
+        )
+        assert missing_tests == int(missing_match.group(1)), (
+            f"Inventory 'Missing tests' says {missing_match.group(1)}, "
+            f"but table has {missing_tests} rows with 'no'"
+        )
+
 
 HARNESS_TASK_PROFILES = {
     "codegg_preflight",

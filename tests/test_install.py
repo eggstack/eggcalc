@@ -379,6 +379,82 @@ class TestRemoveFromPath:
         with pytest.raises(ValueError, match="shell-unsafe"):
             remove_from_path('/home/"user"/bin')
 
+    def test_removes_multiple_marker_export_blocks(self, tmp_path):
+        zshrc = tmp_path / ".zshrc"
+        zshrc.write_text(
+            "pre\n"
+            "# Added by eggcalc install\n"
+            'export PATH="/custom/bin:$PATH"\n'
+            "mid\n"
+            "# Added by eggcalc install\n"
+            'export PATH="/custom/bin:$PATH"\n'
+            "post\n"
+        )
+
+        def fake_expanduser(p):
+            return str(zshrc)
+
+        with patch("os.path.expanduser", side_effect=fake_expanduser):
+            result = remove_from_path("/custom/bin")
+        assert result is True
+        content = zshrc.read_text()
+        assert "pre" in content
+        assert "mid" in content
+        assert "post" in content
+        assert "/custom/bin" not in content
+        assert "# Added by eggcalc install" not in content
+
+    def test_removes_legacy_export_without_marker(self, tmp_path):
+        zshrc = tmp_path / ".zshrc"
+        zshrc.write_text("pre\n" 'export PATH="/custom/bin:$PATH"\n' "post\n")
+
+        def fake_expanduser(p):
+            return str(zshrc)
+
+        with patch("os.path.expanduser", side_effect=fake_expanduser):
+            result = remove_from_path("/custom/bin")
+        assert result is True
+        content = zshrc.read_text()
+        assert "pre" in content
+        assert "post" in content
+        assert "/custom/bin" not in content
+
+    def test_removes_mixed_marker_and_legacy(self, tmp_path):
+        zshrc = tmp_path / ".zshrc"
+        zshrc.write_text(
+            "pre\n"
+            "# Added by eggcalc install\n"
+            'export PATH="/custom/bin:$PATH"\n'
+            "mid\n"
+            'export PATH="/custom/bin:$PATH"\n'
+            "post\n"
+        )
+
+        def fake_expanduser(p):
+            return str(zshrc)
+
+        with patch("os.path.expanduser", side_effect=fake_expanduser):
+            result = remove_from_path("/custom/bin")
+        assert result is True
+        content = zshrc.read_text()
+        assert "pre" in content
+        assert "mid" in content
+        assert "post" in content
+        assert "/custom/bin" not in content
+
+    def test_preserves_unrelated_path_entries(self, tmp_path):
+        zshrc = tmp_path / ".zshrc"
+        zshrc.write_text('export PATH="/other/bin:$PATH"\n')
+
+        def fake_expanduser(p):
+            return str(zshrc)
+
+        with patch("os.path.expanduser", side_effect=fake_expanduser):
+            result = remove_from_path("/custom/bin")
+        assert result is True
+        content = zshrc.read_text()
+        assert '/other/bin' in content
+
 
 # ---------------------------------------------------------------------------
 # update_calc
@@ -567,7 +643,10 @@ class TestMain:
         mock_install.assert_called_once_with(str(tmp_path), True, False)
 
     def test_install_flag_with_spawn_shell(self, tmp_path):
-        with patch("sys.argv", ["install.py", "--install", "--path", str(tmp_path), "--no-path", "--spawn-shell"]):
+        with patch(
+            "sys.argv",
+            ["install.py", "--install", "--path", str(tmp_path), "--no-path", "--spawn-shell"],
+        ):
             with patch("install.install_calc") as mock_install:
                 from install import main
 

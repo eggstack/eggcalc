@@ -314,7 +314,9 @@ def visible_repr(s: str) -> str:
 def _advance_grapheme(s: str, i: int, n: int) -> int:
     """Advance past one grapheme cluster starting at position i.
 
-    Handles GB9 (Extend), GB11 (ZWJ emoji), GB12/GB13 (Regional Indicator pairs).
+    Best-effort helper handling common combining marks, variation selectors,
+    emoji ZWJ sequences, and regional-indicator flag pairs. Not a complete
+    implementation of Unicode UAX #29 extended grapheme cluster segmentation.
 
     Args:
         s: Input string.
@@ -367,14 +369,17 @@ def _advance_grapheme(s: str, i: int, n: int) -> int:
 
 
 def count_graphemes(s: str) -> int:
-    """Count extended grapheme clusters in a string.
+    """Count approximate user-visible grapheme clusters in a string.
 
     A grapheme cluster is what a user would perceive as a single character.
     For example, 'é' as precomposed (U+00E9) or decomposed ('e' + combining
     acute) both count as 1 grapheme. Emoji sequences like '🏳️' or '👨‍👩‍👧‍👦'
     each count as 1 grapheme.
 
-    Handles GB9 (Extend), GB11 (ZWJ emoji), GB12/GB13 (RI pairs) per UAX #29.
+    This dependency-free helper handles common combining marks, variation
+    selectors, emoji ZWJ sequences, and regional-indicator flag pairs. It is
+    not a complete implementation of Unicode UAX #29 extended grapheme cluster
+    segmentation.
 
     Args:
         s: Input string.
@@ -394,11 +399,11 @@ def count_graphemes(s: str) -> int:
 
 
 def _is_extend_char(char: str) -> bool:
-    """Check if char is an Extend-class character per UAX #29 GB9.
+    """Check if char is an Extend-class character for grapheme segmentation.
 
     Note: ZWJ (U+200D) is NOT included here because it's part of emoji
-    ZWJ sequences (GB11) and must be handled specially in grapheme
-    boundary detection.
+    ZWJ sequences and must be handled specially in grapheme boundary
+    detection.
     """
     cat = unicodedata.category(char)
     cp = ord(char)
@@ -438,8 +443,9 @@ def _is_extended_pictographic(char: str) -> bool:
 def truncate_to_grapheme(s: str, max_graphemes: int) -> str:
     """Truncate a string to at most max_graphemes grapheme clusters.
 
-    This ensures the result doesn't cut mid-grapheme, preserving emoji,
-    combining sequences, and flag sequences intact.
+    Best-effort truncation that preserves common grapheme sequences:
+    combining marks, variation selectors, emoji ZWJ sequences, and
+    regional-indicator flag pairs. Not a complete UAX #29 implementation.
 
     Args:
         s: Input string.
