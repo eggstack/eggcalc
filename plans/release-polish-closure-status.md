@@ -14,7 +14,19 @@ black --check eggcalc tests         # PASS
 .venv/bin/python -m pytest tests/ -v  # PASS (2289 passed, 32 skipped)
 mypy eggcalc --ignore-missing-imports # PASS
 python build_single.py              # PASS
+.venv/bin/python eggcalc.py "5+3"   # PASS (→ 8)
 .venv/bin/python -m pytest tests/test_mcp_stdio_smoke.py -v  # PASS
+pytest tests/ -v -k "mcp or tool_inventory or grapheme or truncate or install"  # PASS (831 passed)
+```
+
+### Packaging Verification
+
+```bash
+python -m build                      # PASS (eggcalc-1.1.4)
+python -m twine check dist/*         # PASS (sdist + wheel)
+python -m venv /tmp/eggcalc-wheel-smoke && ...pip install dist/*.whl  # PASS
+calc "five plus two"                 # PASS (→ 7)
+library smoke (evaluate, evaluate_raw, EggCalcApp, UnitValue.convert_to)  # PASS
 ```
 
 ## GitHub Actions
