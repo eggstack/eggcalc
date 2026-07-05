@@ -2,7 +2,7 @@
 
 CLI calculator accepting natural language and unit conversion. Standard library only.
 
-For install as a CLI tool, clone the repo, cd into it, and run `python install.py --install`. It will combine everything into one file and add it to your $path. Then you can run it like `calc 2 meters plus 2ft`. It is spacing-tolerant and normalizes operator-adjacent spacing before parsing, including unit forms like `30 km / h in mph`, `5 in in cm`, and spaced unit products like `5 N m` or `5 m s`.
+Install with `pip install eggcalc` and run it like `calc 2 meters plus 2ft`. It is spacing-tolerant and normalizes operator-adjacent spacing before parsing, including unit forms like `30 km / h in mph`, `5 in in cm`, and spaced unit products like `5 N m` or `5 m s`.
 
 Written in pure Python with no external dependencies, it can be used as a CLI tool, a Python library, or an MCP server for AI agents.
 
@@ -49,6 +49,20 @@ pip install eggcalc
 git clone https://github.com/eggstack/eggcalc.git
 cd eggcalc
 pip install -e .
+```
+
+### Standalone installer (no pip)
+
+```bash
+git clone https://github.com/eggstack/eggcalc.git
+cd eggcalc
+python install.py --install
+```
+
+This builds a single-file executable and adds it to your `$PATH`. Use `--no-path` to skip modifying your shell profile:
+
+```bash
+python install.py --install --no-path
 ```
 
 ### Run directly without installing
@@ -142,7 +156,7 @@ eggcalc can run as an MCP server, exposing deterministic text, JSON, validation,
 calc --mcp
 ```
 
-**64 tools** across 15 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode). All results are deterministic - same input always produces the same output.
+**Tools** across 15 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode). All results are deterministic - same input always produces the same output. See [docs/tool_inventory.md](docs/tool_inventory.md) for the full count.
 
 For the full tool catalog with arguments, return values, and tiers, see [docs/mcp.md](docs/mcp.md).
 
@@ -851,9 +865,10 @@ MAX_EXPONENT = 100000
 - `register_constant()` - Safe to use, values are validated
 
 **Config file warning:**
-- `eggcalc_config.py` is imported from the working directory
+- `eggcalc_config.py` is Python code loaded from the current working directory — only run eggcalc in directories you trust
 - For production, ensure this file is not user-writable
 - Consider removing config loading in high-security environments
+- Disable config loading entirely with `EGGCALC_NO_CONFIG=1`
 
 ### Example: Secure Webapp Usage
 

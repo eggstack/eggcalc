@@ -144,7 +144,6 @@ def remove_from_path(install_dir: str) -> bool:
 
     export_line = f'export PATH="{install_dir}:$PATH"'
     added_marker = "# Added by eggcalc install"
-    removed_marker = "# Removed by eggcalc install"
 
     lines = content.split('\n')
     new_lines = []
@@ -153,22 +152,17 @@ def remove_from_path(install_dir: str) -> bool:
 
     while i < len(lines):
         line = lines[i]
-        if export_line in line:
-            # Found the export line - skip it and any following markers
+        # add_to_path() writes: marker line, then export line.
+        # Match marker-first order (the exact block written by add_to_path).
+        if line.strip() == added_marker:
             found_export = True
-            i += 1
-            # Skip the added/removed marker on next line if present
-            if i < len(lines) and lines[i].strip() in (added_marker, removed_marker):
-                i += 1
+            i += 1  # skip the marker
+            if i < len(lines) and export_line in lines[i]:
+                i += 1  # skip the export line
             continue
-        # Handle markers that follow a removed export line
-        if line.strip() in (added_marker, removed_marker):
-            # Skip if we already found the export (this is its trailing marker)
-            if found_export:
-                i += 1
-                continue
-            # This is an orphaned marker without a preceding export
-            # Skip it
+        # Legacy: export line without preceding marker
+        if export_line in line and not found_export:
+            found_export = True
             i += 1
             continue
         new_lines.append(line)
@@ -199,7 +193,9 @@ def remove_from_path(install_dir: str) -> bool:
     return True
 
 
-def install_calc(install_dir: str, no_path: bool = False) -> bool:
+def install_calc(
+    install_dir: str, no_path: bool = False, spawn_shell: bool = False
+) -> bool:
     """Install calc to the specified directory. Returns True if successful."""
     if is_installed(install_dir):
         print("calc is already installed.")
@@ -220,13 +216,20 @@ def install_calc(install_dir: str, no_path: bool = False) -> bool:
 
     if added:
         print("calc is ready to use!")
-        new_path = f"{install_dir}{os.pathsep}{os.environ.get('PATH', '')}"
-        shell_bin = "zsh" if os.path.exists(os.path.expanduser("~/.zshrc")) else "bash"
-        print(f"\nSpawning shell with calc available...")
-        subprocess.run(
-            [shell_bin, "-i"],
-            env={**os.environ, "PATH": new_path}
-        )
+        if spawn_shell:
+            new_path = f"{install_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+            shell_bin = (
+                "zsh"
+                if os.path.exists(os.path.expanduser("~/.zshrc"))
+                else "bash"
+            )
+            print(f"\nSpawning shell with calc available...")
+            subprocess.run(
+                [shell_bin, "-i"],
+                env={**os.environ, "PATH": new_path},
+            )
+    else:
+        print("calc is ready to use!")
 
     return True
 
@@ -377,12 +380,17 @@ def main():
     parser.add_argument("--uninstall", action="store_true", help="Remove calc from PATH")
     parser.add_argument("--path", "-p", help="Custom installation directory")
     parser.add_argument("--no-path", action="store_true", help="Don't modify PATH")
+    parser.add_argument(
+        "--spawn-shell",
+        action="store_true",
+        help="Spawn an interactive shell with calc on PATH after install",
+    )
     args = parser.parse_args()
 
     install_dir = args.path or get_install_path()
 
     if args.install:
-        install_calc(install_dir, args.no_path)
+        install_calc(install_dir, args.no_path, args.spawn_shell)
     elif args.update:
         update_calc(install_dir)
     elif args.uninstall:

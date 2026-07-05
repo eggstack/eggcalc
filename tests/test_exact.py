@@ -18,6 +18,7 @@ from eggcalc.exact import (
     codepoints,
     common_prefix_suffix,
     count_chars,
+    count_graphemes,
     detect_confusables,
     detect_mixed_scripts,
     diff_spans,
@@ -36,6 +37,7 @@ from eggcalc.exact import (
     raw_equal,
     regex_test,
     text_equal,
+    truncate_to_grapheme,
     unicode_script,
     utf8_bytes,
     validate_json,
@@ -210,6 +212,98 @@ class TestPrimitives:
         assert _is_extend_char('\u0301')  # combining acute accent (Mn)
         assert _is_extend_char('\u0302')  # combining circumflex (Mn)
         assert _is_extend_char('\ufe00')  # variation selector 1
+
+
+class TestGraphemeClusters:
+    """Tests for grapheme cluster counting and truncation."""
+
+    def test_count_graphemes_empty(self):
+        assert count_graphemes("") == 0
+
+    def test_count_graphemes_ascii(self):
+        assert count_graphemes("hello") == 5
+
+    def test_count_graphemes_combining(self):
+        # e + combining acute = 1 grapheme
+        assert count_graphemes("e\u0301") == 1
+        # e + combining ring + combining acute = 1 grapheme
+        assert count_graphemes("e\u030a\u0301") == 1
+
+    def test_count_graphemes_precomposed(self):
+        # é (U+00E9) = 1 grapheme
+        assert count_graphemes("\u00e9") == 1
+
+    def test_count_graphemes_ri_pair(self):
+        # Two RIs form one flag emoji (GB12/GB13)
+        assert count_graphemes("\U0001f1e6\U0001f1e7") == 1  # 🇦🇧
+
+    def test_count_graphemes_ri_lone(self):
+        # Single RI is one grapheme
+        assert count_graphemes("\U0001f1e6") == 1
+
+    def test_count_graphemes_ri_three(self):
+        # Three RIs: one pair + one lone = 2 graphemes
+        assert count_graphemes("\U0001f1e6\U0001f1e7\U0001f1e8") == 2
+
+    def test_count_graphemes_ri_four(self):
+        # Four RIs: two pairs = 2 graphemes
+        assert count_graphemes("\U0001f1e6\U0001f1e7\U0001f1e8\U0001f1e9") == 2
+
+    def test_count_graphemes_ri_six(self):
+        # Six RIs: three pairs = 3 graphemes
+        assert count_graphemes("\U0001f1e6\U0001f1e7\U0001f1e8\U0001f1e9\U0001f1ea\U0001f1eb") == 3
+
+    def test_count_graphemes_zwj_sequence(self):
+        # Family emoji (ZWJ-separated) = 1 grapheme
+        family = "\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466"
+        assert count_graphemes(family) == 1
+
+    def test_count_graphemes_zwj_simple(self):
+        # Simple ZWJ pair (man + ZWJ + woman) = 1 grapheme
+        couple = "\U0001f468\u200d\U0001f469"
+        assert count_graphemes(couple) == 1
+
+    def test_count_graphemes_variation_selector(self):
+        # Character + VS16 (emoji presentation) = 1 grapheme
+        assert count_graphemes("\u0023\ufe0f") == 1  # # + VS16
+        # Character + VS15 (text presentation) = 1 grapheme
+        assert count_graphemes("\u0023\ufe0e") == 1
+
+    def test_count_graphemes_mixed(self):
+        # "A" + flag + "B" = 3 graphemes
+        s = "A\U0001f1e6\U0001f1e7B"
+        assert count_graphemes(s) == 3
+
+    def test_truncate_to_grapheme_empty(self):
+        assert truncate_to_grapheme("", 5) == ""
+
+    def test_truncate_to_grapheme_zero(self):
+        assert truncate_to_grapheme("hello", 0) == ""
+
+    def test_truncate_to_grapheme_ascii(self):
+        assert truncate_to_grapheme("hello", 3) == "hel"
+
+    def test_truncate_to_grapheme_combining(self):
+        # Truncating mid-combining sequence should preserve the base char
+        s = "e\u0301"  # é as decomposed
+        assert truncate_to_grapheme(s, 1) == s
+        assert truncate_to_grapheme(s, 0) == ""
+
+    def test_truncate_to_grapheme_ri_pair(self):
+        # 4 RIs = 2 pairs; truncating to 2 should keep all 4 RIs
+        s = "\U0001f1e6\U0001f1e7\U0001f1e8\U0001f1e9"
+        assert truncate_to_grapheme(s, 2) == s
+
+    def test_truncate_to_grapheme_ri_truncates_pair(self):
+        # 3 RIs = pair + lone; truncating to 1 should keep the pair
+        s = "\U0001f1e6\U0001f1e7\U0001f1e8"
+        assert truncate_to_grapheme(s, 1) == "\U0001f1e6\U0001f1e7"
+
+    def test_truncate_to_grapheme_zwj(self):
+        # Family emoji should not be cut mid-sequence
+        family = "\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466"
+        assert truncate_to_grapheme(family, 1) == family
+        assert truncate_to_grapheme(family, 0) == ""
 
 
 class TestUnicodeTools:

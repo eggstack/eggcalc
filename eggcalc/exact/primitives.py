@@ -311,14 +311,70 @@ def visible_repr(s: str) -> str:
     return "".join(result)
 
 
+def _advance_grapheme(s: str, i: int, n: int) -> int:
+    """Advance past one grapheme cluster starting at position i.
+
+    Handles GB9 (Extend), GB11 (ZWJ emoji), GB12/GB13 (Regional Indicator pairs).
+
+    Args:
+        s: Input string.
+        i: Start position (must be a valid index into s).
+        n: Length of s.
+
+    Returns:
+        Index immediately after the grapheme cluster.
+    """
+    cp = ord(s[i])
+
+    # GB12/GB13: Regional Indicator pairs for flags.
+    # Count pairs from the run start: every two consecutive RIs = 1 grapheme.
+    if 0x1F1E6 <= cp <= 0x1F1FF:
+        i += 1
+        if i < n and 0x1F1E6 <= ord(s[i]) <= 0x1F1FF:
+            i += 1  # consume the paired RI
+        # Consume any trailing Extend characters (GB9)
+        while i < n and _is_extend_char(s[i]):
+            i += 1
+        return i
+
+    i += 1  # Move past base character
+
+    # Process Extend characters and ZWJ sequences (GB9, GB11)
+    while i < n:
+        cp = ord(s[i])
+
+        # GB9: Extend characters (combining marks, ZWNJ, VS)
+        if _is_extend_char(s[i]):
+            i += 1
+            continue
+
+        # GB11: Emoji ZWJ sequences
+        # Pattern: Extended_Pictographic (ZWJ Extend*)* ZWJ Extended_Pictographic
+        if cp == 0x200D:  # ZWJ
+            i += 1  # Skip ZWJ
+            # If next is pictographic, consume it as part of this grapheme
+            if i < n and _is_extended_pictographic(s[i]):
+                i += 1
+                # After pictographic, continue checking for more extends/ZWJ
+                continue
+            # No pictographic after ZWJ, break and let main loop handle
+            break
+
+        # Not an extend or ZWJ, this is the start of next grapheme
+        break
+
+    return i
+
+
 def count_graphemes(s: str) -> int:
     """Count extended grapheme clusters in a string.
 
-    Implements Unicode UAX #29 grapheme cluster boundary rules.
     A grapheme cluster is what a user would perceive as a single character.
     For example, 'é' as precomposed (U+00E9) or decomposed ('e' + combining
     acute) both count as 1 grapheme. Emoji sequences like '🏳️' or '👨‍👩‍👧‍👦'
     each count as 1 grapheme.
+
+    Handles GB9 (Extend), GB11 (ZWJ emoji), GB12/GB13 (RI pairs) per UAX #29.
 
     Args:
         s: Input string.
@@ -332,41 +388,7 @@ def count_graphemes(s: str) -> int:
 
     while i < n:
         count += 1
-        i += 1  # Move past base character
-
-        # Process all Extend characters and ZWJ sequences
-        while i < n:
-            cp = ord(s[i])
-
-            # GB9: Extend characters (combining marks, ZWNJ, VS)
-            if _is_extend_char(s[i]):
-                i += 1
-                continue
-
-            # GB11: Emoji ZWJ sequences
-            # Pattern: Extended_Pictographic (ZWJ Extend*)* ZWJ Extended_Pictographic
-            if cp == 0x200D:  # ZWJ
-                i += 1  # Skip ZWJ
-                # If next is pictographic, consume it as part of this grapheme
-                if i < n and _is_extended_pictographic(s[i]):
-                    i += 1
-                    # After pictographic, continue checking for more extends/ZWJ
-                    continue
-                # No pictographic after ZWJ, break and let main loop handle
-                break
-
-            # GB12/GB13: Regional Indicator pairs for flags
-            # Two consecutive RIs form one grapheme
-            if 0x1F1E6 <= cp <= 0x1F1FF:
-                # Check if next is also RI
-                if i + 1 < n and 0x1F1E6 <= ord(s[i + 1]) <= 0x1F1FF:
-                    i += 2  # Skip both RIs
-                    continue
-                i += 1
-                continue
-
-            # Not an extend or ZWJ or RI pair, this is the start of next grapheme
-            break
+        i = _advance_grapheme(s, i, n)
 
     return count
 
@@ -414,7 +436,7 @@ def _is_extended_pictographic(char: str) -> bool:
 
 
 def truncate_to_grapheme(s: str, max_graphemes: int) -> str:
-    """Truncate a string to at most max_grapheme grapheme clusters.
+    """Truncate a string to at most max_graphemes grapheme clusters.
 
     This ensures the result doesn't cut mid-grapheme, preserving emoji,
     combining sequences, and flag sequences intact.
@@ -438,38 +460,10 @@ def truncate_to_grapheme(s: str, max_graphemes: int) -> str:
     n = len(s)
 
     while i < n and grapheme_count < max_graphemes:
-        result.append(s[i])
+        start = i
+        i = _advance_grapheme(s, i, n)
+        result.append(s[start:i])
         grapheme_count += 1
-        i += 1  # Move past base character
-
-        while i < n:
-            cp = ord(s[i])
-
-            if _is_extend_char(s[i]):
-                result.append(s[i])
-                i += 1
-                continue
-
-            if cp == 0x200D:
-                result.append(s[i])
-                i += 1
-                if i < n and _is_extended_pictographic(s[i]):
-                    result.append(s[i])
-                    i += 1
-                    continue
-                break
-
-            if 0x1F1E6 <= cp <= 0x1F1FF:
-                if i + 1 < n and 0x1F1E6 <= ord(s[i + 1]) <= 0x1F1FF:
-                    result.append(s[i])
-                    result.append(s[i + 1])
-                    i += 2
-                    continue
-                result.append(s[i])
-                i += 1
-                continue
-
-            break
 
     return "".join(result)
 

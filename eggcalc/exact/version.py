@@ -63,9 +63,7 @@ _PRE_RELEASE_ORDER: dict[str, int] = {
 }
 
 _NUMERIC_IDENTIFIER = r'(?:0|[1-9]\d*)'
-_PRE_RELEASE_IDENTIFIER = (
-    r'(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)'
-)
+_PRE_RELEASE_IDENTIFIER = r'(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)'
 _PRE_RELEASE = rf'(?:{_PRE_RELEASE_IDENTIFIER})(?:\.(?:{_PRE_RELEASE_IDENTIFIER}))*'
 _BUILD = r'(?:[0-9A-Za-z-]+)(?:\.(?:[0-9A-Za-z-]+))*'
 

@@ -564,7 +564,15 @@ class TestMain:
                 from install import main
 
                 main()
-        mock_install.assert_called_once_with(str(tmp_path), True)
+        mock_install.assert_called_once_with(str(tmp_path), True, False)
+
+    def test_install_flag_with_spawn_shell(self, tmp_path):
+        with patch("sys.argv", ["install.py", "--install", "--path", str(tmp_path), "--no-path", "--spawn-shell"]):
+            with patch("install.install_calc") as mock_install:
+                from install import main
+
+                main()
+        mock_install.assert_called_once_with(str(tmp_path), True, True)
 
     def test_update_flag(self, tmp_path):
         with patch("sys.argv", ["install.py", "--update", "--path", str(tmp_path)]):

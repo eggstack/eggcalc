@@ -6,7 +6,7 @@ eggcalc includes an MCP (Model Context Protocol) server that exposes text analys
 
 The Model Context Protocol is a JSON-RPC 2.0 based protocol for exposing tools to AI agents. The calc MCP server provides:
 
-- **64 deterministic tools** for AI agent workflows
+- **Deterministic tools** for AI agent workflows (see [tool_inventory.md](tool_inventory.md) for count)
 - **Deterministic results** - same input always produces same output
 - **No external dependencies** - pure Python standard library
 - **stdio-based communication** - operates over stdin/stdout
@@ -2293,6 +2293,7 @@ The MCP server is designed for AI agent use with these security properties:
 3. **Deterministic results** - Same input produces same output
 4. **No external network calls** - Pure computation, no side effects
 5. **Text inspection tools** - Help detect Unicode-based spoofing attacks
+6. **Config trust boundary** - `eggcalc_config.py` is Python code loaded from the current working directory. Only run eggcalc in directories you trust. Set `EGGCALC_NO_CONFIG=1` to disable config loading entirely.
 
 **For untrusted input handling:**
 - Use `text_inspect` to check for hidden characters and confusables before storing user text

@@ -10349,3 +10349,56 @@ class TestMCPSecurityGuards:
         # JSON-RPC 2.0: -32601 = Method not found
         assert response["error"]["code"] == -32601
         assert "Unknown tool" in response["error"]["message"]
+
+
+class TestSubprocessSmoke:
+    """Smoke test: start MCP server as subprocess and verify tool listing."""
+
+    def test_subprocess_tools_list(self):
+        """Start the MCP server subprocess, send initialize + tools/list, verify response."""
+        import subprocess
+        import sys
+
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "eggcalc", "--mcp"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            # Send initialize request
+            init_req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+            # Send tools/list request
+            list_req = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+            proc.stdin.write(init_req + "\n")
+            proc.stdin.write(list_req + "\n")
+            proc.stdin.flush()
+
+            # Read two response lines
+            lines = []
+            for _ in range(2):
+                line = proc.stdout.readline()
+                if line:
+                    lines.append(json.loads(line.strip()))
+
+            assert len(lines) == 2, f"Expected 2 responses, got {len(lines)}"
+
+            # First response is initialize result
+            assert lines[0]["id"] == 1
+            assert "result" in lines[0]
+            assert lines[0]["result"]["serverInfo"]["name"] == "eggcalc"
+
+            # Second response is tools/list result
+            assert lines[1]["id"] == 2
+            assert "result" in lines[1]
+            tools = lines[1]["result"]["tools"]
+            tool_names = sorted(t["name"] for t in tools)
+            assert len(tool_names) > 0, "tools/list returned no tools"
+            # Verify known tools are present
+            assert "math_eval" in tool_names
+            assert "text_inspect" in tool_names
+            assert "validate_json" in tool_names
+        finally:
+            proc.stdin.close()
+            proc.wait(timeout=5)

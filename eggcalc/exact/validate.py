@@ -922,9 +922,7 @@ def regex_test(
             error=f"All samples must be strings; non-string items at indices {non_str_samples[:5]}",
             flags_used=flags_used,
         )
-    long_samples = [
-        i for i, sample in enumerate(samples) if len(sample) > MAX_SAMPLE_LENGTH
-    ]
+    long_samples = [i for i, sample in enumerate(samples) if len(sample) > MAX_SAMPLE_LENGTH]
     if long_samples:
         return RegexTestResult(
             valid_pattern=False,

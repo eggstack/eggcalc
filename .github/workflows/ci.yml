@@ -60,3 +60,32 @@ jobs:
       - name: Type check
         if: matrix.python-version == '3.12'
         run: mypy eggcalc --ignore-missing-imports
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Validate distributions
+        run: twine check dist/*
+
+      - name: Install wheel in clean venv
+        run: |
+          python -m venv /tmp/test-venv
+          /tmp/test-venv/bin/pip install dist/*.whl
+
+      - name: Smoke test
+        run: |
+          /tmp/test-venv/bin/python -c "from eggcalc import evaluate; assert evaluate('2+2') == 4, 'eval failed'"
+          /tmp/test-venv/bin/python -c "from eggcalc.units import UnitValue; assert UnitValue(1, 'm').to('ft').value > 3, 'unit conversion failed'"
