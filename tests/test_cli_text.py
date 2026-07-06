@@ -92,6 +92,14 @@ class TestCLICount:
         assert code == 1
         assert "Usage" in stderr
 
+    def test_count_target_with_spaces_preserved(self):
+        """Counting a single space inside multi-word text should work."""
+        code, stdout, stderr = run_calc(["--json", "count", "hello world", " "])
+        assert code == 0
+        data = json.loads(stdout)
+        assert data["target"] == " "
+        assert data["count"] == 1
+
 
 class TestCLIRegex:
     """Tests for calc regex command."""
@@ -134,6 +142,15 @@ class TestCLIRegex:
         assert code == 0
         data = json.loads(stdout)
         assert data["results"][0]["matches"] is True
+
+    def test_regex_args_with_spaces_preserved(self):
+        """Quoted args containing spaces should not be re-split."""
+        code, stdout, stderr = run_calc(["--json", "regex", "a b", "a b"])
+        assert code == 0
+        data = json.loads(stdout)
+        assert data["valid_pattern"] is True
+        assert data["results"][0]["sample"] == "a b"
+        assert data["results"][0]["fullmatch"] is True
 
 
 class TestCLIReplaceCheck:
@@ -181,6 +198,15 @@ class TestCLIReplaceCheck:
         code, stdout, stderr = run_calc(["replace-check"])
         assert code == 1
         assert "Usage" in stderr
+
+    def test_text_containing_delimiter(self):
+        """Text containing the delimiter should not be truncated."""
+        code, stdout, stderr = run_calc(
+            ["--json", "replace-check", "foo", "|||", "bar", "|||", "foo ||| foo"]
+        )
+        assert code == 0
+        data = json.loads(stdout)
+        assert data["match_count"] == 2
 
 
 class TestCLILines:

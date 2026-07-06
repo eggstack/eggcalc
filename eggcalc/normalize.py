@@ -3154,13 +3154,22 @@ def print_help() -> None:
 _DELIM = "|||"
 
 
-def _cli_text_command(expression: str, json_output: bool = False) -> int:
+def _cli_text_command(
+    expression: str, json_output: bool = False, argv: list[str] | None = None
+) -> int:
     """Handle text commands before math evaluation.
+
+    If ``argv`` is provided, it is used directly as the command + arguments
+    so that quoted arguments from the original shell argv are preserved.
+    Otherwise, ``expression`` is whitespace-split.
 
     Returns:
         0 if command was handled, 1 if expression should continue to math eval
     """
-    parts = expression.strip().split()
+    if argv is not None:
+        parts = list(argv)
+    else:
+        parts = expression.strip().split()
     if not parts:
         return 1
 
@@ -3288,13 +3297,13 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
         return 0
 
     if cmd == "replace-check":
-        if _DELIM not in expression:
+        raw = " ".join(parts[1:]).strip()
+        if _DELIM not in raw:
             print(
                 f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr
             )
             return 1
-        raw = expression[len(cmd) :].strip()
-        segments = raw.split(_DELIM)
+        segments = raw.split(_DELIM, 2)
         if len(segments) < 3:
             print(
                 f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr
@@ -3373,10 +3382,10 @@ def _cli_text_command(expression: str, json_output: bool = False) -> int:
         return 0
 
     if cmd == "patch-check":
-        if _DELIM not in expression:
+        raw = " ".join(parts[1:]).strip()
+        if _DELIM not in raw:
             print(f"Usage: calc patch-check <original> {_DELIM} <patch>", file=sys.stderr)
             return 1
-        raw = expression[len(cmd) :].strip()
         segments = raw.split(_DELIM, 1)
         if len(segments) < 2:
             print(f"Usage: calc patch-check <original> {_DELIM} <patch>", file=sys.stderr)
@@ -3654,7 +3663,10 @@ def main() -> int:
             return 1
 
     # Try text commands first (inspect, count, regex, etc.)
-    cmd_result = _cli_text_command(expression, json_output=args.json)
+    # When invoked with positional args, pass the argv list directly so quoted
+    # arguments (e.g. text containing spaces) are preserved verbatim.
+    text_argv = args.expression if args.expression else None
+    cmd_result = _cli_text_command(expression, json_output=args.json, argv=text_argv)
     if cmd_result == 0:
         return 0  # Command was handled
 
