@@ -420,3 +420,226 @@ def code_fence_extract(
         unclosed_fences=unclosed_fences,
         findings=findings,
     )
+
+
+# ---------------------------------------------------------------------------
+# Markdown link check (lexical, no network)
+# ---------------------------------------------------------------------------
+
+_MAX_LINK_CHECK_INPUT = 500_000
+
+
+class MalformedLink(TypedDict, total=False):
+    """A malformed link detected in markdown."""
+
+    line: int
+    text: str
+    reason: str
+
+
+class DuplicateAnchor(TypedDict, total=False):
+    """A duplicate anchor name from heading links."""
+
+    anchor: str
+    lines: list[int]
+
+
+class UnresolvedRelative(TypedDict, total=False):
+    """A relative link that could not be resolved against known paths."""
+
+    line: int
+    target: str
+
+
+class MarkdownLinkCheckResult(TypedDict, total=False):
+    """Result of markdown_link_check_lexical analysis."""
+
+    total_links: int
+    malformed: list[MalformedLink]
+    duplicate_anchors: list[DuplicateAnchor]
+    unresolved_relatives: list[UnresolvedRelative]
+    external_count: int
+    image_count: int
+
+
+_INLINE_LINK_RE = re.compile(r"!?\[([^\]]*)\]\(([^)]*)\)")
+_REFERENCE_LINK_RE = re.compile(r"!?\[([^\]]*)\]\[([^\]]*)\]")
+_REFERENCE_DEF_RE = re.compile(r"^\[([^\]]+)\]:\s+(\S+)", re.MULTILINE)
+_HEADING_FOR_ANCHOR_RE = re.compile(r"^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$")
+
+
+def _make_anchor(text: str) -> str:
+    """Create a GitHub-style anchor from heading text."""
+    anchor = text.lower().strip()
+    anchor = re.sub(r"[^\w\s-]", "", anchor)
+    anchor = re.sub(r"[\s]+", "-", anchor)
+    anchor = re.sub(r"-+", "-", anchor)
+    return anchor.strip("-")
+
+
+def markdown_link_check_lexical(
+    text: str,
+    known_paths: list[str] | None = None,
+) -> MarkdownLinkCheckResult:
+    """Lexical markdown link validation (no network).
+
+    Extracts all markdown links and checks for:
+    - Malformed link syntax (unclosed brackets, empty URLs)
+    - Duplicate anchor names from heading links
+    - Unresolved relative links (if known_paths provided)
+    - External vs internal link counts
+    - Image vs page link counts
+
+    Args:
+        text: Markdown text to analyze.
+        known_paths: Optional list of known file paths for resolving
+            relative links.
+
+    Returns:
+        MarkdownLinkCheckResult with analysis details.
+    """
+    if not isinstance(text, str):
+        return MarkdownLinkCheckResult(
+            total_links=0,
+            malformed=[],
+            duplicate_anchors=[],
+            unresolved_relatives=[],
+            external_count=0,
+            image_count=0,
+        )
+
+    if len(text) > _MAX_LINK_CHECK_INPUT:
+        return MarkdownLinkCheckResult(
+            total_links=0,
+            malformed=[],
+            duplicate_anchors=[],
+            unresolved_relatives=[],
+            external_count=0,
+            image_count=0,
+        )
+
+    lines = text.split("\n")
+    malformed: list[MalformedLink] = []
+    external_count = 0
+    image_count = 0
+    total_links = 0
+
+    heading_anchors: dict[str, list[int]] = {}
+    anchor_links: dict[str, list[int]] = {}
+    known_set = set(known_paths) if known_paths else None
+    unresolved: list[UnresolvedRelative] = []
+
+    in_fence = False
+    fence_char = ""
+
+    for i, line in enumerate(lines):
+        line_num = i + 1
+
+        fence_match = _CODE_FENCE_RE.match(line.strip())
+        if fence_match:
+            opener = fence_match.group(1)
+            if not in_fence:
+                in_fence = True
+                fence_char = opener[0]
+            elif opener[0] == fence_char and len(opener) >= 3:
+                in_fence = False
+            continue
+
+        if in_fence:
+            continue
+
+        heading_match = _HEADING_FOR_ANCHOR_RE.match(line.strip())
+        if heading_match:
+            heading_text = heading_match.group(2).strip()
+            anchor = _make_anchor(heading_text)
+            heading_anchors.setdefault(anchor, []).append(line_num)
+
+        for m in _INLINE_LINK_RE.finditer(line):
+            total_links += 1
+            link_text = m.group(1)
+            target = m.group(2)
+            is_image = line[m.start() : m.start() + 1] == "!"
+
+            if is_image:
+                image_count += 1
+
+            if target.startswith("http://") or target.startswith("https://"):
+                external_count += 1
+                continue
+
+            if target.startswith("#"):
+                anchor_name = target[1:]
+                anchor_links.setdefault(anchor_name, []).append(line_num)
+                continue
+
+            if target.startswith("mailto:"):
+                continue
+
+            if not target:
+                malformed.append(
+                    MalformedLink(
+                        line=line_num,
+                        text=m.group(0),
+                        reason="Empty URL in link",
+                    )
+                )
+                continue
+
+            if known_set is not None and not target.startswith(
+                ("http://", "https://", "mailto:", "#")
+            ):
+                if target not in known_set:
+                    unresolved.append(
+                        UnresolvedRelative(
+                            line=line_num,
+                            target=target,
+                        )
+                    )
+
+        for m in _REFERENCE_LINK_RE.finditer(line):
+            total_links += 1
+            link_text = m.group(1)
+            ref = m.group(2)
+            is_image = line[m.start() : m.start() + 1] == "!"
+
+            if is_image:
+                image_count += 1
+
+        unclosed_sq = line.count("[") - line.count("]")
+        if unclosed_sq > 0 and _INLINE_LINK_RE.search(line) is None:
+            if not line.strip().startswith("|"):
+                malformed.append(
+                    MalformedLink(
+                        line=line_num,
+                        text=line.strip()[:100],
+                        reason="Unclosed bracket (possible malformed link)",
+                    )
+                )
+
+    duplicate_anchors: list[DuplicateAnchor] = []
+    for anchor_name, anchor_lines in anchor_links.items():
+        if len(anchor_lines) > 1:
+            duplicate_anchors.append(
+                DuplicateAnchor(
+                    anchor=anchor_name,
+                    lines=anchor_lines,
+                )
+            )
+
+    for anchor_name, heading_lines in heading_anchors.items():
+        if len(heading_lines) > 1:
+            duplicate_anchors.append(
+                DuplicateAnchor(
+                    anchor=anchor_name,
+                    lines=heading_lines,
+                )
+            )
+
+    return MarkdownLinkCheckResult(
+        total_links=total_links,
+        malformed=malformed,
+        duplicate_anchors=duplicate_anchors,
+        unresolved_relatives=unresolved,
+        external_count=external_count,
+        image_count=image_count,
+    )

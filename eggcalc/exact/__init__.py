@@ -40,6 +40,25 @@ from .diff import (
     longest_common_subsequence,
 )
 
+# Re-export diff_analysis
+from .diff_analysis import (
+    ConflictMarkerLocation,
+    DiffFileHeaderEntry,
+    DiffFileHeadersResult,
+    DiffHunkRangesFile,
+    DiffHunkRangesResult,
+    DiffTouchedPathsResult,
+    HunkDetail,
+    ModeChange,
+    PatchConflictMarkersResult,
+    UnifiedDiffValidateResult,
+    diff_file_headers,
+    diff_hunk_ranges,
+    diff_touched_paths,
+    patch_conflict_markers_inspect,
+    unified_diff_validate,
+)
+
 # Re-export glob
 from .glob import (
     GlobMatchResult,
@@ -73,16 +92,28 @@ from .inspect_prompt import (
     prompt_input_inspect,
 )
 
+# Re-export llm_hygiene
+from .llm_hygiene import (
+    JsonFixHint,
+    LlmJsonCheckResult,
+    llm_json_output_check,
+)
+
 # Re-export markdown
 from .markdown import (
     CodeFenceBlock,
     CodeFenceExtractResult,
+    DuplicateAnchor,
+    MalformedLink,
     MarkdownCodeFence,
     MarkdownFrontmatter,
     MarkdownHeading,
     MarkdownLink,
+    MarkdownLinkCheckResult,
     MarkdownStructureResult,
+    UnresolvedRelative,
     code_fence_extract,
+    markdown_link_check_lexical,
     markdown_structure,
 )
 
@@ -142,6 +173,12 @@ from .primitives import (
     truncate_to_grapheme,
     utf8_bytes,
     visible_repr,
+)
+
+# Re-export repo_audit
+from .repo_audit import (
+    RepoInventoryResult,
+    repo_file_inventory,
 )
 
 # Re-export shell
@@ -305,6 +342,22 @@ __all__ = [
     "FirstDiff",
     "CommonPrefixSuffix",
     "DiffSpan",
+    # Diff analysis
+    "diff_touched_paths",
+    "diff_hunk_ranges",
+    "diff_file_headers",
+    "patch_conflict_markers_inspect",
+    "unified_diff_validate",
+    "DiffTouchedPathsResult",
+    "DiffHunkRangesResult",
+    "DiffHunkRangesFile",
+    "HunkDetail",
+    "DiffFileHeadersResult",
+    "DiffFileHeaderEntry",
+    "PatchConflictMarkersResult",
+    "ConflictMarkerLocation",
+    "UnifiedDiffValidateResult",
+    "ModeChange",
     # Validate
     "check_brackets",
     "validate_json",
@@ -389,13 +442,25 @@ __all__ = [
     # Markdown
     "markdown_structure",
     "code_fence_extract",
+    "markdown_link_check_lexical",
     "MarkdownStructureResult",
     "CodeFenceExtractResult",
+    "MarkdownLinkCheckResult",
     "MarkdownHeading",
     "MarkdownCodeFence",
     "MarkdownLink",
     "MarkdownFrontmatter",
     "CodeFenceBlock",
+    "MalformedLink",
+    "DuplicateAnchor",
+    "UnresolvedRelative",
+    # LLM hygiene
+    "llm_json_output_check",
+    "LlmJsonCheckResult",
+    "JsonFixHint",
+    # Repo audit
+    "repo_file_inventory",
+    "RepoInventoryResult",
     # Patch
     "patch_apply_check",
     "patch_summary",

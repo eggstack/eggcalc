@@ -35,6 +35,7 @@ from .schemas import (
     TOOL_PROFILES,
     TOOL_SCHEMAS,
     compact_schema,
+    normal_schema,
 )
 
 # Flag set the first time handle_request() runs to ensure MCP-safe defaults
@@ -52,10 +53,14 @@ from .tools import (
     command_preflight,
     config_preflight,
     constant_lookup,
+    diff_file_headers_mcp,
+    diff_hunk_ranges_mcp,
+    diff_touched_paths_mcp,
     dotenv_validate_mcp,
     edit_preflight,
     escape_text,
     glob_match_mcp,
+    go_mod_inspect_mcp,
     identifier_analyze,
     identifier_inspect_mcp,
     identifier_table_inspect_mcp,
@@ -70,17 +75,25 @@ from .tools import (
     list_compare,
     list_dedupe_mcp,
     list_sort_mcp,
+    llm_json_output_check_mcp,
+    lockfile_summary_mcp,
+    markdown_link_check_lexical_mcp,
     markdown_structure_mcp,
     math_eval,
+    package_json_inspect_mcp,
     patch_apply_check_mcp,
+    patch_conflict_markers_inspect_mcp,
     patch_summary_mcp,
     path_analyze_mcp,
     path_compare_mcp,
     path_normalize,
     path_scope_check_mcp,
     prompt_input_inspect_mcp,
+    pyproject_inspect_mcp,
     regex_finditer,
     regex_safety_check,
+    repo_file_inventory_mcp,
+    requirements_inspect_mcp,
     shell_argv_compare,
     shell_quote_join,
     shell_split,
@@ -101,6 +114,7 @@ from .tools import (
     toml_shape_mcp,
     unescape_text,
     unicode_policy_check_mcp,
+    unified_diff_validate_mcp,
     unit_convert,
     unit_info,
     validate_brackets,
@@ -120,6 +134,8 @@ TOOL_HANDLERS: dict[str, Any] = {
     "escape_text": escape_text,
     "line_range_compare": line_range_compare,
     "line_range_extract": line_range_extract,
+    "llm_json_output_check": llm_json_output_check_mcp,
+    "markdown_link_check_lexical": markdown_link_check_lexical_mcp,
     "unescape_text": unescape_text,
     "json_canonicalize": json_canonicalize,
     "json_compare": json_compare,
@@ -131,13 +147,19 @@ TOOL_HANDLERS: dict[str, Any] = {
     "list_sort": list_sort_mcp,
     "math_eval": math_eval,
     "patch_apply_check": patch_apply_check_mcp,
+    "patch_conflict_markers_inspect": patch_conflict_markers_inspect_mcp,
     "patch_summary": patch_summary_mcp,
+    "diff_touched_paths": diff_touched_paths_mcp,
+    "diff_hunk_ranges": diff_hunk_ranges_mcp,
+    "diff_file_headers": diff_file_headers_mcp,
+    "unified_diff_validate": unified_diff_validate_mcp,
     "path_analyze": path_analyze_mcp,
     "path_compare": path_compare_mcp,
     "path_normalize": path_normalize,
     "path_scope_check": path_scope_check_mcp,
     "regex_finditer": regex_finditer,
     "regex_safety_check": regex_safety_check,
+    "repo_file_inventory": repo_file_inventory_mcp,
     "shell_split": shell_split,
     "shell_quote_join": shell_quote_join,
     "argv_compare": shell_argv_compare,
@@ -177,14 +199,54 @@ TOOL_HANDLERS: dict[str, Any] = {
     "command_preflight": command_preflight,
     "config_preflight": config_preflight,
     "structured_data_compare": structured_data_compare,
+    "pyproject_inspect": pyproject_inspect_mcp,
+    "package_json_inspect": package_json_inspect_mcp,
+    "requirements_inspect": requirements_inspect_mcp,
+    "go_mod_inspect": go_mod_inspect_mcp,
+    "lockfile_summary": lockfile_summary_mcp,
 }
 
-MAX_REQUEST_BYTES = 1_000_000
-MAX_OUTPUT_BYTES = 1_000_000
-MAX_REQUESTS_PER_SECOND = 10
+
+def _parse_env_int(name: str, default: int, min_val: int, max_val: int) -> int:
+    """Parse a positive integer from environment variable with clamping.
+
+    Returns default if the variable is not set, empty, or contains a
+    non-numeric value.  The result is always clamped to [min_val, max_val].
+    """
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except (ValueError, TypeError):
+        return default
+    return max(min_val, min(value, max_val))
+
+
+def _parse_env_float(name: str, default: float, min_val: float, max_val: float) -> float:
+    """Parse a float from environment variable with clamping.
+
+    Returns default if the variable is not set, empty, or contains a
+    non-numeric value.  The result is always clamped to [min_val, max_val].
+    """
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except (ValueError, TypeError):
+        return default
+    return max(min_val, min(value, max_val))
+
+
+MAX_REQUEST_BYTES = _parse_env_int("EGGCALC_MCP_MAX_REQUEST_BYTES", 1_000_000, 1_000, 100_000_000)
+MAX_OUTPUT_BYTES = _parse_env_int("EGGCALC_MCP_MAX_OUTPUT_BYTES", 1_000_000, 1_000, 100_000_000)
+MAX_REQUESTS_PER_SECOND = _parse_env_float("EGGCALC_MCP_MAX_REQUESTS_PER_SECOND", 10, 0.1, 1000)
 MAX_REQUEST_ID_LENGTH = 1024
-MAX_TOOL_TIMEOUT_SECONDS = 30
-MAX_CANCELLED_REQUESTS = 10_000
+MAX_TOOL_TIMEOUT_SECONDS = _parse_env_int("EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS", 30, 1, 300)
+MAX_CANCELLED_REQUESTS = _parse_env_int(
+    "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", 10_000, 100, 1_000_000
+)
 # FIFO eviction order for cancellation records. We use deque + set
 # so we can pop the oldest entry deterministically when the cap is
 # exceeded (set.pop() would be non-deterministic and could evict the
@@ -270,7 +332,7 @@ def get_profile_tools(profile: str | None = None) -> list[str]:
 # Bounded thread pool for tool invocations. Prevents unbounded thread
 # accumulation when tools time out. Tasks submitted to a full pool queue
 # until a worker becomes available, providing natural back-pressure.
-_MAX_TOOL_WORKERS = 16
+_MAX_TOOL_WORKERS = _parse_env_int("EGGCALC_MCP_MAX_TOOL_WORKERS", 16, 1, 128)
 _tool_executor: ThreadPoolExecutor | None = None
 _tool_executor_lock = threading.Lock()
 
@@ -950,6 +1012,7 @@ def _handle_list_tools(request: dict) -> dict:
     # Schema detail: per-request override or global default
     detail = schema_detail_param or get_schema_detail()
     use_compact = detail == "compact"
+    schema_detail = detail
 
     # Determine profile-visible tools
     try:
@@ -986,6 +1049,14 @@ def _handle_list_tools(request: dict) -> dict:
         if use_compact:
             entry = compact_schema(schema)
             entry["name"] = name
+            entry["category"] = meta.get("category")
+            entry["llm_exposure"] = meta.get("llm_exposure")
+            entry["cost"] = meta.get("cost")
+        elif schema_detail == "normal":
+            entry = normal_schema(schema)
+            entry["name"] = name
+            entry["tier"] = schema.get("tier")
+            entry["tags"] = schema.get("tags", [])
             entry["category"] = meta.get("category")
             entry["llm_exposure"] = meta.get("llm_exposure")
             entry["cost"] = meta.get("cost")

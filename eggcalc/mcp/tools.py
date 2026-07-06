@@ -87,8 +87,29 @@ from ..exact.config import (
 from ..exact.identifier import (
     identifier_analyze as _identifier_analyze,
 )
+from ..exact.llm_hygiene import (
+    llm_json_output_check as _llm_json_output_check,
+)
+from ..exact.manifests import (
+    go_mod_inspect as _go_mod_inspect,
+)
+from ..exact.manifests import (
+    lockfile_summary as _lockfile_summary,
+)
+from ..exact.manifests import (
+    package_json_inspect as _package_json_inspect,
+)
+from ..exact.manifests import (
+    pyproject_inspect as _pyproject_inspect,
+)
+from ..exact.manifests import (
+    requirements_inspect as _requirements_inspect,
+)
 from ..exact.markdown import (
     code_fence_extract as _code_fence_extract,
+)
+from ..exact.markdown import (
+    markdown_link_check_lexical as _markdown_link_check_lexical,
 )
 from ..exact.markdown import (
     markdown_structure as _markdown_structure,
@@ -110,6 +131,9 @@ from ..exact.primitives import (
 )
 from ..exact.primitives import (
     truncate_to_grapheme as _truncate_to_grapheme,
+)
+from ..exact.repo_audit import (
+    repo_file_inventory as _repo_file_inventory,
 )
 from ..exact.shell import (
     argv_compare as _argv_compare,
@@ -4278,6 +4302,161 @@ def patch_summary_mcp(
         return _error_response("internal_error", str(e), tool="patch_summary")
 
 
+def diff_touched_paths_mcp(patch_text: str, max_files: int = 100) -> dict:
+    """Classify files in a unified diff as added, deleted, renamed, or modified.
+
+    Args:
+        patch_text: The unified diff text to analyze.
+        max_files: Maximum number of files to process.
+
+    Returns:
+        Success envelope with diff touched paths result, or error envelope.
+    """
+    from ..exact.diff_analysis import (
+        diff_touched_paths as _diff_touched_paths,
+    )
+    from ..exact.patch import MAX_PATCH_LENGTH
+
+    if (err := _require_str(patch_text, "patch_text", "diff_touched_paths")) is not None:
+        return err
+
+    if len(patch_text) > MAX_PATCH_LENGTH:
+        return _error_response(
+            "input_too_large",
+            f"Patch text length {len(patch_text)} exceeds maximum of {MAX_PATCH_LENGTH}",
+            [f"Maximum patch text length is {MAX_PATCH_LENGTH}"],
+            tool="diff_touched_paths",
+        )
+
+    try:
+        result = _diff_touched_paths(patch_text, max_files=max_files)
+        return _success_response(result, tool="diff_touched_paths")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="diff_touched_paths")
+
+
+def diff_hunk_ranges_mcp(patch_text: str, max_files: int = 100) -> dict:
+    """Extract hunk ranges per file with line count classification.
+
+    Args:
+        patch_text: The unified diff text to analyze.
+        max_files: Maximum number of files to process.
+
+    Returns:
+        Success envelope with diff hunk ranges result, or error envelope.
+    """
+    from ..exact.diff_analysis import (
+        diff_hunk_ranges as _diff_hunk_ranges,
+    )
+    from ..exact.patch import MAX_PATCH_LENGTH
+
+    if (err := _require_str(patch_text, "patch_text", "diff_hunk_ranges")) is not None:
+        return err
+
+    if len(patch_text) > MAX_PATCH_LENGTH:
+        return _error_response(
+            "input_too_large",
+            f"Patch text length {len(patch_text)} exceeds maximum of {MAX_PATCH_LENGTH}",
+            [f"Maximum patch text length is {MAX_PATCH_LENGTH}"],
+            tool="diff_hunk_ranges",
+        )
+
+    try:
+        result = _diff_hunk_ranges(patch_text, max_files=max_files)
+        return _success_response(result, tool="diff_hunk_ranges")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="diff_hunk_ranges")
+
+
+def diff_file_headers_mcp(patch_text: str, max_files: int = 100) -> dict:
+    """Extract metadata from diff file headers.
+
+    Args:
+        patch_text: The unified diff text to analyze.
+        max_files: Maximum number of files to process.
+
+    Returns:
+        Success envelope with diff file headers result, or error envelope.
+    """
+    from ..exact.diff_analysis import (
+        diff_file_headers as _diff_file_headers,
+    )
+    from ..exact.patch import MAX_PATCH_LENGTH
+
+    if (err := _require_str(patch_text, "patch_text", "diff_file_headers")) is not None:
+        return err
+
+    if len(patch_text) > MAX_PATCH_LENGTH:
+        return _error_response(
+            "input_too_large",
+            f"Patch text length {len(patch_text)} exceeds maximum of {MAX_PATCH_LENGTH}",
+            [f"Maximum patch text length is {MAX_PATCH_LENGTH}"],
+            tool="diff_file_headers",
+        )
+
+    try:
+        result = _diff_file_headers(patch_text, max_files=max_files)
+        return _success_response(result, tool="diff_file_headers")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="diff_file_headers")
+
+
+def patch_conflict_markers_inspect_mcp(text: str) -> dict:
+    """Detect conflict markers in text.
+
+    Args:
+        text: Text to scan for conflict markers.
+
+    Returns:
+        Success envelope with conflict markers result, or error envelope.
+    """
+    from ..exact.diff_analysis import (
+        patch_conflict_markers_inspect as _patch_conflict_markers_inspect,
+    )
+
+    if (err := _require_str(text, "text", "patch_conflict_markers_inspect")) is not None:
+        return err
+
+    try:
+        result = _patch_conflict_markers_inspect(text)
+        return _success_response(result, tool="patch_conflict_markers_inspect")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="patch_conflict_markers_inspect")
+
+
+def unified_diff_validate_mcp(patch_text: str, check_line_counts: bool = True) -> dict:
+    """Validate the structural integrity of a unified diff.
+
+    Args:
+        patch_text: The unified diff text to validate.
+        check_line_counts: If True, validate hunk header line counts.
+
+    Returns:
+        Success envelope with validate result, or error envelope.
+    """
+    from ..exact.diff_analysis import (
+        unified_diff_validate as _unified_diff_validate,
+    )
+    from ..exact.patch import MAX_PATCH_LENGTH
+
+    if (err := _require_str(patch_text, "patch_text", "unified_diff_validate")) is not None:
+        return err
+
+    if len(patch_text) > MAX_PATCH_LENGTH:
+        return _error_response(
+            "input_too_large",
+            f"Patch text length {len(patch_text)} exceeds maximum of {MAX_PATCH_LENGTH}",
+            [f"Maximum patch text length is {MAX_PATCH_LENGTH}"],
+            tool="unified_diff_validate",
+        )
+
+    try:
+        result = _unified_diff_validate(patch_text, check_line_counts=check_line_counts)
+        return _success_response(result, tool="unified_diff_validate")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="unified_diff_validate")
+
+
 def unicode_policy_check_mcp(
     text: str,
     policy: str,
@@ -5880,3 +6059,275 @@ def structured_data_compare(
         findings=all_findings or None,
         machine_code=machine_code,
     )
+
+
+def pyproject_inspect_mcp(text: str) -> dict:
+    """Inspect pyproject.toml text without network or filesystem access."""
+    if (err := _require_str(text, "text", "pyproject_inspect")) is not None:
+        return err
+    try:
+        result = _pyproject_inspect(text)
+        findings = [
+            {
+                "code": f.get("code", "UNKNOWN"),
+                "severity": f.get("severity", "info"),
+                "message": f.get("message", ""),
+            }
+            for f in result.get("findings", [])
+        ]
+        machine_code = None
+        if not result.get("parse_ok"):
+            machine_code = "TOML_PARSE_FAILED"
+        return _success_response(
+            result, tool="pyproject_inspect", findings=findings or None, machine_code=machine_code
+        )
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="pyproject_inspect")
+
+
+def package_json_inspect_mcp(text: str) -> dict:
+    """Inspect package.json text without network or filesystem access."""
+    if (err := _require_str(text, "text", "package_json_inspect")) is not None:
+        return err
+    try:
+        result = _package_json_inspect(text)
+        findings = [
+            {
+                "code": f.get("code", "UNKNOWN"),
+                "severity": f.get("severity", "info"),
+                "message": f.get("message", ""),
+            }
+            for f in result.get("findings", [])
+        ]
+        machine_code = None
+        if not result.get("parse_ok"):
+            machine_code = "JSON_PARSE_FAILED"
+        return _success_response(
+            result,
+            tool="package_json_inspect",
+            findings=findings or None,
+            machine_code=machine_code,
+        )
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="package_json_inspect")
+
+
+def requirements_inspect_mcp(text: str) -> dict:
+    """Inspect requirements.txt-style text without network access."""
+    if (err := _require_str(text, "text", "requirements_inspect")) is not None:
+        return err
+    try:
+        result = _requirements_inspect(text)
+        findings = [
+            {
+                "code": f.get("code", "UNKNOWN"),
+                "severity": f.get("severity", "info"),
+                "message": f.get("message", ""),
+            }
+            for f in result.get("findings", [])
+        ]
+        return _success_response(result, tool="requirements_inspect", findings=findings or None)
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="requirements_inspect")
+
+
+def go_mod_inspect_mcp(text: str) -> dict:
+    """Inspect go.mod text without network or filesystem access."""
+    if (err := _require_str(text, "text", "go_mod_inspect")) is not None:
+        return err
+    try:
+        result = _go_mod_inspect(text)
+        findings = [
+            {
+                "code": f.get("code", "UNKNOWN"),
+                "severity": f.get("severity", "info"),
+                "message": f.get("message", ""),
+            }
+            for f in result.get("findings", [])
+        ]
+        return _success_response(result, tool="go_mod_inspect", findings=findings or None)
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="go_mod_inspect")
+
+
+def lockfile_summary_mcp(text: str, kind: str = "auto") -> dict:
+    """Produce a shallow summary of a lockfile without full parsing."""
+    if (err := _require_str(text, "text", "lockfile_summary")) is not None:
+        return err
+    valid_kinds = {
+        "auto",
+        "package-lock",
+        "pnpm-lock",
+        "yarn-lock",
+        "poetry-lock",
+        "uv-lock",
+        "cargo-lock",
+        "go-sum",
+    }
+    if kind not in valid_kinds:
+        return _error_response(
+            "invalid_arguments",
+            f"kind must be one of {sorted(valid_kinds)}",
+            tool="lockfile_summary",
+        )
+    try:
+        result = _lockfile_summary(text, kind)
+        findings = [
+            {
+                "code": f.get("code", "UNKNOWN"),
+                "severity": f.get("severity", "info"),
+                "message": f.get("message", ""),
+            }
+            for f in result.get("findings", [])
+        ]
+        return _success_response(result, tool="lockfile_summary", findings=findings or None)
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="lockfile_summary")
+
+
+# ---------------------------------------------------------------------------
+# LLM output hygiene tools
+# ---------------------------------------------------------------------------
+
+
+def llm_json_output_check_mcp(text: str) -> dict:
+    """Detect and diagnose common LLM JSON output issues."""
+    if (err := _require_str(text, "text", "llm_json_output_check")) is not None:
+        return err
+    try:
+        result = _llm_json_output_check(text)
+        return _success_response(result, tool="llm_json_output_check")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="llm_json_output_check")
+
+
+# ---------------------------------------------------------------------------
+# Markdown link check tools
+# ---------------------------------------------------------------------------
+
+
+def markdown_link_check_lexical_mcp(
+    text: str,
+    known_paths: list[str] | None = None,
+) -> dict:
+    """Lexical markdown link validation (no network)."""
+    if (err := _require_str(text, "text", "markdown_link_check_lexical")) is not None:
+        return err
+    if known_paths is not None:
+        if not isinstance(known_paths, list):
+            return _error_response(
+                "invalid_arguments",
+                f"known_paths must be a list or None, got {type(known_paths).__name__}",
+                tool="markdown_link_check_lexical",
+            )
+        if len(known_paths) > 10_000:
+            return _error_response(
+                "input_too_large",
+                f"known_paths length {len(known_paths)} exceeds 10000",
+                tool="markdown_link_check_lexical",
+            )
+        non_str = [i for i, p in enumerate(known_paths) if not isinstance(p, str)]
+        if non_str:
+            return _error_response(
+                "invalid_arguments",
+                "All known_paths elements must be strings",
+                [f"Non-string items at indices: {non_str[:5]}"],
+                tool="markdown_link_check_lexical",
+            )
+    try:
+        result = _markdown_link_check_lexical(text, known_paths)
+        return _success_response(result, tool="markdown_link_check_lexical")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="markdown_link_check_lexical")
+
+
+# ---------------------------------------------------------------------------
+# Repo audit tools
+# ---------------------------------------------------------------------------
+
+_MAX_REPO_PATHS = 50_000
+_MAX_REPO_PATH_LENGTH = 1_000
+
+
+def repo_file_inventory_mcp(
+    paths: list[str],
+    sizes: dict[str, int] | None = None,
+    hashes: dict[str, str] | None = None,
+) -> dict:
+    """Analyze file inventory for repo structure signals."""
+    if not isinstance(paths, list):
+        return _error_response(
+            "invalid_arguments",
+            f"paths must be a list, got {type(paths).__name__}",
+            tool="repo_file_inventory",
+        )
+    if len(paths) > _MAX_REPO_PATHS:
+        return _error_response(
+            "input_too_large",
+            f"paths length {len(paths)} exceeds {_MAX_REPO_PATHS}",
+            tool="repo_file_inventory",
+        )
+    non_str = [i for i, p in enumerate(paths) if not isinstance(p, str)]
+    if non_str:
+        return _error_response(
+            "invalid_arguments",
+            "All paths elements must be strings",
+            [f"Non-string items at indices: {non_str[:5]}"],
+            tool="repo_file_inventory",
+        )
+    overlong = [i for i, p in enumerate(paths) if len(p) > _MAX_REPO_PATH_LENGTH]
+    if overlong:
+        return _error_response(
+            "input_too_large",
+            f"Path items exceed max length {_MAX_REPO_PATH_LENGTH}",
+            [f"Oversized items at indices: {overlong[:5]}"],
+            tool="repo_file_inventory",
+        )
+
+    if sizes is not None:
+        if not isinstance(sizes, dict):
+            return _error_response(
+                "invalid_arguments",
+                f"sizes must be a dict or None, got {type(sizes).__name__}",
+                tool="repo_file_inventory",
+            )
+        for k, v in sizes.items():
+            if not isinstance(k, str):
+                return _error_response(
+                    "invalid_arguments",
+                    f"sizes keys must be strings, got {type(k).__name__}",
+                    tool="repo_file_inventory",
+                )
+            if not isinstance(v, int) or isinstance(v, bool):
+                return _error_response(
+                    "invalid_arguments",
+                    f"sizes values must be integers, got {type(v).__name__}",
+                    tool="repo_file_inventory",
+                )
+
+    if hashes is not None:
+        if not isinstance(hashes, dict):
+            return _error_response(
+                "invalid_arguments",
+                f"hashes must be a dict or None, got {type(hashes).__name__}",
+                tool="repo_file_inventory",
+            )
+        for hk, hv in hashes.items():
+            if not isinstance(hk, str):
+                return _error_response(
+                    "invalid_arguments",
+                    f"hashes keys must be strings, got {type(hk).__name__}",
+                    tool="repo_file_inventory",
+                )
+            if not isinstance(hv, str):
+                return _error_response(
+                    "invalid_arguments",
+                    f"hashes values must be strings, got {type(hv).__name__}",
+                    tool="repo_file_inventory",
+                )
+
+    try:
+        result = _repo_file_inventory(paths, sizes, hashes)
+        return _success_response(result, tool="repo_file_inventory")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="repo_file_inventory")

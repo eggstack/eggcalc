@@ -104,7 +104,7 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 
 ## MCP Server
 
-- 64 tools across 15 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode).
+- 77 tools across 18 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo).
 - Tool names unified via `TOOL_SCHEMAS` in `schemas.py` and `server.py`.
 - `MAX_TEXT_LENGTH` enforced on `math_eval`.
 - Case-insensitive tool matching with suggestions for unknown tools.

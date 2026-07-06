@@ -28,6 +28,7 @@ MODULES_CALC = [
 MODULES_EXACT = [
     "exact/primitives",
     "exact/diff",
+    "exact/diff_analysis",
     "exact/validate",
     "exact/measure",
     "exact/unicode_tools",
@@ -47,6 +48,9 @@ MODULES_EXACT = [
     "exact/inspect_prompt",
     "exact/cargo",
     "exact/version",
+    "exact/manifests",
+    "exact/llm_hygiene",
+    "exact/repo_audit",
 ]
 
 MODULES_MCP = [

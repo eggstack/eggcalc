@@ -21,6 +21,28 @@ calc --mcp
 
 The server reads JSON-RPC requests from stdin and writes responses to stdout. It runs until EOF is received.
 
+## Configuration
+
+The MCP server exposes several rate-limiting and resource-guard constants that can be overridden via environment variables. All values are validated and clamped to safe ranges; invalid or out-of-range values silently fall back to the default.
+
+| Environment Variable | Default | Min | Max | Description |
+|----------------------|---------|-----|-----|-------------|
+| `EGGCALC_MCP_MAX_REQUEST_BYTES` | 1,000,000 | 1,000 | 100,000,000 | Maximum size of a single JSON-RPC request in bytes |
+| `EGGCALC_MCP_MAX_OUTPUT_BYTES` | 1,000,000 | 1,000 | 100,000,000 | Maximum size of a single tool response in bytes |
+| `EGGCALC_MCP_MAX_REQUESTS_PER_SECOND` | 10 | 0.1 | 1,000 | Rate limit for incoming requests (float) |
+| `EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS` | 30 | 1 | 300 | Maximum time in seconds a tool call may run |
+| `EGGCALC_MCP_MAX_CANCELLED_REQUESTS` | 10,000 | 100 | 1,000,000 | Size of the cancellation-record ring buffer |
+| `EGGCALC_MCP_MAX_TOOL_WORKERS` | 16 | 1 | 128 | Maximum threads in the tool-execution thread pool |
+
+**Example:**
+
+```bash
+# Allow larger requests and more concurrent workers
+EGGCALC_MCP_MAX_REQUEST_BYTES=5000000 \
+EGGCALC_MCP_MAX_TOOL_WORKERS=32 \
+calc --mcp
+```
+
 ## Protocol Basics
 
 The server uses JSON-RPC 2.0 over stdio:
@@ -1064,6 +1086,7 @@ When a tool call fails, the response includes an error envelope:
 - `parse_error`: Could not parse input (invalid JSON, regex, etc.)
 - `evaluation_error`: Math expression evaluation failed
 - `timeout`: Operation timed out
+- `cancelled`: Request was cancelled before dispatch
 - `internal_error`: Unexpected error in the tool
 
 ---
@@ -1168,6 +1191,47 @@ The MCP server enforces these limits to prevent DoS:
 - `MAX_LIST_ITEMS`: 10,000 items per list argument
 - `MAX_REGEX_SAMPLES`: 100 samples per regex test
 - `MAX_EXPRESSION_LENGTH`: 10,000 characters for math expressions
+
+---
+
+## Cancellation Semantics
+
+The MCP server supports request cancellation via the `notifications/cancelled` method. Cancellation is best-effort — once a tool starts executing in the thread pool, it cannot be reliably stopped.
+
+### Pre-dispatch cancellation
+
+When a `notifications/cancelled` message arrives, the server records the `requestId` in a bounded set (`_cancelled_requests`, capped at 10,000 entries with FIFO eviction). If a `tools/call` arrives with that ID *before* dispatch, it is immediately rejected:
+
+```json
+{
+  "ok": false,
+  "error_type": "cancelled",
+  "error": "Tool 'math_eval' request was cancelled",
+  "hints": []
+}
+```
+
+After rejection, the cancelled ID is removed from the tracking set so it does not affect future requests.
+
+### Post-dispatch cancellation (timeout path)
+
+If a tool is already running when a timeout fires, the server calls `Future.cancel()` on the worker. This is best-effort: it only succeeds if the worker has not started executing yet (Python's `ThreadPoolExecutor` semantics). In practice, most tools will have already started, so cancellation will not stop them. The worker completes on its own, and its result is discarded.
+
+### Bounded thread pool
+
+Tool invocations run in a bounded `ThreadPoolExecutor` (default 16 workers, configurable via `EGGCALC_MCP_MAX_TOOL_WORKERS`). This provides natural back-pressure: when all workers are busy, new tasks queue rather than spawning unbounded threads. This prevents thread accumulation under sustained load or repeated timeouts.
+
+### Long-running tools
+
+Tools that perform heavy computation (regex scanning on large text, diff analysis, schema traversal, identifier collision detection) may run for the full `MAX_TOOL_TIMEOUT_SECONDS` (30 seconds) even after cancellation. The client receives a timeout error, but the worker continues until it finishes or the process exits.
+
+### Error envelope determinism
+
+Both timeout and cancellation error envelopes are sanitized and follow the standard error format. The `error_type` field distinguishes `"timeout"` (tool ran too long) from `"cancelled"` (rejected before dispatch). Error messages are truncated to 2,000 characters and stripped of non-ASCII characters.
+
+### Cooperative cancellation (future enhancement)
+
+Currently, tools do not check for cancellation mid-execution. A future enhancement could add a cancellation token or callback that long-running tools check periodically (e.g., inside regex iteration loops or recursive JSON traversal). This would allow tools to exit early when cancelled, rather than running to completion.
 
 ---
 

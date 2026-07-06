@@ -282,6 +282,48 @@ def path_analyze(path: str, style: str = "auto") -> PathAnalyzeResult:
     )
 
 
+def _parse_path_root(path: str, platform: str) -> tuple[str, list[str], bool, str]:
+    """Parse path into (root_string, tail_components, is_absolute, root_kind).
+
+    root_kind: "none", "drive", "unc", "posix_root"
+    root_string: "C:", "\\\\server\\share", "/", or ""
+    tail_components: list of path components after root (may include "." and "..")
+    """
+    if platform == "windows":
+        normalized = path.replace("/", "\\")
+
+        if normalized.startswith("\\\\"):
+            parts = normalized.split("\\")
+            non_empty = [p for p in parts if p]
+            if len(non_empty) >= 2:
+                root = "\\\\" + non_empty[0] + "\\" + non_empty[1]
+                tail = non_empty[2:]
+                return root, tail, True, "unc"
+            else:
+                return "\\\\", [], True, "unc"
+
+        if len(normalized) >= 2 and normalized[1] == ":":
+            root = normalized[:2]
+            rest = normalized[2:]
+            if rest.startswith("\\") or rest.startswith("/"):
+                parts = [p for p in rest.split("\\") if p]
+                return root, parts, True, "drive"
+            else:
+                parts = [p for p in rest.split("\\") if p]
+                return root, parts, False, "drive"
+
+        parts = [p for p in normalized.split("\\") if p]
+        return "", parts, False, "none"
+
+    if path.startswith("/"):
+        rest = path[1:]
+        parts = [p for p in rest.split("/") if p]
+        return "/", parts, True, "posix_root"
+
+    parts = [p for p in path.split("/") if p]
+    return "", parts, False, "none"
+
+
 def path_normalize(
     path: str,
     platform: str = "posix",
@@ -311,67 +353,58 @@ def path_normalize(
 
     sep = "/" if platform == "posix" else "\\"
 
-    components = []
-    is_unc_track = platform == "windows" and (path.startswith("\\\\") or path.startswith("//"))
-    for part in path.split(sep):
-        if part == "":
-            continue
-        if part == ".":
+    root, tail, is_absolute, root_kind = _parse_path_root(path, platform)
+
+    for comp in tail:
+        if comp == ".":
             has_dot = True
-            if collapse_dot_segments:
+        elif comp == "..":
+            has_dot_dot = True
+
+    if collapse_dot_segments:
+        collapsed: list[str] = []
+        for comp in tail:
+            if comp == ".":
                 warnings.append("Collapsing dot segment")
                 continue
-            else:
-                components.append(part)
-                continue
-        elif part == "..":
-            has_dot_dot = True
-            if collapse_dot_segments:
+            elif comp == "..":
                 warnings.append("Collapsing dot-dot segment")
-                if is_unc_track:
-                    if components and components[-1] not in ("", ".."):
-                        if components[-1] != "server" or len(components) == 1:
-                            components.pop()
-                        else:
-                            components.append("..")
-                    else:
-                        components.append("..")
-                elif components and components[-1] != "..":
-                    components.pop()
-                else:
-                    components.append("..")
+                if collapsed and collapsed[-1] != "..":
+                    collapsed.pop()
+                elif not is_absolute:
+                    collapsed.append(comp)
             else:
-                components.append(part)
-            continue
-        elif is_unc_track and part in ("server", "share"):
-            if len(components) >= 2:
-                is_unc_track = False
-            components.append(part)
-        elif part not in ("", ".", ".."):
-            components.append(part)
+                collapsed.append(comp)
+        components = collapsed
+    else:
+        components = tail[:]
 
     if preserve_trailing_separator and had_trailing_separator and components:
-        components.append("")
+        components = components + [""]
 
-    normalized = sep.join(components) if components else ""
-
-    if platform == "posix" and path.startswith("/") and not normalized.startswith("/"):
-        normalized = "/" + normalized
-    elif platform == "windows":
-        if is_unc_track:
-            normalized = "\\\\" + normalized
-        elif len(path) >= 2 and path[1] == ":":
-            normalized = path[:2] + normalized
+    if components:
+        if root:
+            if root_kind == "posix_root":
+                normalized = root + sep.join(components)
+            elif root_kind == "drive" and not is_absolute:
+                normalized = root + sep.join(components)
+            else:
+                normalized = root + sep + sep.join(components)
+        else:
+            normalized = sep.join(components)
+    else:
+        if root_kind == "drive" and is_absolute:
+            normalized = root + sep
+        elif root_kind == "unc" and had_trailing_separator and preserve_trailing_separator:
+            normalized = root + sep
+        else:
+            normalized = root
 
     if not normalized:
         if platform == "posix" and path.startswith("/"):
             normalized = "/"
-        elif platform == "windows" and is_unc_track:
+        elif platform == "windows" and root_kind == "unc":
             normalized = "\\\\"
-
-    is_absolute = (platform == "posix" and path.startswith("/")) or (
-        platform == "windows" and ((len(path) >= 2 and path[1] == ":") or is_unc_track)
-    )
 
     if has_dot and not collapse_dot_segments:
         warnings.append("Path contains dot segments")

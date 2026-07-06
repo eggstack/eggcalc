@@ -2498,6 +2498,327 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "diff_touched_paths": {
+        "description": "Classify files in a unified diff as added, deleted, renamed, or modified. Also detects binary diffs and file mode changes.",
+        "tier": 2,
+        "tags": ["patch", "diff", "unified", "classification", "files"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch_text": {
+                    "type": "string",
+                    "description": "The unified diff text to analyze",
+                },
+                "max_files": {
+                    "type": "integer",
+                    "description": "Maximum number of files to process",
+                    "default": 100,
+                },
+            },
+            "required": ["patch_text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "error": {"type": ["string", "null"]},
+                "added": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Newly added files",
+                },
+                "deleted": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Deleted files",
+                },
+                "renamed": {
+                    "type": "array",
+                    "description": "Renamed files with from/to paths",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "from": {"type": "string"},
+                            "to": {"type": "string"},
+                        },
+                    },
+                },
+                "modified": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Modified files",
+                },
+                "binary_files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Files with binary content",
+                },
+                "mode_changes": {
+                    "type": "array",
+                    "description": "File mode changes detected",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "file": {"type": "string"},
+                            "old_mode": {"type": "string"},
+                            "new_mode": {"type": "string"},
+                        },
+                    },
+                },
+                "total_files": {
+                    "type": "integer",
+                    "description": "Total number of files processed",
+                },
+            },
+        },
+    },
+    "diff_hunk_ranges": {
+        "description": "Extract hunk ranges per file with line count classification (added/deleted/context) from a unified diff.",
+        "tier": 2,
+        "tags": ["patch", "diff", "unified", "hunks", "ranges"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch_text": {
+                    "type": "string",
+                    "description": "The unified diff text to analyze",
+                },
+                "max_files": {
+                    "type": "integer",
+                    "description": "Maximum number of files to process",
+                    "default": 100,
+                },
+            },
+            "required": ["patch_text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "error": {"type": ["string", "null"]},
+                "files": {
+                    "type": "array",
+                    "description": "Per-file hunk details",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "old_file": {"type": "string"},
+                            "new_file": {"type": "string"},
+                            "hunks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "old_start": {"type": "integer"},
+                                        "old_count": {"type": "integer"},
+                                        "new_start": {"type": "integer"},
+                                        "new_count": {"type": "integer"},
+                                        "added_lines": {"type": "integer"},
+                                        "deleted_lines": {"type": "integer"},
+                                        "context_lines": {"type": "integer"},
+                                        "header_line": {"type": "string"},
+                                    },
+                                },
+                            },
+                            "total_added": {"type": "integer"},
+                            "total_deleted": {"type": "integer"},
+                            "total_context": {"type": "integer"},
+                        },
+                    },
+                },
+            },
+        },
+    },
+    "diff_file_headers": {
+        "description": "Extract metadata from diff file headers: diff --git line, index hash, mode changes, rename/copy directives, and binary indicators.",
+        "tier": 2,
+        "tags": ["patch", "diff", "unified", "headers", "metadata"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch_text": {
+                    "type": "string",
+                    "description": "The unified diff text to analyze",
+                },
+                "max_files": {
+                    "type": "integer",
+                    "description": "Maximum number of files to process",
+                    "default": 100,
+                },
+            },
+            "required": ["patch_text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "error": {"type": ["string", "null"]},
+                "files": {
+                    "type": "array",
+                    "description": "Parsed header metadata per file",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "old_file": {"type": "string"},
+                            "new_file": {"type": "string"},
+                            "diff_git_line": {
+                                "type": ["string", "null"],
+                                "description": "The diff --git line",
+                            },
+                            "index_line": {
+                                "type": ["string", "null"],
+                                "description": "The index hash line",
+                            },
+                            "old_mode": {
+                                "type": ["string", "null"],
+                                "description": "Old file mode",
+                            },
+                            "new_mode": {
+                                "type": ["string", "null"],
+                                "description": "New file mode",
+                            },
+                            "rename_from": {
+                                "type": ["string", "null"],
+                                "description": "Rename source path",
+                            },
+                            "rename_to": {
+                                "type": ["string", "null"],
+                                "description": "Rename destination path",
+                            },
+                            "copy_from": {
+                                "type": ["string", "null"],
+                                "description": "Copy source path",
+                            },
+                            "copy_to": {
+                                "type": ["string", "null"],
+                                "description": "Copy destination path",
+                            },
+                            "is_new_file": {
+                                "type": "boolean",
+                                "description": "True if file is newly added",
+                            },
+                            "is_deleted_file": {
+                                "type": "boolean",
+                                "description": "True if file was deleted",
+                            },
+                            "is_binary": {
+                                "type": "boolean",
+                                "description": "True if file is binary",
+                            },
+                            "hunks_count": {
+                                "type": "integer",
+                                "description": "Number of hunks in this file",
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+    "patch_conflict_markers_inspect": {
+        "description": "Detect and analyze conflict markers (<<<<<<<, =======, >>>>>>>) in text. Reports counts, balance, nesting, and line locations.",
+        "tier": 2,
+        "tags": ["patch", "diff", "conflict", "markers", "merge"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Text to scan for conflict markers",
+                },
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "total_markers": {
+                    "type": "integer",
+                    "description": "Total number of conflict markers found",
+                },
+                "conflict_starts": {
+                    "type": "integer",
+                    "description": "Count of <<<<<<< markers",
+                },
+                "conflict_separators": {
+                    "type": "integer",
+                    "description": "Count of ======= markers",
+                },
+                "conflict_ends": {
+                    "type": "integer",
+                    "description": "Count of >>>>>>> markers",
+                },
+                "imbalanced": {
+                    "type": "boolean",
+                    "description": "True if start and end markers are unbalanced",
+                },
+                "nested": {
+                    "type": "boolean",
+                    "description": "True if conflict markers are nested",
+                },
+                "locations": {
+                    "type": "array",
+                    "description": "Line numbers and types of each marker",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "line": {"type": "integer"},
+                            "kind": {
+                                "type": "string",
+                                "enum": ["start", "separator", "end"],
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+    "unified_diff_validate": {
+        "description": "Validate the structural integrity of a unified diff. Checks parse success, hunk header format, line count consistency, and stray lines.",
+        "tier": 2,
+        "tags": ["patch", "diff", "unified", "validation", "lint"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "patch_text": {
+                    "type": "string",
+                    "description": "The unified diff text to validate",
+                },
+                "check_line_counts": {
+                    "type": "boolean",
+                    "description": "If True, validate hunk header line counts",
+                    "default": True,
+                },
+            },
+            "required": ["patch_text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {
+                    "type": "boolean",
+                    "description": "Whether the diff parsed successfully",
+                },
+                "files_count": {
+                    "type": "integer",
+                    "description": "Number of files in the diff",
+                },
+                "hunks_total": {
+                    "type": "integer",
+                    "description": "Total number of hunks",
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Validation warnings",
+                },
+                "structure_valid": {
+                    "type": "boolean",
+                    "description": "True if the diff structure is valid",
+                },
+            },
+        },
+    },
     "unicode_policy_check": {
         "description": "Apply a named deterministic Unicode safety policy to input text. Policies include identifier_strict (mixed scripts, bidi, confusables), filename_safe (control chars, path separators, reserved names), source_code, human_text (warn-only), json_key, and domain_like.",
         "tier": 2,
@@ -3085,6 +3406,386 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
+    # ── Manifest / package inspection tools ─────────────────────────────────
+    "pyproject_inspect": {
+        "description": "Inspect pyproject.toml text: project name/version, build backend, dependencies, optional groups, scripts, tool sections, package-manager signals. Deterministic, no network.",
+        "tier": 2,
+        "tags": ["python", "pyproject", "toml", "manifest", "dependencies", "inspection"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "The pyproject.toml content to inspect"},
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "project_name": {"type": "string"},
+                "project_version": {"type": "string"},
+                "build_backend": {"type": "string"},
+                "requires_python": {"type": "string"},
+                "dependencies_count": {"type": "integer"},
+                "optional_dependency_groups": {"type": "object"},
+                "scripts": {"type": "object"},
+                "tool_sections": {"type": "array"},
+                "package_manager_signals": {"type": "array"},
+                "findings": {"type": "array"},
+            },
+        },
+    },
+    "package_json_inspect": {
+        "description": "Inspect package.json text: name, version, scripts, dependency counts, engines, packageManager, workspaces. Deterministic, no network.",
+        "tier": 2,
+        "tags": ["node", "npm", "package.json", "manifest", "dependencies", "inspection"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "The package.json content to inspect"},
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "private": {"type": "boolean"},
+                "package_type": {"type": "string"},
+                "scripts_keys": {"type": "array"},
+                "dependencies_count": {"type": "integer"},
+                "dev_dependencies_count": {"type": "integer"},
+                "engines": {"type": "object"},
+                "package_manager": {"type": "string"},
+                "workspaces": {"type": "array"},
+                "findings": {"type": "array"},
+            },
+        },
+    },
+    "requirements_inspect": {
+        "description": "Inspect requirements.txt-style text: package specs, editable refs, direct URLs, VCS refs, comments, environment markers, suspicious lines. Deterministic, no network.",
+        "tier": 2,
+        "tags": ["python", "requirements", "pip", "dependencies", "inspection"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The requirements.txt content to inspect",
+                },
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "total_lines": {"type": "integer"},
+                "package_specs": {"type": "array"},
+                "editable_refs": {"type": "array"},
+                "direct_urls": {"type": "array"},
+                "vcs_refs": {"type": "array"},
+                "comments": {"type": "array"},
+                "environment_markers": {"type": "array"},
+                "suspicious_lines": {"type": "array"},
+                "findings": {"type": "array"},
+            },
+        },
+    },
+    "go_mod_inspect": {
+        "description": "Inspect go.mod text: module path, go version, toolchain, require count, replace/exclude directives. Deterministic, no network.",
+        "tier": 2,
+        "tags": ["go", "golang", "go.mod", "manifest", "dependencies", "inspection"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "The go.mod content to inspect"},
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "module_path": {"type": "string"},
+                "go_version": {"type": "string"},
+                "toolchain": {"type": "string"},
+                "require_count": {"type": "integer"},
+                "replace_directives": {"type": "array"},
+                "exclude_directives": {"type": "array"},
+                "findings": {"type": "array"},
+            },
+        },
+    },
+    "lockfile_summary": {
+        "description": "Shallow lockfile summary: detect kind (npm/pnpm/yarn/poetry/uv/cargo/go), approximate package count, ecosystem. Intentionally shallow, no full parse.",
+        "tier": 2,
+        "tags": ["lockfile", "dependencies", "package-manager", "inspection"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "The lockfile content to summarize"},
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "package-lock",
+                        "pnpm-lock",
+                        "yarn-lock",
+                        "poetry-lock",
+                        "uv-lock",
+                        "cargo-lock",
+                        "go-sum",
+                    ],
+                    "default": "auto",
+                    "description": "Lockfile kind (auto-detect if not specified)",
+                },
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "parse_ok": {"type": "boolean"},
+                "detected_kind": {"type": "string"},
+                "ecosystem": {"type": "string"},
+                "approximate_package_count": {"type": "integer"},
+                "warnings": {"type": "array"},
+                "findings": {"type": "array"},
+            },
+        },
+    },
+    # ── LLM output hygiene tools ──────────────────────────────────────────
+    "llm_json_output_check": {
+        "description": "Detect and diagnose common LLM JSON output issues: fenced code blocks, leading/trailing prose, parse errors with location, fix hints for trailing commas/single quotes/unquoted keys, and multiple concatenated objects.",
+        "tier": 2,
+        "tags": ["text", "json", "llm", "hygiene", "validation", "preflight"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "LLM output text to analyze for JSON issues",
+                },
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "has_fence": {
+                    "type": "boolean",
+                    "description": "True if JSON is wrapped in markdown code fence",
+                },
+                "fence_language": {"type": "string", "description": "Language tag from code fence"},
+                "leading_prose": {
+                    "type": "boolean",
+                    "description": "True if non-JSON content precedes the JSON",
+                },
+                "trailing_prose": {
+                    "type": "boolean",
+                    "description": "True if non-JSON content follows the JSON",
+                },
+                "parse_ok": {"type": "boolean", "description": "True if JSON parsed successfully"},
+                "error_line": {
+                    "type": ["integer", "null"],
+                    "description": "Line number of first parse error",
+                },
+                "error_col": {
+                    "type": ["integer", "null"],
+                    "description": "Column number of first parse error",
+                },
+                "error_message": {"type": ["string", "null"], "description": "Parse error message"},
+                "fix_hints": {
+                    "type": "array",
+                    "description": "Suggested fixes for detected issues",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "code": {"type": "string"},
+                            "message": {"type": "string"},
+                            "line": {"type": "integer"},
+                            "column": {"type": "integer"},
+                        },
+                    },
+                },
+                "extracted_content": {
+                    "type": ["string", "null"],
+                    "description": "Cleaned JSON content if fence/prose was detected",
+                },
+                "multiple_json_objects": {
+                    "type": "boolean",
+                    "description": "True if multiple JSON objects concatenated",
+                },
+                "has_bom": {"type": "boolean", "description": "True if BOM prefix detected"},
+                "original_length": {"type": "integer", "description": "Original input length"},
+                "extracted_length": {"type": "integer", "description": "Extracted content length"},
+            },
+        },
+    },
+    # ── Markdown link check tools ─────────────────────────────────────────
+    "markdown_link_check_lexical": {
+        "description": "Lexical markdown link validation (no network). Detects malformed links, duplicate anchors, unresolved relative links, and counts external/image links.",
+        "tier": 2,
+        "tags": ["text", "markdown", "links", "validation", "hygiene"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Markdown text to analyze",
+                },
+                "known_paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of known file paths for resolving relative links",
+                },
+            },
+            "required": ["text"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "total_links": {"type": "integer", "description": "Total number of links found"},
+                "malformed": {
+                    "type": "array",
+                    "description": "Malformed links with line and reason",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "line": {"type": "integer"},
+                            "text": {"type": "string"},
+                            "reason": {"type": "string"},
+                        },
+                    },
+                },
+                "duplicate_anchors": {
+                    "type": "array",
+                    "description": "Duplicate anchor names",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "anchor": {"type": "string"},
+                            "lines": {"type": "array", "items": {"type": "integer"}},
+                        },
+                    },
+                },
+                "unresolved_relatives": {
+                    "type": "array",
+                    "description": "Relative links not in known_paths",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "line": {"type": "integer"},
+                            "target": {"type": "string"},
+                        },
+                    },
+                },
+                "external_count": {
+                    "type": "integer",
+                    "description": "Number of external (http/https) links",
+                },
+                "image_count": {"type": "integer", "description": "Number of image links"},
+            },
+        },
+    },
+    # ── Repo audit tools ──────────────────────────────────────────────────
+    "repo_file_inventory": {
+        "description": "Analyze file inventory for repo structure signals (no filesystem access). Detects language/ecosystem signals, counts files by category, identifies config/vendor/generated files, and finds suspicious paths.",
+        "tier": 2,
+        "tags": ["repo", "audit", "inventory", "filesystem", "structure"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of file paths to analyze",
+                    "maxItems": 50000,
+                },
+                "sizes": {
+                    "type": "object",
+                    "description": "Optional mapping of path to file size in bytes",
+                    "additionalProperties": {"type": "integer"},
+                },
+                "hashes": {
+                    "type": "object",
+                    "description": "Optional mapping of path to content hash for duplicate detection",
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+            "required": ["paths"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "total_files": {"type": "integer", "description": "Total number of files analyzed"},
+                "by_extension": {
+                    "type": "object",
+                    "description": "File count by extension",
+                },
+                "by_category": {
+                    "type": "object",
+                    "description": "File count by category (source, test, config, doc, data, hidden, other)",
+                },
+                "language_signals": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Detected programming languages/ecosystems",
+                },
+                "config_files_found": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Common config files detected",
+                },
+                "hidden_files": {"type": "integer", "description": "Number of hidden files"},
+                "generated_candidates": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Paths that appear to be generated files",
+                },
+                "vendor_candidates": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Paths in vendor directories",
+                },
+                "suspicious_paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Paths with suspicious patterns",
+                },
+                "largest_files": {
+                    "type": "array",
+                    "description": "Top 10 largest files by size",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "size": {"type": "integer"},
+                        },
+                    },
+                },
+                "duplicate_hashes": {
+                    "type": "array",
+                    "description": "Groups of files with identical content hashes",
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                "total_size": {
+                    "type": ["integer", "null"],
+                    "description": "Total size in bytes (if sizes provided)",
+                },
+                "truncation_warning": {
+                    "type": "boolean",
+                    "description": "True if input was truncated due to size limits",
+                },
+            },
+        },
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -3504,6 +4205,61 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "stability": "stable",
         "composite": False,
     },
+    "diff_touched_paths": {
+        "category": "patch",
+        "tier": 2,
+        "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "diff_hunk_ranges": {
+        "category": "patch",
+        "tier": 2,
+        "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "diff_file_headers": {
+        "category": "patch",
+        "tier": 2,
+        "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "patch_conflict_markers_inspect": {
+        "category": "patch",
+        "tier": 2,
+        "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "unified_diff_validate": {
+        "category": "patch",
+        "tier": 2,
+        "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
     "path_analyze": {
         "category": "path",
         "tier": 2,
@@ -3819,6 +4575,98 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "stability": "stable",
         "composite": True,
     },
+    # ── Manifest / package inspection tools ─────────────────────────────────
+    "pyproject_inspect": {
+        "category": "manifest",
+        "tier": 2,
+        "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["config_preflight"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "package_json_inspect": {
+        "category": "manifest",
+        "tier": 2,
+        "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["config_preflight"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "requirements_inspect": {
+        "category": "manifest",
+        "tier": 2,
+        "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["config_preflight"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "go_mod_inspect": {
+        "category": "manifest",
+        "tier": 2,
+        "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["config_preflight"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "lockfile_summary": {
+        "category": "manifest",
+        "tier": 2,
+        "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["config_preflight"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    # ── LLM output hygiene tools ──────────────────────────────────────────
+    "llm_json_output_check": {
+        "category": "text",
+        "tier": 2,
+        "profiles": ["full", "default", "codegg_preflight", "codegg_core"],
+        "aliases": [],
+        "llm_exposure": "default",
+        "harness_use": ["config_preflight"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    # ── Markdown link check tools ─────────────────────────────────────────
+    "markdown_link_check_lexical": {
+        "category": "text",
+        "tier": 2,
+        "profiles": ["full", "codegg_core", "codegg_repo_audit"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    # ── Repo audit tools ──────────────────────────────────────────────────
+    "repo_file_inventory": {
+        "category": "repo",
+        "tier": 2,
+        "profiles": ["full", "codegg_repo_audit"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["repo_audit"],
+        "cost": "moderate",
+        "stability": "stable",
+        "composite": False,
+    },
 }
 
 
@@ -3902,12 +4750,41 @@ def compact_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def normal_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    """Normal detail level schema. Currently returns the full schema.
+    """Produce a normal-detail version of a tool schema.
 
-    TODO: Implement true normal mode that drops verbose examples and
-    long descriptions while preserving input/output structure.
+    Normal mode preserves:
+    - Tool name, description (truncated to 240 chars)
+    - Required args, types, enums, constraints (minLength, maxLength, minimum, etc.)
+    - Input property descriptions (truncated to 120 chars)
+    - Output schema structure (top-level property keys, types, descriptions)
+    - Tier, tags, deprecated flag
+
+    Normal mode removes:
+    - Verbose examples and long help text
+    - Default values (handled by Python kwargs)
+    - Nested output schema detail beyond top-level
     """
-    return schema
+    result: dict[str, Any] = {}
+
+    # Description: truncate to 240 chars
+    desc = schema.get("description", "")
+    if len(desc) > 240:
+        desc = desc[:237] + "..."
+    result["description"] = desc
+
+    # Deprecated flag
+    if schema.get("deprecated"):
+        result["deprecated"] = True
+
+    # Input schema: keep types, required, enums, constraints, descriptions
+    input_schema = schema.get("inputSchema", {})
+    result["inputSchema"] = _normal_input_schema(input_schema)
+
+    # Output schema: keep top-level property keys, types, and descriptions
+    output_schema = schema.get("outputSchema", {})
+    result["outputSchema"] = _normal_output_schema(output_schema)
+
+    return result
 
 
 def _compact_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -3992,3 +4869,93 @@ def _compact_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
         compact["required"] = schema["required"]
 
     return compact
+
+
+def _normal_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Normal-detail input schema: keep types, required, enums, constraints, descriptions."""
+    if not isinstance(schema, dict):
+        return schema
+
+    result: dict[str, Any] = {}
+    result["type"] = schema.get("type", "object")
+
+    props = schema.get("properties", {})
+    normal_props: dict[str, Any] = {}
+    for prop_name, prop_def in props.items():
+        if not isinstance(prop_def, dict):
+            normal_props[prop_name] = prop_def
+            continue
+        np: dict[str, Any] = {}
+        # Keep type
+        if "type" in prop_def:
+            np["type"] = prop_def["type"]
+        # Keep enum
+        if "enum" in prop_def:
+            np["enum"] = prop_def["enum"]
+        # Keep required sub-fields
+        if "required" in prop_def:
+            np["required"] = prop_def["required"]
+        # Keep items for arrays
+        if "items" in prop_def:
+            np["items"] = prop_def["items"]
+        # Keep all constraints
+        for key in (
+            "minimum",
+            "maximum",
+            "exclusiveMinimum",
+            "exclusiveMaximum",
+            "minLength",
+            "maxLength",
+            "pattern",
+            "minItems",
+            "maxItems",
+            "multipleOf",
+        ):
+            if key in prop_def:
+                np[key] = prop_def[key]
+        # Truncated description (120 chars — longer than compact's 80)
+        desc = prop_def.get("description", "")
+        if desc:
+            if len(desc) > 120:
+                desc = desc[:117] + "..."
+            np["description"] = desc
+        normal_props[prop_name] = np
+
+    result["properties"] = normal_props
+
+    # Keep required at top level
+    if "required" in schema:
+        result["required"] = schema["required"]
+
+    return result
+
+
+def _normal_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Normal-detail output schema: keep top-level property keys, types, and descriptions."""
+    if not isinstance(schema, dict):
+        return {"type": "object"}
+
+    result: dict[str, Any] = {"type": schema.get("type", "object")}
+
+    props = schema.get("properties", {})
+    if props:
+        normal_props: dict[str, Any] = {}
+        for prop_name, prop_def in props.items():
+            if isinstance(prop_def, dict):
+                np: dict[str, Any] = {}
+                if "type" in prop_def:
+                    np["type"] = prop_def["type"]
+                if "enum" in prop_def:
+                    np["enum"] = prop_def["enum"]
+                # Include descriptions for output fields (truncated to 100 chars)
+                desc = prop_def.get("description", "")
+                if desc:
+                    if len(desc) > 100:
+                        desc = desc[:97] + "..."
+                    np["description"] = desc
+                normal_props[prop_name] = np
+            else:
+                normal_props[prop_name] = {}
+        result["properties"] = normal_props
+
+    return result

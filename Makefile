@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format check clean build publish docs
+.PHONY: help install dev test lint format check clean build publish docs generate-docs
 
 help:
 	@echo "eggcalc - Development Commands"
@@ -48,6 +48,12 @@ typecheck:
 
 check: lint format-check typecheck test
 	@echo "All checks passed!"
+
+generate-docs:
+	python3 scripts/generate_mcp_docs.py
+
+docs-check:
+	python3 scripts/generate_mcp_docs.py --check
 
 clean:
 	rm -rf build/ dist/ *.egg-info .pytest_cache .mypy_cache .ruff_cache

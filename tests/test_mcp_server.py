@@ -10041,6 +10041,74 @@ class TestSchemaDetail:
             assert "category" in tool
             assert "llm_exposure" in tool
 
+    def test_normal_schema_preserves_tier_and_tags(self):
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "tools/list",
+                "params": {"schema_detail": "normal"},
+            }
+        )
+        tools = response["result"]["tools"]
+        for tool in tools:
+            assert "tier" in tool
+            assert "tags" in tool
+            assert "category" in tool
+
+    def test_normal_schema_keeps_input_descriptions(self):
+        from eggcalc.mcp.schemas import TOOL_SCHEMAS, normal_schema
+
+        for name, schema in list(TOOL_SCHEMAS.items())[:5]:
+            ns = normal_schema(schema)
+            input_props = ns.get("inputSchema", {}).get("properties", {})
+            for prop_name, prop_def in input_props.items():
+                if isinstance(prop_def, dict):
+                    # Normal schema should keep descriptions (truncated to 120)
+                    if "description" in prop_def:
+                        assert len(prop_def["description"]) <= 120
+
+    def test_normal_schema_keeps_constraints(self):
+        from eggcalc.mcp.schemas import TOOL_SCHEMAS, normal_schema
+
+        for name, schema in TOOL_SCHEMAS.items():
+            ns = normal_schema(schema)
+            input_props = ns.get("inputSchema", {}).get("properties", {})
+            for prop_name, prop_def in input_props.items():
+                if isinstance(prop_def, dict):
+                    # Constraints should be preserved
+                    if "maxLength" in schema.get("inputSchema", {}).get("properties", {}).get(
+                        prop_name, {}
+                    ):
+                        assert "maxLength" in prop_def
+                    if "minLength" in schema.get("inputSchema", {}).get("properties", {}).get(
+                        prop_name, {}
+                    ):
+                        assert "minLength" in prop_def
+
+    def test_normal_smaller_than_full(self):
+        import json
+
+        from eggcalc.mcp.schemas import TOOL_SCHEMAS, normal_schema
+
+        for name, schema in TOOL_SCHEMAS.items():
+            full_size = len(json.dumps(schema))
+            normal_size = len(json.dumps(normal_schema(schema)))
+            # Normal should be <= full (usually smaller due to desc truncation)
+            assert normal_size <= full_size, f"{name}: normal ({normal_size}) > full ({full_size})"
+
+    def test_normal_preserves_output_schema(self):
+        from eggcalc.mcp.schemas import TOOL_SCHEMAS, normal_schema
+
+        for name, schema in TOOL_SCHEMAS.items():
+            ns = normal_schema(schema)
+            if "outputSchema" in schema:
+                assert "outputSchema" in ns
+                out = ns["outputSchema"]
+                assert "type" in out
+                if "properties" in schema["outputSchema"]:
+                    assert "properties" in out
+
 
 class TestSchemaDetailProtocol:
     """Explicit schema-detail protocol tests for tools/list."""

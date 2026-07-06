@@ -533,6 +533,10 @@ Then send JSON-RPC requests via stdio:
 4. **Error Sanitization** — Non-ASCII stripped from error messages
 5. **Input Validation** — Length limits enforced before processing
 
+### Cancellation Semantics
+
+Cancellation is best-effort. Pre-dispatch, a cancelled request ID is immediately rejected with `error_type: "cancelled"`. Post-dispatch, `Future.cancel()` only succeeds if the worker has not started yet — in practice, most tools will already be running and will complete on their own. The bounded thread pool (default 16 workers) prevents thread accumulation. See `docs/mcp.md` for full details.
+
 ### MCP vs Direct Usage
 
 | Feature | MCP Server | Direct Import |

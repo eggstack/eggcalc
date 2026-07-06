@@ -214,6 +214,8 @@ class TestToolMetadata:
         "list",
         "validation",
         "unicode",
+        "manifest",
+        "repo",
     }
     VALID_TIERS = {0, 1, 2, 3}
     VALID_LLM_EXPOSURE = {"default", "contextual", "expert_only", "harness_only", "hidden"}
@@ -456,3 +458,27 @@ class TestProfileInvariants:
         assert (
             not actual_violations
         ), f"composite/harness_only tools in human_math profile: {sorted(actual_violations)}"
+
+
+class TestDocGenerator:
+    """Verify the generated tool inventory doc matches current metadata."""
+
+    def test_generated_doc_matches(self):
+        """The generator's --check mode should pass against the checked-in doc."""
+        import subprocess
+        import sys as _sys
+
+        script = pathlib.Path(__file__).parent.parent / "scripts" / "generate_mcp_docs.py"
+        if not script.exists():
+            return  # generator not present, skip
+        result = subprocess.run(
+            [_sys.executable, str(script), "--check"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, (
+            f"docs/tool_inventory.md is out of date.\n"
+            f"  Run: python scripts/generate_mcp_docs.py\n"
+            f"  stdout: {result.stdout.strip()}\n"
+            f"  stderr: {result.stderr.strip()}"
+        )
