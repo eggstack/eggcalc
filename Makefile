@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format check clean build publish docs generate-docs
+.PHONY: help install dev test lint format check clean build publish docs generate-docs docs-check
 
 help:
 	@echo "eggcalc - Development Commands"

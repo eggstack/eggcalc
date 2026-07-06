@@ -14,65 +14,65 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 1 | `argv_compare` | shell | 2 | yes | no | yes | yes | Compare two command strings or argv lists by parsed argv tokens rather than raw text. |
 | 2 | `canonicalize_text` | unicode | 2 | yes | no | yes | yes | Apply a named text canonicalization profile. |
 | 3 | `cargo_toml_inspect` | cargo | 3 | yes | no | yes | yes | Inspect Cargo.toml text without network or filesystem access. |
-| 4 | `code_fence_extract` | markdown | 2 | yes | no | yes | yes | Extract fenced code blocks from Markdown with exact line ranges, optional... |
+| 4 | `code_fence_extract` | markdown | 2 | yes | no | yes | yes | Extract fenced code blocks from Markdown with exact line ranges, optional language filter, content, and SHA-256 fingerprints. |
 | 5 | `command_preflight` | shell | 1 | yes | no | yes | yes | Composite: analyze a command before user approval or execution. |
 | 6 | `config_preflight` | config | 1 | yes | no | yes | yes | Composite: validate generated config text. |
 | 7 | `constant_lookup` | math | 2 | yes | no | yes | yes | Look up physical constant values and symbols (Avogadro, Planck, speed of light, etc.). |
-| 8 | `diff_file_headers` | patch | 2 | yes | no | no | yes | Extract metadata from diff file headers: diff --git line, index hash, mode... |
-| 9 | `diff_hunk_ranges` | patch | 2 | yes | no | no | yes | Extract hunk ranges per file with line count classification (added/deleted/conte... |
-| 10 | `diff_touched_paths` | patch | 2 | yes | no | yes | yes | Classify files in a unified diff as added, deleted, renamed, or modified. |
+| 8 | `diff_file_headers` | patch | 2 | yes | no | no | yes | Extract metadata from diff file headers: diff --git line, index hash, mode changes, rename/copy directives, and binary indicators. |
+| 9 | `diff_hunk_ranges` | patch | 2 | yes | no | no | yes | Extract hunk ranges per file with line count classification (added/deleted/context) from a unified diff. |
+| 10 | `diff_touched_paths` | patch | 2 | yes | no | yes | yes | Classify files in a unified diff as added, deleted, renamed, or modified. Also detects binary diffs and file mode changes. |
 | 11 | `dotenv_validate` | config | 2 | yes | no | yes | yes | Validate .env-style key=value configuration text. |
 | 12 | `edit_preflight` | patch | 1 | yes | no | yes | yes | Composite: validate a proposed edit before applying it. |
 | 13 | `escape_text` | text | 1 | yes | no | yes | yes | Escape text for various output formats. |
-| 14 | `glob_match` | path | 1 | yes | no | yes | yes | Match a glob pattern against a path with explicit semantics: * matches within... |
-| 15 | `go_mod_inspect` | manifest | 2 | yes | no | no | yes | Inspect go.mod text: module path, go version, toolchain, require count, replace/exclude directives. |
+| 14 | `glob_match` | path | 1 | yes | no | yes | yes | Match a glob pattern against a path with explicit semantics: * matches within one segment, ** matches zero or more segments, ? |
+| 15 | `go_mod_inspect` | manifest | 2 | yes | no | no | yes | Inspect go.mod text: module path, go version, toolchain, require count, replace/exclude directives. Deterministic, no network. |
 | 16 | `identifier_analyze` | identifier | 3 | yes | no | yes | yes | Classify and validate identifier naming conventions across languages. |
 | 17 | `identifier_inspect` | identifier | 1 | yes | no | yes | yes | Inspect identifiers for validity and collisions. |
-| 18 | `identifier_table_inspect` | identifier | 3 | yes | no | yes | yes | Inspect a table of identifiers for casefold collisions, normalization... |
+| 18 | `identifier_table_inspect` | identifier | 3 | yes | no | yes | yes | Inspect a table of identifiers for casefold collisions, normalization collisions, confusable/near-collisions, style variants... |
 | 19 | `ini_validate` | config | 2 | yes | no | yes | yes | Validate simple INI-style configuration files. |
-| 20 | `json_canonicalize` | json | 1 | yes | no | yes | yes | Canonicalize JSON with deterministic formatting, key ordering, duplicate key... |
+| 20 | `json_canonicalize` | json | 1 | yes | no | yes | yes | Canonicalize JSON with deterministic formatting, key ordering, duplicate key detection, and stable hashes. |
 | 21 | `json_compare` | json | 1 | yes | no | yes | yes | Compare two JSON documents semantically, ignoring formatting and key order. |
-| 22 | `json_extract` | json | 2 | yes | no | yes | yes | Extract a value from JSON using RFC 6901 JSON Pointer (e.g., /foo/bar/0). |
+| 22 | `json_extract` | json | 2 | yes | no | yes | yes | Extract a value from JSON using RFC 6901 JSON Pointer (e.g., /foo/bar/0). Navigate nested objects and arrays. |
 | 23 | `json_query` | json | 1 | yes | no | yes | yes | Extract a value from JSON using RFC 6901 JSON Pointer. |
 | 24 | `json_shape` | json | 3 | yes | no | yes | yes | Analyze the structure of a JSON document without returning values. |
-| 25 | `line_range_compare` | text | 2 | yes | no | yes | yes | Compare a line range from two text inputs with exact, trailing-whitespace-ignori... |
-| 26 | `line_range_extract` | text | 1 | yes | no | yes | yes | Extract exact line ranges from text and return stable offsets, byte positions,... |
-| 27 | `list_compare` | list | 2 | yes | no | yes | yes | Compare two lists with explicit modes: ordered ( LCS-based alignment), set... |
-| 28 | `list_dedupe` | list | 1 | yes | no | yes | yes | Remove duplicates from a list while preserving order. |
+| 25 | `line_range_compare` | text | 2 | yes | no | yes | yes | Compare a line range from two text inputs with exact, trailing-whitespace-ignoring, or newline-normalizing comparison. |
+| 26 | `line_range_extract` | text | 1 | yes | no | yes | yes | Extract exact line ranges from text and return stable offsets, byte positions, line counts, and optional fingerprint. |
+| 27 | `list_compare` | list | 2 | yes | no | yes | yes | Compare two lists with explicit modes: ordered ( LCS-based alignment), set (presence only), multiset (count deltas). |
+| 28 | `list_dedupe` | list | 1 | yes | no | yes | yes | Remove duplicates from a list while preserving order. Supports Unicode normalization and casefolding. |
 | 29 | `list_sort` | list | 1 | yes | no | yes | yes | Sort a list of strings with Unicode normalization and casefold support. |
-| 30 | `llm_json_output_check` | text | 2 | yes | no | no | yes | Detect and diagnose common LLM JSON output issues: fenced code blocks,... |
-| 31 | `lockfile_summary` | manifest | 2 | yes | no | no | yes | Shallow lockfile summary: detect kind (npm/pnpm/yarn/poetry/uv/cargo/go),... |
+| 30 | `llm_json_output_check` | text | 2 | yes | no | no | yes | Detect and diagnose common LLM JSON output issues: fenced code blocks, leading/trailing prose, parse errors with location, fix... |
+| 31 | `lockfile_summary` | manifest | 2 | yes | no | no | yes | Shallow lockfile summary: detect kind (npm/pnpm/yarn/poetry/uv/cargo/go), approximate package count, ecosystem. |
 | 32 | `markdown_link_check_lexical` | text | 2 | yes | no | no | yes | Lexical markdown link validation (no network). |
-| 33 | `markdown_structure` | markdown | 2 | yes | no | yes | yes | Parse Markdown structure with a deterministic line scanner: headings (level,... |
+| 33 | `markdown_structure` | markdown | 2 | yes | no | yes | yes | Parse Markdown structure with a deterministic line scanner: headings (level, text, slug), code fences (language, open/close... |
 | 34 | `math_eval` | math | 0 | yes | no | yes | yes | Evaluate arithmetic, unit conversions, constants, and scientific expressions deterministically. |
-| 35 | `package_json_inspect` | manifest | 2 | yes | no | no | yes | Inspect package.json text: name, version, scripts, dependency counts, engines,... |
-| 36 | `patch_apply_check` | patch | 2 | yes | no | yes | yes | Validate and simulate a unified diff against provided in-memory files/text... |
-| 37 | `patch_conflict_markers_inspect` | patch | 2 | yes | no | no | yes | Detect and analyze conflict markers (<<<<<<<, =======, >>>>>>>) in text. |
+| 35 | `package_json_inspect` | manifest | 2 | yes | no | no | yes | Inspect package.json text: name, version, scripts, dependency counts, engines, packageManager, workspaces. |
+| 36 | `patch_apply_check` | patch | 2 | yes | no | yes | yes | Validate and simulate a unified diff against provided in-memory files/text without touching the filesystem. |
+| 37 | `patch_conflict_markers_inspect` | patch | 2 | yes | no | no | yes | Detect and analyze conflict markers (<<<<<<<, =======, >>>>>>>) in text. Reports counts, balance, nesting, and line locations. |
 | 38 | `patch_summary` | patch | 2 | yes | no | yes | yes | Summarize a unified diff without applying it. |
 | 39 | `path_analyze` | path | 2 | yes | no | yes | yes | Analyze path components, extensions, hidden status, and traversal without filesystem access. |
-| 40 | `path_compare` | path | 2 | yes | no | yes | yes | Compare two paths under explicit normalization rules: separator normalization,... |
-| 41 | `path_normalize` | path | 0 | yes | no | yes | yes | Normalize a path using posixpath or ntpath semantics. |
-| 42 | `path_scope_check` | path | 2 | yes | no | yes | yes | Determine whether a target path remains lexically inside a declared root. |
+| 40 | `path_compare` | path | 2 | yes | no | yes | yes | Compare two paths under explicit normalization rules: separator normalization, dot-segment collapsing, and optional... |
+| 41 | `path_normalize` | path | 0 | yes | no | yes | yes | Normalize a path using posixpath or ntpath semantics. Collapse dot segments, resolve components. |
+| 42 | `path_scope_check` | path | 2 | yes | no | yes | yes | Determine whether a target path remains lexically inside a declared root. Lexical only, does not resolve symlinks. |
 | 43 | `prompt_input_inspect` | text | 2 | yes | no | yes | yes | Deterministically inspect text for red flags that may influence agents or humans unexpectedly. |
-| 44 | `pyproject_inspect` | manifest | 2 | yes | no | yes | yes | Inspect pyproject.toml text: project name/version, build backend, dependencies,... |
+| 44 | `pyproject_inspect` | manifest | 2 | yes | no | yes | yes | Inspect pyproject.toml text: project name/version, build backend, dependencies, optional groups, scripts, tool sections... |
 | 45 | `regex_finditer` | regex | 1 | yes | no | yes | yes | Find all regex matches in text with positions, line/column info, and capture groups. |
 | 46 | `regex_safety_check` | regex | 1 | yes | no | yes | yes | Heuristic check for potential catastrophic backtracking risks in regex patterns. |
 | 47 | `repo_file_inventory` | repo | 2 | yes | no | yes | yes | Analyze file inventory for repo structure signals (no filesystem access). |
-| 48 | `requirements_inspect` | manifest | 2 | yes | no | no | yes | Inspect requirements.txt-style text: package specs, editable refs, direct URLs,... |
-| 49 | `shell_quote_join` | shell | 2 | yes | no | yes | yes | Safely quote a list of argv tokens into a POSIX-like shell string. |
-| 50 | `shell_split` | shell | 2 | yes | no | yes | yes | Parse a shell-like command string into argv tokens and report risky lexical... |
+| 48 | `requirements_inspect` | manifest | 2 | yes | no | no | yes | Inspect requirements.txt-style text: package specs, editable refs, direct URLs, VCS refs, comments, environment markers... |
+| 49 | `shell_quote_join` | shell | 2 | yes | no | yes | yes | Safely quote a list of argv tokens into a POSIX-like shell string. Verifies round-trip safety with shell_split. |
+| 50 | `shell_split` | shell | 2 | yes | no | yes | yes | Parse a shell-like command string into argv tokens and report risky lexical features (pipes, redirections, command... |
 | 51 | `structured_data_compare` | json | 2 | yes | no | yes | yes | Composite: compare structured config/data output. |
-| 52 | `text_count` | text | 0 | yes | no | yes | yes | Count exact characters or produce a character frequency table with codepoint... |
-| 53 | `text_diff_explain` | text | 1 | yes | no | yes | yes | Explain why two strings differ, including spans, codepoints, Unicode names,... |
-| 54 | `text_equal` | text | 0 | yes | no | yes | yes | Compare two strings under raw, Unicode-normalized, casefolded, or trimmed modes... |
-| 55 | `text_fingerprint` | text | 0 | yes | no | yes | yes | Compute a deterministic SHA-256 fingerprint of text with canonicalization... |
+| 52 | `text_count` | text | 0 | yes | no | yes | yes | Count exact characters or produce a character frequency table with codepoint positions, grapheme clusters, bytes, or substring... |
+| 53 | `text_diff_explain` | text | 1 | yes | no | yes | yes | Explain why two strings differ, including spans, codepoints, Unicode names, normalization equivalence, confusables... |
+| 54 | `text_equal` | text | 0 | yes | no | yes | yes | Compare two strings under raw, Unicode-normalized, casefolded, or trimmed modes and report exact equality evidence. |
+| 55 | `text_fingerprint` | text | 0 | yes | no | yes | yes | Compute a deterministic SHA-256 fingerprint of text with canonicalization options for Unicode normalization, newline style... |
 | 56 | `text_hash` | text | 2 | yes | no | yes | yes | Compute cryptographic hashes of text for identity checking. |
-| 57 | `text_inspect` | text | 1 | yes | no | yes | yes | Inspect a string for hidden characters, Unicode confusables, mixed scripts,... |
-| 58 | `text_measure` | text | 0 | yes | no | yes | yes | Measure exact text properties: UTF-8 byte length, codepoint count, words,... |
+| 57 | `text_inspect` | text | 1 | yes | no | yes | yes | Inspect a string for hidden characters, Unicode confusables, mixed scripts, normalization state, and display-safe representation. |
+| 58 | `text_measure` | text | 0 | yes | no | yes | yes | Measure exact text properties: UTF-8 byte length, codepoint count, words, lines, whitespace, newline style, Unicode... |
 | 59 | `text_position` | text | 2 | yes | no | yes | yes | Convert between byte offsets, codepoint indices, line/column positions, and UTF-16 offsets. |
 | 60 | `text_replace_check` | text | 1 | yes | no | yes | yes | Check whether a text replacement would apply cleanly before an agent attempts to edit. |
 | 61 | `text_security_inspect` | text | 1 | yes | no | yes | yes | Composite security-oriented text hygiene pass. |
-| 62 | `text_transform` | text | 2 | yes | no | yes | yes | Apply deterministic text transformations: Unicode normalization... |
+| 62 | `text_transform` | text | 2 | yes | no | yes | yes | Apply deterministic text transformations: Unicode normalization (NFC/NFD/NFKC/NFKD), casefold, trim, newline normalization... |
 | 63 | `text_truncate` | text | 3 | yes | no | yes | yes | Truncate a string to a specified number of grapheme clusters (user-perceived characters). |
 | 64 | `text_window` | text | 1 | yes | no | yes | yes | Get a window around a position in text with context lines. |
 | 65 | `toml_shape` | toml | 2 | yes | no | yes | yes | Analyze the structure of a TOML document: top-level keys, tables, and nesting hierarchy. |
@@ -81,12 +81,12 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 68 | `unified_diff_validate` | patch | 2 | yes | no | no | yes | Validate the structural integrity of a unified diff. |
 | 69 | `unit_convert` | math | 2 | yes | no | yes | yes | Convert a numeric value from one unit to another using pre-defined conversion factors. |
 | 70 | `unit_info` | math | 2 | yes | no | yes | yes | Get information about a unit including its canonical form and category. |
-| 71 | `validate_brackets` | validation | 1 | yes | no | yes | yes | Check whether delimiters are structurally balanced and report unmatched... |
+| 71 | `validate_brackets` | validation | 1 | yes | no | yes | yes | Check whether delimiters are structurally balanced and report unmatched delimiters with line/column positions. |
 | 72 | `validate_json` | validation | 0 | yes | no | yes | yes | Validate JSON and report precise parse errors or top-level structure information. |
-| 73 | `validate_regex` | regex | 1 | yes | no | yes | yes | Test a Python regular expression against sample strings and report... |
-| 74 | `validate_schema_light` | validation | 3 | yes | no | yes | yes | Validate JSON against a simple schema format with type, required, enum,... |
-| 75 | `validate_toml` | validation | 1 | yes | no | yes | yes | Validate TOML configuration files (Cargo.toml, pyproject.toml, etc.) and report... |
-| 76 | `version_compare` | version | 2 | yes | no | yes | yes | Compare two version strings with explicit scheme. |
+| 73 | `validate_regex` | regex | 1 | yes | no | yes | yes | Test a Python regular expression against sample strings and report match/fullmatch status, spans, groups, and errors. |
+| 74 | `validate_schema_light` | validation | 3 | yes | no | yes | yes | Validate JSON against a simple schema format with type, required, enum, pattern, and nested constraints. |
+| 75 | `validate_toml` | validation | 1 | yes | no | yes | yes | Validate TOML configuration files (Cargo.toml, pyproject.toml, etc.) and report parse errors with line/column positions. |
+| 76 | `version_compare` | version | 2 | yes | no | yes | yes | Compare two version strings with explicit scheme. Supports semver (major.minor.patch), loose (numeric parts), and deferred pep440. |
 | 77 | `version_constraint_check` | version | 3 | yes | no | yes | yes | Check whether a version satisfies a constraint under a declared versioning scheme. |
 
 ## Legend

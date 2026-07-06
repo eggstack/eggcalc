@@ -70,26 +70,59 @@ def _tool_in_file(name: str, pattern: str) -> bool:
     return False
 
 
+def _truncate_at_word_boundary(text: str, max_len: int) -> str:
+    """Truncate *text* to at most *max_len* chars, ending at a word boundary.
+
+    Never leaves a trailing punctuation fragment (e.g. "e.", "co.", "(...").
+    """
+    if len(text) <= max_len:
+        return text
+    # Leave room for "..."
+    limit = max_len - 3
+    if limit < 20:
+        return text[:max_len] + "..."
+    cut = text[:limit]
+    last_space = cut.rfind(" ")
+    # Keep at least half the text so we don't lose everything
+    if last_space < limit // 2:
+        last_space = limit
+    else:
+        last_space += 1  # include the space
+    result = cut[:last_space].rstrip()
+    # Avoid trailing punctuation fragments
+    while result and result[-1] in ",.:;!?)]":
+        result = result[:-1]
+    return result + "..."
+
+
 def _tool_description(name: str) -> str:
-    """Get short description from schema."""
+    """Get short description from schema, suitable for the Notes column."""
+    MAX_LEN = 130
     schema = TOOL_SCHEMAS.get(name, {})
     desc = schema.get("description", "")
     if not desc:
         return ""
-    # Try to get the first sentence (20-100 chars is ideal)
+    desc = re.sub(r'\s+', ' ', desc).strip()
+    if len(desc) <= MAX_LEN:
+        return desc
+    # Split into sentences
     sentences = re.split(r'(?<=[.!?])\s+', desc)
-    first = sentences[0]
-    if len(first) < 20 and len(sentences) > 1:
-        # First sentence too short, try combining with next
-        first = first + " " + sentences[1]
-    if len(first) > 100:
-        # Truncate at word boundary before 80 chars
-        cut = first[:80]
-        last_space = cut.rfind(" ")
-        if last_space > 60:
-            cut = cut[:last_space]
-        first = cut + "..."
-    return first
+    # Try the first complete sentence if it's substantial
+    if len(sentences[0]) >= 40:
+        if len(sentences[0]) <= MAX_LEN:
+            return sentences[0]
+        return _truncate_at_word_boundary(sentences[0], MAX_LEN)
+    # First sentence is short — try combining with the second
+    if len(sentences) > 1:
+        combined = sentences[0] + " " + sentences[1]
+        if len(combined) <= MAX_LEN:
+            return combined
+        # See if first sentence + start of second fits
+        combined = sentences[0] + " " + _truncate_at_word_boundary(sentences[1], MAX_LEN - len(sentences[0]) - 1)
+        if len(combined) <= MAX_LEN:
+            return combined
+    # Nothing fits cleanly — truncate the whole description
+    return _truncate_at_word_boundary(desc, MAX_LEN)
 
 
 def _sorted_tools() -> list[str]:
