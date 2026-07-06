@@ -13,7 +13,7 @@ help:
 	@echo "  lint        Run linter (ruff)"
 	@echo "  format      Format code (black)"
 	@echo "  typecheck   Run type checker (mypy)"
-	@echo "  check       Run all checks (lint, format --check, typecheck, test)"
+	@echo "  check       Run all checks (lint, format --check, typecheck, docs-check, test)"
 	@echo "  clean       Remove build artifacts"
 	@echo "  build       Build distribution packages"
 	@echo "  publish     Publish to PyPI (requires twine)"
@@ -46,7 +46,7 @@ format-check:
 typecheck:
 	mypy eggcalc --ignore-missing-imports
 
-check: lint format-check typecheck test
+check: lint format-check typecheck docs-check test
 	@echo "All checks passed!"
 
 generate-docs:

@@ -74,12 +74,22 @@ def _tool_description(name: str) -> str:
     """Get short description from schema."""
     schema = TOOL_SCHEMAS.get(name, {})
     desc = schema.get("description", "")
-    # Take first sentence, truncate to 80 chars
-    if "." in desc:
-        desc = desc.split(".")[0] + "."
-    if len(desc) > 80:
-        desc = desc[:77] + "..."
-    return desc
+    if not desc:
+        return ""
+    # Try to get the first sentence (20-100 chars is ideal)
+    sentences = re.split(r'(?<=[.!?])\s+', desc)
+    first = sentences[0]
+    if len(first) < 20 and len(sentences) > 1:
+        # First sentence too short, try combining with next
+        first = first + " " + sentences[1]
+    if len(first) > 100:
+        # Truncate at word boundary before 80 chars
+        cut = first[:80]
+        last_space = cut.rfind(" ")
+        if last_space > 60:
+            cut = cut[:last_space]
+        first = cut + "..."
+    return first
 
 
 def _sorted_tools() -> list[str]:
@@ -155,9 +165,9 @@ def _summary_stats() -> list[str]:
         "| Field | Count |",
         "|-------|------:|",
         f"| Total tools | {total} |",
-        f"| Documented in README | {in_readme} |",
-        f"| Documented in docs/mcp.md | {in_mcp} |",
-        f"| Missing from docs/mcp.md | {total - in_mcp} |",
+        f"| Referenced in README | {in_readme} |",
+        f"| Covered by selected examples in docs/mcp.md | {in_mcp} |",
+        f"| Not covered by selected examples | {total - in_mcp} |",
         f"| Have tests | {have_tests} |",
         f"| Missing tests | {missing_tests} |",
         "",

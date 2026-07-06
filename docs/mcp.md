@@ -1,6 +1,6 @@
 # MCP Server
 
-eggcalc includes an MCP (Model Context Protocol) server that exposes text analysis and math evaluation tools to AI agents. This enables AI agents to perform deterministic text inspection and calculations via a standardized protocol.
+eggcalc includes an MCP (Model Context Protocol) server that exposes text analysis and math evaluation tools to AI agents. This page explains MCP protocol usage, server configuration, profiles, schema-detail controls, and selected examples. The complete generated tool inventory lives in [tool_inventory.md](tool_inventory.md).
 
 ## What is MCP?
 
@@ -56,7 +56,7 @@ The server uses JSON-RPC 2.0 over stdio:
  "params": {"name": "math_eval", "arguments": {"expression": "5 + 3"}}}
 ```
 
-## Available Tools
+## Selected Tool Examples
 
 ### math_eval
 
@@ -1237,16 +1237,16 @@ Currently, tools do not check for cancellation mid-execution. A future enhanceme
 
 ## Tool Tiers
 
-Tools are categorized into tiers based on scope and context cost:
+Tools are categorized into tiers based on scope and context cost. See [tool_inventory.md](tool_inventory.md) for the authoritative tier assignments.
 
 **Tier 0:** Ultra-common, small-schema tools. Always exposed.
-- `math_eval`, `text_equal`, `text_count`, `text_measure`, `text_fingerprint`, `validate_json`, `path_normalize`
+- `math_eval`, `text_equal`, `text_count`, `text_fingerprint`, `validate_json`, `path_normalize`
 
 **Tier 1:** Default coding-agent sanity tools. Exposed by default for coding agents.
 - `text_diff_explain`, `text_inspect`, `text_replace_check`, `line_range_extract`, `json_query`, `json_compare`, `validate_toml`, `glob_match`, `validate_regex`, `regex_finditer`, `regex_safety_check`, `identifier_inspect`, `escape_text`, `unescape_text`, `text_window`, `json_canonicalize`, `validate_brackets`, `list_dedupe`, `list_sort`
 
 **Tier 2:** Heavier analysis tools. Exposed when text/unicode/config analysis is needed.
-- `text_position`, `text_hash`, `text_transform`, `unit_convert`, `unit_info`, `constant_lookup`, `path_analyze`, `path_compare`, `path_scope_check`, `list_compare`, `json_extract`, `version_compare`, `toml_shape`, `markdown_structure`, `code_fence_extract`, `dotenv_validate`, `ini_validate`, `patch_apply_check`, `patch_summary`, `shell_split`, `shell_quote_join`, `argv_compare`, `unicode_policy_check`, `canonicalize_text`, `line_range_compare`
+- `text_position`, `text_hash`, `text_transform`, `text_measure`, `unit_convert`, `unit_info`, `constant_lookup`, `path_analyze`, `path_compare`, `path_scope_check`, `list_compare`, `json_extract`, `version_compare`, `toml_shape`, `markdown_structure`, `code_fence_extract`, `dotenv_validate`, `ini_validate`, `patch_apply_check`, `patch_summary`, `shell_split`, `shell_quote_join`, `argv_compare`, `unicode_policy_check`, `canonicalize_text`, `line_range_compare`, `diff_touched_paths`, `pyproject_inspect`, `repo_file_inventory`
 
 **Tier 3:** Domain-specific tools. Opt-in for specialized workflows.
 - `text_truncate`, `json_shape`, `identifier_analyze`, `validate_schema_light`, `version_constraint_check`, `cargo_toml_inspect`
@@ -1255,48 +1255,45 @@ Tools are categorized into tiers based on scope and context cost:
 
 ## Tool Profiles
 
-Profiles are named subsets of tools that agents can request via the `names` filter in `tools/list`. Each profile includes only the tools relevant to its use case, minimizing context overhead.
+Profiles are named subsets of tools that agents can request via the `profile` filter in `tools/list`. Each profile includes only the tools relevant to its use case, minimizing context overhead.
 
-### `minimal`
+### `codegg_core_min`
 
 Ultra-common tools only. Ideal for agents with tight context budgets or non-coding workflows.
 
-**Tier 0 tools:**
-- `math_eval`, `text_equal`, `text_count`, `text_measure`, `text_fingerprint`, `validate_json`, `path_normalize`
-
 **Use when:** You need math evaluation, basic text comparison, or JSON validation without loading the full tool set.
 
-### `coding-agent-default`
+### `codegg_core`
 
-Tier 0 + Tier 1 tools. Recommended for general-purpose coding agents.
-
-**Includes all Tier 0 and Tier 1 tools (26 tools total).**
+Tier 0 + Tier 1 tools plus contextual manifest and LLM JSON checks. Recommended for general-purpose coding agents.
 
 **Use when:** You want the standard set of tools for code editing, text inspection, regex testing, path manipulation, JSON comparison, and TOML validation.
 
-### `text-unicode-heavy`
+### `codegg_unicode_security`
 
 Tier 0 + Tier 1 + Tier 2 text/unicode tools. For agents working with internationalized text, confusable detection, or Unicode security.
 
-**Adds Tier 2 tools:** `text_position`, `text_hash`, `text_transform`, `unicode_policy_check`, `canonicalize_text`
-
 **Use when:** You need deep Unicode analysis, canonicalization profiles, or security policy checks beyond basic text inspection.
 
-### `config-heavy`
+### `codegg_config`
 
 Tier 0 + Tier 1 + Tier 2 config/validation tools. For agents working with configuration files, patches, or structured data.
 
-**Adds Tier 2 tools:** `patch_apply_check`, `patch_summary`, `dotenv_validate`, `ini_validate`, `markdown_structure`, `code_fence_extract`, `toml_shape`, `version_compare`, `shell_split`, `shell_quote_join`, `argv_compare`
-
 **Use when:** You need to validate, compare, or analyze configuration files, unified diffs, shell commands, or Markdown structure.
 
-### `rust-project`
+### `codegg_repo_audit`
 
-`coding-agent-default` + Tier 2 + Tier 3 tools relevant to Rust projects.
+Repo inventory, manifest tools, patch structural tools, and documentation/markdown hygiene tools.
 
-**Adds:** `toml_shape`, `version_compare`, `identifier_analyze`, `validate_schema_light`, `cargo_toml_inspect`, `version_constraint_check`
+**Use when:** You need to audit repository structure, inspect manifests, or check documentation quality.
 
-**Use when:** Working on Rust projects with Cargo.toml, lockfiles, or package-manager-specific workflows.
+### `codegg_patch`
+
+Patch structural tools for patch workflows.
+
+**Use when:** You are working with unified diffs and need to validate or summarize patches.
+
+See [tool_inventory.md](tool_inventory.md) for the complete profile membership tables.
 
 ### Filtering tools/list
 

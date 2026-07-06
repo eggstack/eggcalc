@@ -46,7 +46,7 @@ black eggcalc tests
 # Type check
 mypy eggcalc --ignore-missing-imports
 
-# All checks at once
+# All checks at once (includes generated-doc drift check)
 make check
 
 # Build single-file distribution
@@ -56,7 +56,7 @@ python build_single.py
 python install.py --install
 ```
 
-CI order: `ruff → black --check → build_single.py → pytest → mypy` (mypy only on 3.12).
+CI order: `ruff → black --check → build_single.py → generate_mcp_docs.py --check → pytest → mypy` (mypy only on 3.12).
 
 ## Constraints
 

@@ -53,7 +53,7 @@ class ErrorEnvelope(TypedDict):
 
 ### TOOL_SCHEMAS
 
-Registry of all available tools (64 total). Tools are organized by tier for selective exposure:
+Registry of all available tools (77 total). Tools are organized by tier for selective exposure:
 
 #### Tier 0 — Ultra-common (minimal schema)
 
@@ -535,7 +535,13 @@ Then send JSON-RPC requests via stdio:
 
 ### Cancellation Semantics
 
-Cancellation is best-effort. Pre-dispatch, a cancelled request ID is immediately rejected with `error_type: "cancelled"`. Post-dispatch, `Future.cancel()` only succeeds if the worker has not started yet — in practice, most tools will already be running and will complete on their own. The bounded thread pool (default 16 workers) prevents thread accumulation. See `docs/mcp.md` for full details.
+Cancellation is best-effort. The server checks cancellation records before dispatching tools, but once a tool is running in the thread pool, Python does not preemptively kill the running thread.
+
+- **Pre-dispatch:** A cancelled request ID is immediately rejected with `error_type: "cancelled"`.
+- **Post-dispatch:** `Future.cancel()` only succeeds if the worker has not started yet (Python's `ThreadPoolExecutor` semantics). In practice, most tools will have already started, so cancellation will not stop them.
+- **Timeout:** Tool calls are bounded by `EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS` (default 30s). Timeout returns `error_type: "timeout"` to the client; the worker continues until it finishes.
+- **Bounded pool:** The `ThreadPoolExecutor` (default 16 workers) provides natural back-pressure.
+- **Future enhancement:** Cooperative cancellation via a cancellation token checked mid-execution could allow tools to exit early. See `docs/mcp.md` for full details.
 
 ### MCP vs Direct Usage
 

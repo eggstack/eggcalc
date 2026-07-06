@@ -12,7 +12,7 @@ Written in pure Python with no external dependencies, it can be used as a CLI to
 - **Unit Conversions**: `"30m + 100ft"` → `60.48 m`
 - **Complex Numbers**: `"sqrt(-1)"` → `1j`
 - **Safe Evaluation**: AST-based parsing, no `eval()`, blocks dangerous operations
-- **MCP Server**: 64 deterministic text, JSON, validation, math, and path tools for AI agents
+- **MCP Server**: deterministic text, JSON, validation, math, path, manifest, patch, and repo-audit tools for AI agents
 - **Pure Python**: Standard library only, no dependencies
 
 ## Installation
@@ -80,7 +80,7 @@ eggcalc runs as an MCP server exposing deterministic tools across 18 categories 
 calc --mcp
 ```
 
-See [docs/mcp.md](docs/mcp.md) for the full tool catalog, profiles, and configuration. See [docs/tool_inventory.md](docs/tool_inventory.md) for the complete tool inventory.
+See [docs/tool_inventory.md](docs/tool_inventory.md) for the complete generated tool inventory. See [docs/mcp.md](docs/mcp.md) for protocol usage, configuration, profiles, schema detail, and selected tool examples.
 
 ## Supported Operations
 
@@ -112,7 +112,7 @@ CUSTOM_ALIASES = {"meter": "m", "meters": "m"}
 ruff check eggcalc tests                  # Lint
 black eggcalc tests                       # Format
 mypy eggcalc --ignore-missing-imports     # Type check
-make check                                # All checks at once
+make check                                # All checks (lint, format, typecheck, docs, test)
 python build_single.py                    # Build single-file distribution
 ```
 
