@@ -7,7 +7,7 @@ eggcalc provides several evaluation functions with different trade-offs. Choose 
 | Use Case | Function | Why |
 |----------|----------|-----|
 | User input (forms, chat) | `evaluate_raw()` | Handles natural language, spaces, units |
-| Pre-normalized input (you control format) | `evaluate()` | ~15x faster, skips normalization |
+| Pre-normalized input (you control format) | `evaluate()` | ~15x faster, skips normalization, no config loading |
 | Repeated queries (webapps) | `evaluate_cached()` | LRU cache, O(1) after first call |
 | Untrusted input | `evaluate_with_timeout()` | Timeout protection against DoS |
 | Async frameworks (FastAPI) | `evaluate_async()` | Runs in thread pool |
@@ -182,6 +182,8 @@ from eggcalc import load_user_config
 
 load_user_config()  # Loads CUSTOM_CONSTANTS, CUSTOM_FUNCTIONS, etc.
 ```
+
+**Config-loading policy:** Library APIs (`evaluate_raw()`, `evaluate_cached()`, etc.) do **not** load cwd-local config by default. Set `EGGCALC_LOAD_CONFIG=1` to enable lazy config loading, or call `load_user_config()` explicitly. CLI loads config by default via `maybe_load_cli_config()`.
 
 ## Types
 

@@ -108,6 +108,11 @@ CUSTOM_TEMP_CONVERSIONS = {
 
 ## Environment Variables
 
+| Variable | Description |
+|----------|-------------|
+| `EGGCALC_LOAD_CONFIG=1` | Enable lazy config loading for library APIs (`evaluate_raw()`, etc.). By default, library APIs do not load `eggcalc_config.py`. |
+| `EGGCALC_NO_CONFIG=1` | Disable config loading entirely (CLI, library, and MCP). |
+
 eggcalc does not read environment variables for calculator input length or cache size. MCP server mode supports `EGGCALC_MCP_PROFILE` and `EGGCALC_MCP_SCHEMA_DETAIL`; see [MCP Server](mcp.md) for those settings.
 
 ## Python Configuration
@@ -192,5 +197,7 @@ CUSTOM_ALIASES = {
 
 - `eggcalc_config.py` is imported from the working directory
 - In production, ensure this file is not user-writable
+- Library APIs do not load config by default; set `EGGCALC_LOAD_CONFIG=1` to enable
+- CLI loads config by default; disable with `EGGCALC_NO_CONFIG=1`
 - Consider disabling config loading in high-security environments
 - Only register trusted functions

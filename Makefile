@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format check clean build publish docs generate-docs docs-check
+.PHONY: help install dev test lint format check clean build publish docs generate-docs docs-check release-check
 
 help:
 	@echo "eggcalc - Development Commands"
@@ -18,6 +18,7 @@ help:
 	@echo "  build       Build distribution packages"
 	@echo "  publish     Publish to PyPI (requires twine)"
 	@echo "  docs        Build documentation"
+	@echo "  release-check Run all checks + build + release-surface smoke tests"
 	@echo "  pre-commit  Install pre-commit hooks"
 
 install:
@@ -76,5 +77,8 @@ pre-commit:
 	pre-commit install
 	pre-commit run --all-files
 
-release: check build
+release-check: check build
+	python scripts/smoke_release_surfaces.py
+
+release: release-check
 	@echo "Ready to release! Run: git tag vX.Y.Z && git push --tags"

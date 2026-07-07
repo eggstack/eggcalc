@@ -340,6 +340,10 @@ def load_user_config() -> None:
 
     Config loading can be disabled by setting the EGGCALC_NO_CONFIG
     environment variable to a non-empty string.
+
+    Library API policy: evaluate_raw() and related full-pipeline APIs do NOT
+    call this function by default. Set EGGCALC_LOAD_CONFIG=1 to enable lazy
+    config loading for library APIs, or call load_user_config() explicitly.
     """
     global _config_loaded
     if _mcp_mode:
@@ -406,12 +410,21 @@ def load_user_config() -> None:
 
 
 def _ensure_config_loaded() -> None:
-    """Ensure user config is loaded (lazy loading)."""
+    """Ensure user config is loaded (lazy loading) if explicitly opted in.
+
+    Library API calls (evaluate_raw, evaluate_cached, etc.) do NOT load
+    cwd-local eggcalc_config.py by default. Set EGGCALC_LOAD_CONFIG=1 to
+    enable lazy config loading for library APIs. CLI loads config by default
+    via maybe_load_cli_config(). MCP never loads config.
+    """
     global _config_loaded
     if _mcp_mode:
         return
     if not _config_loaded:
-        load_user_config()
+        if os.environ.get("EGGCALC_LOAD_CONFIG", ""):
+            load_user_config()
+        else:
+            _config_loaded = True
 
 
 _cache: OrderedDict[str, Any] = OrderedDict()
@@ -2548,8 +2561,10 @@ def evaluate(expression: str) -> Any:
     """Evaluate a pre-normalized Python-AST-compatible expression.
 
     For raw input with spaces or natural language, use evaluate_raw() instead.
+
+    This function never loads cwd-local config — it performs direct AST
+    evaluation only.
     """
-    _ensure_config_loaded()
     return _default_evaluator.evaluate(expression)
 
 
@@ -2558,6 +2573,10 @@ def evaluate_raw(expression: str) -> Any:
 
     This function processes the expression through the full normalization
     pipeline, handling spaces inside parentheses and natural language conversion.
+
+    Config loading: By default, library API calls do NOT load cwd-local
+    eggcalc_config.py. Set EGGCALC_LOAD_CONFIG=1 to enable lazy config
+    loading. CLI loads config by default via maybe_load_cli_config().
 
     Args:
         expression: A raw expression string (e.g., "(2 * 3)" or "five plus three")

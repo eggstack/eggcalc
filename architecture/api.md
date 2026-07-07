@@ -116,8 +116,10 @@ Load configuration from `eggcalc_config.py` in working directory.
 
 **Safety:** This function is NOT called by `import eggcalc`. Library import is side-effect-free. Config loading happens via:
 - CLI: `maybe_load_cli_config()` in normalize.py (once at startup)
-- API: `_ensure_config_loaded()` (lazy, on first `evaluate_raw()` call)
+- API: `_ensure_config_loaded()` (lazy, only when `EGGCALC_LOAD_CONFIG=1` is set)
 - MCP: Disabled entirely (`EGGCALC_NO_CONFIG=1`)
+
+Library APIs (`evaluate_raw()`, `evaluate_cached()`, etc.) do **not** load cwd config by default. Set `EGGCALC_LOAD_CONFIG=1` or call `load_user_config()` explicitly.
 
 ## Memory Functions
 

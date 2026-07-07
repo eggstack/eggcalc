@@ -1,20 +1,63 @@
-"""Regression tests for safe configuration loading (Phase 1).
+"""Regression tests for safe configuration loading.
 
 Verifies that:
-- ``import eggcalc`` does NOT execute cwd-local Python (no load_user_config)
-- CLI startup (normalize.main) DOES load config when EGGCALC_NO_CONFIG is unset
-- MCP server sets EGGCALC_NO_CONFIG=1 before any eggcalc imports
-- ``_ensure_config_loaded()`` still provides lazy loading on first API call
-- ``load_user_config()`` respects _mcp_mode and EGGCALC_NO_CONFIG guards
+- ``import eggcalc`` does NOT execute cwd-local Python
+- ``evaluate()`` does NOT load cwd config (direct AST only)
+- ``evaluate_raw()`` does NOT load cwd config by default
+- ``EGGCALC_LOAD_CONFIG=1`` enables lazy config loading for library APIs
+- CLI startup loads config by default
+- ``EGGCALC_NO_CONFIG=1`` disables CLI config loading
+- MCP server never loads cwd config
+- ``load_user_config()`` explicitly loads cwd config
 """
 
 from __future__ import annotations
 
 import importlib
 import os
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
+
+PYTHON = sys.executable
+REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+
+
+def _write_sentinel_config(tmp_path: Path, marker_name: str = "loaded.txt") -> Path:
+    """Write a malicious eggcalc_config.py that creates a sentinel file."""
+    marker = tmp_path / marker_name
+    marker_str = str(marker).replace("\\", "\\\\")
+    (tmp_path / "eggcalc_config.py").write_text(
+        "from pathlib import Path\n"
+        f"Path({marker_str!r}).write_text('loaded')\n"
+        "CUSTOM_CONSTANTS = {'myconst': 123}\n"
+    )
+    return marker
+
+
+def _run_in_cwd(
+    args: list[str],
+    cwd: Path,
+    env: dict[str, str] | None = None,
+    timeout: float = 15.0,
+) -> subprocess.CompletedProcess[str]:
+    """Run a command in a subprocess with the given cwd and env."""
+    run_env = os.environ.copy()
+    run_env["PYTHONPATH"] = REPO_ROOT
+    run_env.pop("EGGCALC_LOAD_CONFIG", None)
+    run_env.pop("EGGCALC_NO_CONFIG", None)
+    if env:
+        run_env.update(env)
+    return subprocess.run(
+        args,
+        cwd=str(cwd),
+        env=run_env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -25,12 +68,10 @@ class TestImportDoesNotLoadConfig:
 
     def test_init_no_load_user_config_call(self):
         """__init__.py must not contain a bare load_user_config() call at module level."""
-
         init_source = importlib.util.find_spec("eggcalc").origin
         with open(init_source) as f:
             lines = f.readlines()
 
-        # Find lines that call load_user_config() outside of def/class blocks
         in_def_or_class = False
         for line in lines:
             stripped = line.strip()
@@ -45,56 +86,122 @@ class TestImportDoesNotLoadConfig:
                     "Library import must not execute cwd-local Python."
                 )
 
-    def test_import_side_effect_safe(self, tmp_path, monkeypatch):
-        """Importing eggcalc from a directory with a malicious eggcalc_config.py
-        must not execute the malicious code."""
-        malicious_config = tmp_path / "eggcalc_config.py"
-        malicious_config.write_text("import sys; sys.modules['__malicious__'] = True")
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.delitem(sys.modules, "eggcalc", raising=False)
-        monkeypatch.delitem(sys.modules, "eggcalc_config", raising=False)
-
-        assert not hasattr(sys.modules.get("eggcalc_config"), "__malicious__") or (
-            "__malicious__" not in sys.modules
+    def test_import_does_not_execute_cwd_config_subprocess(self, tmp_path):
+        """Importing eggcalc from a dir with malicious config must not execute it."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [PYTHON, "-c", "import eggcalc"],
+            cwd=tmp_path,
         )
+        assert result.returncode == 0, f"import failed: {result.stderr}"
+        assert not marker.exists(), "Sentinel file created — import executed cwd-local config"
 
 
 # ---------------------------------------------------------------------------
-# C02: CLI startup loads config
+# C02: evaluate() must NOT load cwd config (direct AST evaluation)
+# ---------------------------------------------------------------------------
+class TestEvaluateNoConfig:
+    """evaluate() performs direct AST evaluation and never loads cwd config."""
+
+    def test_evaluate_does_not_execute_cwd_config_subprocess(self, tmp_path):
+        """evaluate('2+2') must not trigger config loading from cwd."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [PYTHON, "-c", "from eggcalc import evaluate; assert evaluate('2+2') == 4"],
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0, f"evaluate failed: {result.stderr}"
+        assert not marker.exists(), "Sentinel file created — evaluate() loaded cwd config"
+
+
+# ---------------------------------------------------------------------------
+# C03: evaluate_raw() must NOT load cwd config without opt-in
+# ---------------------------------------------------------------------------
+class TestEvaluateRawNoConfig:
+    """evaluate_raw() does not load cwd config by default."""
+
+    def test_evaluate_raw_does_not_execute_cwd_config_subprocess(self, tmp_path):
+        """evaluate_raw('five plus three') must not trigger config loading."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [
+                PYTHON,
+                "-c",
+                "from eggcalc import evaluate_raw; assert evaluate_raw('five plus three') == 8",
+            ],
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0, f"evaluate_raw failed: {result.stderr}"
+        assert (
+            not marker.exists()
+        ), "Sentinel file created — evaluate_raw() loaded cwd config without opt-in"
+
+    def test_evaluate_raw_with_load_config_opt_in(self, tmp_path):
+        """EGGCALC_LOAD_CONFIG=1 enables lazy config loading for evaluate_raw()."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [PYTHON, "-c", "from eggcalc import evaluate_raw; evaluate_raw('five plus three')"],
+            cwd=tmp_path,
+            env={"EGGCALC_LOAD_CONFIG": "1"},
+        )
+        assert result.returncode == 0, f"evaluate_raw failed: {result.stderr}"
+        assert (
+            marker.exists()
+        ), "Sentinel file not created — EGGCALC_LOAD_CONFIG=1 did not enable config loading"
+
+
+# ---------------------------------------------------------------------------
+# C04: Explicit load_user_config() must load cwd config
+# ---------------------------------------------------------------------------
+class TestExplicitLoadConfig:
+    """load_user_config() explicitly loads cwd config when called."""
+
+    def test_explicit_load_user_config_executes_cwd_config_subprocess(self, tmp_path):
+        """Calling load_user_config() directly must load cwd config."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [PYTHON, "-c", "from eggcalc import load_user_config; load_user_config()"],
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0, f"load_user_config failed: {result.stderr}"
+        assert (
+            marker.exists()
+        ), "Sentinel file not created — load_user_config() did not load cwd config"
+
+
+# ---------------------------------------------------------------------------
+# C05: CLI loads config by default
 # ---------------------------------------------------------------------------
 class TestCLILoadsConfig:
-    """normalize.main() should load config at startup."""
+    """CLI startup loads config by default."""
 
-    def test_maybe_load_cli_config_exists(self):
-        """maybe_load_cli_config must be defined in normalize.py."""
-        from eggcalc.normalize import maybe_load_cli_config
+    def test_cli_loads_cwd_config_by_default_subprocess(self, tmp_path):
+        """python -m eggcalc 'myconst' should see custom constant from cwd config."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [PYTHON, "-m", "eggcalc", "myconst"],
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        assert marker.exists(), "Sentinel file not created — CLI did not load cwd config"
+        assert "123" in result.stdout, f"Expected '123' in output, got: {result.stdout}"
 
-        assert callable(maybe_load_cli_config)
-
-    def test_maybe_load_cli_config_calls_load_user_config(self, monkeypatch):
-        """maybe_load_cli_config() delegates to load_user_config() when not disabled."""
-        called = []
-
-        monkeypatch.setenv("EGGCALC_NO_CONFIG", "")
-        # We can't easily mock the import, so just verify it doesn't error
-        from eggcalc.normalize import maybe_load_cli_config
-
-        # This should not raise even if there's no eggcalc_config.py
-        # (load_user_config handles missing config gracefully)
-        maybe_load_cli_config()
-
-    def test_maybe_load_cli_config_respects_no_config(self, monkeypatch):
-        """maybe_load_cli_config() is a no-op when EGGCALC_NO_CONFIG is set."""
-        monkeypatch.setenv("EGGCALC_NO_CONFIG", "1")
-
-        from eggcalc.normalize import maybe_load_cli_config
-
-        # Should return immediately without calling load_user_config
-        maybe_load_cli_config()
+    def test_cli_no_config_env_blocks_cwd_config_subprocess(self, tmp_path):
+        """EGGCALC_NO_CONFIG=1 prevents CLI from loading cwd config."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [PYTHON, "-m", "eggcalc", "2+2"],
+            cwd=tmp_path,
+            env={"EGGCALC_NO_CONFIG": "1"},
+        )
+        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        assert (
+            not marker.exists()
+        ), "Sentinel file created — EGGCALC_NO_CONFIG=1 did not block CLI config"
 
 
 # ---------------------------------------------------------------------------
-# C03: MCP hardening preserved
+# C06: MCP hardening preserved
 # ---------------------------------------------------------------------------
 class TestMCPHardening:
     """MCP server must set EGGCALC_NO_CONFIG before imports."""
@@ -107,8 +214,8 @@ class TestMCPHardening:
         with open(server_source_path) as f:
             content = f.read()
 
-        assert 'EGGCALC_NO_CONFIG' in content
-        assert 'setdefault' in content
+        assert "EGGCALC_NO_CONFIG" in content
+        assert "setdefault" in content
 
     def test_server_hard_sets_no_config_in_main(self):
         """mcp/server.py mcp_main() hard-sets EGGCALC_NO_CONFIG=1."""
@@ -118,64 +225,31 @@ class TestMCPHardening:
         with open(server_source_path) as f:
             content = f.read()
 
-        # Check that mcp_main sets the env var (not just setdefault)
         assert 'os.environ["EGGCALC_NO_CONFIG"] = "1"' in content
 
-
-# ---------------------------------------------------------------------------
-# C04: _ensure_config_loaded lazy path still works
-# ---------------------------------------------------------------------------
-class TestLazyConfigLoading:
-    """evaluate_raw() etc. still trigger _ensure_config_loaded() on first call."""
-
-    def test_evaluate_raw_triggers_ensure(self):
-        """evaluate_raw() calls _ensure_config_loaded internally."""
-        from eggcalc.evaluator import _ensure_config_loaded
-
-        # _config_loaded should already be True after module import
-        # (module-level code doesn't call it, but the default evaluator init does)
-        # This test just verifies the function exists and is callable
-        assert callable(_ensure_config_loaded)
-
-    def test_load_user_config_exists(self):
-        """load_user_config is still importable from evaluator."""
-        from eggcalc.evaluator import load_user_config
-
-        assert callable(load_user_config)
-
-    def test_load_user_config_no_config_env(self, monkeypatch):
-        """load_user_config returns early when EGGCALC_NO_CONFIG is set.
-
-        Even on early-return, _config_loaded is set to True to prevent
-        redundant calls (this is the intended behavior).
-        """
-        monkeypatch.setenv("EGGCALC_NO_CONFIG", "1")
-        import eggcalc.evaluator as ev
-
-        old_config_loaded = ev._config_loaded
-        ev._config_loaded = False
-        try:
-            from eggcalc.evaluator import load_user_config
-
-            load_user_config()
-            # _config_loaded is True even on early-return (prevents re-entry)
-            assert ev._config_loaded is True
-        finally:
-            ev._config_loaded = old_config_loaded
+    def test_package_mcp_blocks_cwd_config_subprocess(self, tmp_path):
+        """MCP server mode must not load cwd config."""
+        marker = _write_sentinel_config(tmp_path)
+        result = _run_in_cwd(
+            [
+                PYTHON,
+                "-c",
+                "import os; os.environ['EGGCALC_NO_CONFIG'] = '1'; " "import eggcalc.mcp.server",
+            ],
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0, f"MCP import failed: {result.stderr}"
+        assert not marker.exists(), "Sentinel file created — MCP mode loaded cwd config"
 
 
 # ---------------------------------------------------------------------------
-# C05: load_user_config respects _mcp_mode
+# C07: _mcp_mode guard
 # ---------------------------------------------------------------------------
 class TestMCPModeGuard:
     """load_user_config() must not load config when _mcp_mode is True."""
 
     def test_mcp_mode_prevents_loading(self):
-        """load_user_config() returns early when _mcp_mode is True.
-
-        Even on early-return, _config_loaded is set to True to prevent
-        redundant calls (this is the intended behavior).
-        """
+        """load_user_config() returns early when _mcp_mode is True."""
         import eggcalc.evaluator as ev
 
         old_mcp_mode = ev._mcp_mode
@@ -186,8 +260,29 @@ class TestMCPModeGuard:
             from eggcalc.evaluator import load_user_config
 
             load_user_config()
-            # _config_loaded is True even on early-return (prevents re-entry)
             assert ev._config_loaded is True
         finally:
             ev._mcp_mode = old_mcp_mode
+            ev._config_loaded = old_config_loaded
+
+
+# ---------------------------------------------------------------------------
+# C08: EGGCALC_NO_CONFIG guard on load_user_config
+# ---------------------------------------------------------------------------
+class TestNoConfigEnvGuard:
+    """load_user_config() respects EGGCALC_NO_CONFIG."""
+
+    def test_load_user_config_no_config_env(self, monkeypatch):
+        """load_user_config returns early when EGGCALC_NO_CONFIG is set."""
+        monkeypatch.setenv("EGGCALC_NO_CONFIG", "1")
+        import eggcalc.evaluator as ev
+
+        old_config_loaded = ev._config_loaded
+        ev._config_loaded = False
+        try:
+            from eggcalc.evaluator import load_user_config
+
+            load_user_config()
+            assert ev._config_loaded is True
+        finally:
             ev._config_loaded = old_config_loaded

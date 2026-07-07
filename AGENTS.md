@@ -146,8 +146,10 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 | Path | Entry Point | When |
 |------|-------------|------|
 | CLI | `maybe_load_cli_config()` in normalize.py | Once at CLI startup (`main()`) |
-| API (lazy) | `_ensure_config_loaded()` in evaluator.py | First call to `evaluate_raw()` etc. |
+| API (opt-in) | `_ensure_config_loaded()` in evaluator.py | Only when `EGGCALC_LOAD_CONFIG=1` is set |
 | MCP server | Blocked by `EGGCALC_NO_CONFIG=1` | Never |
+
+Library APIs (`evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`) do **not** load cwd-local config by default. Set `EGGCALC_LOAD_CONFIG=1` to enable lazy config loading, or call `load_user_config()` explicitly.
 
 The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCALC_NO_CONFIG` env var. Both early-return paths set `_config_loaded = True` to prevent re-entry.
 

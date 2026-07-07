@@ -62,8 +62,10 @@ NOT eval() — uses AST for safety
 `import eggcalc` does NOT trigger `load_user_config()`. Config loading is handled by three paths:
 
 1. **CLI path:** `maybe_load_cli_config()` in normalize.py — called once at CLI startup
-2. **API path:** `_ensure_config_loaded()` — lazy loading on first `evaluate_raw()` call
+2. **API path:** `_ensure_config_loaded()` — lazy loading, only when `EGGCALC_LOAD_CONFIG=1` is set
 3. **MCP path:** Blocked by `EGGCALC_NO_CONFIG=1` env var set before imports
+
+Library APIs (`evaluate_raw()`, `evaluate_cached()`, etc.) do **not** load cwd config by default. Set `EGGCALC_LOAD_CONFIG=1` or call `load_user_config()` explicitly.
 
 The `load_user_config()` function checks two guards (`_mcp_mode` and `EGGCALC_NO_CONFIG`) and sets `_config_loaded = True` on both early-return and normal paths to prevent re-entry.
 

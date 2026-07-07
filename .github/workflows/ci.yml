@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -92,3 +93,6 @@ jobs:
         run: |
           /tmp/test-venv/bin/python -c "from eggcalc import evaluate; assert evaluate('2+2') == 4, 'eval failed'"
           /tmp/test-venv/bin/python -c "from eggcalc.units import UnitValue; assert UnitValue(1, 'm').convert_to('ft').value > 3, 'unit conversion failed'"
+
+      - name: Release-surface smoke tests
+        run: python scripts/smoke_release_surfaces.py

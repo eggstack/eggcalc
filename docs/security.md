@@ -153,16 +153,23 @@ register_function("safe_double", my_safe_function)
 
 ### Disable Config Loading
 
-In high-security environments, avoid config loading:
+In high-security environments, disable config loading entirely:
 
 ```python
-# Don't call load_user_config()
+# Option 1: Environment variable (recommended for library use)
+import os
+os.environ["EGGCALC_NO_CONFIG"] = "1"
+from eggcalc import evaluate_raw
+
+# Option 2: Use EggCalcApp (no config loading by default)
 from eggcalc import EggCalcApp
 
 app = EggCalcApp()
 # Manually configure instead
 app.register_constant("safe_const", 42)
 ```
+
+**Config-loading policy:** Library APIs (`evaluate_raw()`, `evaluate_cached()`, etc.) do **not** load `eggcalc_config.py` by default. Set `EGGCALC_LOAD_CONFIG=1` to enable lazy config loading, or call `load_user_config()` explicitly. CLI loads config by default.
 
 ## Security Best Practices
 
