@@ -58,7 +58,7 @@ python build_single.py
 python install.py --install
 ```
 
-CI order: `ruff → black --check → build_single.py → generate_mcp_docs.py --check → pytest → mypy` (mypy only on 3.12).
+CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3" (smoke) → generate_mcp_docs.py --check → pytest → mypy` (mypy only on 3.12).
 
 ## Constraints
 
