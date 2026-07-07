@@ -3435,12 +3435,12 @@ def version_compare_mcp(
     Args:
         a: First version string.
         b: Second version string.
-        scheme: Version scheme ("semver", "pep440", or "loose").
+        scheme: Version scheme ("semver" or "loose").
 
     Returns:
         Success envelope with comparison result, or error envelope.
     """
-    valid_schemes = {"semver", "pep440", "loose"}
+    valid_schemes = {"semver", "loose"}
     if scheme not in valid_schemes:
         return _error_response(
             "invalid_arguments",

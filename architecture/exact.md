@@ -27,7 +27,7 @@ exact/
 ├── shell.py               # Shell command parsing and argv comparison
 ├── unicode_policy.py      # Named Unicode safety policies
 ├── cargo.py               # Cargo.toml inspection
-└── version.py             # Semver/PEP440 parsing and comparison
+└── version.py             # Semver/cargo constraint checking
 ```
 
 ## exact/__init__.py — Public API
@@ -787,24 +787,31 @@ CargoInspectResult(
 
 ---
 
-## version.py — Semver/Version Comparison
+## version.py — Semver/Version Constraint Checking
 
 ### Functions
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `parse_version(version)` | VersionInfo | Parse a version string |
-| `check_version_constraint(version, constraint, scheme)` | VersionConstraintResult | Check if version satisfies constraint |
+| `parse_version(version)` | ParsedVersion | Parse a strict semver version string (major.minor.patch with optional pre-release and build metadata) |
+| `check_version_constraint(version, constraint, scheme)` | VersionConstraintResult | Check if version satisfies constraint under semver or cargo scheme |
+
+### Supported Schemes
+
+- **semver**: strict major.minor.patch with full pre-release ordering. Supports operators: `==`, `!=`, `>=`, `<=`, `>`, `<`, `=`, comma-separated ranges.
+- **cargo**: semver with Rust/Cargo-style range operators: `^` (caret), `~` (tilde), `*` (wildcard). Full pre-release support.
+- **pep440, loose**: not supported by constraint checking (use `version_compare` from validate.py for loose comparison).
 
 ### VersionConstraintResult
 
 ```python
 VersionConstraintResult(
     satisfies=bool,
-    parsed_version=VersionInfo,
-    parsed_constraint=dict,
+    parsed_version=ParsedVersion | None,
+    parsed_constraint=ParsedConstraint | None,
     scheme=str,
     explanation=str,
+    findings=list[str],
 )
 ```
 

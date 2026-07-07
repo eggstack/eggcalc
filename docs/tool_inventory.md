@@ -86,7 +86,7 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 73 | `validate_regex` | regex | 1 | yes | no | yes | yes | Test a Python regular expression against sample strings and report match/fullmatch status, spans, groups, and errors. |
 | 74 | `validate_schema_light` | validation | 3 | yes | no | yes | yes | Validate JSON against a simple schema format with type, required, enum, pattern, and nested constraints. |
 | 75 | `validate_toml` | validation | 1 | yes | no | yes | yes | Validate TOML configuration files (Cargo.toml, pyproject.toml, etc.) and report parse errors with line/column positions. |
-| 76 | `version_compare` | version | 2 | yes | no | yes | yes | Compare two version strings with explicit scheme. Supports semver (major.minor.patch), loose (numeric parts), and deferred pep440. |
+| 76 | `version_compare` | version | 2 | yes | no | yes | yes | Compare two version strings with explicit scheme. |
 | 77 | `version_constraint_check` | version | 3 | yes | no | yes | yes | Check whether a version satisfies a constraint under a declared versioning scheme. |
 
 ## Legend

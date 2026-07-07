@@ -352,7 +352,7 @@ TomlShapeResult(valid=True, tables=['package', 'package.name'], ...)
 
 Compare two version strings.
 
-Supported schemes: `semver` (major.minor.patch), `loose` (numeric parts), `pep440` (deferred).
+Supported schemes: `semver` (major.minor.patch, pre-release identifiers ignored in comparison), `loose` (numeric parts only). PEP 440 is not supported.
 
 ```python
 >>> version_compare("1.2.3", "1.2.4")

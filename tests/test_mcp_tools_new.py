@@ -662,7 +662,4 @@ class TestVersionCompareMCP:
                 },
             }
         )
-        content = json.loads(response["result"]["content"][0]["text"])
-        assert content["ok"] is True
-        assert content["result"]["scheme"] == "pep440"
-        assert content["result"]["valid"] is False
+        assert "error" in response

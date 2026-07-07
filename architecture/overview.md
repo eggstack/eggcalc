@@ -316,7 +316,7 @@ The `exact/` package provides low-level deterministic text analysis tools.
 | synthesis.py | [synthesis.md](synthesis.md) | Higher-level text analysis |
 | confusables.py | [confusables.md](confusables.md) | Homoglyph identification (auto-generated data) |
 | cargo.py | — | Cargo.toml inspection |
-| version.py | — | Semver/PEP440 version parsing |
+| version.py | — | Semver/cargo constraint checking |
 | inspect_prompt.py | — | Prompt injection detection |
 | exact (overview) | [exact.md](exact.md) | Package-level overview |
 

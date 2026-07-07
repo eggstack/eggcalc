@@ -1691,10 +1691,16 @@ Compare two version strings with explicit scheme.
 **Arguments:**
 - `a` (string): First version
 - `b` (string): Second version
-- `scheme` (string, optional): "semver", "pep440", or "loose" (default "semver")
+- `scheme` (string, optional): "semver" or "loose" (default "semver")
 
 **Tier:** 2
 **Tags:** `text`, `version`, `semver`, `comparison`
+
+**Supported schemes:**
+- `semver`: strict major.minor.patch comparison. Pre-release identifiers are parsed but ignored in comparison (simplified behavior — use `version_constraint_check` for full pre-release ordering).
+- `loose`: extract all numeric parts and compare sequentially. Non-numeric suffixes are ignored.
+
+**Note:** PEP 440 is not supported. Passing `scheme: "pep440"` returns an error.
 
 **Returns:**
 - `comparison`: -1, 0, or 1
@@ -1721,6 +1727,18 @@ Check whether a version satisfies a constraint under a declared versioning schem
 **Tier:** 3
 **Tags:** `version`, `semver`, `cargo`, `constraint`, `satisfiability`
 
+**Supported schemes:**
+- `semver`: strict major.minor.patch with full pre-release ordering. Supports operators: `==`, `!=`, `>=`, `<=`, `>`, `<`, `=`, `!=`, and comma-separated ranges.
+- `cargo`: semver with Rust/Cargo-style range operators: `^` (caret), `~` (tilde), `*` (wildcard).
+
+**Supported constraint forms:**
+- Semver exact: `1.2.3`
+- Semver comparison: `>=1.2.3`, `<2.0`, `!=1.0`
+- Semver comma-separated ranges: `>=1.2,<2.0`
+- Cargo caret: `^1.2.3` (>=1.2.3, <2.0.0)
+- Cargo tilde: `~1.2.3` (>=1.2.3, <1.3.0)
+- Cargo wildcard: `1.*` (>=1.0.0, <2.0.0), `1.2.*` (>=1.2.0, <1.3.0)
+
 **Returns:**
 - `satisfies`: Boolean
 - `parsed_version`: Parsed version components
@@ -1728,14 +1746,6 @@ Check whether a version satisfies a constraint under a declared versioning schem
 - `scheme`: The scheme used
 - `explanation`: Human-readable explanation
 - `findings`: Analysis notes and warnings
-
-**Supported constraint forms:**
-- Semver exact: `1.2.3`
-- Semver comparison: `>=1.2.3`, `<2.0`, `!=1.0`
-- Semver comma-separated ranges: `>=1.2,<2.0`
-- Cargo caret: `^1.2.3`
-- Cargo tilde: `~1.2.3`
-- Cargo wildcard: `1.*`, `1.2.*`
 
 **Example:**
 ```json

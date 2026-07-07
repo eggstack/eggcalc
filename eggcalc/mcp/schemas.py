@@ -1633,7 +1633,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
     },
     "version_compare": {
-        "description": "Compare two version strings with explicit scheme. Supports semver (major.minor.patch), loose (numeric parts), and deferred pep440.",
+        "description": "Compare two version strings with explicit scheme. Supports semver (major.minor.patch, pre-release identifiers ignored in comparison) and loose (numeric parts only). PEP 440 is not supported.",
         "tier": 2,
         "tags": ["version", "semver", "comparison"],
         "inputSchema": {
@@ -1643,9 +1643,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "b": {"type": "string", "description": "Second version string"},
                 "scheme": {
                     "type": "string",
-                    "enum": ["semver", "pep440", "loose"],
+                    "enum": ["semver", "loose"],
                     "default": "semver",
-                    "description": "Version scheme",
+                    "description": "Version scheme ('semver' for major.minor.patch with pre-release/build metadata, 'loose' for numeric-part-only comparison)",
                 },
             },
             "required": ["a", "b"],

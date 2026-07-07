@@ -508,3 +508,279 @@ class TestToolInventory:
         from eggcalc.mcp.server import TOOL_HANDLERS
 
         assert "version_constraint_check" in TOOL_HANDLERS
+
+
+class TestVersionCompareSchemes:
+    """Tests for version_compare scheme support and boundaries."""
+
+    def test_semver_basic_equal(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.2.3", "1.2.3")
+        assert result["comparison"] == 0
+        assert result["valid"] is True
+        assert result["scheme"] == "semver"
+
+    def test_semver_basic_less(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.2.3", "1.2.4")
+        assert result["comparison"] == -1
+        assert result["valid"] is True
+
+    def test_semver_basic_greater(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("2.0.0", "1.0.0")
+        assert result["comparison"] == 1
+        assert result["valid"] is True
+
+    def test_semver_prerelease_ignored_in_compare(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.0.0-alpha", "1.0.0-beta")
+        assert result["comparison"] == 0
+        assert result["valid"] is True
+
+    def test_semver_build_metadata_ignored(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.0.0+build.1", "1.0.0+build.2")
+        assert result["comparison"] == 0
+        assert result["valid"] is True
+
+    def test_semver_invalid_returns_invalid(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("not-a-version", "1.0.0")
+        assert result["valid"] is False
+        assert "Invalid semver" in result["summary"]
+
+    def test_semver_both_invalid(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("foo", "bar")
+        assert result["valid"] is False
+
+    def test_loose_basic_equal(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.2.3", "1.2.3", scheme="loose")
+        assert result["comparison"] == 0
+        assert result["valid"] is True
+        assert result["scheme"] == "loose"
+
+    def test_loose_basic_less(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.2.3", "1.2.10", scheme="loose")
+        assert result["comparison"] == -1
+        assert result["valid"] is True
+
+    def test_loose_numeric_parts_only(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.2.3", "1.2.3.4", scheme="loose")
+        assert result["comparison"] == -1
+
+    def test_loose_non_numeric_suffix(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.2.3-beta", "1.2.3-alpha", scheme="loose")
+        assert result["comparison"] == 0
+
+    def test_loose_different_lengths(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.2", "1.2.0", scheme="loose")
+        assert result["comparison"] == 0
+
+    def test_pep440_rejected_by_validate(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.0.0", "2.0.0", scheme="pep440")
+        assert result["valid"] is False
+        assert "not supported" in result["summary"].lower()
+
+    def test_unknown_scheme_rejected(self):
+        from eggcalc.exact.validate import version_compare
+
+        result = version_compare("1.0.0", "2.0.0", scheme="unknown")
+        assert result["valid"] is False
+
+
+class TestVersionCompareMcpRejection:
+    """Tests for MCP wrapper rejection of unsupported schemes."""
+
+    def test_pep440_rejected(self):
+        from eggcalc.mcp.tools import version_compare_mcp
+
+        resp = version_compare_mcp("1.0.0", "2.0.0", scheme="pep440")
+        assert resp["ok"] is False
+        assert resp["error_type"] == "invalid_arguments"
+        assert "pep440" in resp["error"].lower()
+
+    def test_unknown_scheme_rejected(self):
+        from eggcalc.mcp.tools import version_compare_mcp
+
+        resp = version_compare_mcp("1.0.0", "2.0.0", scheme="bad")
+        assert resp["ok"] is False
+        assert resp["error_type"] == "invalid_arguments"
+
+    def test_semver_accepted(self):
+        from eggcalc.mcp.tools import version_compare_mcp
+
+        resp = version_compare_mcp("1.0.0", "2.0.0", scheme="semver")
+        assert resp["ok"] is True
+        assert resp["result"]["comparison"] == -1
+
+    def test_loose_accepted(self):
+        from eggcalc.mcp.tools import version_compare_mcp
+
+        resp = version_compare_mcp("1.0.0", "2.0.0", scheme="loose")
+        assert resp["ok"] is True
+        assert resp["result"]["comparison"] == -1
+
+    def test_invalid_input_returns_error(self):
+        from eggcalc.mcp.tools import version_compare_mcp
+
+        resp = version_compare_mcp(123, "2.0.0")
+        assert resp["ok"] is False
+
+
+class TestVersionConstraintSchemeRejection:
+    """Tests for version_constraint_check rejecting unsupported schemes."""
+
+    def test_pep440_rejected(self):
+        from eggcalc.mcp.tools import version_constraint_check_mcp
+
+        resp = version_constraint_check_mcp("1.0.0", ">=1.0", scheme="pep440")
+        assert resp["ok"] is False
+        assert resp["error_type"] == "invalid_arguments"
+
+    def test_loose_rejected(self):
+        from eggcalc.mcp.tools import version_constraint_check_mcp
+
+        resp = version_constraint_check_mcp("1.0.0", ">=1.0", scheme="loose")
+        assert resp["ok"] is False
+        assert resp["error_type"] == "invalid_arguments"
+
+    def test_semver_accepted(self):
+        from eggcalc.mcp.tools import version_constraint_check_mcp
+
+        resp = version_constraint_check_mcp("1.5.0", ">=1.0")
+        assert resp["ok"] is True
+        assert resp["result"]["satisfies"] is True
+
+    def test_cargo_accepted(self):
+        from eggcalc.mcp.tools import version_constraint_check_mcp
+
+        resp = version_constraint_check_mcp("1.5.0", "^1.2.3", scheme="cargo")
+        assert resp["ok"] is True
+        assert resp["result"]["satisfies"] is True
+
+
+class TestSemverComparisonTable:
+    """Table-driven tests for semver comparison ordering."""
+
+    def _compare(self, a, b):
+        from eggcalc.exact.validate import version_compare
+
+        return version_compare(a, b)["comparison"]
+
+    def test_equal_versions(self):
+        assert self._compare("1.0.0", "1.0.0") == 0
+        assert self._compare("0.0.0", "0.0.0") == 0
+        assert self._compare("999.999.999", "999.999.999") == 0
+
+    def test_major_ordering(self):
+        assert self._compare("1.0.0", "2.0.0") == -1
+        assert self._compare("2.0.0", "1.0.0") == 1
+
+    def test_minor_ordering(self):
+        assert self._compare("1.0.0", "1.1.0") == -1
+        assert self._compare("1.1.0", "1.0.0") == 1
+
+    def test_patch_ordering(self):
+        assert self._compare("1.0.0", "1.0.1") == -1
+        assert self._compare("1.0.1", "1.0.0") == 1
+
+
+class TestLooseComparisonTable:
+    """Table-driven tests for loose comparison ordering."""
+
+    def _compare(self, a, b):
+        from eggcalc.exact.validate import version_compare
+
+        return version_compare(a, b, scheme="loose")["comparison"]
+
+    def test_equal(self):
+        assert self._compare("1.0.0", "1.0.0") == 0
+
+    def test_different_lengths(self):
+        assert self._compare("1.0", "1.0.0") == 0
+        assert self._compare("1.0.0", "1.0.0.0") == 0
+
+    def test_numeric_dominance(self):
+        assert self._compare("1.2.3", "1.2.10") == -1
+        assert self._compare("1.2.10", "1.2.3") == 1
+
+    def test_non_numeric_ignored(self):
+        assert self._compare("1.0.0-alpha", "1.0.0") == 0
+        assert self._compare("1.0.0+build", "1.0.0") == 0
+
+
+class TestConstraintOperators:
+    """Table-driven tests for all supported constraint operators."""
+
+    def test_exact_equal(self):
+        result = check_version_constraint("1.2.3", "1.2.3")
+        assert result["satisfies"] is True
+
+    def test_exact_not_equal(self):
+        result = check_version_constraint("1.2.3", "1.2.4")
+        assert result["satisfies"] is False
+
+    def test_operator_eq(self):
+        assert check_version_constraint("1.0.0", "=1.0.0")["satisfies"] is True
+        assert check_version_constraint("1.0.0", "=1.0.1")["satisfies"] is False
+
+    def test_operator_double_eq(self):
+        assert check_version_constraint("1.0.0", "==1.0.0")["satisfies"] is True
+        assert check_version_constraint("1.0.0", "==1.0.1")["satisfies"] is False
+
+    def test_operator_ne(self):
+        assert check_version_constraint("1.0.0", "!=1.0.0")["satisfies"] is False
+        assert check_version_constraint("1.0.0", "!=1.0.1")["satisfies"] is True
+
+    def test_operator_gt(self):
+        assert check_version_constraint("1.0.1", ">1.0.0")["satisfies"] is True
+        assert check_version_constraint("1.0.0", ">1.0.0")["satisfies"] is False
+        assert check_version_constraint("0.9.9", ">1.0.0")["satisfies"] is False
+
+    def test_operator_gte(self):
+        assert check_version_constraint("1.0.0", ">=1.0.0")["satisfies"] is True
+        assert check_version_constraint("1.0.1", ">=1.0.0")["satisfies"] is True
+        assert check_version_constraint("0.9.9", ">=1.0.0")["satisfies"] is False
+
+    def test_operator_lt(self):
+        assert check_version_constraint("0.9.9", "<1.0.0")["satisfies"] is True
+        assert check_version_constraint("1.0.0", "<1.0.0")["satisfies"] is False
+        assert check_version_constraint("1.0.1", "<1.0.0")["satisfies"] is False
+
+    def test_operator_lte(self):
+        assert check_version_constraint("1.0.0", "<=1.0.0")["satisfies"] is True
+        assert check_version_constraint("0.9.9", "<=1.0.0")["satisfies"] is True
+        assert check_version_constraint("1.0.1", "<=1.0.0")["satisfies"] is False
+
+    def test_comma_range_all_satisfied(self):
+        result = check_version_constraint("1.5.0", ">=1.0.0,<2.0.0")
+        assert result["satisfies"] is True
+
+    def test_comma_range_lower_fail(self):
+        result = check_version_constraint("0.9.0", ">=1.0.0,<2.0.0")
+        assert result["satisfies"] is False
+
+    def test_comma_range_upper_fail(self):
+        result = check_version_constraint("2.0.0", ">=1.0.0,<2.0.0")
+        assert result["satisfies"] is False

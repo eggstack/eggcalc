@@ -83,7 +83,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `markdown.py` - Markdown structure analysis
 - `config.py` - dotenv/INI validation
 - `cargo.py` - Cargo.toml inspection
-- `version.py` - Semver/PEP440 version parsing
+- `version.py` - Semver/cargo constraint checking
 - `inspect_prompt.py` - Prompt injection detection
 - `glob.py` - Glob pattern matching
 - `__init__.py` - Package exports

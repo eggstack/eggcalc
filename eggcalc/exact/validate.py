@@ -500,7 +500,10 @@ def version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareRes
     Args:
         a: First version string.
         b: Second version string.
-        scheme: Version scheme ("semver", "pep440", or "loose").
+        scheme: Version scheme ("semver" or "loose").
+            - semver: strict major.minor.patch comparison; pre-release
+              identifiers are parsed but ignored in comparison (simplified).
+            - loose: extract all numeric parts and compare sequentially.
 
     Returns:
         Dictionary with comparison (-1, 0, 1), valid (bool), scheme,
@@ -520,7 +523,7 @@ def version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareRes
             comparison=0,
             valid=False,
             scheme="pep440",
-            summary="PEP 440 not implemented (requires packaging library)",
+            summary="PEP 440 is not supported (no packaging library; use semver or loose scheme)",
         )
     elif scheme == "loose":
         return _loose_version_compare(a, b)

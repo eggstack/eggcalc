@@ -125,8 +125,8 @@ Registry of all available tools (77 total). Tools are organized by tier for sele
 | `json_query` | Query JSON using RFC 6901 JSON Pointer |
 | `path_analyze` | Analyze path components, extensions, hidden status |
 | `identifier_analyze` | Classify and validate identifier naming conventions |
-| `version_compare` | Compare two version strings (semver, loose) |
-| `version_constraint_check` | Check if version satisfies constraint (semver/cargo) |
+| `version_compare` | Compare two version strings (semver, loose; PEP 440 not supported) |
+| `version_constraint_check` | Check if version satisfies constraint (semver/cargo, full pre-release ordering) |
 | `toml_shape` | Analyze TOML document structure |
 | `cargo_toml_inspect` | Inspect Cargo.toml structure |
 | `glob_match` | Match glob pattern against path |
