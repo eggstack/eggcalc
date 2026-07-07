@@ -1,29 +1,37 @@
-# diff.py - String Diffing Algorithms
+# diff.py - Diff and Span Primitives
+
+## Table of Contents
+
+- [Purpose](#purpose)
+- [Constants](#constants)
+- [Types](#types)
+  - [FirstDiff](#firstdiff)
+  - [CommonPrefixSuffix](#commonprefixsuffix)
+  - [DiffSpan](#diffspan)
+- [Functions](#functions)
+  - [first_diff](#first_diffa-str-b-str-firstdiff--none)
+  - [common_prefix_suffix](#common_prefix_suffixa-str-b-str-commonprefixsuffix)
+  - [levenshtein_distance](#levenshtein_distancea-str-b-str-max_len-int--int)
+  - [longest_common_subsequence](#longest_common_subsequencea-str-b-str-max_len-int--str)
+  - [diff_spans](#diff_spansa-str-b-str-max_diffs-int--listdiffspan)
+- [Algorithm Details](#algorithm-details)
+- [Index](#index)
 
 ## Purpose
 
-Provides algorithms for computing differences between strings, including edit distance calculation, first difference detection, and diff span generation.
+Provides low-level diff operations including Levenshtein distance, first difference detection, common prefix/suffix, longest common subsequence, and diff spans using `difflib.SequenceMatcher`.
 
-## Core Functions
-
-### `levenshtein_distance(a: str, b: str) -> int`
-
-Calculate the Levenshtein (edit) distance between two strings.
-
-The edit distance is the minimum number of operations (insertions, deletions, substitutions) required to transform `a` into `b`.
+## Constants
 
 ```python
->>> levenshtein_distance("kitten", "sitting")
-3
->>> levenshtein_distance("hello", "hello")
-0
+MAX_LEVENSHTEIN_LEN = 10000
 ```
 
-**Algorithm**: Uses dynamic programming with O(mn) time and O(min(m,n)) space optimization.
+Maximum string length allowed for `levenshtein_distance` and `longest_common_subsequence`. Both functions raise `ValueError` if either input exceeds this limit.
 
-### `first_diff(a: str, b: str) -> FirstDiff | None`
+## Types
 
-Find the first difference between two strings.
+### FirstDiff
 
 ```python
 class FirstDiff(TypedDict):
@@ -35,7 +43,30 @@ class FirstDiff(TypedDict):
     b_codepoint: str
 ```
 
-Returns `None` if strings are identical.
+### CommonPrefixSuffix
+
+```python
+class CommonPrefixSuffix(TypedDict):
+    common_prefix_len: int
+    common_suffix_len: int
+```
+
+### DiffSpan
+
+```python
+class DiffSpan(TypedDict):
+    kind: str           # "replace", "insert", or "delete"
+    a_span: list[int]   # [start, end) indices in string a
+    b_span: list[int]   # [start, end) indices in string b
+    a_text: str         # text from string a in this span
+    b_text: str         # text from string b in this span
+```
+
+## Functions
+
+### `first_diff(a: str, b: str) -> FirstDiff | None`
+
+Find the first difference between two strings.
 
 ```python
 >>> first_diff("hello", "hallo")
@@ -45,20 +76,61 @@ FirstDiff(a_index=1, b_index=1, a_char='e', b_char='a',
 None
 ```
 
+**Parameters:**
+- `a`: First string.
+- `b`: Second string.
+
+**Returns:** `FirstDiff` with indices, characters, and codepoint representations, or `None` if strings are identical.
+
+**Edge cases:**
+- When strings differ only in length, the differing character is at position `min(len(a), len(b))` and the shorter string's char/codepoint fields are empty strings.
+- Indices are always equal (both `a_index` and `b_index` hold the same value) since comparison is positional.
+
 ### `common_prefix_suffix(a: str, b: str) -> CommonPrefixSuffix`
 
-Find common prefix and suffix lengths between two strings.
+Find common prefix and suffix lengths of two strings. Avoids overlapping prefix and suffix.
 
 ```python
->>> common_prefix_suffix("hello", "yo")
-{'common_prefix_len': 0, 'common_suffix_len': 1}
+>>> common_prefix_suffix("hello world", "hello there")
+{'common_prefix_len': 6, 'common_suffix_len': 0}
 >>> common_prefix_suffix("testing", "ing")
 {'common_prefix_len': 0, 'common_suffix_len': 3}
 ```
 
-### `longest_common_subsequence(a: str, b: str) -> str`
+**Parameters:**
+- `a`: First string.
+- `b`: Second string.
 
-Find the longest common subsequence of two strings using dynamic programming.
+**Returns:** `CommonPrefixSuffix` with `common_prefix_len` and `common_suffix_len`.
+
+**Edge cases:**
+- If prefix and suffix would overlap (i.e., `prefix_len + suffix_len > min_len`), the suffix is truncated to `min_len - prefix_len`. In the extreme case where the entire shorter string is a prefix, both are zero.
+
+### `levenshtein_distance(a: str, b: str, max_len: int = MAX_LEVENSHTEIN_LEN) -> int`
+
+Calculate the Levenshtein (edit) distance between two strings.
+
+```python
+>>> levenshtein_distance("kitten", "sitting")
+3
+>>> levenshtein_distance("hello", "hello")
+0
+```
+
+**Parameters:**
+- `a`: First string.
+- `b`: Second string.
+- `max_len`: Maximum string length to process (default `MAX_LEVENSHTEIN_LEN`, 10000).
+
+**Returns:** Edit distance as a non-negative integer.
+
+**Raises:** `ValueError` if either string exceeds `max_len`.
+
+**Algorithm:** Dynamic programming with O(mn) time and O(min(m,n)) space (two-row optimization).
+
+### `longest_common_subsequence(a: str, b: str, max_len: int = MAX_LEVENSHTEIN_LEN) -> str`
+
+Find the longest common subsequence of two strings.
 
 ```python
 >>> longest_common_subsequence("abcde", "ace")
@@ -67,78 +139,43 @@ Find the longest common subsequence of two strings using dynamic programming.
 ''
 ```
 
+**Parameters:**
+- `a`: First string.
+- `b`: Second string.
+- `max_len`: Maximum allowed length for either input string (default `MAX_LEVENSHTEIN_LEN`, 10000).
+
+**Returns:** The longest common subsequence as a string.
+
+**Raises:** `ValueError` if either string exceeds `max_len`.
+
+**Algorithm:** Standard O(mn) DP table with backtrack reconstruction. Returns empty string for empty inputs before checking length limits.
+
 ### `diff_spans(a: str, b: str, max_diffs: int = 50) -> list[DiffSpan]`
 
-Generate a list of diff spans between two strings.
+Find diff spans between two strings using `difflib.SequenceMatcher`.
 
 ```python
-class DiffSpan(TypedDict):
-    kind: str
-    a_span: list[int]
-    b_span: list[int]
-    a_text: str
-    b_text: str
-```
-
-### FirstDiff (TypedDict)
-
-```python
-class FirstDiff(TypedDict):
-    a_index: int
-    b_index: int
-    a_char: str
-    b_char: str
-    a_codepoint: str
-    b_codepoint: str
-```
-
-### CommonPrefixSuffix (TypedDict)
-
-```python
-class CommonPrefixSuffix(TypedDict):
-    common_prefix_len: int
-    common_suffix_len: int
-```
-
-**Algorithm**: Uses difflib.SequenceMatcher to compute optimal edit script, then converts to diff spans.
-
-```python
->>> list(diff_spans("hello", "hallo"))
+>>> diff_spans("hello", "hallo")
 [DiffSpan(kind='replace', a_span=[1, 2], b_span=[1, 2], a_text='e', b_text='a')]
 ```
 
-## Data Structures
+**Parameters:**
+- `a`: First string.
+- `b`: Second string.
+- `max_diffs`: Maximum number of diff spans to return (default 50). Larger strings will have diffs truncated to this limit.
 
-### `FirstDiff`
+**Returns:** List of `DiffSpan` dicts. Each span has `kind` (`"replace"`, `"insert"`, or `"delete"`), `a_span` and `b_span` as `[start, end)` index pairs, and `a_text` / `b_text` as the corresponding substrings. Equal (unchanged) segments are omitted.
 
-TypedDict containing:
-- `a_index`: Position in first string
-- `b_index`: Position in second string  
-- `a_char`: Character at position in first string
-- `b_char`: Character at position in second string
-- `a_codepoint`: Codepoint of character at position in first string (U+XXXX format)
-- `b_codepoint`: Codepoint of character at position in second string
-
-### `DiffSpan`
-
-TypedDict containing:
-- `kind`: Type of diff ("equal", "insert", "delete", "replace")
-- `a_span`: [start, end) indices in string a
-- `b_span`: [start, end) indices in string b
-- `a_text`: The text from string a in this span
-- `b_text`: The text from string b in this span
-
-### `CommonPrefixSuffix`
-
-TypedDict containing:
-- `common_prefix_len`: Length of common prefix
-- `common_suffix_len`: Length of common suffix
+**Edge cases:**
+- `max_diffs` caps output early; spans beyond the limit are silently dropped.
+- `"insert"` spans have `a_span` where `a_span[0] == a_span[1]` (zero-width in a).
+- `"delete"` spans have `b_span` where `b_span[0] == b_span[1]` (zero-width in b).
 
 ## Algorithm Details
 
 ### Levenshtein Distance
 
-Uses dynamic programming with the recurrence:
+Two-row DP optimization: maintains `prev_row` and `curr_row` of length `len(b)+1`. Swaps rows each iteration.
 
 ```
 dp[i][j] = min(
@@ -148,11 +185,16 @@ dp[i][j] = min(
 )
 ```
 
+### Longest Common Subsequence
+
+Full O(mn) DP table with traceback from `dp[m][n]` back to `dp[0][0]`. The result is built by reversing the collected characters.
+
 ### Diff Span Generation
 
-1. Uses `difflib.SequenceMatcher` to compute optimal edit script
-2. Converts SequenceMatcher opcodes to diff spans
-3. Skips equal (unchanged) segments
+1. `difflib.SequenceMatcher(None, a, b)` computes the optimal edit script.
+2. Opcodes with tag `"equal"` are skipped.
+3. Remaining tags (`"replace"`, `"insert"`, `"delete"`) become `DiffSpan` entries.
+4. Processing stops when `max_diffs` spans have been collected.
 
 ## Index
 

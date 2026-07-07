@@ -1,21 +1,33 @@
 # validate.py - Validation Utilities
 
+## Table of Contents
+
+- [Purpose](#purpose)
+- [Constants](#constants)
+- [TypedDicts](#typeddicts)
+- [Core Functions](#core-functions)
+- [Input Limits](#input-limits)
+- [Error Handling](#error-handling)
+
 ## Purpose
 
-Provides validation utilities for checking brackets, JSON/TOML syntax, regex patterns, schema validation, and version comparison.
+Provides validation utilities for checking brackets, JSON/TOML syntax, regex patterns, schema validation, version comparison, JSON comparison/extraction/canonicalization, and list operations.
 
 ## Constants
 
 ```python
-MAX_INPUT_LENGTH = 100_000       # Maximum input length for most functions
-MAX_PATTERN_LENGTH = 1000        # Maximum regex pattern length
-MAX_PATTERN_NESTING = 5          # Maximum regex nesting depth
-MAX_SAMPLE_LENGTH = 10_000       # Maximum sample string length for regex_test
-MAX_SCHEMA_VIOLATIONS = 100      # Maximum violations returned by validate_schema_light
-MAX_TEXT_LENGTH_REGEX = 100_000  # Maximum text length for regex functions
-MAX_PATTERN_LENGTH_REGEX = 1000  # Maximum pattern length for regex functions
-MAX_MATCHES = 100                # Maximum matches returned by regex_finditer
-MAX_GROUPS = 100                 # Maximum groups captured by regex_finditer
+MAX_INPUT_LENGTH = 100_000        # Maximum input length for most functions
+MAX_LIST_ITEMS = 10_000           # Maximum list items for list_dedupe/list_sort
+MAX_PATTERN_LENGTH = 1000         # Maximum regex pattern length
+MAX_PATTERN_NESTING = 5           # Maximum regex nesting depth
+MAX_SAMPLE_LENGTH = 10_000        # Maximum sample string length for regex_test
+MAX_SCHEMA_DEPTH = 50             # Maximum nesting depth for schema validation
+MAX_SCHEMA_ELEMENTS = 100_000     # Maximum elements walked during schema validation
+MAX_SCHEMA_VIOLATIONS = 100       # Maximum violations returned by validate_schema_light
+MAX_TEXT_LENGTH_REGEX = 100_000   # Maximum text length for regex_finditer
+MAX_PATTERN_LENGTH_REGEX = 1000   # Maximum pattern length for regex_finditer
+MAX_MATCHES = 100                 # Maximum matches returned by regex_finditer
+MAX_GROUPS = 100                  # Maximum groups captured by regex_finditer
 
 DEFAULT_BRACKET_PAIRS: dict[str, str] = {
     "(": ")",
@@ -301,7 +313,7 @@ class JsonQueryResult(TypedDict):
 
 ### `check_brackets(s: str, pairs: dict[str, str] | None = None) -> CheckBracketsResult`
 
-Check whether delimiters are structurally balanced.
+Check whether delimiters are structurally balanced. Tracks unmatched openers and closers with line/column positions.
 
 ```python
 >>> check_brackets("({[]})")
@@ -312,6 +324,8 @@ CheckBracketsResult(balanced=False, unmatched_openers=[...],
                     unmatched_closers=[...])
 ```
 
+**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+
 ### `validate_json(s: str) -> ValidateJsonResult`
 
 Validate JSON syntax and report precise parse errors.
@@ -319,40 +333,41 @@ Validate JSON syntax and report precise parse errors.
 ```python
 >>> validate_json('{"hello": "world"}')
 ValidateJsonResult(valid=True, error=None, position=None,
-                   line=None, column=None, type='object')
+                   line=None, column=None, type='object',
+                   top_level_keys=['hello'])
 >>> validate_json('{"hello": }')
 ValidateJsonResult(valid=False, error='Expecting property name',
-                   position=10, line=1,
-                   column=10, type=None)
+                   position=10, line=1, column=10, type=None,
+                   top_level_keys=None)
 ```
 
-**Note:** `top_level_keys` is only populated for objects. For arrays and primitives, it returns `None`.
+**Note:** `top_level_keys` is only populated for objects. For arrays and primitives, it returns `None`. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
 
 ### `validate_toml_text(text: str) -> ValidateTomlResult`
 
-Validate TOML string and return detailed structure information.
+Validate TOML string and return detailed structure information. Requires Python 3.11+ (tomllib).
 
 ```python
 >>> validate_toml_text('[package]\nname = "test"')
 ValidateTomlResult(valid=True, error=None, tables=['package', 'package.name'], ...)
 ```
 
-Requires Python 3.11+ (tomllib).
+**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
 
 ### `toml_shape(text: str, max_tables: int = 100) -> TomlShapeResult`
 
-Analyze the structure of a TOML document.
+Analyze the structure of a TOML document without returning values.
 
 ```python
 >>> toml_shape('[package]\nname = "test"')
 TomlShapeResult(valid=True, tables=['package', 'package.name'], ...)
 ```
 
+**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+
 ### `version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareResult`
 
-Compare two version strings.
-
-Supported schemes: `semver` (major.minor.patch, pre-release identifiers ignored in comparison), `loose` (numeric parts only). PEP 440 is not supported.
+Compare two version strings. Supported schemes: `semver` (strict major.minor.patch comparison; pre-release identifiers parsed but ignored), `loose` (extract all numeric parts and compare sequentially). PEP 440 is not supported (no packaging library).
 
 ```python
 >>> version_compare("1.2.3", "1.2.4")
@@ -361,9 +376,35 @@ VersionCompareResult(comparison=-1, valid=True, scheme='semver', summary='1.2.3 
 VersionCompareResult(comparison=0, valid=True, scheme='semver', summary='1.2.3 == 1.2.3')
 ```
 
-### `regex_test(pattern: str, samples: list[str], flags: list[str] | None = None, ...) -> RegexTestResult`
+**Raises:** `ValueError` if either input exceeds `MAX_INPUT_LENGTH`.
 
-Test a Python regular expression against sample strings.
+### `list_dedupe(items: list[str], normalization: str = "NFC", casefold: bool = False, stable: bool = True) -> list[str]`
+
+Remove duplicates from list while preserving first-occurrence order.
+
+```python
+>>> list_dedupe(["a", "b", "a", "c"])
+['a', 'b', 'c']
+```
+
+The `stable` parameter is accepted for API compatibility; deduplication always preserves first occurrence order. **Raises:** `ValueError` if items list exceeds `MAX_LIST_ITEMS`.
+
+### `list_sort(items: list[str], normalization: str = "NFC", casefold: bool = False, reverse: bool = False, stable: bool = True) -> list[str]`
+
+Sort list of strings with normalization support. The `stable` parameter is accepted for API compatibility; Python's `sorted()` is always stable.
+
+```python
+>>> list_sort(["banana", "Apple", "cherry"])
+['Apple', 'banana', 'cherry']
+>>> list_sort(["banana", "Apple", "cherry"], casefold=True)
+['Apple', 'banana', 'cherry']
+```
+
+**Raises:** `ValueError` if items list exceeds `MAX_LIST_ITEMS`.
+
+### `regex_test(pattern: str, samples: list[str], flags: list[str] | None = None, ignore_case: bool = False, multiline: bool = False, dotall: bool = False, ascii: bool = False) -> RegexTestResult`
+
+Test a Python regular expression against sample strings. Uses `search()` for match detection and `fullmatch()` for fullmatch reporting.
 
 ```python
 >>> regex_test(r"^\d+$", ["123", "abc", "12a"])
@@ -377,13 +418,16 @@ RegexTestResult(
                    span=None, groups=[], groupdict={}),
         RegexMatch(sample='12a', matches=True, fullmatch=False,
                    span=[0, 2], groups=[], groupdict={})
-    ]
+    ],
+    flags_used=RegexFlags(ignore_case=False, multiline=False, dotall=False, ascii=False)
 )
 ```
 
-**Supported flags**: `IGNORECASE`, `MULTILINE`, `DOTALL`, `UNICODE`, `DEBUG`, `VERBOSE`
+**Supported string flags:** `IGNORECASE`, `MULTILINE`, `DOTALL`, `UNICODE`, `DEBUG`, `VERBOSE`
 
-### `regex_replace_preview(pattern: str, replacement: str, samples: list[str], ...) -> dict`
+Pattern complexity is checked before compilation (ReDoS prevention): rejects patterns exceeding `MAX_PATTERN_LENGTH`, exceeding `MAX_PATTERN_NESTING` depth, containing nested quantifiers, or containing adjacent quantifiers.
+
+### `regex_replace_preview(pattern: str, replacement: str, samples: list[str], ignore_case: bool = False, multiline: bool = False, dotall: bool = False, ascii: bool = False) -> dict`
 
 Preview regex replacements on sample strings.
 
@@ -395,61 +439,11 @@ Preview regex replacements on sample strings.
 ]}
 ```
 
-### `list_dedupe(items: list[str], normalization: str = "NFC", casefold: bool = False, stable: bool = True) -> list[str]`
+**Raises:** `ValueError` if samples list exceeds `MAX_LIST_ITEMS` or pattern exceeds `MAX_PATTERN_LENGTH`.
 
-Remove duplicates from list while preserving order.
+### `regex_finditer(pattern: str, text: str, flags: list[str] | None = None, max_matches: int = MAX_MATCHES, include_line_column: bool = True, include_groups: bool = True) -> RegexFindIterResult`
 
-```python
->>> list_dedupe(["a", "b", "a", "c"])
-['a', 'b', 'c']
-```
-
-### `list_sort(items: list[str], normalization: str = "NFC", casefold: bool = False, reverse: bool = False, stable: bool = True) -> list[str]`
-
-Sort list of strings with normalization support.
-The `stable` parameter is accepted for API compatibility; Python sorting is always stable.
-
-```python
->>> list_sort(["banana", "Apple", "cherry"])
-['Apple', 'banana', 'cherry']
->>> list_sort(["banana", "Apple", "cherry"], casefold=True)
-['Apple', 'banana', 'cherry']
-```
-
-### `json_compare(a: str, b: str, ignore_object_order: bool = True, ...) -> JsonCompareResult`
-
-Compare two JSON documents semantically.
-
-```python
->>> json_compare('{"a": 1, "b": 2}', '{"b": 2, "a": 1}')
-JsonCompareResult(equal=True, diff_count=0, ...)
->>> json_compare('{"a": 1}', '{"a": 2}')
-JsonCompareResult(equal=False, diff_count=1, diffs=[...], ...)
-```
-
-Options: `ignore_object_order`, `ignore_array_order`, `numeric_string_equivalence`, `casefold_keys`, `treat_missing_null_as_equal`, `max_diffs`
-
-### `json_extract(text: str, pointer: str = "", max_output_chars: int = 4000) -> JsonExtractResult`
-
-Extract a value from JSON using RFC 6901 JSON Pointer.
-
-```python
->>> json_extract('{"foo": {"bar": [1, 2, 3]}}', '/foo/bar/1')
-JsonExtractResult(found=True, value=2, value_type='number', ...)
-```
-
-### `json_shape(text: str, max_depth: int = 4, max_keys: int = 100, max_array_items: int = 5) -> JsonShapeResult`
-
-Analyze the structure of a JSON document without returning values.
-
-```python
->>> json_shape('{"name": "test", "items": [1, 2, 3]}')
-JsonShapeResult(valid=True, shape={'type': 'object', 'keys': {'name': {...}, 'items': {...}}}, ...)
-```
-
-### `regex_finditer(pattern: str, text: str, flags: list[str] | None = None, max_matches: int = 100, ...) -> RegexFindIterResult`
-
-Find all regex matches in text with positions.
+Find all regex matches in text with positions. Returns line/column for each match start. Uses `compiled.finditer()` internally.
 
 ```python
 >>> regex_finditer(r"\d+", "abc123def456", max_matches=2)
@@ -465,9 +459,11 @@ RegexFindIterResult(
 )
 ```
 
+**Supported flags:** `IGNORECASE`, `MULTILINE`, `DOTALL`, `UNICODE`, `VERBOSE`. **Raises:** `ValueError` if text exceeds `MAX_TEXT_LENGTH_REGEX`. Groups are capped at `MAX_GROUPS` per match.
+
 ### `regex_safety_check(pattern: str) -> RegexSafetyResult`
 
-Check regex pattern for potential catastrophic backtracking risks.
+Check regex pattern for potential catastrophic backtracking risks. This is a heuristic check and does not guarantee safety.
 
 ```python
 >>> regex_safety_check(r"(\w+)+$")
@@ -478,20 +474,46 @@ RegexSafetyResult(
 )
 ```
 
-### `validate_schema_light(data: Any, schema: dict) -> ValidateSchemaLightResult`
+**Risk levels:** `low` (no findings), `medium` (backreferences or ambiguous patterns), `high` (complexity violations or nested quantifiers). **Finding kinds:** `complexity`, `nested_quantifier`, `backreference`, `ambiguous_dot_star`.
 
-Validate data against a simple schema format (NOT full JSON Schema).
+### `json_compare(a: str, b: str, ignore_object_order: bool = True, ignore_array_order: bool = False, numeric_string_equivalence: bool = False, casefold_keys: bool = False, treat_missing_null_as_equal: bool = False, max_diffs: int = 50) -> JsonCompareResult`
 
-Supported schema features: `type`, `required`, `properties`, `additional_properties`, `enum`, `min_length`, `max_length`, `min_items`, `max_items`, `pattern`, `items`.
+Compare two JSON documents semantically. Reports parse errors for invalid inputs.
 
 ```python
->>> validate_schema_light({"name": "test"}, {"type": "object", "required": ["name"]})
-ValidateSchemaLightResult(valid=True, violations=[], ...)
+>>> json_compare('{"a": 1, "b": 2}', '{"b": 2, "a": 1}')
+JsonCompareResult(equal=True, diff_count=0, ...)
+>>> json_compare('{"a": 1}', '{"a": 2}')
+JsonCompareResult(equal=False, diff_count=1, diffs=[...], ...)
 ```
 
-### `json_canonicalize(text: str, sort_keys: bool = True, indent: int | None = None, ...) -> JsonCanonicalizeResult`
+Diff kinds: `parse_error_a`, `parse_error_b`, `type_changed`, `value_changed`, `key_missing_in_b`, `key_missing_in_a`, `array_length_changed`. **Raises:** `ValueError` if either input exceeds `MAX_INPUT_LENGTH`.
 
-Canonicalize JSON with deterministic formatting and duplicate key detection.
+### `json_extract(text: str, pointer: str = "", max_output_chars: int = 4000) -> JsonExtractResult`
+
+Extract a value from JSON using RFC 6901 JSON Pointer. Empty pointer returns the whole document.
+
+```python
+>>> json_extract('{"foo": {"bar": [1, 2, 3]}}', '/foo/bar/1')
+JsonExtractResult(found=True, value=2, value_type='number', ...)
+```
+
+**Missing-value reasons:** `invalid_json`, `key_not_found`, `index_out_of_range`, `invalid_pointer_syntax`. Returns `available_keys` for missing object keys, `array_length` for out-of-range array access. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+
+### `json_shape(text: str, max_depth: int = 4, max_keys: int = 100, max_array_items: int = 5) -> JsonShapeResult`
+
+Analyze the structure of a JSON document without returning values.
+
+```python
+>>> json_shape('{"name": "test", "items": [1, 2, 3]}')
+JsonShapeResult(valid=True, shape=JsonShapeKey(type='object', keys={...}, ...), ...)
+```
+
+**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+
+### `json_canonicalize(text: str, sort_keys: bool = True, indent: int | None = None, ensure_ascii: bool = False, detect_duplicate_keys: bool = True, trailing_newline: bool = False) -> JsonCanonicalizeResult`
+
+Canonicalize JSON with deterministic formatting and duplicate key detection. Returns canonical form, minified form, and SHA-256 hash of canonical output.
 
 ```python
 >>> json_canonicalize('{"b": 1, "a": 2}', sort_keys=True)
@@ -501,36 +523,109 @@ JsonCanonicalizeResult(
     minified='{"a":1,"b":2}',
     sha256='...',
     duplicate_keys=[],
+    top_level_type='object',
+    top_level_keys=['b', 'a'],
     ...
 )
 ```
 
+When `detect_duplicate_keys=True`, uses a custom `object_pairs_hook` to track duplicate keys during parsing. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+
 ### `json_query(text: str, pointer: str = "") -> JsonQueryResult`
 
-Query JSON using RFC 6901 JSON Pointer.
+Query JSON using RFC 6901 JSON Pointer. Simpler than `json_extract` — returns the raw value without preview/truncation logic.
 
 ```python
 >>> json_query('{"foo": {"bar": "baz"}}', '/foo/bar')
 JsonQueryResult(found=True, value='baz', type='string', ...)
 ```
 
+**Missing-value reasons:** `invalid_json`, `key_not_found`, `index_out_of_range`, `invalid_pointer_syntax`. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+
+### `validate_schema_light(data: Any, schema: dict) -> ValidateSchemaLightResult`
+
+Validate data against a simple schema format (NOT full JSON Schema). This is a lightweight internal schema validator.
+
+Supported schema features:
+- `type`: object, array, string, number, integer, boolean, null
+- `required`: list of required keys
+- `properties`: nested property definitions
+- `additional_properties`: false to disallow extra keys
+- `enum`: list of allowed values
+- `min_length`, `max_length`: for strings
+- `min_items`, `max_items`: for arrays
+- `pattern`: regex pattern for strings (checked for safety via `_check_pattern_complexity`)
+- `items`: schema for array items (nested validation)
+
+```python
+>>> validate_schema_light({"name": "test"}, {"type": "object", "required": ["name"]})
+ValidateSchemaLightResult(valid=True, violations=[], truncated=False, summary='Data is valid')
+```
+
+**Limits:** `MAX_SCHEMA_VIOLATIONS` (100) violations returned, `MAX_SCHEMA_ELEMENTS` (100,000) elements walked, `MAX_SCHEMA_DEPTH` (50) nesting depth.
+
+## Internal Helper Functions
+
+### `_check_pattern_complexity(pattern: str) -> tuple[bool, str | None]`
+
+Check if regex pattern is too complex (ReDoS prevention). Detects excessive nesting depth, nested quantifiers, and adjacent quantifiers.
+
+### `_decode_pointer_token(token: str) -> str`
+
+Decode RFC 6901 escape sequences (`~1` -> `/`, `~0` -> `~`).
+
+### `_encode_pointer_token(token: str) -> str`
+
+Encode a key for use in a JSON pointer (`/` -> `~1`, `~` -> `~0`).
+
+### `_get_json_type(value: Any) -> str`
+
+Get type string for a JSON value (`null`, `boolean`, `integer`, `float`, `string`, `array`, `object`).
+
+### `_build_newline_index(s: str) -> list[int]`
+
+Build a sorted list of newline positions for O(log N) line/column lookup.
+
+### `_get_line_column_from_index(newlines: list[int], index: int) -> tuple[int, int]`
+
+Get 1-based line and column using a precomputed newline index.
+
+### `_get_line_column(s: str, index: int) -> tuple[int, int]`
+
+Get 1-based line and column for a string index (linear scan).
+
+### `_sort_json_keys(obj: Any) -> Any`
+
+Recursively sort object keys in JSON-compatible data for canonicalization.
+
+### `_extract_tables(d: dict, prefix: str = "") -> list[str]`
+
+Recursively extract all table names from parsed TOML (e.g., `['package', 'package.name']`).
+
 ## Input Limits
 
 Functions raise `ValueError` when input exceeds `MAX_INPUT_LENGTH`:
-- `check_brackets()`, `validate_json()`, `validate_toml_text()`, `toml_shape()`, `json_extract()`, `json_shape()`, `json_canonicalize()`, `json_query()`
+- `check_brackets()`, `validate_json()`, `validate_toml_text()`, `toml_shape()`, `json_extract()`, `json_shape()`, `json_canonicalize()`, `json_query()`, `version_compare()`
 
 Functions use their own limits:
-- `regex_test()`: `MAX_SAMPLE_LENGTH = 10_000` per sample
-- `regex_finditer()`: `MAX_TEXT_LENGTH_REGEX = 100_000` for text, `MAX_PATTERN_LENGTH_REGEX = 1000` for pattern
-- `validate_schema_light()`: `MAX_SCHEMA_VIOLATIONS = 100`
+- `list_dedupe()`, `list_sort()`: `MAX_LIST_ITEMS = 10_000`
+- `regex_test()`: `MAX_SAMPLE_LENGTH = 10_000` per sample, `MAX_LIST_ITEMS` for samples list
+- `regex_finditer()`: `MAX_TEXT_LENGTH_REGEX = 100_000` for text, `MAX_PATTERN_LENGTH_REGEX = 1000` for pattern, `MAX_MATCHES = 100`, `MAX_GROUPS = 100`
+- `regex_replace_preview()`: `MAX_LIST_ITEMS` for samples, `MAX_SAMPLE_LENGTH` per sample
+- `validate_schema_light()`: `MAX_SCHEMA_VIOLATIONS = 100`, `MAX_SCHEMA_ELEMENTS = 100_000`, `MAX_SCHEMA_DEPTH = 50`
 
 ## Error Handling
 
-All functions return TypedDict results with error information rather than raising exceptions:
+Most functions return TypedDict results with error information rather than raising exceptions:
 - `check_brackets` returns `CheckBracketsResult` with `balanced=False` and unmatched entries
 - `validate_json` returns `ValidateJsonResult` with `valid=False` and error details
+- `validate_toml_text` returns `ValidateTomlResult` with `valid=False` and error details
 - `regex_test` returns `RegexTestResult` with `valid_pattern=False` and error message
+- `regex_finditer` returns `RegexFindIterResult` with `valid_pattern=False` and error message
 - `regex_safety_check` returns `RegexSafetyResult` with `risk` level and `findings`
+- `json_compare` returns `JsonCompareResult` with parse errors for invalid inputs
+
+Functions that raise `ValueError`: `check_brackets`, `validate_json`, `validate_toml_text`, `toml_shape`, `json_extract`, `json_shape`, `json_canonicalize`, `json_query`, `version_compare`, `list_dedupe`, `list_sort`, `regex_replace_preview`.
 
 ## Index
 

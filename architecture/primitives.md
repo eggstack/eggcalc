@@ -1,18 +1,46 @@
 # primitives.py — Core Unicode Primitives
 
-Core text primitives built on Python's `unicodedata` module. These are the **building blocks** for all other exact/ modules.
+Low-level Unicode text primitives built on Python's `unicodedata` module. These are the **building blocks** for all other `exact/` modules.
 
-## File: `eggcalc/exact/primitives.py`
+## Table of Contents
+
+- [Overview](#overview)
+- [Type Definitions](#type-definitions)
+- [Constants](#constants)
+- [Public Functions](#public-functions)
+  - [utf8_bytes](#utf8_bytes)
+  - [codepoints](#codepoints)
+  - [normalize_unicode](#normalize_unicode)
+  - [casefold_text](#casefold_text)
+  - [raw_equal](#raw_equal)
+  - [normalized_equal](#normalized_equal)
+  - [measure_basic](#measure_basic)
+  - [find_invisibles](#find_invisibles)
+  - [visible_repr](#visible_repr)
+  - [count_graphemes](#count_graphemes)
+  - [truncate_to_grapheme](#truncate_to_grapheme)
+  - [byte_offset_to_codepoint_index](#byte_offset_to_codepoint_index)
+  - [codepoint_index_to_byte_offset](#codepoint_index_to_byte_offset)
+  - [codepoint_index_to_line_column](#codepoint_index_to_line_column)
+  - [line_column_to_codepoint_index](#line_column_to_codepoint_index)
+  - [get_line_text](#get_line_text)
+  - [get_surrounding_lines](#get_surrounding_lines)
+  - [detect_newline_style](#detect_newline_style)
+- [Internal Helpers](#internal-helpers)
+- [Dependencies](#dependencies)
 
 ## Overview
 
 Provides low-level deterministic operations for:
+
 - UTF-8 encoding
-- Codepoint iteration
-- Unicode normalization
-- Case folding
+- Codepoint iteration and inspection
+- Unicode normalization and case folding
 - Invisible character detection
-- Grapheme counting
+- Text measurement (bytes, codepoints, graphemes, whitespace, ASCII)
+- Grapheme cluster counting and truncation
+- Byte/codepoint/line-column index conversions
+- Newline style detection
 
 **Key principle:** No semantic interpretation, no LLM calls, deterministic results.
 
@@ -22,7 +50,7 @@ Provides low-level deterministic operations for:
 
 ```python
 class CodepointInfo(NamedTuple):
-    index: int      # Position in string (0-indexed)
+    idx: int        # Position in string (0-indexed)
     char: str       # The character itself
     codepoint: str  # "U+XXXX" hex format
     name: str       # Unicode name (e.g., "LATIN SMALL LETTER A")
@@ -37,7 +65,7 @@ class MeasureBasic(TypedDict):
     codepoints: int              # Number of codepoints
     graphemes_estimate: int      # Estimated grapheme clusters
     chars_no_whitespace: int     # Non-whitespace characters
-    ascii: int                   # ASCII characters
+    ascii: int                   # ASCII characters (codepoint < 128)
     non_ascii: int               # Non-ASCII characters
 ```
 
@@ -50,12 +78,14 @@ class InvisibleCharInfo(TypedDict):
     codepoint: str       # "U+XXXX" format
     name: str            # Unicode name
     category: str        # Unicode category
-    display: str         # Short display name (e.g., "ZWSP")
+    display: str         # Short display name (e.g., "ZWSP", "CTRL", "CM")
 ```
 
-## Invisible Characters
+## Constants
 
-The module maintains a dictionary of invisible characters:
+### `_INVISIBLE_CHARS`
+
+Dictionary mapping invisible characters to `(full_name, short_display)` tuples:
 
 ```python
 _INVISIBLE_CHARS: dict[str, tuple[str, str]] = {
@@ -84,198 +114,346 @@ _INVISIBLE_CHARS: dict[str, tuple[str, str]] = {
 }
 ```
 
-Also detects variation selectors (U+FE00 to U+FE0F).
+### `_VARIATION_SELECTORS`
 
-## Functions
+Set of codepoints U+FE00 through U+FE0F:
 
-### `utf8_bytes(s: str) -> bytes`
+```python
+_VARIATION_SELECTORS = set(range(0xFE00, 0xFE10))
+```
 
-Returns raw UTF-8 encoded bytes.
+## Public Functions
+
+### `utf8_bytes`
+
+```python
+def utf8_bytes(s: str) -> bytes
+```
+
+Returns raw UTF-8 encoded bytes of the string.
 
 ```python
 utf8_bytes("hello")        # → b'hello'
-utf8_bytes("こんにちは")   # → b'\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf'
+utf8_bytes("こんにちは")   # → b'\xe3\x81\x93...'
 utf8_bytes("")             # → b''
 ```
 
-**Returns:** Actual `bytes` object, not a count.
+**Returns:** `bytes` object, not an int count.
 
-### `codepoints(s: str) -> list[CodepointInfo]`
+### `codepoints`
 
-Returns detailed information about each codepoint.
+```python
+def codepoints(s: str) -> list[CodepointInfo]
+```
+
+Returns detailed information about each codepoint in the string.
 
 ```python
 codepoints("Hi")
 # → [
-#     CodepointInfo(index=0, char='H', codepoint='U+0048', name='LATIN CAPITAL LETTER H', category='Lu'),
-#     CodepointInfo(index=1, char='i', codepoint='U+0069', name='LATIN SMALL LETTER I', category='Ll')
+#     CodepointInfo(idx=0, char='H', codepoint='U+0048', name='LATIN CAPITAL LETTER H', category='Lu'),
+#     CodepointInfo(idx=1, char='i', codepoint='U+0069', name='LATIN SMALL LETTER I', category='Ll')
 # ]
 ```
 
-### `normalize_unicode(s: str, form: str) -> str`
-
-Normalizes Unicode string to specified form.
+### `normalize_unicode`
 
 ```python
-normalize_unicode("café", "NFC")   # → "café" (composed)
-normalize_unicode("cafe\u0301", "NFC")  # → "café" (same as above)
-normalize_unicode("café", "NFD")   # → "cafe\u0301" (decomposed)
+def normalize_unicode(s: str, form: str) -> str
 ```
 
-**Valid forms:** NFC, NFD, NFKC, NFKD
+Normalizes Unicode string to the specified form.
 
-**Raises:** `ValueError` if form is invalid
+```python
+normalize_unicode("café", "NFC")        # → "café" (composed)
+normalize_unicode("cafe\u0301", "NFC")  # → "café" (same as above)
+normalize_unicode("café", "NFD")        # → "cafe\u0301" (decomposed)
+```
 
-### `casefold_text(s: str) -> str`
+**Valid forms:** `NFC`, `NFD`, `NFKC`, `NFKD` (case-insensitive).
+
+**Raises:** `ValueError` if form is not a recognized normalization form.
+
+### `casefold_text`
+
+```python
+def casefold_text(s: str) -> str
+```
 
 Returns casefolded version for case-insensitive comparison.
 
 ```python
-casefold_text("HELLO")  # → "hello"
-casefold_text("Straße")  # → "strasse" (German ß -> ss)
+casefold_text("HELLO")   # → "hello"
+casefold_text("Straße")  # → "strasse" (German ß → ss)
 ```
 
-### `raw_equal(a: str, b: str) -> bool`
-
-Checks exact byte equality.
+### `raw_equal`
 
 ```python
-raw_equal("abc", "abc")     # → True
-raw_equal("abc", "ABC")     # → False
-raw_equal("café", "cafe\u0301")  # → False (different bytes)
+def raw_equal(a: str, b: str) -> bool
 ```
 
-### `normalized_equal(a: str, b: str) -> bool`
+Checks exact byte equality (identity comparison).
 
-Checks equality after NFC normalization.
+```python
+raw_equal("abc", "abc")           # → True
+raw_equal("abc", "ABC")           # → False
+raw_equal("café", "cafe\u0301")  # → False (different representations)
+```
+
+### `normalized_equal`
+
+```python
+def normalized_equal(a: str, b: str, form: str = "NFC") -> bool
+```
+
+Checks equality after Unicode normalization.
 
 ```python
 normalized_equal("café", "cafe\u0301")  # → True
 normalized_equal("ABC", "abc")           # → False (case-sensitive)
+normalized_equal("café", "cafe\u0301", form="NFD")  # → True
 ```
 
-### `measure_basic(s: str) -> MeasureBasic`
+**Default form:** `NFC`.
+
+### `measure_basic`
+
+```python
+def measure_basic(s: str) -> MeasureBasic
+```
 
 Returns basic text metrics.
 
 ```python
 measure_basic("Hello World")
 # → MeasureBasic(
-#     bytes_utf8=11,
-#     codepoints=11,
-#     graphemes_estimate=11,
-#     chars_no_whitespace=10,
-#     ascii=11,
-#     non_ascii=0
+#     bytes_utf8=11, codepoints=11, graphemes_estimate=11,
+#     chars_no_whitespace=10, ascii=11, non_ascii=0
 # )
 ```
 
-### `count_graphemes(s: str) -> int`
-
-Counts grapheme clusters (what a user would consider a "character").
+### `find_invisibles`
 
 ```python
-count_graphemes("hello")        # → 5
-count_graphemes("café")         # → 4 (é as single grapheme)
-count_graphemes("👨‍👩‍👧‍👦")     # → 1 (family emoji is ZWJ sequence)
+def find_invisibles(s: str) -> list[InvisibleCharInfo]
 ```
 
-### `truncate_to_grapheme(s: str, max_graphemes: int) -> str`
+Finds all invisible or control characters in the string. Detects:
 
-Truncates string to max grapheme count, preserving grapheme integrity.
-
-```python
-truncate_to_grapheme("Hello World", 5)   # → "Hello"
-truncate_to_grapheme("café", 3)          # → "caf"
-truncate_to_grapheme("👋🌍", 1)           # → "👋"
-```
-
-### `find_invisibles(s: str) -> list[InvisibleCharInfo]`
-
-Detects invisible characters in string.
+- Known invisible characters (`_INVISIBLE_CHARS` dict)
+- Variation selectors (U+FE00–U+FE0F)
+- Format characters (U+2061–U+2065)
+- BIDI controls (U+2066–U+206F)
+- Combining marks (category `M*`)
+- Other control characters (category `C*`, excluding `\n`, `\t`, `\r`)
 
 ```python
 find_invisibles("hello\u200bworld")
 # → [InvisibleCharInfo(
-#     index=5,
-#     char='\u200b',
-#     codepoint='U+200B',
-#     name='ZERO WIDTH SPACE',
-#     category='Cf',
-#     display='ZWSP'
+#     index=5, char='\u200b', codepoint='U+200B',
+#     name='ZERO WIDTH SPACE', category='Cf', display='ZWSP'
 # )]
 ```
 
-### `visible_repr(s: str) -> str`
-
-Returns display-safe representation with invisible characters marked.
+### `visible_repr`
 
 ```python
-visible_repr("hello\u200bworld")  # → 'hello[ZWSP]world'
+def visible_repr(s: str) -> str
+```
+
+Returns a display-safe representation of the string. Maps invisible or ambiguous characters to visible markers.
+
+**Replacement mapping:**
+
+| Character | Output |
+|-----------|--------|
+| Space (U+0020) | `␠` |
+| Tab (U+0009) | `␉` |
+| Newline (U+000A) | `␊` |
+| Carriage return (U+000D) | `␍` |
+| `_INVISIBLE_CHARS` members | `⟦{display}⟧` (e.g., `⟦ZWSP⟧`) |
+| Variation selectors (U+FE00–U+FE0F) | `⟦VS⟧` |
+| Combining marks (category `M*`) | `◌{char}` |
+| Format chars (U+2061–U+2065) | `⟦FORMAT:{label}⟧` |
+| BIDI controls (U+2066–U+206F) | `⟦{name}⟧` (e.g., `⟦LRI⟧`, `⟦PDF⟧`) |
+
+**Detection order:** Whitespace → `_INVISIBLE_CHARS` → variation selectors → combining marks → format chars → BIDI controls → pass through.
+
+```python
+visible_repr("hello\u200bworld")  # → 'hello⟦ZWSP⟧world'
 visible_repr("hi")                # → 'hi'
 ```
 
-**Display order matters:** Variation selector checks come BEFORE combining mark checks (U+FE00-U+FE0F before category 'M').
+### `count_graphemes`
 
-## Unicode Categories
+```python
+def count_graphemes(s: str) -> int
+```
 
-Categories used in codepoint info and metrics:
+Counts approximate user-visible grapheme clusters. Handles common combining marks, variation selectors, emoji ZWJ sequences, and regional-indicator flag pairs. **Not** a complete UAX #29 implementation.
 
-| Category | Name | Examples |
-|----------|------|----------|
-| Lu | Letter, uppercase | A-Z (Latin) |
-| Ll | Letter, lowercase | a-z (Latin) |
-| Lo | Letter, other | Chinese characters |
-| Nd | Number, decimal digit | 0-9 |
-| Nl | Number, letter | Roman numerals |
-| No | Number, other | Superscripts |
-| Po | Punctuation, other | . , ! ? |
-| Pi | Punctuation, initial | « |
-| Pf | Punctuation, final | » |
-| Pd | Punctuation, dash | - |
-| Zs | Separator, space | Space |
-| Zl | Separator, line | Line separator |
-| Zp | Separator, paragraph | Paragraph separator |
-| Cf | Format | Word joiner, BOM |
-| Cn | Not assigned | Unassigned |
+```python
+count_graphemes("hello")       # → 5
+count_graphemes("café")        # → 4 (é as single grapheme)
+count_graphemes("👨‍👩‍👧‍👦")    # → 1 (family emoji is ZWJ sequence)
+count_graphemes("🇺🇸")          # → 1 (flag = 2 regional indicators)
+```
 
-## Implementation Notes
+### `truncate_to_grapheme`
 
-### Grapheme Counting Algorithm
+```python
+def truncate_to_grapheme(s: str, max_graphemes: int) -> str
+```
 
-Grapheme clusters are counted using Unicode segmentation:
-1. Iterate through string by codepoint
-2. Check for combining characters (category 'M' or 'Mn')
-3. Check for variation selectors (U+FE00-U+FE0F)
-4. Check for zero-width joiners (ZWJ U+200D)
-5. Check for Regional Indicator pairs (GB12/GB13: flags like 🇺🇸 = U+1F1FA U+1F1F8)
-6. Group connected codepoints into graphemes
+Truncates a string to at most `max_graphemes` grapheme clusters, preserving grapheme integrity. Best-effort; not a complete UAX #29 implementation.
 
-### Visible Representation Display Order
+```python
+truncate_to_grapheme("Hello World", 5)  # → "Hello"
+truncate_to_grapheme("café", 3)         # → "caf"
+truncate_to_grapheme("👋🌍", 1)          # → "👋"
+truncate_to_grapheme("hello", 0)        # → ""
+```
 
-The `visible_repr()` function has specific ordering for detecting invisible characters:
+Returns `""` if `max_graphemes <= 0`. Returns `s` unchanged if `len(s) == 0`.
 
-1. First check for known invisible characters (ZWSP, BOM, etc.)
-2. Then check for variation selectors (U+FE00-U+FE0F)
-3. Then check for combining marks (category 'Mn', 'Mc')
-4. Then check for BIDI override characters (U+2060-206F, U+202A-202E)
-5. Then report character as-is
+### `byte_offset_to_codepoint_index`
 
-This ordering matters because some variation selectors can look like combining marks but should be handled differently.
+```python
+def byte_offset_to_codepoint_index(s: str, byte_offset: int) -> int
+```
+
+Converts a UTF-8 byte offset (0-based) to a codepoint index (0-based).
+
+**Raises:** `ValueError` if `byte_offset` is out of range or falls inside a multi-byte character.
+
+```python
+byte_offset_to_codepoint_index("abc", 0)   # → 0
+byte_offset_to_codepoint_index("你好", 3)   # → 1 (first char is 3 bytes)
+```
+
+### `codepoint_index_to_byte_offset`
+
+```python
+def codepoint_index_to_byte_offset(s: str, codepoint_index: int) -> int
+```
+
+Converts a codepoint index (0-based) to a UTF-8 byte offset (0-based).
+
+**Raises:** `ValueError` if `codepoint_index` is out of range.
+
+```python
+codepoint_index_to_byte_offset("abc", 0)  # → 0
+codepoint_index_to_byte_offset("你好", 1)  # → 3
+```
+
+### `codepoint_index_to_line_column`
+
+```python
+def codepoint_index_to_line_column(
+    s: str, codepoint_index: int, line_base: int = 1, column_base: int = 1
+) -> tuple[int, int]
+```
+
+Converts a codepoint index to (line, column). Both line and column are 1-based by default.
+
+**Raises:** `ValueError` if `codepoint_index` is out of range.
+
+```python
+codepoint_index_to_line_column("ab\ncd", 4)  # → (2, 1)
+```
+
+### `line_column_to_codepoint_index`
+
+```python
+def line_column_to_codepoint_index(
+    s: str, line: int, column: int, line_base: int = 1, column_base: int = 1
+) -> int
+```
+
+Converts line and column to a codepoint index. Both are 1-based by default.
+
+**Raises:** `ValueError` if line or column is out of range.
+
+```python
+line_column_to_codepoint_index("ab\ncd", 2, 1)  # → 3
+```
+
+### `get_line_text`
+
+```python
+def get_line_text(s: str, line: int, line_base: int = 1) -> str
+```
+
+Extracts the text of a specific line (without the trailing newline). Returns `""` if the line does not exist.
+
+```python
+get_line_text("ab\ncd\nef", 2)  # → "cd"
+get_line_text("ab\ncd", 5)      # → ""
+```
+
+### `get_surrounding_lines`
+
+```python
+def get_surrounding_lines(
+    s: str, line: int, context_lines: int, line_base: int = 1
+) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]
+```
+
+Returns lines before and after a given line, each as a list of `(line_number, text)` tuples. The target line itself is excluded.
+
+```python
+get_surrounding_lines("a\nb\nc\nd\ne", 3, 1)
+# → ([(2, 'b')], [(4, 'd')])
+```
+
+### `detect_newline_style`
+
+```python
+def detect_newline_style(s: str) -> str
+```
+
+Returns the newline style of a string: `"CRLF"`, `"LF"`, `"CR"`, or `"mixed"`. Defaults to `"LF"` if no newlines are found.
+
+```python
+detect_newline_style("a\nb")      # → "LF"
+detect_newline_style("a\r\nb")    # → "CRLF"
+detect_newline_style("a\rb")      # → "CR"
+detect_newline_style("a\n\rb")    # → "mixed"
+```
+
+## Internal Helpers
+
+These private functions support grapheme cluster segmentation:
+
+### `_advance_grapheme(s, i, n) -> int`
+
+Advances past one grapheme cluster starting at position `i`. Handles regional indicator pairs (GB12/GB13), extend characters (GB9), and emoji ZWJ sequences (GB11).
+
+### `_is_extend_char(char) -> bool`
+
+Checks if a character is an Extend-class character for grapheme segmentation: combining marks (category `M*`), ZWNJ (U+200C), or variation selectors (U+FE00–U+FE0F). ZWJ (U+200D) is **not** included here.
+
+### `_is_extended_pictographic(char) -> bool`
+
+Checks if a character is Extended Pictographic for emoji ZWJ sequences. Uses codepoint range heuristics for common emoji blocks (U+1F300–U+1F9FF, U+2600–U+26FF, U+2700–U+27BF) and `So` category name matching.
 
 ## Dependencies
 
 ```
 primitives.py
-    └── (no external dependencies, uses only unicodedata and typing)
+    └── (standard library only: unicodedata, typing)
 ```
+
+No external dependencies.
 
 ## Usage Example
 
 ```python
 from eggcalc.exact import (
-    utf8_bytes, codepoints, normalize_unicode,
-    measure_basic, count_graphemes, find_invisibles
+    utf8_bytes, codepoints, normalize_unicode, casefold_text,
+    measure_basic, count_graphemes, find_invisibles, visible_repr,
+    truncate_to_grapheme, detect_newline_style,
 )
 
 # Basic measurements
@@ -288,26 +466,19 @@ print(f"Graphemes: {count_graphemes(text)}")
 # Normalization comparison
 raw = "café"
 decomposed = "cafe\u0301"
-print(f"Raw equal: {raw == decomposed}")  # False
+print(f"Raw equal: {raw == decomposed}")            # False
 print(f"NFC equal: {normalize_unicode(raw, 'NFC') == normalize_unicode(decomposed, 'NFC')}")  # True
+
+# Case-insensitive comparison
+print(casefold_text("Straße") == "strasse")         # True
 
 # Invisible detection
 hidden = "password\u200b123"
 invisibles = find_invisibles(hidden)
 if invisibles:
     print(f"Found {len(invisibles)} invisible characters!")
+print(visible_repr(hidden))                          # 'password⟦ZWSP⟧123'
+
+# Newline detection
+print(detect_newline_style("a\r\nb"))               # 'CRLF'
 ```
-
-## Testing Strategy
-
-Since primitives are deterministic:
-1. Test with known inputs for predictable outputs
-2. Test Unicode edge cases (empty strings, surrogate pairs)
-3. Test combining character sequences
-4. Test ZWJ emoji sequences
-5. Test all four normalization forms
-6. Test invisible character detection for each known type
-
-## Index
-
-See [overview.md](overview.md) for the module index.
