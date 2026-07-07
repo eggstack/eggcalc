@@ -1253,47 +1253,137 @@ Tools are categorized into tiers based on scope and context cost. See [tool_inve
 
 ---
 
+## Profile Selection
+
+The active profile controls which tools are available in `tools/call` and which tools are returned by `tools/list`. Select a profile at server startup with the `EGGCALC_MCP_PROFILE` environment variable:
+
+```bash
+# Start the server with a restricted profile
+EGGCALC_MCP_PROFILE=codegg_core_min calc --mcp
+
+# Start the server with math-only tools
+EGGCALC_MCP_PROFILE=human_math calc --mcp
+```
+
+The default profile is `full`, which exposes all 77 tools. Unknown profile names cause an immediate `SystemExit(1)` at startup.
+
+Tools outside the active profile are **rejected** at `tools/call` time with JSON-RPC error `-32602`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {"name": "math_eval", "arguments": {"expression": "1+1"}}
+}
+```
+→ Returns error `-32602`: `Tool 'math_eval' is not available in profile 'codegg_core_min'.`
+
+You can override the active profile per-request by passing a `profile` parameter in `tools/list`:
+
+```json
+{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"profile": "human_math"}}
+```
+
+The `profiles/list` method returns all available profiles and their tool counts, so agents can discover and switch profiles at runtime.
+
+### Schema Detail
+
+The `EGGCALC_MCP_SCHEMA_DETAIL` environment variable controls the default schema verbosity for `tools/list` responses. This can also be overridden per-request with the `schema_detail` parameter:
+
+| Level | Behavior |
+|-------|----------|
+| `"full"` (default) | Complete schema with descriptions, examples, defaults, and verbose help |
+| `"normal"` | Truncated descriptions (240 chars), compact output schema, preserves input schema structure |
+| `"compact"` | Tool names, types, required fields, enums only. Drops descriptions and defaults for minimal context |
+
+---
+
 ## Tool Profiles
 
-Profiles are named subsets of tools that agents can request via the `profile` filter in `tools/list`. Each profile includes only the tools relevant to its use case, minimizing context overhead.
+Profiles are named subsets of tools. Each profile includes only the tools relevant to its use case, minimizing context overhead. Use `EGGCALC_MCP_PROFILE` to select the active profile, or pass `profile` in `tools/list` to override per-request.
 
 ### `codegg_core_min`
 
-Ultra-common tools only. Ideal for agents with tight context budgets or non-coding workflows.
+Minimal preflight and edit-safety tools (6 tools). Ideal for agents with tight context budgets.
 
-**Use when:** You need math evaluation, basic text comparison, or JSON validation without loading the full tool set.
+**Tools:** `command_preflight`, `config_preflight`, `edit_preflight`, `text_replace_check`, `text_security_inspect`, `validate_json`
+
+**Use when:** You need edit preflight checks, config validation, or text safety inspection without loading the full tool set.
 
 ### `codegg_core`
 
-Tier 0 + Tier 1 tools plus contextual manifest and LLM JSON checks. Recommended for general-purpose coding agents.
+Core coding-agent tools (22 tools). Recommended for general-purpose coding agents.
 
-**Use when:** You want the standard set of tools for code editing, text inspection, regex testing, path manipulation, JSON comparison, and TOML validation.
+**Tools:** `cargo_toml_inspect`, `command_preflight`, `config_preflight`, `edit_preflight`, `go_mod_inspect`, `identifier_inspect`, `llm_json_output_check`, `lockfile_summary`, `markdown_link_check_lexical`, `package_json_inspect`, `path_normalize`, `pyproject_inspect`, `requirements_inspect`, `structured_data_compare`, `text_diff_explain`, `text_equal`, `text_fingerprint`, `text_inspect`, `text_replace_check`, `text_security_inspect`, `validate_json`, `validate_toml`
+
+**Use when:** You want the standard set of tools for code editing, text inspection, diff analysis, path manipulation, JSON comparison, and TOML validation.
+
+### `codegg_preflight`
+
+Pre-execution safety tools (10 tools). For agents that need to validate actions before executing them.
+
+**Tools:** `command_preflight`, `config_preflight`, `edit_preflight`, `llm_json_output_check`, `patch_apply_check`, `path_scope_check`, `prompt_input_inspect`, `shell_split`, `text_security_inspect`, `unicode_policy_check`
+
+**Use when:** You need comprehensive preflight validation including edit safety, shell command inspection, path scope checks, and prompt security analysis.
 
 ### `codegg_unicode_security`
 
-Tier 0 + Tier 1 + Tier 2 text/unicode tools. For agents working with internationalized text, confusable detection, or Unicode security.
+Unicode analysis and security tools (8 tools). For agents working with internationalized text, confusable detection, or Unicode security.
+
+**Tools:** `canonicalize_text`, `identifier_inspect`, `prompt_input_inspect`, `text_inspect`, `text_position`, `text_security_inspect`, `text_transform`, `unicode_policy_check`
 
 **Use when:** You need deep Unicode analysis, canonicalization profiles, or security policy checks beyond basic text inspection.
 
 ### `codegg_config`
 
-Tier 0 + Tier 1 + Tier 2 config/validation tools. For agents working with configuration files, patches, or structured data.
+Configuration and structured data tools (17 tools). For agents working with configuration files, patches, or structured data.
+
+**Tools:** `config_preflight`, `dotenv_validate`, `ini_validate`, `json_canonicalize`, `json_compare`, `json_extract`, `lockfile_summary`, `go_mod_inspect`, `package_json_inspect`, `pyproject_inspect`, `requirements_inspect`, `structured_data_compare`, `toml_shape`, `validate_json`, `validate_schema_light`, `validate_toml`, `version_compare`
 
 **Use when:** You need to validate, compare, or analyze configuration files, unified diffs, shell commands, or Markdown structure.
 
 ### `codegg_repo_audit`
 
-Repo inventory, manifest tools, patch structural tools, and documentation/markdown hygiene tools.
+Repository audit and manifest tools (18 tools). For agents auditing repository structure.
+
+**Tools:** `cargo_toml_inspect`, `code_fence_extract`, `diff_file_headers`, `diff_hunk_ranges`, `diff_touched_paths`, `go_mod_inspect`, `identifier_table_inspect`, `json_shape`, `lockfile_summary`, `markdown_link_check_lexical`, `markdown_structure`, `package_json_inspect`, `patch_conflict_markers_inspect`, `pyproject_inspect`, `repo_file_inventory`, `requirements_inspect`, `text_fingerprint`, `unified_diff_validate`
 
 **Use when:** You need to audit repository structure, inspect manifests, or check documentation quality.
 
 ### `codegg_patch`
 
-Patch structural tools for patch workflows.
+Patch structural tools (12 tools). For agents working with unified diffs and patches.
+
+**Tools:** `diff_file_headers`, `diff_hunk_ranges`, `diff_touched_paths`, `edit_preflight`, `line_range_compare`, `line_range_extract`, `patch_apply_check`, `patch_conflict_markers_inspect`, `patch_summary`, `text_diff_explain`, `text_replace_check`, `unified_diff_validate`
 
 **Use when:** You are working with unified diffs and need to validate or summarize patches.
 
+### `codegg_shell`
+
+Shell command analysis tools (5 tools). For agents inspecting or comparing shell commands.
+
+**Tools:** `argv_compare`, `command_preflight`, `regex_safety_check`, `shell_quote_join`, `shell_split`
+
+**Use when:** You need to split, compare, or validate shell commands and argv lists.
+
+### `human_math`
+
+Math and unit conversion tools (4 tools). For agents focused on calculations and unit conversions.
+
+**Tools:** `constant_lookup`, `math_eval`, `unit_convert`, `unit_info`
+
+**Use when:** You need math evaluation, unit conversion, physical constants, or unit metadata.
+
+### `default`
+
+General-purpose coding-agent tools (25 tools). The `default` profile is a curated subset for typical coding workflows.
+
 See [tool_inventory.md](tool_inventory.md) for the complete profile membership tables.
+
+### `full`
+
+All 77 tools. This is the default profile — it includes every tool where `llm_exposure` is not `"hidden"`.
 
 ### Filtering tools/list
 
@@ -1301,17 +1391,13 @@ The `tools/list` method supports these filters to narrow the returned tool set:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `profile` | string | Return only tools in the named profile (e.g., `"codegg_core_min"`). Unknown profile names fail closed with a JSON-RPC error. |
+| `profile` | string | Return only tools in the named profile (e.g., `"codegg_core_min"`). Overrides the active profile. Unknown profile names return a JSON-RPC error. |
 | `tier` | integer | Return only tools at the given tier (0, 1, 2, or 3). |
 | `tags` | array of strings | Return tools that have **all** listed tags. |
 | `names` | array of strings | Return only the listed tool names (subset selection). |
 | `schema_detail` | string | `"compact"`, `"normal"`, or `"full"` — controls schema verbosity per-request. Overrides the global default. |
 
-**Schema detail behavior:**
-
-- `"full"` — Complete schema with descriptions, examples, defaults, and verbose help.
-- `"normal"` — Currently aliases `"full"` (same output). Reserved for future differentiation.
-- `"compact"` — Tool names, types, required fields, and enums only. Removes verbose descriptions and defaults to reduce context overhead.
+Filters are applied **after** profile selection: the profile narrows the tool set, then `tier`/`tags`/`names` filter further within that profile.
 
 Unknown `profile` values return a JSON-RPC error code `-32602` (invalid params) rather than silently returning an empty tool list.
 
@@ -1329,9 +1415,17 @@ A `profiles/list` request returns all available profile names, their tool lists,
   "result": {
     "active": "full",
     "profiles": {
-      "full": {"tools": ["math_eval", ...], "tool_count": 64},
-      "codegg_core": {"tools": ["canonicalize_text", ...], "tool_count": 18},
-      ...
+      "full": {"tools": ["math_eval", "text_equal", ...], "tool_count": 77},
+      "default": {"tools": ["escape_text", "glob_match", ...], "tool_count": 25},
+      "codegg_core_min": {"tools": ["command_preflight", ...], "tool_count": 6},
+      "codegg_core": {"tools": ["cargo_toml_inspect", ...], "tool_count": 22},
+      "codegg_preflight": {"tools": ["command_preflight", ...], "tool_count": 10},
+      "codegg_patch": {"tools": ["diff_file_headers", ...], "tool_count": 12},
+      "codegg_config": {"tools": ["config_preflight", ...], "tool_count": 17},
+      "codegg_unicode_security": {"tools": ["canonicalize_text", ...], "tool_count": 8},
+      "codegg_shell": {"tools": ["argv_compare", ...], "tool_count": 5},
+      "codegg_repo_audit": {"tools": ["cargo_toml_inspect", ...], "tool_count": 18},
+      "human_math": {"tools": ["constant_lookup", ...], "tool_count": 4}
     }
   }
 }

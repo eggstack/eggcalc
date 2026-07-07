@@ -10512,3 +10512,146 @@ class TestSubprocessSmoke:
         finally:
             proc.stdin.close()
             proc.wait(timeout=5)
+
+
+class TestProfileConsistency:
+    """Consistency tests: profiles reference valid schemas and handlers."""
+
+    def test_all_profile_tools_have_schemas(self):
+        """Every tool listed in every profile must have an entry in TOOL_SCHEMAS."""
+        from eggcalc.mcp.schemas import TOOL_PROFILES, TOOL_SCHEMAS
+
+        for profile_name, tools in TOOL_PROFILES.items():
+            for tool_name in tools:
+                assert (
+                    tool_name in TOOL_SCHEMAS
+                ), f"Profile '{profile_name}' lists '{tool_name}' but it has no schema"
+
+    def test_all_profile_tools_have_handlers(self):
+        """Every tool listed in every profile must have a handler in TOOL_HANDLERS."""
+        from eggcalc.mcp.schemas import TOOL_PROFILES
+        from eggcalc.mcp.server import TOOL_HANDLERS
+
+        for profile_name, tools in TOOL_PROFILES.items():
+            for tool_name in tools:
+                assert (
+                    tool_name in TOOL_HANDLERS
+                ), f"Profile '{profile_name}' lists '{tool_name}' but it has no handler"
+
+    def test_all_handlers_have_schemas_or_are_hidden(self):
+        """Every public TOOL_HANDLERS entry should have a schema, unless intentionally hidden."""
+        from eggcalc.mcp.schemas import TOOL_METADATA, TOOL_SCHEMAS
+        from eggcalc.mcp.server import TOOL_HANDLERS
+
+        for handler_name in TOOL_HANDLERS:
+            meta = TOOL_METADATA.get(handler_name, {})
+            if meta.get("llm_exposure") == "hidden":
+                continue
+            assert (
+                handler_name in TOOL_SCHEMAS
+            ), f"Handler '{handler_name}' exists but has no schema and is not hidden"
+
+    def test_all_schema_tools_have_handlers_or_are_hidden(self):
+        """Every schema tool intended for exposure should have a handler."""
+        from eggcalc.mcp.schemas import TOOL_METADATA, TOOL_SCHEMAS
+        from eggcalc.mcp.server import TOOL_HANDLERS
+
+        for schema_name in TOOL_SCHEMAS:
+            meta = TOOL_METADATA.get(schema_name, {})
+            if meta.get("llm_exposure") == "hidden":
+                continue
+            assert (
+                schema_name in TOOL_HANDLERS
+            ), f"Schema '{schema_name}' exists but has no handler and is not hidden"
+
+    def test_full_profile_excludes_hidden_tools(self):
+        """The full profile should not include any hidden tools."""
+        from eggcalc.mcp.schemas import TOOL_METADATA
+        from eggcalc.mcp.server import get_profile_tools
+
+        full_tools = get_profile_tools("full")
+        for tool_name in full_tools:
+            meta = TOOL_METADATA.get(tool_name, {})
+            assert (
+                meta.get("llm_exposure") != "hidden"
+            ), f"Hidden tool '{tool_name}' found in full profile"
+
+    def test_tools_list_profile_filter_returns_only_profile_tools(self):
+        """tools/list with a profile param returns only that profile's tools."""
+        from eggcalc.mcp.schemas import TOOL_PROFILES
+
+        for profile_name in ["codegg_core_min", "codegg_core", "human_math"]:
+            response = handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/list",
+                    "params": {"profile": profile_name},
+                }
+            )
+            assert "result" in response
+            tool_names = sorted(t["name"] for t in response["result"]["tools"])
+            expected = TOOL_PROFILES[profile_name]
+            assert (
+                tool_names == expected
+            ), f"tools/list profile='{profile_name}' mismatch: got {tool_names}"
+
+    def test_tools_call_rejects_tool_outside_active_profile(self):
+        """tools/call rejects a tool not in the active profile."""
+        from eggcalc.mcp.server import get_active_profile, set_active_profile
+
+        old = get_active_profile()
+        try:
+            set_active_profile("codegg_core_min")
+            response = handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "math_eval",
+                        "arguments": {"expression": "1+1"},
+                    },
+                }
+            )
+            assert "error" in response
+            assert "not available in profile" in response["error"]["message"]
+        finally:
+            set_active_profile(old)
+
+    def test_tools_list_schema_detail_compact_is_smaller_than_full(self):
+        """compact schema detail produces less data than full for the same tool."""
+        full_resp = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": {"names": ["text_inspect"], "schema_detail": "full"},
+            }
+        )
+        compact_resp = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/list",
+                "params": {"names": ["text_inspect"], "schema_detail": "compact"},
+            }
+        )
+        full_tool = full_resp["result"]["tools"][0]
+        compact_tool = compact_resp["result"]["tools"][0]
+        full_size = len(json.dumps(full_tool))
+        compact_size = len(json.dumps(compact_tool))
+        assert (
+            compact_size <= full_size
+        ), f"compact ({compact_size}) should be <= full ({full_size})"
+
+    def test_profile_names_match_tool_profiles_keys(self):
+        """PROFILE_NAMES should match the keys in TOOL_PROFILES."""
+        from eggcalc.mcp.schemas import PROFILE_NAMES, TOOL_PROFILES
+
+        profile_keys = set(TOOL_PROFILES.keys())
+        profile_names_set = set(PROFILE_NAMES)
+        assert profile_keys == profile_names_set, (
+            f"Mismatch: TOOL_PROFILES keys={sorted(profile_keys)} "
+            f"vs PROFILE_NAMES={sorted(profile_names_set)}"
+        )

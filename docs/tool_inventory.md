@@ -18,14 +18,14 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 5 | `command_preflight` | shell | 1 | yes | no | yes | yes | Composite: analyze a command before user approval or execution. |
 | 6 | `config_preflight` | config | 1 | yes | no | yes | yes | Composite: validate generated config text. |
 | 7 | `constant_lookup` | math | 2 | yes | no | yes | yes | Look up physical constant values and symbols (Avogadro, Planck, speed of light, etc.). |
-| 8 | `diff_file_headers` | patch | 2 | yes | no | no | yes | Extract metadata from diff file headers: diff --git line, index hash, mode changes, rename/copy directives, and binary indicators. |
-| 9 | `diff_hunk_ranges` | patch | 2 | yes | no | no | yes | Extract hunk ranges per file with line count classification (added/deleted/context) from a unified diff. |
+| 8 | `diff_file_headers` | patch | 2 | yes | no | yes | yes | Extract metadata from diff file headers: diff --git line, index hash, mode changes, rename/copy directives, and binary indicators. |
+| 9 | `diff_hunk_ranges` | patch | 2 | yes | no | yes | yes | Extract hunk ranges per file with line count classification (added/deleted/context) from a unified diff. |
 | 10 | `diff_touched_paths` | patch | 2 | yes | no | yes | yes | Classify files in a unified diff as added, deleted, renamed, or modified. Also detects binary diffs and file mode changes. |
 | 11 | `dotenv_validate` | config | 2 | yes | no | yes | yes | Validate .env-style key=value configuration text. |
 | 12 | `edit_preflight` | patch | 1 | yes | no | yes | yes | Composite: validate a proposed edit before applying it. |
 | 13 | `escape_text` | text | 1 | yes | no | yes | yes | Escape text for various output formats. |
 | 14 | `glob_match` | path | 1 | yes | no | yes | yes | Match a glob pattern against a path with explicit semantics: * matches within one segment, ** matches zero or more segments, ? |
-| 15 | `go_mod_inspect` | manifest | 2 | yes | no | no | yes | Inspect go.mod text: module path, go version, toolchain, require count, replace/exclude directives. Deterministic, no network. |
+| 15 | `go_mod_inspect` | manifest | 2 | yes | no | yes | yes | Inspect go.mod text: module path, go version, toolchain, require count, replace/exclude directives. Deterministic, no network. |
 | 16 | `identifier_analyze` | identifier | 3 | yes | no | yes | yes | Classify and validate identifier naming conventions across languages. |
 | 17 | `identifier_inspect` | identifier | 1 | yes | no | yes | yes | Inspect identifiers for validity and collisions. |
 | 18 | `identifier_table_inspect` | identifier | 3 | yes | no | yes | yes | Inspect a table of identifiers for casefold collisions, normalization collisions, confusable/near-collisions, style variants... |
@@ -40,14 +40,14 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 27 | `list_compare` | list | 2 | yes | no | yes | yes | Compare two lists with explicit modes: ordered ( LCS-based alignment), set (presence only), multiset (count deltas). |
 | 28 | `list_dedupe` | list | 1 | yes | no | yes | yes | Remove duplicates from a list while preserving order. Supports Unicode normalization and casefolding. |
 | 29 | `list_sort` | list | 1 | yes | no | yes | yes | Sort a list of strings with Unicode normalization and casefold support. |
-| 30 | `llm_json_output_check` | text | 2 | yes | no | no | yes | Detect and diagnose common LLM JSON output issues: fenced code blocks, leading/trailing prose, parse errors with location, fix... |
-| 31 | `lockfile_summary` | manifest | 2 | yes | no | no | yes | Shallow lockfile summary: detect kind (npm/pnpm/yarn/poetry/uv/cargo/go), approximate package count, ecosystem. |
-| 32 | `markdown_link_check_lexical` | text | 2 | yes | no | no | yes | Lexical markdown link validation (no network). |
+| 30 | `llm_json_output_check` | text | 2 | yes | no | yes | yes | Detect and diagnose common LLM JSON output issues: fenced code blocks, leading/trailing prose, parse errors with location, fix... |
+| 31 | `lockfile_summary` | manifest | 2 | yes | no | yes | yes | Shallow lockfile summary: detect kind (npm/pnpm/yarn/poetry/uv/cargo/go), approximate package count, ecosystem. |
+| 32 | `markdown_link_check_lexical` | text | 2 | yes | no | yes | yes | Lexical markdown link validation (no network). |
 | 33 | `markdown_structure` | markdown | 2 | yes | no | yes | yes | Parse Markdown structure with a deterministic line scanner: headings (level, text, slug), code fences (language, open/close... |
 | 34 | `math_eval` | math | 0 | yes | no | yes | yes | Evaluate arithmetic, unit conversions, constants, and scientific expressions deterministically. |
-| 35 | `package_json_inspect` | manifest | 2 | yes | no | no | yes | Inspect package.json text: name, version, scripts, dependency counts, engines, packageManager, workspaces. |
+| 35 | `package_json_inspect` | manifest | 2 | yes | no | yes | yes | Inspect package.json text: name, version, scripts, dependency counts, engines, packageManager, workspaces. |
 | 36 | `patch_apply_check` | patch | 2 | yes | no | yes | yes | Validate and simulate a unified diff against provided in-memory files/text without touching the filesystem. |
-| 37 | `patch_conflict_markers_inspect` | patch | 2 | yes | no | no | yes | Detect and analyze conflict markers (<<<<<<<, =======, >>>>>>>) in text. Reports counts, balance, nesting, and line locations. |
+| 37 | `patch_conflict_markers_inspect` | patch | 2 | yes | no | yes | yes | Detect and analyze conflict markers (<<<<<<<, =======, >>>>>>>) in text. Reports counts, balance, nesting, and line locations. |
 | 38 | `patch_summary` | patch | 2 | yes | no | yes | yes | Summarize a unified diff without applying it. |
 | 39 | `path_analyze` | path | 2 | yes | no | yes | yes | Analyze path components, extensions, hidden status, and traversal without filesystem access. |
 | 40 | `path_compare` | path | 2 | yes | no | yes | yes | Compare two paths under explicit normalization rules: separator normalization, dot-segment collapsing, and optional... |
@@ -58,7 +58,7 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 45 | `regex_finditer` | regex | 1 | yes | no | yes | yes | Find all regex matches in text with positions, line/column info, and capture groups. |
 | 46 | `regex_safety_check` | regex | 1 | yes | no | yes | yes | Heuristic check for potential catastrophic backtracking risks in regex patterns. |
 | 47 | `repo_file_inventory` | repo | 2 | yes | no | yes | yes | Analyze file inventory for repo structure signals (no filesystem access). |
-| 48 | `requirements_inspect` | manifest | 2 | yes | no | no | yes | Inspect requirements.txt-style text: package specs, editable refs, direct URLs, VCS refs, comments, environment markers... |
+| 48 | `requirements_inspect` | manifest | 2 | yes | no | yes | yes | Inspect requirements.txt-style text: package specs, editable refs, direct URLs, VCS refs, comments, environment markers... |
 | 49 | `shell_quote_join` | shell | 2 | yes | no | yes | yes | Safely quote a list of argv tokens into a POSIX-like shell string. Verifies round-trip safety with shell_split. |
 | 50 | `shell_split` | shell | 2 | yes | no | yes | yes | Parse a shell-like command string into argv tokens and report risky lexical features (pipes, redirections, command... |
 | 51 | `structured_data_compare` | json | 2 | yes | no | yes | yes | Composite: compare structured config/data output. |
@@ -78,7 +78,7 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 65 | `toml_shape` | toml | 2 | yes | no | yes | yes | Analyze the structure of a TOML document: top-level keys, tables, and nesting hierarchy. |
 | 66 | `unescape_text` | text | 1 | yes | no | yes | yes | Unescape text from various formats. |
 | 67 | `unicode_policy_check` | unicode | 2 | yes | no | yes | yes | Apply a named deterministic Unicode safety policy to input text. |
-| 68 | `unified_diff_validate` | patch | 2 | yes | no | no | yes | Validate the structural integrity of a unified diff. |
+| 68 | `unified_diff_validate` | patch | 2 | yes | no | yes | yes | Validate the structural integrity of a unified diff. |
 | 69 | `unit_convert` | math | 2 | yes | no | yes | yes | Convert a numeric value from one unit to another using pre-defined conversion factors. |
 | 70 | `unit_info` | math | 2 | yes | no | yes | yes | Get information about a unit including its canonical form and category. |
 | 71 | `validate_brackets` | validation | 1 | yes | no | yes | yes | Check whether delimiters are structurally balanced and report unmatched delimiters with line/column positions. |
@@ -102,8 +102,8 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 |-------|------:|
 | Total tools | 77 |
 | Referenced in README | 0 |
-| Covered by selected examples in docs/mcp.md | 67 |
-| Not covered by selected examples | 10 |
+| Covered by selected examples in docs/mcp.md | 77 |
+| Not covered by selected examples | 0 |
 | Have tests | 77 |
 | Missing tests | 0 |
 

@@ -475,6 +475,47 @@ The actual server implementation wraps success results in `{"content": [{"type":
 
 ---
 
+## Profile System
+
+Profiles are named subsets of tools that control which tools are available via `tools/call` and returned by `tools/list`. The system is defined in `schemas.py` (profile metadata and tool assignments) and enforced in `server.py` (profile filtering and call-time rejection).
+
+### Data Structures
+
+**`TOOL_METADATA`** (schemas.py:3808–4670): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile.
+
+**`TOOL_PROFILES`** (schemas.py:4691): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
+
+**`PROFILE_NAMES`** (schemas.py:4694–4706): Canonical list of all 11 profile names:
+`full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
+
+### Profile Selection
+
+The active profile is set at server startup via `EGGCALC_MCP_PROFILE` environment variable (default: `"full"`). Invalid profile names cause `SystemExit(1)` at import time.
+
+```python
+_active_profile: str = os.environ.get("EGGCALC_MCP_PROFILE", "full")
+```
+
+### `get_profile_tools()` (server.py:313–329)
+
+Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it dynamically returns all tools where `llm_exposure != "hidden"`. This allows hiding tools from the `full` profile without removing them from individual named profiles.
+
+### Enforcement
+
+- **`tools/list`** (server.py:1006–1106): Filters `TOOL_SCHEMAS` by `get_profile_tools(profile_filter)`. Additional filters (`tier`, `tags`, `names`) are applied after profile selection.
+- **`tools/call`** (server.py:807–831): Rejects tools not in the active profile with JSON-RPC error `-32602` before the handler executes.
+- **`profiles/list`**: Returns all profile names, their tool lists, and tool counts.
+
+### Schema Detail
+
+`EGGCALC_MCP_SCHEMA_DETAIL` (default `"full"`) controls schema verbosity globally. Overridden per-request via `schema_detail` parameter in `tools/list`:
+
+- **`full`**: Raw schemas with all fields
+- **`normal`**: Truncated descriptions, compact output schema (`normal_schema()`)
+- **`compact`**: Types and required fields only (`compact_schema()`)
+
+---
+
 ## Usage
 
 ### CLI Mode (Calculator)
