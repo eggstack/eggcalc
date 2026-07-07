@@ -104,24 +104,33 @@ def test_overflow():
 tests/
 ├── conftest.py                      # Shared fixtures
 ├── test_build_single.py             # Build script tests
+├── test_bugs_2026_07_regressions.py # Regression tests for 2026-07 bugs
 ├── test_cargo_inspect.py            # Cargo.toml inspection tests
 ├── test_cli_text.py                 # CLI text tools tests
 ├── test_clicalc.py                  # Core functional tests
+├── test_config_loading.py           # Config loading tests
 ├── test_config_validation.py        # dotenv/INI validation tests
+├── test_diff_analysis.py            # Diff analysis tests
 ├── test_exact.py                    # Exact module tests
 ├── test_golden_fixtures.py          # Golden fixture tests
 ├── test_identifier_table.py         # Identifier table inspection tests
 ├── test_install.py                  # Install script tests
 ├── test_line_range.py               # Line range extract/compare tests
+├── test_manifest_inspect.py         # Manifest inspection tests
 ├── test_markdown_tools.py           # Markdown structure tests
 ├── test_math_edge_cases.py          # Math edge case tests
 ├── test_math_identities.py          # Mathematical laws verification
+├── test_mcp_env_limits.py           # MCP environment limits tests
+├── test_mcp_resource_bounds.py      # MCP resource bounds tests
 ├── test_mcp_server.py               # MCP server integration tests
+├── test_mcp_stdio_smoke.py          # MCP stdio smoke tests
 ├── test_mcp_tools_new.py            # MCP integration tests for new tools
 ├── test_normalize.py                # Normalization tests
 ├── test_patch_tools.py              # Patch apply/summary tools tests
 ├── test_path_compare.py             # Path comparison tests
 ├── test_path_scope.py               # Path scope check tests
+├── test_path_windows_normalize.py   # Path Windows normalization tests
+├── test_phase5_tools.py             # Phase 5 tools tests
 ├── test_production_review_2026_07_b.py # Production review tests
 ├── test_prompt_inspect.py           # Prompt injection detection tests
 ├── test_repl_and_cli.py             # REPL and CLI integration tests
@@ -137,7 +146,7 @@ tests/
 ```
 
 ## Current Test Count
-- 2278 tests pass (as of 2026-06-29)
+- 2619 tests pass (as of 2026-07-07)
 - All must continue to pass
 
 ## Common Issues When Testing

@@ -161,7 +161,7 @@ Combines all modules into a single `eggcalc.py` file (~394KB) for portability.
 
 **Module Groups:**
 - `MODULES_CALC`: units, evaluator, normalize (core calculator)
-- `MODULES_EXACT`: 22 exact/ submodules (text analysis tools)
+- `MODULES_EXACT`: 25 exact/ submodules (text analysis tools)
 - `MODULES_MCP`: schemas, tools, server (MCP protocol)
 
 **Output:** Self-contained executable with CLI and MCP modes.
@@ -333,7 +333,7 @@ The `exact/` package provides low-level deterministic text analysis tools.
 | Document | Purpose |
 |----------|---------|
 | [api.md](api.md) | Public API reference |
-| [review_plan.md](review_plan.md) | Architecture review orchestration |
+| [review_plan.md](review_plan.md) | Architecture review plan (archived — completed 2026-05-29) |
 
 ---
 

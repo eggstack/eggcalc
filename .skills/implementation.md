@@ -64,11 +64,12 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `eggcalc/units.py` - Unit definitions
 - `eggcalc/__main__.py` - CLI entry
 
-#### exact/ modules (22 submodules, always separate)
+#### exact/ modules (25 submodules, always separate)
 - `primitives.py` - UTF-8, codepoints, visible_repr
 - `unicode_tools.py` - Script detection, confusables (forward and reverse)
 - `confusables.py` - Auto-generated data file (CONFUSABLES dict only)
 - `diff.py` - Levenshtein, diff_spans, `__all__` exports
+- `diff_analysis.py` - Diff analysis and classification
 - `measure.py` - Line/word metrics
 - `validate.py` - Bracket/JSON/regex validation with input limits
 - `synthesis.py` - Text comparison/explanation
@@ -86,6 +87,9 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `version.py` - Semver/cargo constraint checking
 - `inspect_prompt.py` - Prompt injection detection
 - `glob.py` - Glob pattern matching
+- `manifests.py` - Manifest inspection tools
+- `llm_hygiene.py` - LLM hygiene analysis
+- `repo_audit.py` - Repository audit tools
 - `__init__.py` - Package exports
 
 ### Always Run Tests

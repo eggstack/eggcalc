@@ -71,11 +71,11 @@ For each module, examine:
 **Documentation/Code inconsistencies to watch for:**
 
 - TypedDict vs NamedTuple mismatches (code uses TypedDict throughout)
-- Missing function aliases (check `mcp_main = main` at server.py:234)
+- Missing function aliases (check `mcp_main = main` at server.py:1372)
 - Data structure field mismatches (verify against actual code)
 - Parameter name alignment (docs sometimes use different names than code)
 
-**Note:** The architecture review has been completed. All 15 module reviews were performed and findings incorporated into the documentation. Test count: 2278 (as of 2026-06-29).
+**Note:** The architecture review has been completed. All 15 module reviews were performed and findings incorporated into the documentation. Test count: 2619 (as of 2026-07-07).
 
 ## Architecture Review Findings (2026-05-28 through 2026-05-29)
 

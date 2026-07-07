@@ -26,7 +26,7 @@ Assembles `eggcalc/` into a single portable `eggcalc.py`. The build script:
 
 ## CI Pipeline Order
 ```
-ruff → black --check → build_single.py → pytest → mypy
+ruff → black --check → build_single.py → python eggcalc.py "5+3" (smoke) → generate_mcp_docs.py --check → pytest → mypy
 ```
 - mypy only runs on Python 3.12
 - All checks must pass before merge
