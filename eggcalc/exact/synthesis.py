@@ -1507,6 +1507,49 @@ def text_replace_check(
     text_norm = _normalize_for_match(text, mode)
     old_norm = _normalize_for_match(old, mode)
 
+    def _norm_offset_to_orig(norm_idx: int) -> int:
+        """Map a codepoint offset in text_norm back to an offset in text.
+
+        For modes that alter codepoint count (NFC/NFKC compose or expand;
+        casefold expansion; whitespace collapse), the normalized and original
+        indices do not coincide. We walk the original text codepoint by
+        codepoint, tracking how many normalized codepoints the prefix produces.
+        """
+        if norm_idx <= 0:
+            return 0
+        norm_total = len(text_norm)
+        if norm_idx >= norm_total:
+            return len(text)
+        if mode == "exact":
+            return min(norm_idx, len(text))
+        if mode == "whitespace_collapse":
+            out_pos = 0
+            prev_was_ws = False
+            last_ok = 0
+            for orig_i, ch in enumerate(text):
+                is_ws = ch.isspace()
+                if is_ws:
+                    if not prev_was_ws:
+                        out_pos += 1
+                else:
+                    out_pos += 1
+                if out_pos > norm_idx:
+                    return last_ok
+                last_ok = orig_i + 1
+                prev_was_ws = is_ws
+            return last_ok
+        # nfc / nfkc / casefold: progressive prefix normalization.
+        prev_norm = ""
+        last_ok = 0
+        for i, ch in enumerate(text):
+            new_norm = _normalize_for_match(prev_norm + ch, mode)
+            new_len = len(new_norm)
+            if new_len > norm_idx:
+                return last_ok
+            last_ok = i + 1
+            prev_norm = new_norm
+        return last_ok
+
     # Find all matches (non-overlapping)
     positions: list[dict[str, int]] = []
     search_start = 0
@@ -1514,16 +1557,20 @@ def text_replace_check(
         idx = text_norm.find(old_norm, search_start)
         if idx == -1:
             break
-        byte_start = len(text[:idx].encode("utf-8"))
-        byte_end = len(text[: idx + len(old)].encode("utf-8"))
-        cp_line, cp_col = _cp_to_line_col(text, idx, 1, 1)
+        orig_idx = _norm_offset_to_orig(idx)
+        orig_end = _norm_offset_to_orig(idx + len(old_norm))
+        match_codepoint_length = orig_end - orig_idx
+        byte_start = len(text[:orig_idx].encode("utf-8"))
+        byte_end = len(text[:orig_end].encode("utf-8"))
+        cp_line, cp_col = _cp_to_line_col(text, orig_idx, 1, 1)
         positions.append(
             {
-                "codepoint_index": idx,
+                "codepoint_index": orig_idx,
                 "byte_start": byte_start,
                 "byte_end": byte_end,
                 "line": cp_line,
                 "column": cp_col,
+                "match_codepoint_length": match_codepoint_length,
             }
         )
         search_start = idx + len(old_norm) if len(old_norm) > 0 else idx + 1
@@ -1571,32 +1618,21 @@ def text_replace_check(
 
     # Build changed text for fingerprinting and preview
     if would_change:
-        changed_text = (
-            text_norm.replace(old_norm, new)
-            if mode != "whitespace_collapse"
-            else re.sub(r"\s+", " ", text).replace(re.sub(r"\s+", " ", old), new)
-        )
         if mode in ("nfc", "nfkc", "casefold"):
-            # Rebuild from original
-            if mode == "casefold":
-                # casefold matching but keep original casing elsewhere
-                parts = []
-                last = 0
-                for pos in positions:
-                    parts.append(text[last : pos["codepoint_index"]])
-                    parts.append(new)
-                    last = pos["codepoint_index"] + len(old)
-                parts.append(text[last:])
-                changed_text = "".join(parts)
-            else:
-                parts = []
-                last = 0
-                for pos in positions:
-                    parts.append(text[last : pos["codepoint_index"]])
-                    parts.append(new)
-                    last = pos["codepoint_index"] + len(old)
-                parts.append(text[last:])
-                changed_text = "".join(parts)
+            # Rebuild from original so the surrounding codepoints are preserved
+            parts = []
+            last = 0
+            for pos in positions:
+                orig_idx = pos["codepoint_index"]
+                parts.append(text[last:orig_idx])
+                parts.append(new)
+                last = orig_idx + pos["match_codepoint_length"]
+            parts.append(text[last:])
+            changed_text = "".join(parts)
+        elif mode == "whitespace_collapse":
+            changed_text = re.sub(r"\s+", " ", text).replace(re.sub(r"\s+", " ", old), new)
+        else:
+            changed_text = text_norm.replace(old_norm, new)
     else:
         changed_text = text
 

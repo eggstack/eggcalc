@@ -7682,6 +7682,48 @@ print('OK')
         err = server._validate_value_against_schema(42, {"type": ["string", "null"]}, "x")
         assert err is not None and "must be one of" in err
 
+    def test_schema_bool_rejected_for_nullable_numeric(self):
+        """Bug fix: bool must not satisfy nullable integer/number schemas.
+
+        Python's bool is a subclass of int, so `isinstance(True, int)` passes
+        when the schema's type list contains `integer`. Without the explicit
+        bool guard, True/False would be accepted as a numeric value.
+        """
+        from eggcalc.mcp import server
+
+        for schema in (
+            {"type": ["integer", "null"]},
+            {"type": ["number", "null"]},
+            {"type": ["integer", "number"]},
+        ):
+            assert server._validate_value_against_schema(True, schema, "x") is not None
+            assert server._validate_value_against_schema(False, schema, "x") is not None
+        # Sanity: int and None are still allowed in the nullable integer case.
+        assert server._validate_value_against_schema(5, {"type": ["integer", "null"]}, "x") is None
+        assert (
+            server._validate_value_against_schema(None, {"type": ["integer", "null"]}, "x") is None
+        )
+
+    def test_schema_unique_items_enforced_for_unhashable(self):
+        """Bug fix: uniqueItems must be enforced even when items are unhashable.
+
+        The previous set-based check silently passed arrays containing dicts
+        or lists. The validator must structurally compare each item pair.
+        """
+        from eggcalc.mcp import server
+
+        schema = {"type": "array", "uniqueItems": True}
+        # Hashable duplicate still caught
+        assert server._validate_value_against_schema([1, 1], schema, "x") is not None
+        # Unhashable duplicates now caught
+        assert server._validate_value_against_schema([{"a": 1}, {"a": 1}], schema, "x") is not None
+        assert server._validate_value_against_schema([[1], [1]], schema, "x") is not None
+        # Distinct values still accepted
+        assert server._validate_value_against_schema([{"a": 1}, {"a": 2}], schema, "x") is None
+        assert (
+            server._validate_value_against_schema([{"a": 1, "b": 2}, {"a": 1}], schema, "x") is None
+        )
+
     def test_fact_rejects_unit_argument(self):
         """M-12: fact(5m) must raise, not silently return 120."""
         import subprocess

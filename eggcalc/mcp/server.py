@@ -529,6 +529,26 @@ def _run_handler_in_thread(handler: Any, arguments: dict[str, Any]) -> Any:
     return handler(**arguments)
 
 
+def _json_value_equal(a: Any, b: Any) -> bool:
+    """Recursively compare two JSON-like values for structural equality.
+
+    Used by uniqueItems to detect duplicates among unhashable items (dicts,
+    lists) as well as scalars. Floats compare exactly — JSON Schema does not
+    require a canonical NaN or ±0 representation, so we use Python's `==`.
+    """
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        if a.keys() != b.keys():
+            return False
+        return all(_json_value_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list):
+        if len(a) != len(b):
+            return False
+        return all(_json_value_equal(x, y) for x, y in zip(a, b))
+    return bool(a == b)
+
+
 def _validate_value_against_schema(
     value: Any, prop: dict, path: str, max_depth: int = 10
 ) -> str | None:
@@ -599,8 +619,8 @@ def _validate_value_against_schema(
             return f"Argument '{path}' must be {type_options[0]}, got {type(value).__name__}"
         return f"Argument '{path}' must be one of [{', '.join(type_options)}], got {type(value).__name__}"
 
-    # Bool is subclass of int in Python; reject bool when all allowed types are numeric
-    if all(t in ("integer", "number") for t in type_options) and isinstance(value, bool):
+    # Bool is subclass of int in Python; reject bool when any numeric type is allowed
+    if any(t in ("integer", "number") for t in type_options) and isinstance(value, bool):
         if len(type_options) == 1:
             return f"Argument '{path}' must be {type_options[0]}, got bool"
         return f"Argument '{path}' must be one of [{', '.join(type_options)}], got bool"
@@ -699,12 +719,16 @@ def _validate_value_against_schema(
             return f"Argument '{path}' has {len(value)} items, exceeds maxItems {max_items}"
 
         if prop.get("uniqueItems") is True:
-            try:
-                if len(set(value)) != len(value):
+            seen: list[Any] = []
+            for item in value:
+                duplicate = False
+                for prev in seen:
+                    if _json_value_equal(prev, item):
+                        duplicate = True
+                        break
+                if duplicate:
                     return f"Argument '{path}' has duplicate items but uniqueItems is True"
-            except TypeError:
-                # Unhashable items — fall through, we can't enforce uniqueItems.
-                pass
+                seen.append(item)
 
         items_schema = prop.get("items")
         if items_schema:

@@ -169,3 +169,47 @@ class TestTextReplaceCheckEdgeCases:
         assert (
             "\r\n" not in result.get("preview_after", "") or result["newline_style_after"] == "LF"
         )
+
+
+class TestTextReplaceCheckNormalizedOffsets:
+    """Regression tests: offsets must reference the original text, not the
+    normalized form. Modes that change codepoint layout (NFC/NFKC compose or
+    expand, casefold expansion, whitespace collapse) must still produce
+    correct codepoint_index, byte_start, byte_end, line, column, and the
+    preview must preserve surrounding codepoints."""
+
+    def test_nfc_offset_after_decomposed_prefix(self):
+        # é (NFD: e + combining acute) followed by X. NFC matches X at
+        # normalized index 1, but original codepoint index 2. The preview
+        # preserves the original decomposed form (NFC matching must not
+        # silently rewrite the prefix).
+        result = text_replace_check("e\u0301X", "X", "Y", mode="nfc", return_preview=True)
+        pos = result["positions"][0]
+        assert pos["codepoint_index"] == 2
+        assert pos["byte_start"] == 3
+        assert pos["byte_end"] == 4
+        assert pos["column"] == 3
+        assert result["preview_after"] == "e\u0301Y"
+
+    def test_nfkc_offset_after_ligature(self):
+        # U+FB03 (ﬃ) decomposes under NFKC to "ffi" (3 codepoints). The X
+        # that follows should map to original codepoint index 1 and byte 3,
+        # and the preview must keep the original ligature glyph.
+        result = text_replace_check("\ufb03X", "X", "Y", mode="nfkc", return_preview=True)
+        pos = result["positions"][0]
+        assert pos["codepoint_index"] == 1
+        assert pos["byte_start"] == 3
+        assert pos["byte_end"] == 4
+        assert pos["column"] == 2
+        assert result["preview_after"] == "ﬃY"
+
+    def test_casefold_preserves_original_casing_in_preview(self):
+        # casefold matching should NOT lowercase unmatched surroundings in
+        # the rendered change.
+        result = text_replace_check(
+            "Hello WORLD", "world", "earth", mode="casefold", return_preview=True
+        )
+        assert result["preview_after"] == "Hello earth"
+        assert result["positions"][0]["codepoint_index"] == 6
+        assert result["positions"][0]["byte_start"] == 6
+        assert result["positions"][0]["byte_end"] == 11
