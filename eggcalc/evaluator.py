@@ -2649,6 +2649,13 @@ def _evaluate_with_timeout_worker(
 
 def _get_eval_multiprocessing_context() -> multiprocessing.context.BaseContext:
     """Return the multiprocessing context for timeout evaluation workers."""
+    # Prefer spawn over fork: fork() in a multi-threaded process (e.g.
+    # when called from the MCP server's ThreadPoolExecutor) can deadlock
+    # the child because locks held by other threads are left in an
+    # acquired state that the child cannot release.  spawn is ~300-400ms
+    # slower due to re-importing, but it is safe in all contexts.
+    if os.name != "nt" and "spawn" in multiprocessing.get_all_start_methods():
+        return multiprocessing.get_context("spawn")
     if os.name != "nt" and "fork" in multiprocessing.get_all_start_methods():
         return multiprocessing.get_context("fork")
     return multiprocessing.get_context("spawn")

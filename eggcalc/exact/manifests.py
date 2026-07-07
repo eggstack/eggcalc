@@ -11,8 +11,6 @@ import json
 import re
 from typing import Any, TypedDict, cast
 
-import tomllib
-
 _MAX_INPUT_LENGTH = 500_000
 _MAX_FINDINGS = 200
 
@@ -130,6 +128,19 @@ def pyproject_inspect(text: str) -> PyprojectInspectResult:
         )
 
     findings: list[_Finding] = []
+    try:
+        import tomllib
+    except ImportError:
+        return PyprojectInspectResult(
+            parse_ok=False,
+            findings=[
+                _finding(
+                    "TOML_NOT_AVAILABLE",
+                    "error",
+                    "tomllib is not available (requires Python 3.11+)",
+                ),
+            ],
+        )
     try:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
