@@ -25,7 +25,7 @@ from eggcalc.evaluator import (
     get_default_evaluator,
     register_constant,  # Add user constants
     register_function,  # Add user functions
-    load_user_config,   # Load eggcalc_config.py
+    load_user_config,   # Load eggcalc_config.py (not called at import time)
     # Memory functions
     memory_store, memory_recall, memory_add, memory_subtract,
     memory_clear, memory_list,
@@ -56,6 +56,16 @@ from eggcalc.evaluator import (
 
 NOT eval() — uses AST for safety
 ```
+
+### Config Loading Safety
+
+`import eggcalc` does NOT trigger `load_user_config()`. Config loading is handled by three paths:
+
+1. **CLI path:** `maybe_load_cli_config()` in normalize.py — called once at CLI startup
+2. **API path:** `_ensure_config_loaded()` — lazy loading on first `evaluate_raw()` call
+3. **MCP path:** Blocked by `EGGCALC_NO_CONFIG=1` env var set before imports
+
+The `load_user_config()` function checks two guards (`_mcp_mode` and `EGGCALC_NO_CONFIG`) and sets `_config_loaded = True` on both early-return and normal paths to prevent re-entry.
 
 ## AST Node Handlers
 

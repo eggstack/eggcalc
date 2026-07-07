@@ -12,6 +12,8 @@ python -m eggcalc "five plus two"
 
 `main()` in `normalize.py` handles all CLI parsing and execution. When assembled into a single file by `build_single.py`, it is aliased as `normalize_main()` to avoid conflict with the MCP server's `main()` function.
 
+At startup, `main()` calls `maybe_load_cli_config()` to load `eggcalc_config.py` from the working directory. This is the only path that triggers config loading for the CLI. The library import path (`import eggcalc`) does NOT load config.
+
 ## CLI Options
 
 | Option | Description |

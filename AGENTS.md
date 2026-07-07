@@ -133,6 +133,20 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 | `synthesis.md` | Higher-level text analysis |
 | `confusables.md` | Auto-generated homoglyph data |
 
+## Config Loading Safety
+
+`import eggcalc` does **not** execute cwd-local Python. Config loading (`eggcalc_config.py`) is handled by:
+
+| Path | Entry Point | When |
+|------|-------------|------|
+| CLI | `maybe_load_cli_config()` in normalize.py | Once at CLI startup (`main()`) |
+| API (lazy) | `_ensure_config_loaded()` in evaluator.py | First call to `evaluate_raw()` etc. |
+| MCP server | Blocked by `EGGCALC_NO_CONFIG=1` | Never |
+
+The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCALC_NO_CONFIG` env var. Both early-return paths set `_config_loaded = True` to prevent re-entry.
+
+**Do not** add import-time config loading back to `__init__.py`. Library import must remain side-effect-free.
+
 ## Common Pitfalls
 
 1. **Wrong test API** — `evaluate("five plus three")` fails. Use `run()` or CLI for NL.

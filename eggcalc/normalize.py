@@ -3527,12 +3527,35 @@ def _cli_text_command(
     return 1  # Not a text command, continue to math eval
 
 
+def maybe_load_cli_config() -> None:
+    """Load user config for CLI usage if not disabled.
+
+    This is the CLI-owned config loading entry point. It is called once
+    during CLI startup (single-expression, -e, interactive modes). It is
+    intentionally NOT called from library API functions like evaluate_raw()
+    so that ``import eggcalc`` never executes cwd-local Python.
+
+    Config loading can be disabled by setting EGGCALC_NO_CONFIG=1.
+    """
+    import os
+
+    if os.environ.get("EGGCALC_NO_CONFIG", ""):
+        return
+    try:
+        from eggcalc.evaluator import load_user_config
+    except (ImportError, ModuleNotFoundError):
+        pass  # single-file mode: load_user_config is a module-level global
+    load_user_config()
+
+
 def main() -> int:
     """Main entry point for CLI."""
     import os
     import signal
 
     import eggcalc
+
+    maybe_load_cli_config()
 
     try:
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)

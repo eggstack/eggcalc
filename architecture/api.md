@@ -114,6 +114,11 @@ register_function("square", lambda x: x ** 2)
 
 Load configuration from `eggcalc_config.py` in working directory.
 
+**Safety:** This function is NOT called by `import eggcalc`. Library import is side-effect-free. Config loading happens via:
+- CLI: `maybe_load_cli_config()` in normalize.py (once at startup)
+- API: `_ensure_config_loaded()` (lazy, on first `evaluate_raw()` call)
+- MCP: Disabled entirely (`EGGCALC_NO_CONFIG=1`)
+
 ## Memory Functions
 
 Calculator-style memory operations:
