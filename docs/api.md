@@ -29,7 +29,7 @@ except TimeoutError:
 
 ### `evaluate(expression: str) -> Any`
 
-Direct AST evaluation. **Expects pre-normalized input** (no spaces, no natural language words).
+Direct AST evaluation. **Expects pre-normalized input** — valid Python math syntax. Spaces are tolerated; natural language and unit suffixes are rejected.
 
 ```python
 from eggcalc import evaluate

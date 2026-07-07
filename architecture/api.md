@@ -8,7 +8,7 @@
 
 ### `evaluate(expression: str) -> Any`
 
-Evaluate a **pre-normalized expression** (no spaces, no natural language).
+Evaluate a **pre-normalized Python-AST-compatible expression** (no natural language, no unit suffixes).
 
 ```python
 result = evaluate("5+3")  # 8

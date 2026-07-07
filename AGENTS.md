@@ -8,10 +8,11 @@
 
 This is the #1 source of mistakes. The codebase has two distinct entry points:
 
-| Function | Handles | Input Format |
+| Function | Handles | Input format |
 |----------|---------|-------------|
-| `run(expr, NORMALIZE, PATTERNS)` | NL + units + math | `"five plus three"`, `"30m + 100ft"` |
-| `evaluate(expr)` | Pure math only | `"5+3"`, `"2**10"` — no spaces, no NL, no units |
+| `evaluate(expr)` | Direct AST evaluation | Already-normalized Python-AST-compatible math expression (`"5+3"`, `"5 + 3"`, `"2**10"`) |
+| `evaluate_raw(expr)` | NL + units + math | User-facing expressions (`"five plus three"`, `"30m + 100ft"`) |
+| `run(expr, NORMALIZE, PATTERNS)` | CLI-compatible normalization path | Lower-level helper for NL/unit normalization and evaluation |
 
 `run()` normalizes NL/units first, then calls `evaluate()` internally. `evaluate()` parses directly via Python AST — it **rejects** natural language and unit suffixes.
 
@@ -19,14 +20,15 @@ This is the #1 source of mistakes. The codebase has two distinct entry points:
 run("five plus three", NORMALIZE, PATTERNS)  # → 8
 run("30m + 100ft", NORMALIZE, PATTERNS)      # → 60.48 m
 evaluate("5+3")                              # → 8
+evaluate("5 + 3")                            # → 8 (spaces are tolerated)
 evaluate("five plus three")                  # → raises SyntaxError
 ```
 
 The public API wraps these differently:
-- `evaluate_raw()` / `evaluate_cached()` / `evaluate_async()` → full pipeline (like `run()`)
-- `evaluate()` → direct AST only
+- `evaluate_raw()` / `evaluate_cached()` / `evaluate_async()` → full pipeline (NL/units → normalize → evaluate)
+- `evaluate()` → direct AST evaluation (accepts valid Python math syntax with or without spaces, but rejects natural language and unit suffixes)
 
-**When writing tests:** use `evaluate()` for pure math (`5+3`), use CLI or `run()` for NL/units.
+**When writing tests:** use `evaluate()` for direct AST evaluator behavior (e.g. `"5+3"`, `"2**10"`). Use `evaluate_raw()`, CLI subprocesses, or `run()` for natural-language and unit parsing behavior.
 
 ## Commands
 
@@ -68,15 +70,15 @@ CI order: `ruff → black --check → build_single.py → generate_mcp_docs.py -
 
 ## Module Map
 
-| Module | Lines | Role |
-|--------|-------|------|
-| `eggcalc/normalize.py` | 3669 | NL tokenization, number words, expression normalization, CLI main |
-| `eggcalc/evaluator.py` | 2873 | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
-| `eggcalc/units.py` | 2093 | Unit definitions, conversions, `UnitValue` class |
-| `eggcalc/__main__.py` | 19 | Module entry, delegates to `normalize.main()` |
-| `eggcalc/exact/` | 20843 | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
-| `eggcalc/mcp/` | 11166 | MCP server: schemas (3994), tools (5882), server (1277) |
-| `build_single.py` | 842 | Assembles everything into `eggcalc.py` |
+| Module | Role |
+|--------|------|
+| `eggcalc/normalize.py` | NL tokenization, number words, expression normalization, CLI main |
+| `eggcalc/evaluator.py` | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
+| `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class |
+| `eggcalc/__main__.py` | Module entry, delegates to `normalize.main()` |
+| `eggcalc/exact/` | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
+| `eggcalc/mcp/` | MCP server: schemas, tools, server |
+| `build_single.py` | Assembles everything into `eggcalc.py` |
 
 ## Unit Conventions
 

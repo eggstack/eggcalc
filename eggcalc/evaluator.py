@@ -2545,7 +2545,7 @@ class Evaluator(ast.NodeVisitor):
 
 
 def evaluate(expression: str) -> Any:
-    """Evaluate a pre-normalized expression (no spaces, no natural language).
+    """Evaluate a pre-normalized Python-AST-compatible expression.
 
     For raw input with spaces or natural language, use evaluate_raw() instead.
     """

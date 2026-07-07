@@ -25,7 +25,7 @@ Use this when you control the input format and want maximum performance (~15x fa
 ```python
 from eggcalc import evaluate
 
-evaluate("5+3")      # 8 - no spaces allowed
+evaluate("5+3")      # 8 - valid Python math syntax
 evaluate("sin(1)+2") # 2.8414...
 ```
 

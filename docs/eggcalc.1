@@ -654,7 +654,7 @@ For untrusted input, use \fBevaluate_with_timeout()\fR from the Python API to pr
   result = evaluate_raw("five plus three")    # 8
   result = evaluate_raw("30m + 100ft")        # 60.48 m
 
-  # Pre-normalized expressions (faster, no spaces allowed)
+  # Pre-normalized expressions (faster, no natural language or units)
   result = evaluate("5+3")                   # 8
 
   # With caching for repeated queries

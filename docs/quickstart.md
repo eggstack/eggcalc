@@ -130,7 +130,7 @@ result = evaluate_raw("30m + 100ft")      # 60.48 m
 ```python
 from eggcalc import evaluate  # Note: different import path
 
-result = evaluate("5+3")  # 8 - must have no spaces
+result = evaluate("5+3")  # 8 - valid Python math syntax
 ```
 
 **For untrusted input (with timeout):**
