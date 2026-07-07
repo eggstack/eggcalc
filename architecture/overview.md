@@ -1,95 +1,114 @@
 # eggcalc Architecture Overview
 
-A natural language math expression calculator that parses expressions in English (like "five plus three") and converts them to numeric results, with support for unit conversions. The system also includes a comprehensive suite of Unicode text analysis tools exposed via an MCP (Model Context Protocol) server.
-
-**All tests pass.**
+A natural language math calculator (CLI, library, MCP server) and Unicode text analysis suite. Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file.
 
 ---
 
 ## Table of Contents
 
-- [System Overview](#system-overview)
-- [Core Calculator Modules](#core-calculator-modules)
-  - [normalize.py](normalize.md) — Natural Language Processing Pipeline
-  - [evaluator.py](evaluator.md) — Safe AST-Based Expression Evaluation
-  - [units.py](units.md) — Unit Definitions and Conversions
-  - [CLI Entry Point](cli.md) — Command-Line Interface
-- [Build System](#build-system)
+- [What eggcalc Is](#what-eggcalc-is)
+- [Module Map](#module-map)
+- [Core Calculator Pipeline](#core-calculator-pipeline)
 - [Data Flow](#data-flow)
-- [Key Data Structures](#key-data-structures)
+- [Entry Points](#entry-points)
 - [Module Dependencies](#module-dependencies)
+- [Key Data Structures](#key-data-structures)
+- [Build System](#build-system)
 - [Deep Dive Index](#deep-dive-index)
 
 ---
 
-## System Overview
+## What eggcalc Is
 
 eggcalc is a dual-purpose tool:
 
-1. **Natural Language Calculator** — Accepts math expressions in plain English ("five plus three") and evaluates them with full unit conversion support
-2. **Unicode Text Analysis Suite** — A collection of deterministic text processing tools for AI safety, security auditing, and text manipulation
+1. **Natural Language Calculator** — Accepts math expressions in plain English (`"five plus three"`) or with units (`"30m + 100ft"`) and evaluates them with full unit conversion support.
+2. **Unicode Text Analysis Suite** — Deterministic text processing tools for AI safety, security auditing, and text manipulation, exposed via CLI subcommands and an MCP server.
 
 ### Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        CLI / API                                │
-│                   (eggcalc/__main__.py)                         │
+│                     Entry Points                                │
+│   CLI (__main__.py → normalize.main())  |  MCP Server (server) │
 └────────────────────────────────────┬────────────────────────────┘
                                      │
                     ┌────────────────┴────────────────┐
                     │                                 │
           ┌─────────▼─────────┐              ┌────────▼────────┐
-          │   Normalize.py   │              │   MCP Server    │
-          │  (NL → Python)   │              │  (Tool Access)  │
+          │   normalize.py   │              │   mcp/tools.py  │
+          │  (NL → Python)   │              │  (Tool Router)  │
           └─────────┬─────────┘              └────────┬────────┘
                     │                                 │
           ┌─────────▼─────────┐              ┌────────▼────────┐
-          │   Evaluator.py   │              │  exact/ Tools   │
-          │    (AST Eval)    │              │   (Text Ops)    │
+          │   evaluator.py   │              │   exact/ pkg    │
+          │    (AST Eval)    │              │  (Text Ops)     │
           └─────────┬─────────┘              └─────────────────┘
                     │
           ┌─────────▼─────────┐
-          │     Units.py      │
-          │ (Conversions)     │
+          │     units.py      │
+          │  (Conversions)    │
           └───────────────────┘
 ```
 
 ---
 
-## Core Calculator Modules
+## Module Map
 
-### [normalize.py](normalize.md) — Natural Language Processing Pipeline
-
-**Location:** `eggcalc/normalize.py`
-
-Converts natural language expressions into Python syntax through a multi-stage pipeline:
-
-| Stage | Description | Example |
-|-------|-------------|---------|
-| Word Replacement | Number words → digits | `"five"` → `5` |
-| Operator Conversion | Operator words → symbols | `"plus"` → `+` |
-| Function Normalization | Function aliases → canonical | `"square root"` → `sqrt` |
-| Constant Recognition | Physical constants | `"avogadro"` → `6.022e23` |
-| Phrase Stripping | Remove filler | `"what's"` → `""` |
-| Unit Parsing | Number + unit detection | `"30m"` → `30*m` |
-
-Unit parsing is spacing-tolerant, including compound units with spaces around `/` and unit conversions like `30 km / h in mph` or `5 in in cm`.
-
-**Key exports:** `run()`, `normalize()`, `normalize_expression()`, `NORMALIZE`, `PATTERNS`
-
-**Detailed documentation:** [normalize.md](normalize.md)
+| Module | Role | Key Exports |
+|--------|------|-------------|
+| [`normalize.py`](normalize.md) | NL tokenization, number words, expression normalization, CLI main | `run()`, `normalize_text()`, `normalize_expression()`, `main()` |
+| [`evaluator.py`](evaluator.md) | AST parsing, math evaluation, `EggCalcApp` | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()` |
+| [`units.py`](units.md) | Unit definitions, conversions, `UnitValue` class | `UnitValue`, `get_conversion_factor()`, `is_unit()`, `convert_temperature()` |
+| `__main__.py` | Module entry point | Delegates to `normalize.main()` |
+| `__init__.py` | Public API surface | Re-exports all key symbols from submodules |
+| [`exact/`](exact.md) | Text analysis: Unicode, confusables, diffs, validation, shell parsing | `inspect_text()`, `count_chars()`, `shell_split()`, `markdown_structure()` |
+| [`mcp/`](mcp.md) | MCP server: schemas, tools, server | `mcp_main()`, `handle_request()`, `TOOL_SCHEMAS` |
+| `build_single.py` | Assembles all modules into one file | Produces `eggcalc.py` (~394KB) |
+| `install.py` | Installs to `~/.local/bin/calc` | `python install.py --install` |
 
 ---
 
-### [evaluator.py](evaluator.md) — Safe AST-Based Expression Evaluation
+## Core Calculator Pipeline
 
-**Location:** `eggcalc/evaluator.py`
+### Two Evaluation Paths
 
-Safely evaluates mathematical expressions using Python's AST module — **not `eval()`**. Provides full protection against code injection.
+This is the most important architectural distinction in the codebase:
 
-| Category | Functions/Features |
-|----------|-------------------|
+| Function | Handles | Input format |
+|----------|---------|-------------|
+| `evaluate(expr)` | Direct AST evaluation | Already-normalized Python-AST-compatible math expression (`"5+3"`, `"2**10"`) |
+| `evaluate_raw(expr)` | NL + units + math | User-facing expressions (`"five plus three"`, `"30m + 100ft"`) |
+| `run(expr, NORMALIZE, PATTERNS)` | CLI-compatible normalization path | Lower-level helper for NL/unit normalization and evaluation |
+
+```python
+run("five plus three", NORMALIZE, PATTERNS)  # → 8
+run("30m + 100ft", NORMALIZE, PATTERNS)      # → 60.48 m
+evaluate("5+3")                              # → 8
+evaluate("five plus three")                  # → raises SyntaxError
+```
+
+### Normalization Pipeline (normalize.py)
+
+Multi-stage pipeline that converts natural language to Python syntax:
+
+| Stage | Description | Example |
+|-------|-------------|---------|
+| Unicode replacement | Normalize special characters | `→` → `to` |
+| Number word replacement | Words → digits | `"five"` → `5` |
+| Operator conversion | Words → symbols | `"plus"` → `+` |
+| Function normalization | Aliases → canonical | `"square root"` → `sqrt` |
+| Constant recognition | Physical constants | `"avogadro"` → `6.022e23` |
+| Phrase stripping | Remove filler words | `"what's"` → `""` |
+| Unit parsing | Number + unit detection | `"30m"` → `30*m` |
+| Parenthesization | Implicit precedence | `"2 + 3 * 4"` → correct grouping |
+
+### Safe AST Evaluation (evaluator.py)
+
+Uses Python's `ast` module — **never `eval()`**. Provides full protection against code injection.
+
+| Category | Functions |
+|----------|-----------|
 | Arithmetic | `+`, `-`, `*`, `/`, `**`, `//`, `%` |
 | Trigonometric | `sin`, `cos`, `tan`, `asin`, `acos`, `atan` (complex-aware) |
 | Hyperbolic | `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh` |
@@ -104,24 +123,16 @@ Safely evaluates mathematical expressions using Python's AST module — **not `e
 | Variables | `setvar`, `getvar`, `delvar`, `listvars` |
 | Physical Constants | `pi`, `e`, `c`, `h`, `avogadro`, `k`, `G`, etc. |
 
-**Key exports:** `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `EggCalcApp`, `Evaluator`
+### Unit System (units.py)
 
-**Detailed documentation:** [evaluator.md](evaluator.md)
+Comprehensive unit conversion with 20+ categories and proper temperature offset handling:
 
----
-
-### [units.py](units.md) — Unit Definitions and Conversions
-
-**Location:** `eggcalc/units.py`
-
-Comprehensive unit conversion system with 20+ unit categories and proper temperature offset handling.
-
-| Category | Base Unit | Example Units |
-|----------|-----------|--------------|
+| Category | Base | Example Units |
+|----------|------|--------------|
 | Length | m | km, cm, mm, in, ft, yd, mi, ly, au, pc |
-| Time | s | ms, us, ns, min, h, d, wk, yr |
+| Time | s | ms, μs, ns, min, h, d, wk, yr |
 | Mass | kg | g, mg, lb, oz, ton, stone |
-| Data | B (bytes) | KB, MB, GB, TB (binary 1024) |
+| Data | B | KB, MB, GB, TB (binary 1024) |
 | Data Rate | bps | Kbps, Mbps, Gbps (decimal 1000) |
 | Volume | L | mL, gal, qt, pt, cup, floz, tbsp, tsp |
 | Pressure | Pa | kPa, MPa, GPa, bar, atm, psi |
@@ -129,44 +140,161 @@ Comprehensive unit conversion system with 20+ unit categories and proper tempera
 | Power | W | kW, MW, GW, mW, hp |
 | Force | N | kN, mN, dyne, lbf |
 | Speed | m/s | km/h, mph, kn, mach |
-| Temperature | K | C, F, R (offset-based) |
+| Temperature | K | C, F, Ra (offset-based) |
 | Frequency | Hz | kHz, MHz, GHz, THz |
-| Area | m2 | km2, cm2, mm2, acre, ft2, in2 |
-
-**Key exports:** `UnitValue`, `get_conversion_factor()`, `is_unit()`, `get_unit_category()`, `are_units_compatible()`, `convert_temperature()`
-
-**Detailed documentation:** [units.md](units.md)
+| Area | m² | km², cm², mm², acre, ft², in² |
 
 ---
 
-### [CLI Entry Point](cli.md) — Command-Line Interface
+## Data Flow
 
-**Location:** `eggcalc/__main__.py`
+### Natural Language Evaluation
 
-Entry point for `python -m eggcalc`. Delegates to `normalize.main()` which handles:
-- Single expression mode: `calc "5 + 3"`
-- Interactive REPL: `calc -i`
-- Text tools: `calc inspect <text>`, `calc count <text>`, etc.
-- MCP server mode: `calc --mcp`
+```
+Input: "five plus three"
+    ↓
+normalize_text():    "five" → "5", "plus" → "+"
+    ↓
+normalize_expression(): build "5+3", add parens
+    ↓
+evaluator.evaluate(): AST parse → safe evaluation
+    ↓
+Output: 8
+```
 
-**Detailed documentation:** [cli.md](cli.md)
+### Unit Conversion
+
+```
+Input: "30m + 100ft in meters"
+    ↓
+normalize(): parse units, detect "in" conversion
+    ↓
+evaluator: UnitValue(30, "m") + UnitValue(100, "ft")
+    ↓
+UnitValue arithmetic: auto-convert to shared unit
+    ↓
+Output: UnitValue(60.48, "m")
+```
+
+### Direct AST Evaluation
+
+```
+Input: "5 + 3"  (valid Python syntax)
+    ↓
+evaluator.evaluate(): AST parse → safe evaluation
+    ↓
+Output: 8
+```
+
+### MCP Tool Execution
+
+```
+Input: JSON-RPC tools/call with tool name + args
+    ↓
+server.py: route to tools.py handler
+    ↓
+tools.py: validate args, call exact/ function
+    ↓
+exact/: deterministic text analysis
+    ↓
+Output: JSON result
+```
+
+---
+
+## Entry Points
+
+| Entry Point | How | Description |
+|-------------|-----|-------------|
+| CLI (package) | `python -m eggcalc "expr"` | `normalize.main()` → NL pipeline → evaluate |
+| CLI (pip) | `calc "expr"` | Same (via pyproject.toml scripts) |
+| CLI (single-file) | `python3 eggcalc.py "expr"` | Assembled single file |
+| API (direct) | `evaluate("5+3")` | Direct AST evaluation |
+| API (raw) | `evaluate_raw("five plus three")` | Full NL pipeline |
+| API (cached) | `evaluate_cached("5+3")` | With LRU cache |
+| API (async) | `await evaluate_async("5+3")` | Async wrapper |
+| API (timeout) | `evaluate_with_timeout("5+3", timeout=5.0)` | Child process with timeout |
+| API (webapp) | `EggCalcApp().calculate("5+3")` | Thread-safe with isolation |
+| MCP server | `python eggcalc.py --mcp` | stdio JSON-RPC server |
+
+---
+
+## Module Dependencies
+
+```
+__main__.py
+    └── normalize.main()
+
+normalize.py
+    ├── evaluator.evaluate()
+    ├── units.UnitValue, UNIT_ALIASES, is_unit, UNIT_CATEGORIES
+    └── exact/ (inspect_text, count_chars, regex_test, shell_split, etc.)
+
+evaluator.py
+    └── units (UnitValue, UNIT_ALIASES, convert_temperature, etc.)
+
+units.py
+    └── (no eggcalc dependencies — leaf module)
+
+exact/
+    ├── primitives.py (foundation — no dependencies on other exact modules)
+    ├── unicode_tools.py → primitives
+    ├── measure.py → primitives
+    ├── diff.py → primitives
+    ├── validate.py → primitives
+    ├── synthesis.py → all exact modules (high-level orchestrator)
+    ├── confusables.py (auto-generated data only — ~176KB)
+    ├── config.py, shell.py, path_tools.py, markdown.py, patch.py
+    ├── transform.py, position.py, identifier.py, identifier_inspect.py
+    ├── glob.py, unicode_policy.py, cargo.py, version.py
+    └── inspect_prompt.py, manifests.py, llm_hygiene.py, repo_audit.py
+
+mcp/
+    ├── schemas.py (no dependencies — tool definitions)
+    ├── tools.py → exact/, evaluator
+    └── server.py → tools, schemas
+```
+
+---
+
+## Key Data Structures
+
+| Structure | Module | Purpose |
+|-----------|--------|---------|
+| `NUMBER_WORDS` | normalize.py | Maps number values to word variants (`"one"` → `"1"`) |
+| `OPERATOR_CONVERSIONS` | normalize.py | Maps operator words to symbols (`"plus"` → `"+"`) |
+| `FUNCTION_MAPPINGS` | normalize.py | Maps function name aliases (`"square root"` → `"sqrt"`) |
+| `CONSTANT_WORDS` | normalize.py | Maps physical constant names (`"avogadro"` → `"na"`) |
+| `NORMALIZE` / `PATTERNS` | normalize.py | Mutable config dicts rebuilt on config change |
+| `UNIT_BASE` | units.py | Base units with conversion factors to canonical unit |
+| `UNIT_ALIASES` | units.py | Maps all unit variants to canonical forms (~500 entries) |
+| `UNIT_CATEGORIES` | units.py | Maps units to categories (length, mass, time, etc.) |
+| `UNIT_CONVERSIONS` | units.py | Pre-computed pairwise conversion factors |
+| `TEMPERATURE_CONVERSIONS` | units.py | Offset-based temperature conversion rules |
+| `UnitValue` | units.py | Numeric value with optional units and full arithmetic |
+| `Memory` | evaluator.py | Thread-safe calculator memory registers (M, M+, MR, MC) |
+| `Evaluator` | evaluator.py | `ast.NodeVisitor` for safe expression evaluation |
+| `EggCalcApp` | evaluator.py | Thread-safe wrapper with LRU cache and async support |
+| `TOOL_SCHEMAS` | mcp/schemas.py | MCP tool definitions with JSON schemas (77 tools) |
+| `TOOL_PROFILES` | mcp/schemas.py | 11 tool profiles (full, default, codegg_*, human_math) |
 
 ---
 
 ## Build System
 
-### [build_single.py](../build_single.py)
+### build_single.py
 
-Combines all modules into a single `eggcalc.py` file (~394KB) for portability.
+Assembles all modules into a single `eggcalc.py` file (~394KB) for portability.
 
-**Module Groups:**
-- `MODULES_CALC`: units, evaluator, normalize (core calculator)
-- `MODULES_EXACT`: 25 exact/ submodules (text analysis tools)
-- `MODULES_MCP`: schemas, tools, server (MCP protocol)
+| Module Group | Modules |
+|-------------|---------|
+| `MODULES_CALC` | units, evaluator, normalize |
+| `MODULES_EXACT` | 25 exact/ submodules |
+| `MODULES_MCP` | schemas, tools, server |
 
-**Output:** Self-contained executable with CLI and MCP modes.
+Strips docstrings, relative imports, `__main__` blocks, and `__future__` imports. Replaces relative imports with global assignments.
 
-### [install.py](../install.py)
+### install.py
 
 Builds and installs `eggcalc.py` to `~/.local/bin/calc`.
 
@@ -176,205 +304,68 @@ python install.py --update      # Update
 python install.py --uninstall   # Remove
 ```
 
----
+### Development Commands
 
-## Data Flow
-
-### Natural Language Evaluation (`run()`)
-
-```
-Input: "five plus three"
-    ↓
-normalize(): Remove filler, replace words with symbols
-    ↓
-normalize_expression(): Build "5+3" Python syntax
-    ↓
-evaluator.evaluate(): AST parse → safe evaluation
-    ↓
-Output: 8
-```
-
-### Unit Conversion (`run()`)
-
-```
-Input: "30m + 100ft in meters"
-    ↓
-normalize(): Parse units, recognize "in" conversion
-    ↓
-evaluator: UnitValue(30, "m") + UnitValue(100, "ft")
-    ↓
-UnitValue.convert_to(): Apply conversion factor
-    ↓
-Output: UnitValue(60.48, "m")
-```
-
-Spacing around unit symbols is normalized here as well, so `30 km / h in mph` and `2 ft / s in m / s` follow the same pipeline.
-
-### Direct AST Evaluation (`evaluate()`)
-
-```
-Input: "5 + 3" (valid Python syntax)
-    ↓
-evaluator.evaluate(): AST parse → safe evaluation
-    ↓
-Output: 8
-```
-
----
-
-## Key Data Structures
-
-| Structure | Module | Purpose |
-|-----------|--------|---------|
-| `NUMBER_WORDS` | normalize.py | Maps number values to word variants ("one" → "1") |
-| `OPERATOR_CONVERSIONS` | normalize.py | Maps operator words to symbols ("plus" → "+") |
-| `FUNCTION_MAPPINGS` | normalize.py | Maps function name aliases ("square root" → "sqrt") |
-| `CONSTANT_WORDS` | normalize.py | Maps physical constant names ("avogadro" → "na") |
-| `UNIT_BASE` | units.py | Base units with conversion factors to canonical unit |
-| `UNIT_CONVERSIONS` | units.py | Pre-computed pairwise conversion factors |
-| `UNIT_ALIASES` | units.py | Maps all unit variants to canonical forms |
-| `UNIT_CATEGORIES` | units.py | Maps units to categories (length, mass, time, etc.) |
-| `UnitValue` | units.py | Numeric value with optional units and arithmetic |
-| `Memory` | evaluator.py | Calculator memory registers (M, M+, MR, MC) |
-| `Evaluator` | evaluator.py | AST visitor for safe expression evaluation |
-| `TOOL_SCHEMAS` | mcp/schemas.py | MCP tool definitions with JSON schemas |
-
----
-
-## Module Dependencies
-
-```
-eggcalc/__main__.py
-    └── normalize.main()
-
-eggcalc/normalize.py
-    ├── evaluator.evaluate()
-    ├── units.UnitValue, UNIT_ALIASES, is_unit
-    └── exact/ (inspect_text, count_chars, regex_test, etc.)
-
-eggcalc/evaluator.py
-    └── units (UnitValue, UNIT_ALIASES, convert_temperature)
-
-eggcalc/units.py
-    (no dependencies on other eggcalc modules)
-
-eggcalc/exact/
-    ├── primitives.py (foundation - no dependencies)
-    ├── unicode_tools.py → primitives
-    ├── measure.py → primitives
-    ├── diff.py → primitives
-    ├── validate.py → primitives
-    ├── synthesis.py → all exact modules
-    ├── confusables.py (data only - auto-generated)
-    ├── config.py
-    ├── shell.py
-    ├── path_tools.py
-    ├── markdown.py
-    ├── patch.py
-    ├── transform.py
-    ├── position.py
-    ├── identifier.py
-    ├── identifier_inspect.py
-    ├── glob.py
-    ├── unicode_policy.py
-    ├── cargo.py
-    ├── version.py
-    └── inspect_prompt.py
-
-eggcalc/mcp/
-    ├── schemas.py (no dependencies)
-    ├── tools.py → exact/, evaluator
-    └── server.py → tools, schemas
+```bash
+make test          # Run tests
+make lint          # ruff check
+make format        # black
+make typecheck     # mypy
+make check         # All checks (lint + format + typecheck + docs-check + test)
+make build         # Build distribution
+make release-check # All checks + build + smoke tests
 ```
 
 ---
 
 ## Deep Dive Index
 
-Each module has a dedicated architecture document for focused review:
+Each component has a dedicated architecture document. Use this index to navigate to focused reviews.
 
-### Core Calculator Modules
+### Core Calculator
 
-| Module | Document | Purpose |
-|--------|----------|---------|
-| normalize.py | [normalize.md](normalize.md) | NL → Python expression pipeline |
-| evaluator.py | [evaluator.md](evaluator.md) | Safe AST-based evaluation |
-| units.py | [units.md](units.md) | Unit definitions & conversions |
-| CLI | [cli.md](cli.md) | Command-line interface |
+| Component | Document | What It Covers |
+|-----------|----------|----------------|
+| normalize.py | [normalize.md](normalize.md) | NL tokenization pipeline, number words, unit parsing, CLI main |
+| evaluator.py | [evaluator.md](evaluator.md) | AST parsing, math functions, constants, EggCalcApp, memory, variables |
+| units.py | [units.md](units.md) | Unit definitions, conversions, UnitValue class, temperature offset math |
+| CLI | [cli.md](cli.md) | Entry points, argument parsing, REPL, text subcommands |
+| Public API | [api.md](api.md) | Exported symbols, function signatures, usage patterns |
 
-### exact/ — Unicode Text Primitives
+### exact/ — Unicode Text Analysis Package
 
-The `exact/` package provides low-level deterministic text analysis tools.
-
-| Module | Document | Purpose |
-|--------|----------|---------|
-| primitives.py | [primitives.md](primitives.md) | UTF-8, codepoints, normalization, invisibles |
-| unicode_tools.py | [unicode_tools.md](unicode_tools.md) | Script detection, confusables |
-| measure.py | [measure.md](measure.md) | Text metrics (words, lines, categories) |
-| diff.py | [diff.md](diff.md) | String diffing algorithms |
-| validate.py | [validate.md](validate.md) | JSON/bracket/regex validation |
-| synthesis.py | [synthesis.md](synthesis.md) | Higher-level text analysis |
-| confusables.py | [confusables.md](confusables.md) | Homoglyph identification (auto-generated data) |
-| cargo.py | — | Cargo.toml inspection |
-| version.py | — | Semver/cargo constraint checking |
-| inspect_prompt.py | — | Prompt injection detection |
-| exact (overview) | [exact.md](exact.md) | Package-level overview |
+| Component | Document | What It Covers |
+|-----------|----------|----------------|
+| exact/ (overview) | [exact.md](exact.md) | Package-level architecture, module relationships |
+| primitives.py | [primitives.md](primitives.md) | UTF-8 bytes, codepoints, Unicode normalization, invisible chars |
+| unicode_tools.py | [unicode_tools.md](unicode_tools.md) | Script detection, confusable identification, mixed scripts |
+| confusables.py | [confusables.md](confusables.md) | Auto-generated homoglyph data (~176KB) |
+| measure.py | [measure.md](measure.md) | Text metrics: line, word, character category counts |
+| diff.py | [diff.md](diff.md) | String diffing: first diff, common prefix/suffix, Levenshtein distance |
+| validate.py | [validate.md](validate.md) | Bracket checking, JSON/TOML validation, regex safety |
+| synthesis.py | [synthesis.md](synthesis.md) | Higher-level text analysis, inspection, comparison |
 
 ### mcp/ — Model Context Protocol Server
 
-| Module | Document | Purpose |
-|--------|----------|---------|
-| schemas.py | [mcp.md](mcp.md#schemaspy) | Tool JSON schemas |
-| tools.py | [mcp.md](mcp.md#toolspy) | Tool implementations |
-| server.py | [mcp.md](mcp.md#serverpy) | stdio-based JSON-RPC server |
+| Component | Document | What It Covers |
+|-----------|----------|----------------|
+| mcp/ (overview) | [mcp.md](mcp.md) | Server architecture, tool schemas, profiles, JSON-RPC protocol |
+| schemas.py | [mcp.md](mcp.md#schemaspy) | 77 tool definitions, 11 profiles, schema detail levels |
+| tools.py | [mcp.md](mcp.md#toolspy) | Tool implementations, error handling, input validation |
+| server.py | [mcp.md](mcp.md#serverpy) | stdio JSON-RPC, ThreadPoolExecutor, profile selection |
 
 ### Supporting Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [api.md](api.md) | Public API reference |
-| [review_plan.md](review_plan.md) | Architecture review plan (archived — completed 2026-05-29) |
+| Document | What It Covers |
+|----------|----------------|
+| [review_plan.md](review_plan.md) | Architecture review plan (completed 2026-05-29) |
 
 ---
 
-## API Quick Reference
+## Constraints
 
-### CLI Usage
-
-```bash
-# Natural language math
-python -m eggcalc "five plus three"           # → 8
-python -m eggcalc "thirty meters plus 100 feet" # → 60.48 m
-
-# Unit conversion
-python -m eggcalc "100F to C"                  # → 37.777... C
-python -m eggcalc "1km in miles"               # → 0.621... mi
-
-# Interactive REPL
-python -m eggcalc -i
-
-# Text inspection
-python -m eggcalc inspect "paypal"             # Check for confusables
-python -m eggcalc count "hello world"
-```
-
-### Library Usage
-
-```python
-from eggcalc import evaluate, run, UnitValue, NORMALIZE, PATTERNS
-
-# Direct math (valid Python syntax)
-evaluate("5 + 3")  # → 8
-
-# Natural language (requires run())
-run("five plus three", NORMALIZE, PATTERNS)  # → 8
-
-# Unit conversion
-run("30m + 100ft", NORMALIZE, PATTERNS)  # → UnitValue(60.48, "m")
-```
-
-### MCP Server
-
-```bash
-python eggcalc.py --mcp
-```
+- **Standard library only** — no pip packages in `eggcalc/`. Imports limited to: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`
+- **`build_single.py` compatibility** — all runtime code must live in one of the four core modules or the `exact/` and `mcp/` packages
+- **TypedDict over NamedTuple** — for structured return types
+- **CLI output is result-only** — no echo of input, no arrows, no extra characters
+- **Python ≥3.10** — per `pyproject.toml`
