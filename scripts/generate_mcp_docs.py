@@ -118,7 +118,11 @@ def _tool_description(name: str) -> str:
         if len(combined) <= MAX_LEN:
             return combined
         # See if first sentence + start of second fits
-        combined = sentences[0] + " " + _truncate_at_word_boundary(sentences[1], MAX_LEN - len(sentences[0]) - 1)
+        combined = (
+            sentences[0]
+            + " "
+            + _truncate_at_word_boundary(sentences[1], MAX_LEN - len(sentences[0]) - 1)
+        )
         if len(combined) <= MAX_LEN:
             return combined
     # Nothing fits cleanly — truncate the whole description

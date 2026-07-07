@@ -8,8 +8,6 @@ Supports Linux, macOS, and Windows.
 
 import argparse
 import os
-import shutil
-import stat
 import subprocess
 import sys
 
@@ -51,7 +49,7 @@ def create_executable(source_path: str, install_dir: str) -> str:
     os.makedirs(install_dir, exist_ok=True)
     dest_path = os.path.join(install_dir, "calc")
 
-    with open(source_path, "r") as f:
+    with open(source_path) as f:
         content = f.read()
 
     # Write to a temp file first, then rename atomically
@@ -104,7 +102,7 @@ def add_to_path(install_dir: str) -> bool:
         target_file = zshrc if os.path.exists(zshrc) else shell_profile
 
         if os.path.exists(target_file):
-            with open(target_file, "r") as f:
+            with open(target_file) as f:
                 content = f.read()
 
             export_line = f'export PATH="{install_dir}:$PATH"'
@@ -139,7 +137,7 @@ def remove_from_path(install_dir: str) -> bool:
         print("No shell config found.")
         return False
 
-    with open(target_file, "r") as f:
+    with open(target_file) as f:
         content = f.read()
 
     export_line = f'export PATH="{install_dir}:$PATH"'
@@ -224,7 +222,7 @@ def install_calc(
                 if os.path.exists(os.path.expanduser("~/.zshrc"))
                 else "bash"
             )
-            print(f"\nSpawning shell with calc available...")
+            print("\nSpawning shell with calc available...")
             subprocess.run(
                 [shell_bin, "-i"],
                 env={**os.environ, "PATH": new_path},
@@ -249,7 +247,7 @@ def _is_pip_entry_point(path: str) -> bool:
     if not path:
         return False
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             head = f.read(512)
     except OSError:
         return False
@@ -284,7 +282,7 @@ def update_calc(install_dir: str) -> bool:
 
     calc_path = get_calc_path(install_dir)
 
-    with open(single_file, "r") as f:
+    with open(single_file) as f:
         new_content = f.read()
 
     import tempfile

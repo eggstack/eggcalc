@@ -12,7 +12,6 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-
 DEFAULT_URL = "https://www.unicode.org/Public/security/latest/confusables.txt"
 OUTPUT_FILE = Path(__file__).parent.parent / "eggcalc" / "exact" / "confusables.py"
 COMMENTS_AND_HEADER_LINES = 35  # Approximate header lines to skip
@@ -212,6 +211,7 @@ def main() -> None:
 
     # Verify by importing
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from eggcalc.exact import confusables as conf_module
 

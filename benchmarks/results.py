@@ -11,6 +11,7 @@ from typing import TypedDict
 
 class BenchmarkResult(TypedDict):
     """Result of a benchmark run."""
+
     mean_seconds: float
     median_seconds: float
     stddev_seconds: float

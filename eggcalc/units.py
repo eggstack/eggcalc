@@ -213,8 +213,18 @@ class UnitValue:
                     result = self.value // other.value
                     unit = None
                 else:
-                    result = self.value // other.value
-                    unit = _simplify_unit_string(f"{self.unit}//{other.unit}")
+                    # Different but compatible units (e.g., m vs cm): scale
+                    # left up to right's unit to avoid float-precision loss.
+                    # 1 m // 1 cm becomes 100 cm // 1 cm = 100, not
+                    # 1 m // 0.01 m = 99.
+                    try:
+                        factor = get_conversion_factor(self.unit, other.unit)
+                    except (KeyError, ValueError):
+                        result = self.value // other.value
+                        unit = _simplify_unit_string(f"{self.unit}//{other.unit}")
+                    else:
+                        result = (self.value * factor) // other.value
+                        unit = None
             elif other.unit:
                 result = self.value // other.value
                 unit = _simplify_unit_string(f"1//{other.unit}")
@@ -247,8 +257,18 @@ class UnitValue:
                     result = self.value % other.value
                     unit = None
                 else:
-                    result = self.value % other.value
-                    unit = _simplify_unit_string(f"{self.unit}%{other.unit}")
+                    # Different but compatible units: scale left up to
+                    # right's unit to avoid float-precision loss.
+                    try:
+                        factor = get_conversion_factor(self.unit, other.unit)
+                    except (KeyError, ValueError):
+                        result = self.value % other.value
+                        unit = _simplify_unit_string(f"{self.unit}%{other.unit}")
+                    else:
+                        scaled = self.value * factor
+                        result = scaled % other.value
+                        # Remainder is in right.unit; express in right's unit.
+                        unit = other.unit
             elif other.unit:
                 result = self.value % other.value
                 unit = _simplify_unit_string(f"1%{other.unit}")

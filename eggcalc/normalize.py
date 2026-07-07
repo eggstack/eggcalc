@@ -136,7 +136,11 @@ OPERATOR_CONVERSIONS: dict[str, list[str]] = {
     ",": [],
     "&": ["bitand", "bit and"],
     "|": ["OR", "or", "bitor", "bit or"],
-    "^": ["XOR", "xor", "bitxor", "bit xor"],
+    # ``^`` is the symbol for exponentiation (matching docs/quickstart.md
+    # and docs/api.md). The natural-language words ``xor`` / ``bitxor`` /
+    # ``bit xor`` are rewritten into ``bitxor(...)`` function calls by
+    # ``_normalize_xor_word_to_bitxor_call`` before this mapping runs.
+    "^": [],
     "<<": ["left shift", "shift left", "lshift"],
     ">>": ["right shift", "shift right", "rshift"],
     "~": ["NOT", "not", "bitnot", "bit not"],
@@ -1470,6 +1474,77 @@ def _normalize_spaced_unit_caret_exponents(expression: str) -> str:
     )
 
 
+def _normalize_xor_word_to_bitxor_call(expression: str) -> str:
+    """Rewrite ``<left> xor <right>`` natural-language phrases as ``bitxor(<left>, <right>)``.
+
+    The symbol ``^`` now means exponentiation (matching docs/quickstart.md,
+    docs/api.md, etc.). Natural-language forms of bitwise XOR
+    (``xor`` / ``XOR`` / ``bitxor`` / ``bit xor``) must therefore be
+    rewritten as ``bitxor(...)`` function calls so that they keep their
+    bitwise-XOR meaning rather than being exponentiated.
+
+    Operands are extracted by walking the string and balancing
+    parentheses: everything to the left of the xor word up to the
+    previous top-level operator boundary becomes the left operand, and
+    everything to the right up to the next top-level operator boundary
+    (or end of string) becomes the right operand.
+    """
+    xor_re = re.compile(r"\b(?:xor|XOR|bitxor|bit\s+xor)\b", re.IGNORECASE)
+    # Operators / boundaries that terminate an operand at the top level.
+    _BOUNDARY_CHARS = set("+-*/%&|<>=!~,")
+
+    def _scan_left(start: int) -> int:
+        """Return the index where the left operand ends (exclusive)."""
+        i = start - 1
+        depth = 0
+        while i >= 0:
+            ch = expression[i]
+            if ch == ")":
+                depth += 1
+            elif ch == "(":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif depth == 0 and ch in _BOUNDARY_CHARS:
+                break
+            i -= 1
+        return i + 1
+
+    def _scan_right(start: int) -> int:
+        """Return the index where the right operand ends (exclusive)."""
+        i = start
+        depth = 0
+        n = len(expression)
+        while i < n:
+            ch = expression[i]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif depth == 0 and ch in _BOUNDARY_CHARS:
+                break
+            i += 1
+        return i
+
+    result: list[str] = []
+    last_end = 0
+    for m in xor_re.finditer(expression):
+        left_start = _scan_left(m.start())
+        right_end = _scan_right(m.end())
+        left = expression[left_start : m.start()].strip()
+        right = expression[m.end() : right_end].strip()
+        # Trim trailing whitespace (already handled by strip).
+        if not left or not right:
+            continue
+        result.append(expression[last_end:left_start])
+        result.append(f"bitxor({left},{right})")
+        last_end = right_end
+    result.append(expression[last_end:])
+    return "".join(result)
+
+
 # Module-level multi-word function name mappings (constant, no need to recreate each call)
 _MULTI_WORD_FUNCTIONS: dict[str, str] = {
     "square root": "sqrt",
@@ -1886,7 +1961,16 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     )
 
     expression = _normalize_postfix_unit_power_words(expression)
+    # Strip a leading "convert" keyword before the spelled-unit-conversion
+    # pass so phrases like "convert 100 meters to feet" become
+    # "convert(100*m,ft)" (rather than "convert convert(100*m,ft)") once
+    # the inner pattern matches and rewrites the tail.
+    expression = re.sub(r"^\s*convert\s+", "", expression, flags=re.IGNORECASE)
     expression = _normalize_spelled_unit_conversions(expression)
+    # Rewrite "xor" / "XOR" / "bitxor" / "bit xor" phrases into
+    # ``bitxor(...)`` function calls so they retain bitwise-XOR meaning
+    # now that ``^`` is the symbol for exponentiation.
+    expression = _normalize_xor_word_to_bitxor_call(expression)
 
     # Strip longer filler phrases before word-to-operator conversion so that
     # "the value of pi" → "pi" (not "value * pi" after "of" → "*").

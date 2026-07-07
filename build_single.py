@@ -14,8 +14,6 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import sys
-
 
 EGGCALC_DIR = os.path.join(os.path.dirname(__file__), "eggcalc")
 
@@ -84,7 +82,7 @@ import os
 def get_version() -> str:
     """Get version from __init__.py"""
     init_path = os.path.join(EGGCALC_DIR, "__init__.py")
-    with open(init_path, "r") as f:
+    with open(init_path) as f:
         for line in f:
             if line.startswith("__version__"):
                 import re as _re
@@ -105,7 +103,7 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     """
     module_path = os.path.join(EGGCALC_DIR, f"{module_name}.py")
 
-    with open(module_path, "r") as f:
+    with open(module_path) as f:
         lines = f.readlines()
 
     # Find where code starts (after docstring)

@@ -7,6 +7,7 @@ from typing import TypedDict
 
 class BenchmarkStats(TypedDict):
     """Statistics from a benchmark run."""
+
     mean_seconds: float
     median_seconds: float
     stddev_seconds: float
@@ -81,16 +82,14 @@ def benchmark_normalize(n: int = 10000, warmup: int = 100) -> BenchmarkStats:
     Returns:
         BenchmarkStats with timing results
     """
-    from eggcalc.normalize import normalize_expression, NORMALIZE, PATTERNS
+    from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
 
     # Warmup
     for _ in range(warmup):
         normalize_expression("five plus three", NORMALIZE, PATTERNS)
 
     # Benchmark
-    timer = timeit.Timer(
-        lambda: normalize_expression("five plus three", NORMALIZE, PATTERNS)
-    )
+    timer = timeit.Timer(lambda: normalize_expression("five plus three", NORMALIZE, PATTERNS))
     times = timer.repeat(repeat=10, number=n)
 
     times_seconds = [t / n for t in times]

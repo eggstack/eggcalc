@@ -187,6 +187,19 @@ _DIMENSIONLESS_REQUIRED_FUNCTIONS: frozenset[str] = frozenset(
     }
 )
 
+# Functions whose first argument is a variable name (string). The argument
+# is preserved as a raw string even if it collides with a constant or unit
+# name (e.g., setvar("pi", 5) should bind the variable "pi" rather than
+# replace math.pi). The visit_Call handler keeps these as plain strings
+# before the generic constant-resolution path would otherwise rewrite them.
+_STRING_NAME_FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "setvar",
+        "getvar",
+        "delvar",
+    }
+)
+
 # Historical note: some one-letter constant names (e.g., 'c', 'k', 'r') are
 # effectively shadowed by UNIT_ALIASES in visit_Name's lookup order, but
 # the set below is not used in any logic. It exists purely as documentation
@@ -1947,7 +1960,12 @@ class Evaluator(ast.NodeVisitor):
         ast.LShift: _bitlshift_safe,
         ast.RShift: _bitrshift_safe,
         ast.BitOr: (lambda a, b: a | b),
-        ast.BitXor: (lambda a, b: a ^ b),
+        # ``^`` is the documented symbol for exponentiation (matching
+        # most calculators and the docs in docs/quickstart.md and
+        # docs/api.md). Use the word forms ``xor`` / ``bitxor`` / etc.
+        # for bitwise XOR — the natural-language normalizer emits them
+        # as ``bitxor(...)`` function calls rather than ``^``.
+        ast.BitXor: _safe_pow,
         ast.BitAnd: (lambda a, b: a & b),
     }
 
@@ -2212,7 +2230,7 @@ class Evaluator(ast.NodeVisitor):
 
         result_unit = left_unit or right_unit
 
-        is_bitwise = op_class in (ast.BitAnd, ast.BitOr, ast.BitXor, ast.LShift, ast.RShift)
+        is_bitwise = op_class in (ast.BitAnd, ast.BitOr, ast.LShift, ast.RShift)
         if is_bitwise and (isinstance(left_val, float) or isinstance(right_val, float)):
             raise EvaluationError("Bitwise operations require integer operands, not floats")
 
@@ -2257,11 +2275,14 @@ class Evaluator(ast.NodeVisitor):
         # Power operator with a unit on the right is physically nonsensical
         # (e.g., 2 ** 5m). Reject explicitly rather than silently dropping the
         # right-hand unit, which would let nonsense like "32.0 m" pass.
-        if op_class is ast.Pow and isinstance(right, UnitValue) and right.unit:
+        # ``ast.BitXor`` also routes through power dispatch (``^`` is the
+        # documented exponent symbol) so the same unit guards apply.
+        is_pow_dispatch = op_class is ast.Pow or op_class is ast.BitXor
+        if is_pow_dispatch and isinstance(right, UnitValue) and right.unit:
             raise EvaluationError(f"Cannot raise a value to a power with units ('{right.unit}')")
 
         # Power operator: handle unit exponentiation (e.g., 5m ** 2 -> 25 m**2)
-        if op_class is ast.Pow and isinstance(left, UnitValue) and left.unit:
+        if is_pow_dispatch and isinstance(left, UnitValue) and left.unit:
             if isinstance(right, int):
                 if right == 0:
                     return result  # anything**0 is dimensionless
@@ -2305,11 +2326,30 @@ class Evaluator(ast.NodeVisitor):
 
         # Compound unit detection for floor division and modulo:
         # Same-unit -> dimensionless (e.g., 6m // 3m -> 2, 7m % 3m -> 1)
-        # Different units follow UnitValue semantics and form a compound unit.
+        # Compatible different-units scale to avoid precision loss (1 m // 1 cm -> 100, not 99).
         if op_class in (ast.FloorDiv, ast.Mod) and isinstance(left, UnitValue) and left.unit:
             if isinstance(right, UnitValue) and right.unit:
-                if left.unit == right.unit:
-                    return result  # dimensionless
+                aligned_left, aligned_right = _align_compatible_units(left, right)
+                if aligned_left.unit == aligned_right.unit:
+                    if left.unit == right.unit:
+                        if op_class is ast.FloorDiv:
+                            return aligned_left.value // aligned_right.value
+                        return aligned_left.value % aligned_right.value
+                    # Different but compatible units (e.g., m vs cm): scale
+                    # left up to right's unit to avoid float-precision loss.
+                    # 1 m // 1 cm becomes 100 cm // 1 cm = 100, not
+                    # 1 m // 0.01 m = 99 (precision loss).
+                    try:
+                        factor = self._get_conversion_factor(left.unit, right.unit)
+                    except EvaluationError:
+                        operator = "//" if op_class is ast.FloorDiv else "%"
+                        compound = _simplify_unit_string(f"{left.unit}{operator}{right.unit}")
+                        return UnitValue(result, compound)
+                    scaled_left = left.value * factor
+                    if op_class is ast.FloorDiv:
+                        return scaled_left // right.value
+                    # Remainder is in right.unit; preserve it as a length.
+                    return UnitValue(scaled_left % right.value, right.unit)
                 operator = "//" if op_class is ast.FloorDiv else "%"
                 compound = _simplify_unit_string(f"{left.unit}{operator}{right.unit}")
                 return UnitValue(result, compound)
@@ -2433,6 +2473,22 @@ class Evaluator(ast.NodeVisitor):
                 convert_args.append(result)
             try:
                 return self.FUNCTIONS[func_name](*convert_args)
+            except (TypeError, ValueError) as e:
+                raise EvaluationError(str(e)) from None
+
+        # Special handling for variable-management functions (setvar/getvar/delvar):
+        # the first argument is a variable name (string), which must remain a
+        # string even if it happens to collide with a constant or unit name
+        # (e.g., setvar("pi", 5) should bind "pi", not replace math.pi).
+        if func_name in _STRING_NAME_FUNCTIONS:
+            name_args: list[Any] = []
+            for i, arg in enumerate(node.args):
+                if i == 0 and isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    name_args.append(arg.value)
+                else:
+                    name_args.append(self.visit(arg))
+            try:
+                return self.FUNCTIONS[func_name](*name_args)
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 

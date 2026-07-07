@@ -172,13 +172,23 @@ class TestNFuncPatterns:
 
 
 # ---------------------------------------------------------------------------
-# Group C: ^ is XOR, not power
+# Group C: ^ is power; bitwise XOR uses NL words xor/bitxor/etc.
 # ---------------------------------------------------------------------------
 class TestXorVsPower:
-    """`^` is bitwise XOR; power must use `**` or NL phrase."""
+    """`^` is exponentiation; bitwise XOR uses NL words or ``bitxor()``."""
 
-    def test_caret_is_xor(self):
+    def test_caret_is_power(self):
         result, code, _out, _err = _run("5^3")
+        assert code == 0
+        assert _val(result) == 125  # 5 ** 3 = 125
+
+    def test_xor_word_is_bitwise(self):
+        result, code, _out, _err = _run("5 xor 3")
+        assert code == 0
+        assert _val(result) == 6  # 5 XOR 3 = 6
+
+    def test_bitxor_word_is_bitwise(self):
+        result, code, _out, _err = _run("5 bitxor 3")
         assert code == 0
         assert _val(result) == 6  # 5 XOR 3 = 6
 
