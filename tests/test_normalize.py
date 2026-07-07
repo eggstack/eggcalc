@@ -754,9 +754,10 @@ class TestUnitSpacingProbes:
         assert normalized == "5*m2/(100*cm2)"
         result, code, _out, _err = _run(expr)
         assert code == 0
-        assert isinstance(result, UnitValue)
-        assert result.value == pytest.approx(0.05)
-        assert result.unit == "m2/cm2"
+        # Both operands are area: the units cancel after scale conversion,
+        # leaving a dimensionless 5 m**2 / 0.01 m**2 = 500.
+        assert not isinstance(result, UnitValue)
+        assert result == pytest.approx(500.0)
 
     def test_same_digit_unit_division_spacing_cancels(self):
         normalized, code = normalize_expression("5m2 / 100m2", NORMALIZE, PATTERNS)

@@ -161,8 +161,9 @@ class UnitValue:
     def __mul__(self, other: Numeric) -> UnitValue:
         if isinstance(other, UnitValue):
             if self.unit and other.unit:
-                result = self.value * other.value
-                unit = _simplify_unit_string(f"{self.unit}*{other.unit}")
+                left, right = _align_compatible_units(self, other)
+                result = left.value * right.value
+                unit = _simplify_unit_string(f"{left.unit}*{right.unit}")
             else:
                 result = self.value * other.value
                 unit = self.unit or other.unit
@@ -180,12 +181,13 @@ class UnitValue:
             if other.value == 0:
                 raise ZeroDivisionError("Cannot divide UnitValue by zero")
             if self.unit and other.unit:
-                if self.unit == other.unit:
-                    result = self.value / other.value
+                left, right = _align_compatible_units(self, other)
+                if left.unit == right.unit:
+                    result = left.value / right.value
                     unit = None
                 else:
-                    result = self.value / other.value
-                    unit = _simplify_unit_string(f"{self.unit}/{other.unit}")
+                    result = left.value / right.value
+                    unit = _simplify_unit_string(f"{left.unit}/{right.unit}")
             elif other.unit:
                 # self is dimensionless, other has a unit -> reciprocal unit
                 result = self.value / other.value
@@ -289,13 +291,13 @@ class UnitValue:
                 # Anything to the 0th power is dimensionless.
                 if other == 0:
                     return UnitValue(result, None)
-                unit = _simplify_unit_string(f"{self.unit}**{other}") or f"{self.unit}**{other}"
+                unit = _pow_unit_string(self.unit, other) or f"{self.unit}**{other}"
             elif isinstance(other, float) and other.is_integer():
                 int_exp = int(other)
                 result = self.value**other
                 if int_exp == 0:
                     return UnitValue(result, None)
-                unit = _simplify_unit_string(f"{self.unit}**{int_exp}") or f"{self.unit}**{int_exp}"
+                unit = _pow_unit_string(self.unit, int_exp) or f"{self.unit}**{int_exp}"
             else:
                 raise ValueError(f"Cannot raise unit '{self.unit}' to non-integer power")
         else:
@@ -2055,6 +2057,45 @@ def _simplify_unit_string(unit: str | None) -> str | None:
     if sig is None:
         return unit
     return _signature_to_canonical_string(sig)
+
+
+def _align_compatible_units(left: UnitValue, right: UnitValue) -> tuple[UnitValue, UnitValue]:
+    """Convert two UnitValues to a shared unit when they share a category.
+
+    Returns a ``(left, right)`` pair with both values expressed in the
+    same unit (chosen to be ``left``'s unit). When the units are already
+    equal or belong to different categories, the pair is returned
+    unchanged.
+    """
+    if left.unit is None or right.unit is None:
+        return left, right
+    if left.unit == right.unit:
+        return left, right
+    lcat = get_unit_category(left.unit)
+    rcat = get_unit_category(right.unit)
+    if lcat is None or rcat is None or lcat != rcat:
+        return left, right
+    converted = right.convert_to(left.unit)
+    return left, UnitValue(converted.value, converted.unit)
+
+
+def _pow_unit_string(unit: str, exp: int) -> str | None:
+    """Raise a (possibly compound) unit string to an integer power.
+
+    Works on the parsed signature so that compound units like
+    ``"m/s"`` are exponentiated across the full expression
+    (``(m/s)**2`` -> ``"m**2/s**2"``) rather than only on the
+    trailing denominator (``"m/s**2"``). Returns ``None`` if the
+    result is fully dimensionless (so the caller can produce a
+    UnitValue with no unit), and ``None`` if ``unit`` cannot be
+    parsed as a compound form.
+    """
+    sig = _parse_compound_signature(unit)
+    if sig is None:
+        return None
+    num, den = sig
+    scaled = (tuple((b, e * exp) for b, e in num), tuple((b, e * exp) for b, e in den))
+    return _signature_to_canonical_string(scaled)
 
 
 def are_units_compatible(unit1: str | None, unit2: str | None) -> bool:

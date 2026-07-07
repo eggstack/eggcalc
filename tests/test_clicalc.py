@@ -1148,12 +1148,11 @@ class TestCompoundUnitDivision:
         assert abs(result.value - 50.0) < 1e-10
 
     def test_unit_division_by_unit(self):
-        """Test that UnitValue / UnitValue with different units creates compound."""
+        """Test that UnitValue / UnitValue with compatible units cancels to a number."""
         result = evaluate("(100*km) / (2*m)")
-        assert isinstance(result, UnitValue)
-        assert result.unit == "km/m"
-        # Division does NOT convert units (only add/sub do); result is 100/2 = 50 km/m
-        assert abs(result.value - 50.0) < 1e-10
+        # Both are length: convert and divide to a dimensionless 50000.
+        assert not isinstance(result, UnitValue)
+        assert abs(result - 50000.0) < 1e-10
 
 
 class TestCompoundUnitPipeline:
@@ -2291,12 +2290,27 @@ class TestProductionReviewBugfixes2026_07:
         assert exit_code != 0
 
     def test_evaluator_temperature_addition_works(self):
-        """1K + 1C should give 275.15 K (after offset conversion)."""
-        result, exit_code = run("1K + 1C", NORMALIZE, PATTERNS)
+        """Cross-scale temperature addition is rejected; same-unit addition still works."""
+        # Same-unit addition still works
+        result, exit_code = run("1C + 1C", NORMALIZE, PATTERNS)
         assert exit_code == 0
         assert isinstance(result, UnitValue)
-        assert abs(result.value - 275.15) < 1e-9
-        assert result.unit == "K"
+        assert abs(result.value - 2.0) < 1e-9
+        assert result.unit == "C"
+        # Cross-scale addition is rejected — adding absolute temperatures across
+        # scales (e.g. 1C + 1F) is physically meaningless.
+        result, exit_code = run("1C + 1F", NORMALIZE, PATTERNS)
+        assert exit_code != 0
+        # Subtraction across scales still gives a temperature delta at the
+        # evaluator level (the high-level run() rejects it via pre-existing
+        # normalize checks, so we exercise evaluate_raw() directly).
+        from eggcalc.evaluator import evaluate_raw
+
+        result = evaluate_raw("1C - 1F")
+        assert isinstance(result, UnitValue)
+        assert result.unit == "C"
+        # 1°C - 1°F: 1°F ≈ -17.222°C; 1°C - (-17.222°C) ≈ 18.222°C
+        assert abs(result.value - (1.0 - (-17.222222222222221))) < 1e-6
 
     # --- Units: simplification / cross-form ---
     def test_simplify_returns_none_for_fully_cancelled(self):

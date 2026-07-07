@@ -26,6 +26,8 @@ from .units import (
     UNIT_ALIASES,
     UNIT_CONVERSIONS,
     UnitValue,
+    _align_compatible_units,
+    _pow_unit_string,
     _simplify_unit_string,
     are_units_compatible,
     convert_temperature,
@@ -792,6 +794,10 @@ def _convert(value: Any, to_unit: str | Any) -> Any:
         # Handle case where to_unit is passed as a UnitValue (unit name like 'ft')
         if isinstance(to_unit, UnitValue):
             to_unit = to_unit.unit if to_unit.unit else str(to_unit.value)
+        if not isinstance(to_unit, str):
+            raise EvaluationError(
+                f"Invalid target unit for convert(): expected a unit string, got {type(to_unit).__name__} ({to_unit!r})"
+            )
 
         if isinstance(value, UnitValue):
             # Check for temperature conversions (special handling needed)
@@ -806,7 +812,7 @@ def _convert(value: Any, to_unit: str | Any) -> Any:
             return UnitValue(float(value), None).convert_to(to_unit)
         except ValueError as e:
             raise EvaluationError(str(e)) from None
-    except (TypeError, ValueError) as e:
+    except (TypeError, ValueError, AttributeError) as e:
         if isinstance(e, EvaluationError):
             raise
         raise EvaluationError(str(e)) from None
@@ -2158,6 +2164,17 @@ class Evaluator(ast.NodeVisitor):
             left_cat = get_unit_category(left_unit)
             right_cat = get_unit_category(right_unit)
             if left_cat == "temperature" and right_cat == "temperature":
+                # Cross-scale addition of absolute temperatures (e.g. 10*C + 10*F)
+                # is physically meaningless: the offset shifts the operand and yields
+                # a plausible-looking but invalid temperature value. Subtraction is
+                # permitted as a temperature delta.
+                if op_class is ast.Add:
+                    raise EvaluationError(
+                        f"Cannot add absolute temperatures across scales: "
+                        f"'{left_unit}' and '{right_unit}'. "
+                        f"Convert one operand to the other scale first (e.g. via convert()), "
+                        f"or subtract to get a temperature delta."
+                    )
                 try:
                     right_val = convert_temperature(cast(float, right_val), right_unit, left_unit)
                     right_unit = left_unit
@@ -2235,17 +2252,13 @@ class Evaluator(ast.NodeVisitor):
             if isinstance(right, int):
                 if right == 0:
                     return result  # anything**0 is dimensionless
-                simplified = (
-                    _simplify_unit_string(f"{left.unit}**{right}") or f"{left.unit}**{right}"
-                )
+                simplified = _pow_unit_string(left.unit, right) or f"{left.unit}**{right}"
                 return UnitValue(result, simplified)
             if isinstance(right, float) and right.is_integer():
-                if int(right) == 0:
+                int_exp = int(right)
+                if int_exp == 0:
                     return result
-                simplified = (
-                    _simplify_unit_string(f"{left.unit}**{int(right)}")
-                    or f"{left.unit}**{int(right)}"
-                )
+                simplified = _pow_unit_string(left.unit, int_exp) or f"{left.unit}**{int_exp}"
                 return UnitValue(result, simplified)
             # Non-integer exponent on a unit is physically nonsensical
             raise EvaluationError(f"Cannot raise unit '{left.unit}' to non-integer power")
@@ -2257,10 +2270,11 @@ class Evaluator(ast.NodeVisitor):
         # 3. number / UnitValue with a unit -> "1/right_unit" (e.g., 5 / 2s -> 2.5 1/s)
         if op_class is ast.Div and isinstance(right, UnitValue) and right.unit:
             if isinstance(left, UnitValue) and left.unit:
-                if left.unit == right.unit:
-                    return left_val / right_val
-                compound = _simplify_unit_string(f"{left.unit}/{right.unit}")
-                return UnitValue(left_val / right_val, compound)
+                aligned_left, aligned_right = _align_compatible_units(left, right)
+                if aligned_left.unit == aligned_right.unit:
+                    return aligned_left.value / aligned_right.value
+                compound = _simplify_unit_string(f"{aligned_left.unit}/{aligned_right.unit}")
+                return UnitValue(aligned_left.value / aligned_right.value, compound)
             if not isinstance(left, UnitValue) and right_unit_name is None:
                 compound = _simplify_unit_string(f"1/{right.unit}")
                 if compound is None:
@@ -2298,8 +2312,9 @@ class Evaluator(ast.NodeVisitor):
         # UnitValue * number whose AST name is a unit -> "left_unit*name"
         if op_class is ast.Mult and isinstance(left, UnitValue) and left.unit:
             if isinstance(right, UnitValue) and right.unit:
-                compound = _simplify_unit_string(f"{left.unit}*{right.unit}")
-                return UnitValue(left_val * right_val, compound)
+                aligned_left, aligned_right = _align_compatible_units(left, right)
+                compound = _simplify_unit_string(f"{aligned_left.unit}*{aligned_right.unit}")
+                return UnitValue(aligned_left.value * aligned_right.value, compound)
             if not isinstance(right, UnitValue) and right_unit_name:
                 compound = _simplify_unit_string(f"{left.unit}*{right_unit_name}")
                 return UnitValue(left_val * right_val, compound)
