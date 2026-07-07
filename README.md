@@ -127,6 +127,8 @@ eggcalc uses AST-based parsing (no `eval()`) with built-in DoS protection:
 | `MAX_EXPONENT` | 10,000 |
 | `MAX_FACTORIAL` | 1,000 |
 
+The MCP server adds additional resource bounds: request/output byte limits, per-tool timeouts, bounded thread pools, and pre-bounded inputs for all 77 tools. See [docs/mcp.md](docs/mcp.md#resource-limits) and [docs/mcp_resource_limits.md](docs/mcp_resource_limits.md) for details.
+
 `eggcalc_config.py` is Python code loaded from the current working directory — only run eggcalc in directories you trust. Disable config loading with `EGGCALC_NO_CONFIG=1`.
 
 ## License

@@ -216,6 +216,7 @@ MAX_MATCHES_REGEX = 100
 MAX_TEXT_LENGTH_REGEX = 100_000
 REGEX_TIMEOUT_SECONDS = 5
 MAX_CONCURRENT_SPAWNED = 4
+MAX_PAIRWISE_ITEMS: int = 1000
 
 # Module-level semaphore that caps how many worker processes can be in flight
 # at once. multiprocessing.spawn is ~150-300 ms per call, and unbounded
@@ -2142,6 +2143,14 @@ def list_compare(
             tool="list_compare",
         )
 
+    if include_near_matches and (len(a) > MAX_PAIRWISE_ITEMS or len(b) > MAX_PAIRWISE_ITEMS):
+        return _error_response(
+            "input_too_large",
+            f"Pairwise near-match check limited to {MAX_PAIRWISE_ITEMS} items per list",
+            [f"When include_near_matches=true, maximum is {MAX_PAIRWISE_ITEMS} items per list"],
+            tool="list_compare",
+        )
+
     # Validate all elements are strings
     non_str_a = [i for i, item in enumerate(a) if not isinstance(item, str)]
     non_str_b = [i for i, item in enumerate(b) if not isinstance(item, str)]
@@ -3266,6 +3275,14 @@ def identifier_inspect_mcp(
             "input_too_large",
             f"Number of identifiers {len(identifiers)} exceeds MAX_LIST_ITEMS {MAX_LIST_ITEMS}",
             [f"Maximum {MAX_LIST_ITEMS} identifiers allowed"],
+            tool="identifier_inspect",
+        )
+
+    if check_confusables and len(identifiers) > MAX_PAIRWISE_ITEMS:
+        return _error_response(
+            "input_too_large",
+            f"Pairwise confusable check limited to {MAX_PAIRWISE_ITEMS} identifiers, got {len(identifiers)}",
+            [f"When check_confusables=true, maximum is {MAX_PAIRWISE_ITEMS} identifiers"],
             tool="identifier_inspect",
         )
 
@@ -4578,6 +4595,19 @@ def identifier_table_inspect_mcp(
             "input_too_large",
             f"Number of identifiers {len(identifiers)} exceeds MAX_LIST_ITEMS {MAX_LIST_ITEMS}",
             [f"Maximum {MAX_LIST_ITEMS} identifiers allowed"],
+            tool="identifier_table_inspect",
+        )
+
+    active_checks_set = (
+        set(checks)
+        if checks is not None
+        else {"casefold", "normalization", "confusable", "style", "reserved", "mixed_style"}
+    )
+    if "confusable" in active_checks_set and len(identifiers) > MAX_PAIRWISE_ITEMS:
+        return _error_response(
+            "input_too_large",
+            f"Pairwise confusable check limited to {MAX_PAIRWISE_ITEMS} identifiers, got {len(identifiers)}",
+            [f"When confusable check is active, maximum is {MAX_PAIRWISE_ITEMS} identifiers"],
             tool="identifier_table_inspect",
         )
 

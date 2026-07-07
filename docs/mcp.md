@@ -2345,6 +2345,29 @@ Composite JSON comparison with shape analysis. Compare two JSON documents semant
 
 ---
 
+## Resource Limits
+
+Every MCP tool has explicit input and output bounds. The server enforces:
+
+- **Request byte limit**: `MAX_REQUEST_BYTES` (default 1 MB) — rejects oversized JSON-RPC requests
+- **Output byte limit**: `MAX_OUTPUT_BYTES` (default 1 MB) — truncates oversized tool responses
+- **Per-tool timeout**: `MAX_TOOL_TIMEOUT_SECONDS` (default 30s) — cancels long-running tools
+- **Worker count**: `MAX_TOOL_WORKERS` (default 16) — bounded thread pool
+- **Rate limit**: `MAX_REQUESTS_PER_SECOND` (default 10) — token-bucket rate limiter
+- **Spawned-process limit**: `MAX_CONCURRENT_SPAWNED` (4) — regex/math tools use subprocess isolation
+- **Pairwise limit**: `MAX_PAIRWISE_ITEMS` (1,000) — caps O(N²) work in `identifier_inspect`, `identifier_table_inspect`, and `list_compare` (near-match mode)
+
+Tool-level constants:
+
+- `MAX_TEXT_LENGTH` = 100,000 (string inputs)
+- `MAX_EXPRESSION_LENGTH` = 10,000 (math expressions)
+- `MAX_LIST_ITEMS` = 10,000 (list inputs)
+- Regex: `MAX_PATTERN_LENGTH_REGEX` = 1,000, `MAX_REGEX_SAMPLES` = 100, `MAX_MATCHES_REGEX` = 100, `REGEX_TIMEOUT_SECONDS` = 5
+
+Already-running Python threads cannot be force-killed, so tool inputs are pre-bounded at the handler level. Pathological inputs return structured MCP errors (`input_too_large`, `timeout`, `internal_error`) rather than unbounded results.
+
+For the complete per-tool audit, see [mcp_resource_limits.md](mcp_resource_limits.md).
+
 ## Security Considerations
 
 The MCP server is designed for AI agent use with these security properties:
@@ -2367,6 +2390,7 @@ The MCP server is designed for AI agent use with these security properties:
 ## See Also
 
 - [Exact Module](exact.md) - Underlying text processing functions
+- [Resource Limits](mcp_resource_limits.md) - Per-tool resource bounds audit
 - [Security](security.md) - Security best practices
 - [CLI](cli.md) - Command-line text tools (`calc inspect`, `calc count`, `calc regex`)
 - [Agent Recipes](agent-recipes.md) - Suggested workflows for common tasks

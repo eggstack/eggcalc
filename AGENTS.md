@@ -107,9 +107,11 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - 77 tools across 18 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo).
 - Tool names unified via `TOOL_SCHEMAS` in `schemas.py` and `server.py`.
 - `MAX_TEXT_LENGTH` enforced on `math_eval`.
+- `MAX_PAIRWISE_ITEMS` (1,000) caps O(N²) work in `identifier_inspect`, `identifier_table_inspect`, and `list_compare` (near-match mode).
 - Case-insensitive tool matching with suggestions for unknown tools.
 - `mcp_main` is defined in `server.py:1277`.
 - 11 tool profiles: `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
+- Resource audit: `docs/mcp_resource_limits.md` covers all 77 tools.
 
 ## Architecture Docs
 
