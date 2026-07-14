@@ -430,6 +430,7 @@ class TestCargoTomlInspectWorkspaceDeps:
         assert serde.get("version") == "1.0"
 
 
+@_needs_tomllib
 class TestCargoTomlInspectInvalid:
     """Tests for invalid TOML input."""
 

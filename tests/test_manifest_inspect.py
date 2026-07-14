@@ -274,6 +274,7 @@ version = "8.1.7"
 class TestManifestMCPWrappers:
     """Verify MCP wrappers return proper success envelopes."""
 
+    @_needs_tomllib
     def test_pyproject_inspect_mcp(self):
         from eggcalc.mcp.tools import pyproject_inspect_mcp
 
