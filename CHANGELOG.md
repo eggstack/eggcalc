@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2026-07-14
+
+### Fixed
+- Trailing comma detection made unconditional in llm_json_output_check
+- Skip 3.10-only test failures and fix mypy type errors
+- Skip additional 3.10-only tests that were missed
+
 ## [1.1.4] - 2026-06-30
 
 ### Fixed
