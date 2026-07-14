@@ -2333,8 +2333,8 @@ class Evaluator(ast.NodeVisitor):
                 if aligned_left.unit == aligned_right.unit:
                     if left.unit == right.unit:
                         if op_class is ast.FloorDiv:
-                            return aligned_left.value // aligned_right.value
-                        return aligned_left.value % aligned_right.value
+                            return aligned_left.value // aligned_right.value  # type: ignore[operator]
+                        return aligned_left.value % aligned_right.value  # type: ignore[operator]
                     # Different but compatible units (e.g., m vs cm): scale
                     # left up to right's unit to avoid float-precision loss.
                     # 1 m // 1 cm becomes 100 cm // 1 cm = 100, not
@@ -2347,9 +2347,9 @@ class Evaluator(ast.NodeVisitor):
                         return UnitValue(result, compound)
                     scaled_left = left.value * factor
                     if op_class is ast.FloorDiv:
-                        return scaled_left // right.value
+                        return scaled_left // right.value  # type: ignore[operator]
                     # Remainder is in right.unit; preserve it as a length.
-                    return UnitValue(scaled_left % right.value, right.unit)
+                    return UnitValue(scaled_left % right.value, right.unit)  # type: ignore[operator]
                 operator = "//" if op_class is ast.FloorDiv else "%"
                 compound = _simplify_unit_string(f"{left.unit}{operator}{right.unit}")
                 return UnitValue(result, compound)

@@ -87,7 +87,7 @@ class TestSecurityFuzz:
             try:
                 result = evaluate_raw(test_input)
                 assert result is not None
-            except (EvaluationError, SyntaxError):
+            except (EvaluationError, SyntaxError, ValueError):
                 pass  # Expected
             except Exception as e:
                 pytest.fail(

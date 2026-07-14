@@ -11,12 +11,20 @@ Tests for:
 - Invalid TOML input
 """
 
+import sys
+
+import pytest
+
 from eggcalc.exact.cargo import (
     _detect_duplicates,
     _normalize_ident,
     cargo_toml_inspect,
 )
 from eggcalc.mcp.tools import cargo_toml_inspect_mcp
+
+_needs_tomllib = pytest.mark.skipif(
+    sys.version_info < (3, 11), reason="tomllib requires Python 3.11+"
+)
 
 BASIC_CARGO_TOML = """\
 [package]
@@ -187,6 +195,7 @@ class TestDetectDuplicates:
         assert result == ["Serde", "serde"]
 
 
+@_needs_tomllib
 class TestCargoTomlInspectBasic:
     """Tests for basic package metadata extraction."""
 
@@ -223,6 +232,7 @@ class TestCargoTomlInspectBasic:
         assert result["findings"] == []
 
 
+@_needs_tomllib
 class TestCargoTomlInspectMinimal:
     """Tests for minimal Cargo.toml."""
 
@@ -239,6 +249,7 @@ class TestCargoTomlInspectMinimal:
         assert result["dependencies"]["dependencies"] == {}
 
 
+@_needs_tomllib
 class TestCargoTomlInspectWorkspace:
     """Tests for workspace section analysis."""
 
@@ -263,6 +274,7 @@ class TestCargoTomlInspectWorkspace:
         assert result["workspace"]["present"] is False
 
 
+@_needs_tomllib
 class TestCargoTomlInspectDependencies:
     """Tests for dependency analysis."""
 
@@ -296,6 +308,7 @@ class TestCargoTomlInspectDependencies:
         assert result["dependencies"]["dependencies"] == {}
 
 
+@_needs_tomllib
 class TestCargoTomlInspectPathDeps:
     """Tests for path dependency extraction."""
 
@@ -312,6 +325,7 @@ class TestCargoTomlInspectPathDeps:
         assert my_lib["version"] == "0.1.0"
 
 
+@_needs_tomllib
 class TestCargoTomlInspectGitDeps:
     """Tests for git dependency analysis."""
 
@@ -328,6 +342,7 @@ class TestCargoTomlInspectGitDeps:
         assert pinned["tag"] == "v1.0"
 
 
+@_needs_tomllib
 class TestCargoTomlInspectMissingEdition:
     """Tests for missing edition detection."""
 
@@ -356,6 +371,7 @@ class TestCargoTomlInspectMissingEdition:
         assert "workspace" in edition_findings[0].lower()
 
 
+@_needs_tomllib
 class TestCargoTomlInspectConfusables:
     """Tests for confusable/duplicate dependency name detection."""
 
@@ -370,6 +386,7 @@ class TestCargoTomlInspectConfusables:
         assert any("confusable" in f.lower() for f in result["findings"])
 
 
+@_needs_tomllib
 class TestCargoTomlInspectSuspicious:
     """Tests for suspicious dependency name detection."""
 
@@ -385,6 +402,7 @@ class TestCargoTomlInspectSuspicious:
         assert result["suspicious_dependency_names"] == []
 
 
+@_needs_tomllib
 class TestCargoTomlInspectTargetSpecific:
     """Tests for target-specific dependencies."""
 
@@ -396,6 +414,7 @@ class TestCargoTomlInspectTargetSpecific:
         assert "nix" in target_specific[first_key] or "winapi" in target_specific[first_key]
 
 
+@_needs_tomllib
 class TestCargoTomlInspectWorkspaceDeps:
     """Tests for workspace dependency inheritance."""
 
@@ -436,6 +455,7 @@ class TestCargoTomlInspectInputLimits:
         assert any("exceeds" in f.lower() for f in result["findings"])
 
 
+@_needs_tomllib
 class TestCargoTomlInspectMCP:
     """Tests for the MCP wrapper."""
 

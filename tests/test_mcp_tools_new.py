@@ -1,8 +1,15 @@
 """Integration tests for text_replace_check, line_range_extract, line_range_compare MCP tools."""
 
 import json
+import sys
+
+import pytest
 
 from eggcalc.mcp.server import TOOL_HANDLERS, handle_request
+
+_needs_tomllib = pytest.mark.skipif(
+    sys.version_info < (3, 11), reason="tomllib requires Python 3.11+"
+)
 
 
 class TestTextReplaceCheckMCP:
@@ -504,6 +511,7 @@ class TestConstantLookupMCP:
         assert len(values) == 1
 
 
+@_needs_tomllib
 class TestTomlShapeMCP:
     """Test toml_shape via MCP protocol."""
 

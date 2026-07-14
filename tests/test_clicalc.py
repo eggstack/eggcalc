@@ -1,5 +1,7 @@
 """Tests for nl-calc."""
 
+import sys
+
 import pytest
 
 from eggcalc import EvaluationError, UnitValue, evaluate
@@ -1385,6 +1387,7 @@ class TestUntestedMathFunctions:
         val = result.value if isinstance(result, UnitValue) else result
         assert val == -1
 
+    @pytest.mark.skipif(sys.version_info < (3, 11), reason="math.cbrt requires Python 3.11+")
     def test_cbrt(self):
         """Test cube root function."""
         result = evaluate("cbrt(27)")
