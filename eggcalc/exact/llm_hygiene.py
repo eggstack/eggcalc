@@ -200,22 +200,17 @@ def _detect_fix_hints(content: str, error_msg: str) -> list[JsonFixHint]:
                 )
             )
 
-    if (
-        "Expecting ',' delimiter" in error_msg
-        or "Expecting value" in error_msg
-        or "trailing comma" in error_msg.lower()
-    ):
-        m = _TRAILING_COMMA_RE.search(content)
-        if m:
-            line, col = _count_line_col(content, m.start())
-            hints.append(
-                JsonFixHint(
-                    code="TRAILING_COMMA",
-                    message="Trailing comma detected. Remove comma before closing bracket.",
-                    line=line,
-                    column=col,
-                )
+    m = _TRAILING_COMMA_RE.search(content)
+    if m:
+        line, col = _count_line_col(content, m.start())
+        hints.append(
+            JsonFixHint(
+                code="TRAILING_COMMA",
+                message="Trailing comma detected. Remove comma before closing bracket.",
+                line=line,
+                column=col,
             )
+        )
 
     if "'" in content and '"' not in content.split("'")[0][:20]:
         m = _SINGLE_QUOTE_RE.search(content)
