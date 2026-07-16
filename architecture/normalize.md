@@ -519,6 +519,10 @@ Normalizes postfix unit power words: `"m squared"` → `"m**2"`, `"cm cubed"` �
 
 Normalizes unit exponent shorthand while preserving `^` as XOR. Handles `"5 m ^ 2"` → `"5*m**2"` and `"/ m ^ 2"` → `"/m**2"`.
 
+### `_rewrite_calculator_caret(expression: str) -> str`
+
+Rewrites `^` to `**` (exponentiation) for user-facing calculator syntax. Called during normalization so that `evaluate_raw()` and CLI treat `^` as power, while direct `evaluate()` calls keep `^` as bitwise XOR (Python AST semantics). Word forms `xor` and `bitxor` are not affected by this rewrite — they remain mapped to the `^` operator token and are handled as bitwise XOR by the evaluator.
+
 ### `_canonical_power_unit(unit: str, exponent: str) -> str`
 
 Returns the canonical form of a unit raised to an exponent, looking up `UNIT_ALIASES` for shorthand forms.

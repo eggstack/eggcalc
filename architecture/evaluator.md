@@ -106,6 +106,25 @@ The `Evaluator` class implements `visit_*` methods for each AST node type:
 | `ast.Name` | visit_Name | Variables/constants (lookup order: units → constants → functions → user vars) |
 | `ast.Attribute` | visit_Attribute | Attribute access (`.real`, `.imag`, `.conjugate()` only) |
 
+**Operator semantics note:** `^` is dispatched as **bitwise XOR** (`ast.BitXor`) via Python AST semantics. The normalize pipeline (`_rewrite_calculator_caret()` in `normalize.py`) rewrites `^` to `**` before `evaluate()` is called, so user-facing calculator syntax treats `^` as exponentiation. Direct `evaluate()` calls always treat `^` as XOR.
+
+### Floor Division and Modulo with Units
+
+Same-unit operations have dimensional semantics:
+
+| Operation | Same-unit result | Cross-unit result |
+|-----------|-----------------|-------------------|
+| `//` (floor div) | Dimensionless quotient | `EvaluationError` |
+| `%` (modulo) | Dimensioned remainder in divisor unit | `EvaluationError` |
+
+```python
+evaluate_raw("5m % 2m")   # → 1 m (remainder in divisor unit)
+evaluate_raw("7m // 2m")  # → 3 (dimensionless quotient)
+evaluate_raw("5m % 2s")   # → EvaluationError
+```
+
+The shared helpers `_floor_divide_quantities()` and `_modulo_quantities()` in `units.py` implement this logic.
+
 **Forbidden node types** (raise `EvaluationError`):
 - `ast.Compare` — comparison operators
 - `ast.BoolOp` — boolean operations

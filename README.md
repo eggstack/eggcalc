@@ -70,6 +70,10 @@ result = evaluate_raw("30m + 100ft")        # 60.48 m
 result = evaluate("5+3")                     # 8
 ```
 
+**Caret (`^`) semantics differ between the two paths:**
+- `evaluate()` treats `^` as **bitwise XOR** (Python AST semantics).
+- `evaluate_raw()` and CLI normalize `^` as **exponentiation** (rewritten to `**` before parsing). Use `xor`/`bitxor` word forms for bitwise XOR through the full pipeline.
+
 See [docs/api.md](docs/api.md) for the full API reference including `EggCalcApp`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, custom constants/functions, and performance benchmarks.
 
 ## MCP Server

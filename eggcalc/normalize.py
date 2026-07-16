@@ -1431,13 +1431,12 @@ def _normalize_postfix_unit_power_words(expression: str) -> str:
 
 
 def _normalize_spaced_unit_caret_exponents(expression: str) -> str:
-    """Normalize unit exponent shorthand while preserving ``^`` as XOR.
+    """Normalize unit exponent shorthand using ``^`` as exponentiation.
 
-    Numeric ``^`` remains bitwise XOR by design, but users reasonably write
-    unit shorthands such as ``5 m ^ 2`` or ``5 m/s^2``. Compact ``5m^2`` was
-    already accepted because ``m^2`` is a unit alias; this makes spaced forms
-    follow the same path before generic operator splitting turns ``^`` into
-    XOR.
+    Users reasonably write unit shorthands such as ``5 m ^ 2`` or
+    ``5 m/s^2``.  Compact ``5m^2`` was already accepted because ``m^2``
+    is a unit alias; this makes spaced forms follow the same path before
+    generic operator splitting encounters them.
     """
     unit_alt = _UNIT_NAMES_ALTERNATION
 
@@ -1543,6 +1542,72 @@ def _normalize_xor_word_to_bitxor_call(expression: str) -> str:
         last_end = right_end
     result.append(expression[last_end:])
     return "".join(result)
+
+
+def _rewrite_calculator_caret(expression: str) -> str:
+    """Rewrite standalone calculator ``^`` tokens to ``**`` (exponentiation).
+
+    This runs *after* ``_normalize_xor_word_to_bitxor_call`` has already
+    rewritten natural-language XOR forms into ``bitxor(...)`` function calls.
+    Any remaining ``^`` in the expression is therefore calculator exponentiation
+    and must be converted to ``**`` before Python AST parsing.
+
+    Contract:
+    - Rewrites standalone ``^`` tokens to ``**``.
+    - Skips characters inside single- or double-quoted strings.
+    - Rejects malformed repeated caret sequences (``^^``, ``^^^``, ``^*``, etc.)
+      with a clear normalization error.
+    - Preserves surrounding whitespace where practical.
+    - Bounded linear-time: single pass over the expression.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(expression)
+    while i < n:
+        ch = expression[i]
+
+        # Skip string literals (single or double quoted).
+        if ch in ("'", '"'):
+            quote = ch
+            out.append(ch)
+            i += 1
+            while i < n:
+                c = expression[i]
+                out.append(c)
+                if c == "\\" and i + 1 < n:
+                    i += 1
+                    out.append(expression[i])
+                elif c == quote:
+                    break
+                i += 1
+            i += 1
+            continue
+
+        if ch != "^":
+            out.append(ch)
+            i += 1
+            continue
+
+        # Found a '^'. Check for malformed sequences.
+        j = i + 1
+        while j < n and expression[j] == "^":
+            j += 1
+        caret_count = j - i
+        if caret_count > 1:
+            raise ValueError(
+                f"Malformed caret sequence: {'^' * caret_count} " f"(use ** for exponentiation)"
+            )
+        # Check for mixed forms like ^* or *^
+        if j < n and expression[j] in ("*",):
+            raise ValueError("Malformed caret form: use ** for exponentiation")
+        if i > 0 and expression[i - 1] == "*":
+            raise ValueError("Malformed caret form: use ** for exponentiation")
+
+        # Single '^' → '**'
+        out.append("**")
+        i += 1
+
+    return "".join(out)
 
 
 # Module-level multi-word function name mappings (constant, no need to recreate each call)
@@ -2182,6 +2247,11 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     # Restore temperature expressions from placeholder (strip "degrees", keep unit)
     expression = expression.replace(_DEG_PLACEHOLDER, "")
     expression = _normalize_spaced_unit_caret_exponents(expression)
+    # Rewrite remaining calculator ``^`` tokens to ``**`` (exponentiation).
+    # This runs AFTER unit caret normalization so unit-context carets
+    # (e.g., ``5 m ^ 2``) are already absorbed into unit aliases, and
+    # only standalone numeric ``^`` symbols are converted to ``**``.
+    expression = _rewrite_calculator_caret(expression)
 
     # Handle "N percent" -> "N/100" BEFORE _join_number_parts so compound
     # numbers like "twenty five percent" → "20 5 percent" → "(20+5)/100" = 0.25

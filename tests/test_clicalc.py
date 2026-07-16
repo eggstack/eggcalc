@@ -2179,35 +2179,29 @@ class TestDeferredD5D6UnitSimplification:
         assert _simplify_unit_string(None) is None
         assert _simplify_unit_string("xyz") == "xyz"
 
-    def test_floordiv_simplifies_compound_units(self):
-        """Floor division of compound units should also be simplified."""
+    def test_floordiv_incompatible_units_rejected(self):
+        """Floor division of incompatible compound units must be rejected."""
         from eggcalc.units import UnitValue
 
-        result = UnitValue(7.0, "m/s") // UnitValue(1.0, "s")
-        assert result.unit == "m/s**2"
-        assert result.value == 7.0
+        with pytest.raises(ValueError):
+            UnitValue(7.0, "m/s") // UnitValue(1.0, "s")
 
-    def test_evaluator_floordiv_simplifies_compound_units(self):
-        """Evaluator floor division should match UnitValue compound-unit semantics."""
-        result = evaluate("(7*m/s)//(1*s)")
-        assert isinstance(result, UnitValue)
-        assert result.unit == "m/s**2"
-        assert result.value == 7.0
+    def test_evaluator_floordiv_incompatible_units_rejected(self):
+        """Evaluator floor division of incompatible units must be rejected."""
+        with pytest.raises(EvaluationError):
+            evaluate("(7*m/s)//(1*s)")
 
-    def test_mod_simplifies_compound_units(self):
-        """Modulo of compound units should also be simplified."""
+    def test_mod_incompatible_units_rejected(self):
+        """Modulo of incompatible compound units must be rejected."""
         from eggcalc.units import UnitValue
 
-        result = UnitValue(7.0, "m/s") % UnitValue(2.0, "s")
-        assert result.unit == "m/s**2"
-        assert result.value == 1.0
+        with pytest.raises(ValueError):
+            UnitValue(7.0, "m/s") % UnitValue(2.0, "s")
 
-    def test_evaluator_mod_simplifies_compound_units(self):
-        """Evaluator modulo should match UnitValue compound-unit semantics."""
-        result = evaluate("(7*m/s)%(2*s)")
-        assert isinstance(result, UnitValue)
-        assert result.unit == "m/s**2"
-        assert result.value == 1.0
+    def test_evaluator_mod_incompatible_units_rejected(self):
+        """Evaluator modulo of incompatible units must be rejected."""
+        with pytest.raises(EvaluationError):
+            evaluate("(7*m/s)%(2*s)")
 
     def test_truediv_reciprocal_of_compound(self):
         """1 / (m/s) should produce s/m, not 1/m/s."""

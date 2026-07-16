@@ -1960,12 +1960,7 @@ class Evaluator(ast.NodeVisitor):
         ast.LShift: _bitlshift_safe,
         ast.RShift: _bitrshift_safe,
         ast.BitOr: (lambda a, b: a | b),
-        # ``^`` is the documented symbol for exponentiation (matching
-        # most calculators and the docs in docs/quickstart.md and
-        # docs/api.md). Use the word forms ``xor`` / ``bitxor`` / etc.
-        # for bitwise XOR — the natural-language normalizer emits them
-        # as ``bitxor(...)`` function calls rather than ``^``.
-        ast.BitXor: _safe_pow,
+        ast.BitXor: (lambda a, b: _require_int(a, "bitxor") ^ _require_int(b, "bitxor")),
         ast.BitAnd: (lambda a, b: a & b),
     }
 
@@ -2230,7 +2225,7 @@ class Evaluator(ast.NodeVisitor):
 
         result_unit = left_unit or right_unit
 
-        is_bitwise = op_class in (ast.BitAnd, ast.BitOr, ast.LShift, ast.RShift)
+        is_bitwise = op_class in (ast.BitAnd, ast.BitOr, ast.BitXor, ast.LShift, ast.RShift)
         if is_bitwise and (isinstance(left_val, float) or isinstance(right_val, float)):
             raise EvaluationError("Bitwise operations require integer operands, not floats")
 
@@ -2261,11 +2256,12 @@ class Evaluator(ast.NodeVisitor):
             if abs(result) > MAX_RESULT_VALUE:
                 raise EvaluationError("Result too large")
 
-        # Check digit count for large int results from Add/Sub/Mult/Shift
+        # Check digit count for large int results from Add/Sub/Mult/Shift/Xor
         if isinstance(result, int) and op_class in (
             ast.Add,
             ast.Sub,
             ast.Mult,
+            ast.BitXor,
             ast.LShift,
             ast.RShift,
         ):
@@ -2275,9 +2271,7 @@ class Evaluator(ast.NodeVisitor):
         # Power operator with a unit on the right is physically nonsensical
         # (e.g., 2 ** 5m). Reject explicitly rather than silently dropping the
         # right-hand unit, which would let nonsense like "32.0 m" pass.
-        # ``ast.BitXor`` also routes through power dispatch (``^`` is the
-        # documented exponent symbol) so the same unit guards apply.
-        is_pow_dispatch = op_class is ast.Pow or op_class is ast.BitXor
+        is_pow_dispatch = op_class is ast.Pow
         if is_pow_dispatch and isinstance(right, UnitValue) and right.unit:
             raise EvaluationError(f"Cannot raise a value to a power with units ('{right.unit}')")
 
@@ -2325,7 +2319,8 @@ class Evaluator(ast.NodeVisitor):
                 return UnitValue(left_val / right_val, compound)
 
         # Compound unit detection for floor division and modulo:
-        # Same-unit -> dimensionless (e.g., 6m // 3m -> 2, 7m % 3m -> 1)
+        # Same-unit floor division -> dimensionless (e.g., 6m // 3m -> 2).
+        # Same-unit modulo -> remainder in divisor unit (e.g., 5m % 2m -> 1 m).
         # Compatible different-units scale to avoid precision loss (1 m // 1 cm -> 100, not 99).
         if op_class in (ast.FloorDiv, ast.Mod) and isinstance(left, UnitValue) and left.unit:
             if isinstance(right, UnitValue) and right.unit:
@@ -2334,7 +2329,8 @@ class Evaluator(ast.NodeVisitor):
                     if left.unit == right.unit:
                         if op_class is ast.FloorDiv:
                             return aligned_left.value // aligned_right.value  # type: ignore[operator]
-                        return aligned_left.value % aligned_right.value  # type: ignore[operator]
+                        # Modulo: remainder carries the divisor unit.
+                        return UnitValue(aligned_left.value % aligned_right.value, right.unit)  # type: ignore[operator]
                     # Different but compatible units (e.g., m vs cm): scale
                     # left up to right's unit to avoid float-precision loss.
                     # 1 m // 1 cm becomes 100 cm // 1 cm = 100, not
@@ -2350,9 +2346,13 @@ class Evaluator(ast.NodeVisitor):
                         return scaled_left // right.value  # type: ignore[operator]
                     # Remainder is in right.unit; preserve it as a length.
                     return UnitValue(scaled_left % right.value, right.unit)  # type: ignore[operator]
-                operator = "//" if op_class is ast.FloorDiv else "%"
-                compound = _simplify_unit_string(f"{left.unit}{operator}{right.unit}")
-                return UnitValue(result, compound)
+                # Incompatible dimensions — reject rather than synthesize
+                # a misleading compound unit string (e.g., "m%s").
+                op_name = "floor division" if op_class is ast.FloorDiv else "modulo"
+                raise EvaluationError(
+                    f"Cannot compute {op_name} of incompatible units: "
+                    f"'{left.unit}' and '{right.unit}'"
+                )
             if op_class is ast.FloorDiv and not isinstance(right, UnitValue) and right_unit_name:
                 compound = _simplify_unit_string(f"{left.unit}//{right_unit_name}")
                 return UnitValue(result, compound)

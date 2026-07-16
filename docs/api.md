@@ -39,10 +39,18 @@ result = evaluate("sin(1)+2")  # 2.8414...
 result = evaluate("10")       # 10
 ```
 
+**Caret (`^`) is bitwise XOR** in this path (Python AST semantics):
+
+```python
+evaluate("5 ^ 3")   # → 6 (bitwise XOR)
+evaluate("2 ^ 3")   # → 1 (bitwise XOR)
+```
+
 **Does NOT work with:**
 - Natural language: `evaluate("five plus three")` → `EvaluationError`
 - Spaces: `evaluate("5 + 3")` → 8 (works but wasteful, use evaluate_raw)
 - Units attached: `evaluate("30m")` → `EvaluationError`
+- `^` as exponentiation: `evaluate("2^10")` → `1022` (XOR, not 1024)
 
 ### `evaluate_raw(expression: str) -> Any`
 
@@ -50,6 +58,8 @@ Full pipeline evaluation. Handles natural language, spaces, units, and mixed inp
 
 Internally calls `normalize_expression()` to convert natural language before evaluation.
 Unit parsing is also spacing-tolerant, so expressions like `30 km / h in mph` and `5 in in cm` are handled the same as their compact forms.
+
+**Caret (`^`) is exponentiation** in this path — the normalize pipeline rewrites `^` to `**` before evaluation. Use `xor` or `bitxor` for bitwise XOR:
 
 ```python
 from eggcalc import evaluate_raw
@@ -59,6 +69,22 @@ result = evaluate_raw("five plus three")  # 8
 result = evaluate_raw("30m + 100ft")    # 60.48 m (with units)
 result = evaluate_raw("sqrt(144)")     # 12
 result = evaluate_raw("what is five plus three")  # 8
+
+# Caret is exponentiation (rewritten to **)
+result = evaluate_raw("2 ^ 10")        # 1024 (exponentiation)
+# Use word forms for bitwise XOR
+result = evaluate_raw("5 xor 3")       # 6 (bitwise XOR)
+result = evaluate_raw("5 bitxor 3")    # 6 (bitwise XOR)
+```
+
+**Floor division and modulo with units:**
+
+Same-unit operations have dimensional semantics; incompatible dimensions are rejected:
+
+```python
+result = evaluate_raw("5m % 2m")       # 1 m (remainder in divisor unit)
+result = evaluate_raw("7m // 2m")      # 3 (dimensionless quotient)
+# evaluate_raw("5m % 2s")              # → EvaluationError (incompatible)
 ```
 
 ### `normalize_expression(expression: str, operators: dict | None = None, patterns: Mapping | None = None, skip_validation: bool = False) -> tuple[str, int]`

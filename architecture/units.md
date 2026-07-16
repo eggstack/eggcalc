@@ -122,8 +122,8 @@ UnitValue(value: float | complex, unit: str | None = None)
 | `UnitValue - UnitValue` | Common unit | Converts right operand to left operand's unit if compatible |
 | `UnitValue * UnitValue` | Compound (e.g. `m*m`) | Auto-aligns compatible units before multiplying |
 | `UnitValue / UnitValue` | Compound (e.g. `m/s`) | Auto-aligns compatible units before dividing; same-unit division cancels to dimensionless |
-| `UnitValue // UnitValue` | Compound | Floor division; same-unit floor division cancels to dimensionless |
-| `UnitValue % UnitValue` | Compound | Modulo; same-unit modulo cancels to dimensionless |
+| `UnitValue // UnitValue` | Dimensionless or `EvaluationError` | Floor division of compatible units returns a dimensionless quotient; incompatible units raise `EvaluationError` |
+| `UnitValue % UnitValue` | Dimensioned remainder or `EvaluationError` | Same-unit modulo returns a remainder in the divisor unit; incompatible units raise `EvaluationError` |
 | `UnitValue ** n` | Power of unit | E.g. `m ** 2` → `m**2`; integer exponents only for dimensional units |
 
 **Important:** Adding/subtracting incompatible units raises `ValueError`.
@@ -456,6 +456,14 @@ Renders a `(num, den)` signature back to a canonical string (e.g. `"m**2/s"`).
 ### `_derived_category(unit: str) -> str | None`
 
 Returns the category for a compound unit expression by parsing its signature and looking it up in `_DERIVED_CATEGORIES`.
+
+### `_floor_divide_quantities(left: UnitValue, right: UnitValue) -> UnitValue`
+
+Floor division of two `UnitValue` operands. Compatible same-unit division returns a dimensionless quotient. Incompatible dimensions raise `ValueError`.
+
+### `_modulo_quantities(left: UnitValue, right: UnitValue) -> UnitValue`
+
+Modulo of two `UnitValue` operands. Same-unit modulo returns a dimensioned remainder in the divisor unit (e.g., `5m % 2m → 1 m`). Incompatible dimensions raise `ValueError`.
 
 ### `_align_compatible_units(left, right) -> tuple[UnitValue, UnitValue]`
 

@@ -778,31 +778,27 @@ class TestUnitSpacingProbes:
         assert result == pytest.approx(0.05)
 
     @pytest.mark.parametrize(
-        ("expr", "expected_normalized", "expected_value"),
+        ("expr", "expected_normalized"),
         [
-            ("7m/s//1s", "(7*m/s)//(1*s)", 7),
-            ("7m/s % 2s", "(7*m/s)%(2*s)", 1),
+            ("7m/s//1s", "(7*m/s)//(1*s)"),
+            ("7m/s % 2s", "(7*m/s)%(2*s)"),
         ],
     )
-    def test_compound_unit_floor_mod_spacing(self, expr, expected_normalized, expected_value):
+    def test_compound_unit_floor_mod_spacing(self, expr, expected_normalized):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
         assert normalized == expected_normalized
-        result, code, _out, _err = _run(expr)
-        assert code == 0
-        assert isinstance(result, UnitValue)
-        assert result.value == pytest.approx(expected_value)
-        assert result.unit == "m/s**2"
+        # Incompatible-dimension floor/mod must be rejected (no compound unit strings).
+        _result, code, _out, _err = _run(expr)
+        assert code != 0
 
     def test_chained_compound_unit_floor_mod_spacing(self):
         normalized, code = normalize_expression("7m/s//1s//1s", NORMALIZE, PATTERNS)
         assert code == 0
         assert normalized == "((7*m/s)//(1*s))//(1*s)"
-        result, code, _out, _err = _run("7m/s//1s//1s")
-        assert code == 0
-        assert isinstance(result, UnitValue)
-        assert result.value == pytest.approx(7)
-        assert result.unit == "m/s**3"
+        # Incompatible-dimension floor/mod must be rejected.
+        _result, code, _out, _err = _run("7m/s//1s//1s")
+        assert code != 0
 
     @pytest.mark.parametrize("expr", ["1kg in g", "1 kg in g", "1 kg  in   g"])
     def test_simple_unit_conversion_spacing(self, expr):

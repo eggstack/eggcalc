@@ -28,6 +28,31 @@ The public API wraps these differently:
 - `evaluate_raw()` / `evaluate_cached()` / `evaluate_async()` → full pipeline (NL/units → normalize → evaluate)
 - `evaluate()` → direct AST evaluation (accepts valid Python math syntax with or without spaces, but rejects natural language and unit suffixes)
 
+### Caret (`^`) semantics
+
+The two paths interpret `^` differently:
+
+| Path | `^` means | `xor` / `bitxor` |
+|------|-----------|-------------------|
+| `evaluate()` | Bitwise XOR (Python AST) | N/A (use `^` directly) |
+| `evaluate_raw()` / CLI | Rewritten to `**` (exponentiation) via `_rewrite_calculator_caret()` | Use `xor`/`bitxor` for bitwise XOR |
+
+```python
+evaluate("5 ^ 3")                    # → 6 (bitwise XOR)
+evaluate_raw("5 ^ 3")                # → 125 (exponentiation, rewritten to 5**3)
+evaluate_raw("5 xor 3")              # → 6 (bitwise XOR)
+```
+
+### Floor division and modulo with units
+
+Same-unit modulo returns a dimensioned remainder in the divisor unit; incompatible dimensions are rejected:
+
+```python
+evaluate_raw("5m % 2m")   # → 1 m (remainder in divisor unit)
+evaluate_raw("7m // 2m")  # → 3 (dimensionless quotient)
+evaluate_raw("5m % 2s")   # → EvaluationError (incompatible dimensions)
+```
+
 **When writing tests:** use `evaluate()` for direct AST evaluator behavior (e.g. `"5+3"`, `"2**10"`). Use `evaluate_raw()`, CLI subprocesses, or `run()` for natural-language and unit parsing behavior.
 
 ## Commands
@@ -163,3 +188,5 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 4. **build_single.py breakage** — adding imports outside the allowed set or code that can't be concatenated will break the build.
 5. **confusables.py editing** — it's generated data; edit `scripts/generate_confusables.py` instead.
 6. **`normalize_main` alias** — created by `build_single.py` during assembly, does not exist in source `normalize.py`. Don't reference it in tests.
+7. **Caret (`^`) contract mismatch** — `evaluate("5^3")` returns `6` (XOR), but `evaluate_raw("5^3")` returns `125` (exponentiation). Use `evaluate()` for XOR, `evaluate_raw()` or CLI for exponentiation. Use `xor`/`bitxor` word forms when you need XOR through the full pipeline.
+8. **Floor/mod with incompatible units** — `evaluate_raw("5m % 2s")` raises `EvaluationError`. Floor division and modulo require dimensionally compatible operands.

@@ -220,14 +220,15 @@ class UnitValue:
                     try:
                         factor = get_conversion_factor(self.unit, other.unit)
                     except (KeyError, ValueError):
-                        result = self.value // other.value
-                        unit = _simplify_unit_string(f"{self.unit}//{other.unit}")
+                        raise ValueError(
+                            f"Cannot floor-divide incompatible units: "
+                            f"'{self.unit}' and '{other.unit}'"
+                        )
                     else:
                         result = (self.value * factor) // other.value
                         unit = None
             elif other.unit:
-                result = self.value // other.value
-                unit = _simplify_unit_string(f"1//{other.unit}")
+                raise ValueError(f"Cannot floor-divide a number by a unit value ('{other.unit}')")
             else:
                 result = self.value // other.value
                 unit = self.unit
@@ -255,23 +256,25 @@ class UnitValue:
             if self.unit and other.unit:
                 if self.unit == other.unit:
                     result = self.value % other.value
-                    unit = None
+                    # Remainder carries the divisor unit (same-unit modulo).
+                    unit = other.unit
                 else:
                     # Different but compatible units: scale left up to
                     # right's unit to avoid float-precision loss.
                     try:
                         factor = get_conversion_factor(self.unit, other.unit)
                     except (KeyError, ValueError):
-                        result = self.value % other.value
-                        unit = _simplify_unit_string(f"{self.unit}%{other.unit}")
+                        raise ValueError(
+                            f"Cannot compute modulo of incompatible units: "
+                            f"'{self.unit}' and '{other.unit}'"
+                        )
                     else:
                         scaled = self.value * factor
                         result = scaled % other.value
                         # Remainder is in right.unit; express in right's unit.
                         unit = other.unit
             elif other.unit:
-                result = self.value % other.value
-                unit = _simplify_unit_string(f"1%{other.unit}")
+                raise ValueError(f"Cannot compute modulo by a unit value ('{other.unit}')")
             else:
                 result = self.value % other.value
                 unit = self.unit
@@ -2097,6 +2100,45 @@ def _align_compatible_units(left: UnitValue, right: UnitValue) -> tuple[UnitValu
         return left, right
     converted = right.convert_to(left.unit)
     return left, UnitValue(converted.value, converted.unit)
+
+
+def _floor_divide_quantities(left: UnitValue, right: UnitValue) -> int | float:
+    """Floor-divide two compatible UnitValues, returning a dimensionless quotient.
+
+    For same-unit operands, returns ``left.value // right.value``.
+    For compatible different-unit operands, converts the dividend into the
+    divisor's unit first to avoid floating-point precision loss.
+    Raises ``ValueError`` if the units are incompatible.
+    """
+    if left.unit and right.unit:
+        if left.unit == right.unit:
+            return left.value // right.value  # type: ignore[operator]
+        # Convert left into right's unit before floor division.
+        converted = left.convert_to(right.unit)
+        return converted.value // right.value  # type: ignore[operator]
+    if right.unit:
+        raise ValueError(f"Cannot floor-divide a number by a unit value ('{right.unit}')")
+    return left.value // right.value  # type: ignore[operator]
+
+
+def _modulo_quantities(left: UnitValue, right: UnitValue) -> UnitValue:
+    """Compute the modulo of two compatible UnitValues.
+
+    Returns a ``UnitValue`` whose display unit is the divisor's unit.
+    For same-unit operands, the result carries the (shared) unit.
+    For compatible different-unit operands, the dividend is converted into
+    the divisor's unit first.
+    Raises ``ValueError`` if the units are incompatible.
+    """
+    if left.unit and right.unit:
+        if left.unit == right.unit:
+            return UnitValue(left.value % right.value, right.unit)  # type: ignore[operator]
+        # Convert left into right's unit before modulo.
+        converted = left.convert_to(right.unit)
+        return UnitValue(converted.value % right.value, right.unit)  # type: ignore[operator]
+    if right.unit:
+        raise ValueError(f"Cannot compute modulo by a unit value ('{right.unit}')")
+    return UnitValue(left.value % right.value, left.unit)  # type: ignore[operator]
 
 
 def _pow_unit_string(unit: str, exp: int) -> str | None:
