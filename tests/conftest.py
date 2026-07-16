@@ -16,6 +16,7 @@ def _restore_evaluator_defaults():
     runs and restores it after, so that non-MCP modules (e.g. test_clicalc)
     are not affected by MCP state changes.
     """
+    import eggcalc.mcp.server as _server_mod
     from eggcalc import evaluator as _evaluator
     from eggcalc import get_default_evaluator
 
@@ -23,10 +24,14 @@ def _restore_evaluator_defaults():
     orig_mcp_mode = _evaluator._mcp_mode
     orig_allow_random = ev._allow_random
     orig_allow_side_effects = ev._allow_side_effects
+    orig_mcp_defaults_configured = _server_mod._mcp_defaults_configured
+    orig_default_session = _server_mod._default_session
     yield
     _evaluator._mcp_mode = orig_mcp_mode
     ev._allow_random = orig_allow_random
     ev._allow_side_effects = orig_allow_side_effects
+    _server_mod._mcp_defaults_configured = orig_mcp_defaults_configured
+    _server_mod._default_session = orig_default_session
 
 
 @pytest.fixture

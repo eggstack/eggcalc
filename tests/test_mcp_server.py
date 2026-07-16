@@ -6,8 +6,38 @@ import sys
 import pytest
 
 from eggcalc.exact.identifier import identifier_analyze
-from eggcalc.mcp.server import TOOL_HANDLERS, handle_request
+from eggcalc.mcp.server import (
+    TOOL_HANDLERS,
+    McpSession,
+    handle_request,
+)
 from eggcalc.mcp.tools import MAX_TEXT_LENGTH
+
+
+def ready_session() -> McpSession:
+    """Create a McpSession and complete the handshake to READY state."""
+    from eggcalc.mcp.server import McpSession as SM
+    from eggcalc.mcp.server import McpSessionState as SS
+
+    session = SM(initial_state=SS.UNINITIALIZED)
+    handle_request(
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        session=session,
+    )
+    handle_request(
+        {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+        session=session,
+    )
+    return session
+
+
+def session_request(session, method, params=None, request_id=1):
+    """Send a request through a session."""
+    return handle_request(
+        {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params or {}},
+        session=session,
+    )
+
 
 _needs_tomllib = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="tomllib requires Python 3.11+"
@@ -18,13 +48,17 @@ class TestProtocolHandshake:
     """Test MCP protocol handshake and initialization."""
 
     def test_initialize_returns_protocol_version(self):
+        from eggcalc.mcp.server import McpSession, McpSessionState
+
+        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
         response = handle_request(
             {
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "initialize",
                 "params": {},
-            }
+            },
+            session=session,
         )
         assert response["result"]["protocolVersion"] == "2024-11-05"
         assert "capabilities" in response["result"]
@@ -10476,7 +10510,7 @@ class TestSubprocessSmoke:
     """Smoke test: start MCP server as subprocess and verify tool listing."""
 
     def test_subprocess_tools_list(self):
-        """Start the MCP server subprocess, send initialize + tools/list, verify response."""
+        """Start the MCP server subprocess, send initialize + notifications/initialized + tools/list, verify response."""
         import subprocess
         import sys
 
@@ -10490,13 +10524,16 @@ class TestSubprocessSmoke:
         try:
             # Send initialize request
             init_req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+            # Send notifications/initialized
+            notif_req = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
             # Send tools/list request
             list_req = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
             proc.stdin.write(init_req + "\n")
+            proc.stdin.write(notif_req + "\n")
             proc.stdin.write(list_req + "\n")
             proc.stdin.flush()
 
-            # Read two response lines
+            # Read two response lines (notification produces no response)
             lines = []
             for _ in range(2):
                 line = proc.stdout.readline()
@@ -10666,3 +10703,277 @@ class TestProfileConsistency:
             f"Mismatch: TOOL_PROFILES keys={sorted(profile_keys)} "
             f"vs PROFILE_NAMES={sorted(profile_names_set)}"
         )
+
+
+class TestSessionLifecycle:
+    """Test McpSession lifecycle state machine."""
+
+    def test_tools_list_before_init_rejected(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {"jsonrpc": "2.0", "id": "t1", "method": "tools/list", "params": {}},
+            session=session,
+        )
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+
+    def test_tools_call_before_init_rejected(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "t2",
+                "method": "tools/call",
+                "params": {"name": "math_eval", "arguments": {"expression": "1+1"}},
+            },
+            session=session,
+        )
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+
+    def test_initialize_transitions_to_initializing(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {"jsonrpc": "2.0", "id": "i1", "method": "initialize", "params": {}},
+            session=session,
+        )
+        assert "result" in response
+        assert session.state == SS.INITIALIZING
+
+    def test_notifications_initialized_transitions_to_ready(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        handle_request(
+            {"jsonrpc": "2.0", "id": "i1", "method": "initialize", "params": {}},
+            session=session,
+        )
+        handle_request(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            session=session,
+        )
+        assert session.state == SS.READY
+
+    def test_full_handshake_enables_tools(self):
+        session = ready_session()
+        response = session_request(session, "tools/list", request_id="t1")
+        assert "result" in response
+        assert "tools" in response["result"]
+
+    def test_rejected_duplicate_initialize(self):
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = ready_session()
+        response = handle_request(
+            {"jsonrpc": "2.0", "id": "i2", "method": "initialize", "params": {}},
+            session=session,
+        )
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+        assert session.state == SS.READY
+
+    def test_ping_allowed_before_init(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {"jsonrpc": "2.0", "id": "p1", "method": "ping", "params": {}},
+            session=session,
+        )
+        assert "result" in response
+
+    def test_profiles_list_before_init_rejected(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {"jsonrpc": "2.0", "id": "pr1", "method": "profiles/list", "params": {}},
+            session=session,
+        )
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+
+    def test_unknown_method_before_init(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {"jsonrpc": "2.0", "id": "u1", "method": "unknown/method", "params": {}},
+            session=session,
+        )
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+
+    def test_notifications_cancelled_ignored_before_ready(self):
+        """notifications/cancelled is accepted in any state (returns None)."""
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/cancelled",
+                "params": {"requestId": "abc"},
+            },
+            session=session,
+        )
+        assert response is None
+
+
+class TestProtocolVersionNegotiation:
+    """Test protocol version negotiation."""
+
+    def test_supported_version_accepted(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "v1",
+                "method": "initialize",
+                "params": {"protocolVersion": "2024-11-05"},
+            },
+            session=session,
+        )
+        assert response["result"]["protocolVersion"] == "2024-11-05"
+
+    def test_unsupported_version_falls_back(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "v2",
+                "method": "initialize",
+                "params": {"protocolVersion": "2099-01-01"},
+            },
+            session=session,
+        )
+        assert response["result"]["protocolVersion"] == "2024-11-05"
+
+    def test_no_version_uses_latest(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {"jsonrpc": "2.0", "id": "v3", "method": "initialize", "params": {}},
+            session=session,
+        )
+        assert response["result"]["protocolVersion"] == "2024-11-05"
+
+    def test_supported_protocol_versions_constant(self):
+        from eggcalc.mcp.server import SUPPORTED_PROTOCOL_VERSIONS
+
+        assert "2024-11-05" in SUPPORTED_PROTOCOL_VERSIONS
+
+
+class TestErrorClassification:
+    """Test JSON-RPC error code classification."""
+
+    def test_parse_error(self):
+        from eggcalc.mcp.server import _parse_error
+
+        resp = _parse_error(None, "bad")
+        assert resp["error"]["code"] == -32700
+
+    def test_method_not_found(self):
+        from eggcalc.mcp.server import _method_not_found
+
+        resp = _method_not_found(42, "foo/bar")
+        assert resp["error"]["code"] == -32601
+
+    def test_invalid_params(self):
+        from eggcalc.mcp.server import _invalid_params
+
+        resp = _invalid_params(42, "missing field")
+        assert resp["error"]["code"] == -32602
+
+    def test_internal_error(self):
+        from eggcalc.mcp.server import _internal_error
+
+        resp = _internal_error(42, "boom")
+        assert resp["error"]["code"] == -32603
+
+    def test_invalid_request_non_object(self):
+        resp = handle_request("not a dict")
+        assert resp["error"]["code"] == -32600
+
+    def test_invalid_request_missing_method(self):
+        resp = handle_request({"jsonrpc": "2.0", "id": 1})
+        assert resp["error"]["code"] == -32600
+
+    def test_invalid_request_wrong_jsonrpc(self):
+        resp = handle_request({"jsonrpc": "1.0", "id": 1, "method": "ping"})
+        assert resp["error"]["code"] == -32600
+
+    def test_invalid_request_boolean_id(self):
+        resp = handle_request({"jsonrpc": "2.0", "id": True, "method": "ping"})
+        assert resp["error"]["code"] == -32600
+
+    def test_unknown_tool_returns_method_not_found(self):
+        session = ready_session()
+        response = session_request(
+            session,
+            "tools/call",
+            {"name": "nonexistent", "arguments": {}},
+            request_id="t1",
+        )
+        assert response["error"]["code"] == -32601
+
+
+class TestNotificationDispatch:
+    """Test notification handling."""
+
+    def test_initialized_notification_returns_none(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.INITIALIZING)
+        response = handle_request(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            session=session,
+        )
+        assert response is None
+
+    def test_cancelled_notification_returns_none(self):
+        session = ready_session()
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/cancelled",
+                "params": {"requestId": "abc"},
+            },
+            session=session,
+        )
+        assert response is None
+
+    def test_unknown_notification_returns_none(self):
+        session = ready_session()
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/unknown_thing",
+                "params": {"data": "x"},
+            },
+            session=session,
+        )
+        assert response is None

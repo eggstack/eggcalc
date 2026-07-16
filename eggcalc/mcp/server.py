@@ -7,6 +7,7 @@ and measurement tools to agents.
 
 from __future__ import annotations
 
+import enum
 import inspect
 import json
 import logging
@@ -247,6 +248,35 @@ MAX_TOOL_TIMEOUT_SECONDS = _parse_env_int("EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS"
 MAX_CANCELLED_REQUESTS = _parse_env_int(
     "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", 10_000, 100, 1_000_000
 )
+
+SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05",)
+LATEST_SUPPORTED_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[-1]
+
+SUPPORTED_SCHEMA_KEYWORDS = frozenset(
+    {
+        "type",
+        "enum",
+        "const",
+        "default",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "multipleOf",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "minItems",
+        "maxItems",
+        "uniqueItems",
+        "items",
+        "properties",
+        "required",
+        "additionalProperties",
+        "description",
+    }
+)
+
 # FIFO eviction order for cancellation records. We use deque + set
 # so we can pop the oldest entry deterministically when the cap is
 # exceeded (set.pop() would be non-deterministic and could evict the
@@ -420,6 +450,198 @@ def _invalid_request(request_id: Any, message: str) -> dict:
             "message": message,
         },
     }
+
+
+_invalid_request_error = _invalid_request
+
+
+def _jsonrpc_error(request_id: Any, code: int, message: str) -> dict:
+    """Build a JSON-RPC error response."""
+    return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
+
+
+def _parse_error(request_id: Any = None, message: str = "Parse error") -> dict:
+    """Build JSON-RPC parse error (-32700)."""
+    return _jsonrpc_error(request_id, -32700, message)
+
+
+def _method_not_found(request_id: Any, method: str) -> dict:
+    """Build JSON-RPC method not found error (-32601)."""
+    display = method[:100] + "..." if len(method) > 100 else method
+    return _jsonrpc_error(request_id, -32601, f"Method not found: {display}")
+
+
+def _invalid_params(request_id: Any, message: str) -> dict:
+    """Build JSON-RPC invalid params error (-32602)."""
+    return _jsonrpc_error(request_id, -32602, message)
+
+
+def _internal_error(request_id: Any, message: str) -> dict:
+    """Build JSON-RPC internal error (-32603)."""
+    return _jsonrpc_error(request_id, -32603, f"Internal error: {message}")
+
+
+class McpSessionState(enum.Enum):
+    """MCP protocol session lifecycle states."""
+
+    UNINITIALIZED = "uninitialized"
+    INITIALIZING = "initializing"
+    READY = "ready"
+    CLOSED = "closed"
+
+
+class McpSession:
+    """MCP protocol session with lifecycle state management.
+
+    Owns negotiated protocol version, client info, and lifecycle state.
+    The ``handle_message`` method dispatches JSON-RPC requests and
+    notifications with lifecycle enforcement.
+    """
+
+    def __init__(self, *, initial_state: McpSessionState = McpSessionState.READY):
+        self.state = initial_state
+        self.negotiated_version: str | None = None
+        self.client_info: dict | None = None
+        self.client_capabilities: dict | None = None
+        self.request_id: str | None = None
+
+    def handle_message(self, request: dict) -> dict | None:
+        """Route MCP request to appropriate handler with lifecycle enforcement."""
+        method = request.get("method", "")
+        request_id = request.get("id")
+
+        # Lifecycle state check
+        error = self._check_ready_for_dispatch(method, request_id)
+        if error is not None:
+            return error
+
+        # Dispatch
+        if method == "initialize":
+            return self._handle_initialize(request)
+        elif method == "notifications/initialized":
+            self._handle_notifications_initialized()
+            return None
+        elif method == "notifications/cancelled":
+            self._handle_cancelled(request)
+            return None
+        elif method == "ping":
+            return {"jsonrpc": "2.0", "id": request_id, "result": {}}
+        elif method == "tools/list":
+            return _handle_list_tools(request)
+        elif method == "tools/call":
+            return _handle_call_tool(request)
+        elif method == "profiles/list":
+            return _handle_list_profiles(request)
+        elif method.startswith("notifications/"):
+            # Unknown notifications are silently ignored per MCP spec
+            return None
+        else:
+            display = method[:100] + "..." if len(method) > 100 else method
+            return _method_not_found(request_id, display)
+
+    def _check_ready_for_dispatch(self, method: str, request_id: Any) -> dict | None:
+        """Check if session state allows this method to be dispatched."""
+        if method == "initialize":
+            if self.state == McpSessionState.UNINITIALIZED:
+                return None
+            return _invalid_request_error(request_id, "Server already initialized")
+
+        if method == "notifications/initialized":
+            return None  # Always accepted (silently ignored in wrong state)
+
+        if method == "ping":
+            return None  # Allowed in any state
+
+        if method == "notifications/cancelled":
+            return None  # Always accepted
+
+        # All other methods require READY state
+        if self.state != McpSessionState.READY:
+            return _invalid_request_error(request_id, "Server not initialized")
+
+        return None
+
+    def _handle_initialize(self, request: dict) -> dict:
+        """Handle an initialize MCP request with parameter validation."""
+        params = request.get("params", {})
+        if not isinstance(params, dict):
+            return _invalid_params(request.get("id"), "Invalid params: expected object")
+
+        # Validate protocolVersion
+        protocol_version = params.get("protocolVersion")
+        if protocol_version is not None and not isinstance(protocol_version, str):
+            return _invalid_params(
+                request.get("id"), "Invalid params: protocolVersion must be a string"
+            )
+
+        # Validate capabilities
+        capabilities = params.get("capabilities")
+        if capabilities is not None and not isinstance(capabilities, dict):
+            return _invalid_params(
+                request.get("id"), "Invalid params: capabilities must be an object"
+            )
+
+        # Validate clientInfo
+        client_info = params.get("clientInfo")
+        if client_info is not None:
+            if not isinstance(client_info, dict):
+                return _invalid_params(
+                    request.get("id"), "Invalid params: clientInfo must be an object"
+                )
+            if "name" not in client_info or not isinstance(client_info["name"], str):
+                return _invalid_params(
+                    request.get("id"),
+                    "Invalid params: clientInfo.name must be a string",
+                )
+
+        # Negotiate protocol version
+        if protocol_version and protocol_version in SUPPORTED_PROTOCOL_VERSIONS:
+            self.negotiated_version = protocol_version
+        else:
+            self.negotiated_version = LATEST_SUPPORTED_PROTOCOL_VERSION
+
+        self.client_info = client_info
+        self.client_capabilities = capabilities
+        self.state = McpSessionState.INITIALIZING
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request.get("id"),
+            "result": {
+                "protocolVersion": self.negotiated_version,
+                "capabilities": {
+                    "tools": {"listChanged": False},
+                },
+                "serverInfo": {
+                    "name": "eggcalc",
+                    "version": __version__,
+                },
+            },
+        }
+
+    def _handle_notifications_initialized(self) -> None:
+        """Transition from INITIALIZING to READY state."""
+        if self.state == McpSessionState.INITIALIZING:
+            self.state = McpSessionState.READY
+
+    def _handle_cancelled(self, request: dict) -> None:
+        """Handle notifications/cancelled using module-level cancellation state."""
+        params = request.get("params", {})
+        if not isinstance(params, dict):
+            return None
+        cancelled_id = params.get("requestId")
+        if (
+            cancelled_id is not None
+            and isinstance(cancelled_id, (str, int))
+            and not isinstance(cancelled_id, bool)
+        ):
+            with _cancelled_lock:
+                if cancelled_id not in _cancelled_requests:
+                    _cancelled_requests.add(cancelled_id)
+                    _cancelled_requests_order.append(cancelled_id)
+                while len(_cancelled_requests) > MAX_CANCELLED_REQUESTS:
+                    oldest = _cancelled_requests_order.popleft()
+                    _cancelled_requests.discard(oldest)
 
 
 def _levenshtein_distance(s1: str, s2: str) -> int:
@@ -1112,7 +1334,7 @@ def _handle_initialize(request: dict) -> dict:
         "jsonrpc": "2.0",
         "id": request.get("id"),
         "result": {
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": LATEST_SUPPORTED_PROTOCOL_VERSION,
             "capabilities": {
                 "tools": {"listChanged": False},
             },
@@ -1151,15 +1373,25 @@ def _handle_list_profiles(request: dict) -> dict:
     }
 
 
-def handle_request(request: Any) -> dict | None:
-    """Route MCP request to appropriate handler."""
+_default_session: McpSession | None = None
+
+
+def handle_request(request: Any, session: McpSession | None = None) -> dict | None:
+    """Route MCP request to appropriate handler.
+
+    If *session* is ``None`` a module-level default session (starting in
+    READY state) is used for backward compatibility — existing callers
+    that do not perform the handshake will continue to work unchanged.
+    Callers that pass an explicit ``McpSession`` get full lifecycle
+    enforcement.
+    """
     # Ensure MCP-safe defaults are in effect. Idempotent: a one-time
     # check is enough to set _mcp_mode and configure the default
     # evaluator. We do this on first call (not at import time) so that
     # importing this module for any reason does not globally disable
     # random/setvar in the default evaluator — only code that actually
     # uses the MCP server gets the MCP-safe defaults.
-    global _mcp_defaults_configured
+    global _mcp_defaults_configured, _default_session
     with _mcp_defaults_lock:
         if not _mcp_defaults_configured:
             _evaluator._mcp_mode = True
@@ -1206,61 +1438,20 @@ def handle_request(request: Any) -> dict | None:
             "Invalid Request: 'method' must be a string",
         )
 
-    if method == "tools/list":
-        return _handle_list_tools(request)
-    elif method == "tools/call":
-        return _handle_call_tool(request)
-    elif method == "profiles/list":
-        return _handle_list_profiles(request)
-    elif method == "initialize":
-        return _handle_initialize(request)
-    elif method == "notifications/initialized":
-        return None
-    elif method == "notifications/cancelled":
-        params = request.get("params", {})
-        if not isinstance(params, dict):
-            return None
-        cancelled_id = params.get("requestId")
-        if (
-            cancelled_id is not None
-            and isinstance(cancelled_id, (str, int))
-            and not isinstance(cancelled_id, bool)
-        ):
-            with _cancelled_lock:
-                if cancelled_id not in _cancelled_requests:
-                    _cancelled_requests.add(cancelled_id)
-                    _cancelled_requests_order.append(cancelled_id)
-                # Evict oldest entries (FIFO) if over limit. Using a
-                # deque + set pair gives deterministic eviction order
-                # so the record for a still-relevant request won't be
-                # discarded by set.pop()'s non-deterministic choice.
-                while len(_cancelled_requests) > MAX_CANCELLED_REQUESTS:
-                    oldest = _cancelled_requests_order.popleft()
-                    _cancelled_requests.discard(oldest)
-        return None
-    elif method == "ping":
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "result": {},
-        }
-    else:
-        # Cap method name to prevent large error messages from oversized input
-        display_method = method[:100] + "..." if len(method) > 100 else method
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "error": {
-                "code": -32601,
-                "message": f"Method not found: {display_method}",
-            },
-        }
+    # Get or create session for backward compatibility
+    if session is None:
+        if _default_session is None:
+            _default_session = McpSession()
+        session = _default_session
+
+    return session.handle_message(request)
 
 
 def main() -> int:
     """Main entry point for MCP server.
 
     Reads JSON-RPC requests from stdin and writes responses to stdout.
+    Creates one McpSession per connection for lifecycle management.
     """
     os.environ["EGGCALC_NO_CONFIG"] = "1"
     # MCP-safe defaults are configured by handle_request() on first call,
@@ -1268,6 +1459,7 @@ def main() -> int:
     # configure them here.
     request_times: deque[float] = deque()
     window = 1.0  # sliding window in seconds
+    session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
 
     for line in sys.stdin:
         try:
@@ -1277,40 +1469,22 @@ def main() -> int:
 
             response: dict[str, Any] | None = None
             if len(line.encode('utf-8')) > MAX_REQUEST_BYTES:
-                response = {
-                    "jsonrpc": "2.0",
-                    "id": None,
-                    "error": {
-                        "code": -32700,
-                        "message": f"Request exceeds maximum size of {MAX_REQUEST_BYTES} bytes",
-                    },
-                }
+                response = _parse_error(
+                    None,
+                    f"Request exceeds maximum size of {MAX_REQUEST_BYTES} bytes",
+                )
                 print(json.dumps(response), flush=True)
                 continue
 
             if line.startswith('['):
-                response = {
-                    "jsonrpc": "2.0",
-                    "id": None,
-                    "error": {
-                        "code": -32600,
-                        "message": "Batch requests are not supported",
-                    },
-                }
+                response = _invalid_request_error(None, "Batch requests are not supported")
                 print(json.dumps(response), flush=True)
                 continue
 
             try:
                 request = json.loads(line)
             except json.JSONDecodeError:
-                response = {
-                    "jsonrpc": "2.0",
-                    "id": None,
-                    "error": {
-                        "code": -32700,
-                        "message": "Parse error: invalid JSON",
-                    },
-                }
+                response = _parse_error(None, "Parse error: invalid JSON")
                 print(json.dumps(response), flush=True)
                 continue
 
@@ -1319,44 +1493,29 @@ def main() -> int:
                 request_times.popleft()
 
             if len(request_times) >= MAX_REQUESTS_PER_SECOND:
-                response = {
-                    "jsonrpc": "2.0",
-                    "id": request.get("id") if isinstance(request, dict) else None,
-                    "error": {
-                        "code": -32600,
-                        "message": f"Rate limit exceeded: max {MAX_REQUESTS_PER_SECOND} requests per second",
-                    },
-                }
+                response = _invalid_request_error(
+                    request.get("id") if isinstance(request, dict) else None,
+                    f"Rate limit exceeded: max {MAX_REQUESTS_PER_SECOND} requests per second",
+                )
                 print(json.dumps(response), flush=True)
                 continue
 
             request_times.append(now)
 
             try:
-                response = handle_request(request)
+                response = handle_request(request, session=session)
             except Exception as e:
                 message = _sanitize_error(str(e))[:2000]
-                response = {
-                    "jsonrpc": "2.0",
-                    "id": request.get("id") if isinstance(request, dict) else None,
-                    "error": {
-                        "code": -32603,
-                        "message": f"Internal error: {message}",
-                    },
-                }
+                response = _internal_error(
+                    request.get("id") if isinstance(request, dict) else None,
+                    message,
+                )
 
             if response is not None:
                 try:
                     print(json.dumps(response), flush=True)
                 except TypeError:
-                    fallback = {
-                        "jsonrpc": "2.0",
-                        "id": None,
-                        "error": {
-                            "code": -32603,
-                            "message": "Internal error: response not JSON-serializable",
-                        },
-                    }
+                    fallback = _internal_error(None, "response not JSON-serializable")
                     print(json.dumps(fallback), flush=True)
         except BrokenPipeError:
             return 0

@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Caret rewrite placed after `_normalize_spaced_unit_caret_exponents` to preserve unit caret shorthand (`5 m ^ 2`)
 - Documentation updated: README, AGENTS.md, architecture docs, API docs, functions.md, CLI docs, quickstart
 
+## [2.0.0] - Unreleased
+
+### Added
+- `McpSession` class for explicit MCP protocol lifecycle management (UNINITIALIZED → INITIALIZING → READY → CLOSED)
+- `McpSessionState` enum for lifecycle state tracking
+- Protocol version negotiation in `initialize` — client-requested version matched against `SUPPORTED_PROTOCOL_VERSIONS`
+- Centralized JSON-RPC error helpers (`_jsonrpc_error`, `_parse_error`, `_invalid_request`, `_method_not_found`, `_invalid_params`, `_internal_error`)
+- `SUPPORTED_SCHEMA_KEYWORDS` frozenset defining which JSON Schema keywords the validator supports
+- Schema lint tests (`test_mcp_schema_lint.py`) that walk all `TOOL_SCHEMAS` and reject unsupported keywords
+- Session-aware test helpers (`ready_session()`, `session_request()`) for clean handshake setup
+- `handle_request()` now accepts an optional `session` parameter for lifecycle enforcement
+- `main()` creates one `McpSession` per connection for lifecycle management
+
+### Changed
+- Tool requests before initialization now return `-32600` ("Server not initialized") instead of being silently accepted
+- Duplicate `initialize` requests return `-32600` ("Server already initialized")
+- Documentation updated for protocol version support, session lifecycle, error taxonomy, and migration notes
+
 ## [1.1.6] - 2026-07-14
 
 ### Fixed

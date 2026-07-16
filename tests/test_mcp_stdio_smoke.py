@@ -22,8 +22,13 @@ def test_mcp_tools_list_subprocess_smoke():
         stderr=subprocess.PIPE,
     )
     try:
-        request = _make_request("tools/list") + "\n"
-        stdout, stderr = proc.communicate(input=request.encode(), timeout=10)
+        # Send initialize, notifications/initialized, then tools/list
+        init_req = _make_request("initialize", 1) + "\n"
+        notif_req = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
+        list_req = _make_request("tools/list", 2) + "\n"
+        stdout, stderr = proc.communicate(
+            input=(init_req + notif_req + list_req).encode(), timeout=10
+        )
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
@@ -40,9 +45,17 @@ def test_mcp_tools_list_subprocess_smoke():
     lines = [line for line in stdout.decode().splitlines() if line.strip()]
     assert lines, f"No response lines from MCP server. stderr: {stderr.decode(errors='replace')}"
 
-    payload = json.loads(lines[0])
+    # Find the tools/list response (second response, first is initialize)
+    payload = None
+    for line in lines:
+        p = json.loads(line)
+        if p.get("id") == 2:
+            payload = p
+            break
+    assert payload is not None, f"No tools/list response found in: {lines}"
+
     assert payload["jsonrpc"] == "2.0", f"Not JSON-RPC: {payload}"
-    assert payload["id"] == 1, f"Wrong id: {payload}"
+    assert payload["id"] == 2, f"Wrong id: {payload}"
 
     tools = payload.get("result", {}).get("tools", [])
     assert tools, "No tools returned"

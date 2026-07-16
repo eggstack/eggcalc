@@ -27,6 +27,8 @@ from .units import (
     UNIT_CONVERSIONS,
     UnitValue,
     _align_compatible_units,
+    _floor_divide_quantities,
+    _modulo_quantities,
     _pow_unit_string,
     _simplify_unit_string,
     are_units_compatible,
@@ -2322,43 +2324,16 @@ class Evaluator(ast.NodeVisitor):
         # Same-unit floor division -> dimensionless (e.g., 6m // 3m -> 2).
         # Same-unit modulo -> remainder in divisor unit (e.g., 5m % 2m -> 1 m).
         # Compatible different-units scale to avoid precision loss (1 m // 1 cm -> 100, not 99).
+        # Both cases delegate to the shared helpers in units.py so that
+        # UnitValue.__floordiv__/__mod__ and the evaluator share one semantic path.
         if op_class in (ast.FloorDiv, ast.Mod) and isinstance(left, UnitValue) and left.unit:
             if isinstance(right, UnitValue) and right.unit:
-                aligned_left, aligned_right = _align_compatible_units(left, right)
-                if aligned_left.unit == aligned_right.unit:
-                    if left.unit == right.unit:
-                        if op_class is ast.FloorDiv:
-                            return aligned_left.value // aligned_right.value  # type: ignore[operator]
-                        # Modulo: remainder carries the divisor unit.
-                        return UnitValue(aligned_left.value % aligned_right.value, right.unit)  # type: ignore[operator]
-                    # Different but compatible units (e.g., m vs cm): scale
-                    # left up to right's unit to avoid float-precision loss.
-                    # 1 m // 1 cm becomes 100 cm // 1 cm = 100, not
-                    # 1 m // 0.01 m = 99 (precision loss).
-                    try:
-                        factor = self._get_conversion_factor(left.unit, right.unit)
-                    except EvaluationError:
-                        operator = "//" if op_class is ast.FloorDiv else "%"
-                        compound = _simplify_unit_string(f"{left.unit}{operator}{right.unit}")
-                        return UnitValue(result, compound)
-                    scaled_left = left.value * factor
+                try:
                     if op_class is ast.FloorDiv:
-                        return scaled_left // right.value  # type: ignore[operator]
-                    # Remainder is in right.unit; preserve it as a length.
-                    return UnitValue(scaled_left % right.value, right.unit)  # type: ignore[operator]
-                # Incompatible dimensions — reject rather than synthesize
-                # a misleading compound unit string (e.g., "m%s").
-                op_name = "floor division" if op_class is ast.FloorDiv else "modulo"
-                raise EvaluationError(
-                    f"Cannot compute {op_name} of incompatible units: "
-                    f"'{left.unit}' and '{right.unit}'"
-                )
-            if op_class is ast.FloorDiv and not isinstance(right, UnitValue) and right_unit_name:
-                compound = _simplify_unit_string(f"{left.unit}//{right_unit_name}")
-                return UnitValue(result, compound)
-            if op_class is ast.Mod and not isinstance(right, UnitValue) and right_unit_name:
-                compound = _simplify_unit_string(f"{left.unit}%{right_unit_name}")
-                return UnitValue(result, compound)
+                        return _floor_divide_quantities(left, right)
+                    return _modulo_quantities(left, right)
+                except ValueError as exc:
+                    raise EvaluationError(str(exc)) from exc
 
         # Compound unit detection for multiplication:
         # UnitValue * UnitValue -> simplified "left_unit*right_unit" (m*m -> m**2)

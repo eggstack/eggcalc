@@ -277,6 +277,38 @@ MAX_ORPHANED_REGEX_PROCESSES = 256    # Max orphaned regex child processes
 
 stdio-based JSON-RPC 2.0 server implementation with bounded thread pool, rate limiting, and orphaned process cleanup.
 
+### Session Lifecycle
+
+The MCP server uses `McpSession` and `McpSessionState` to manage protocol lifecycle:
+
+```
+UNINITIALIZED --initialize request--> INITIALIZING
+INITIALIZING  --notifications/initialized--> READY
+READY         --EOF/shutdown/close--> CLOSED
+```
+
+| State | Allowed Methods |
+|-------|----------------|
+| `UNINITIALIZED` | `initialize` only (plus `ping`, `notifications/initialized`, `notifications/cancelled` which are silently accepted) |
+| `INITIALIZING` | All methods except `initialize` are rejected until `notifications/initialized` arrives |
+| `READY` | All methods. Tool requests (`tools/list`, `tools/call`) are dispatched normally |
+| `CLOSED` | All methods rejected |
+
+Tool requests before initialization return `-32600` ("Server not initialized"). Duplicate `initialize` requests return `-32600` ("Server already initialized").
+
+### Protocol Version Negotiation
+
+Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05",)` with `LATEST_SUPPORTED_PROTOCOL_VERSION` derived from it. The `initialize` handler inspects the client's `protocolVersion`:
+
+- If the client requests a supported version, the server responds with that version.
+- If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version.
+
+This avoids breaking clients that depend on a specific version string while keeping the server future-proof.
+
+### Notification Dispatch
+
+Notifications (JSON-RPC messages with no `id`) are handled silently — they never produce a response. The `McpSession.handle_message()` method dispatches `notifications/initialized` and `notifications/cancelled` to their handlers and returns `None`. Unknown notifications are also silently ignored per the protocol.
+
 ### Server Constants
 
 All configurable via environment variables with clamping to safe ranges:
@@ -294,8 +326,12 @@ All configurable via environment variables with clamping to safe ranges:
 ### Request Handling
 
 ```python
-def handle_request(request: Any) -> dict | None:
-    """Route MCP request to appropriate handler."""
+def handle_request(request: Any, session: McpSession | None = None) -> dict | None:
+    """Route MCP request to appropriate handler.
+    
+    When session is None, a module-level default session (starting in
+    READY state) is used for backward compatibility.
+    """
 ```
 
 | Method | Handler | Description |
@@ -420,11 +456,13 @@ Two layers of validation before tool execution:
 | Code | Name | Description |
 |------|------|-------------|
 | -32700 | ParseError | Invalid JSON |
-| -32600 | InvalidRequest | Invalid JSON-RPC request (batch requests rejected, rate limit) |
+| -32600 | InvalidRequest | Invalid JSON-RPC request (batch requests rejected, rate limit, server already initialized, not initialized) |
 | -32601 | MethodNotFound | Unknown method or tool |
 | -32602 | InvalidParams | Invalid method parameters, profile violation, schema validation error |
 | -32603 | InternalError | Internal error (unhandled exceptions) |
 | -32000 | ToolError | Tool execution error (handler exception) |
+
+Centralized error helpers (`_jsonrpc_error`, `_parse_error`, `_invalid_request`, `_method_not_found`, `_invalid_params`, `_internal_error`) prevent code drift across return paths.
 
 ### Response Format
 
@@ -641,13 +679,14 @@ Cancellation is best-effort. The server checks cancellation records before dispa
 
 Main entry point:
 1. Sets `EGGCALC_NO_CONFIG=1`
-2. Reads JSON-RPC requests from stdin (line by line)
-3. Validates JSON-RPC version, ID, method
-4. Enforces rate limiting (sliding window)
-5. Rejects oversized requests and batch requests
-6. Handles each request via `handle_request()`
-7. Writes responses to stdout
-8. Returns exit code on EOF or `BrokenPipeError`
+2. Creates one `McpSession(initial_state=UNINITIALIZED)` per connection
+3. Reads JSON-RPC requests from stdin (line by line)
+4. Validates JSON-RPC version, ID, method
+5. Enforces rate limiting (sliding window)
+6. Rejects oversized requests and batch requests
+7. Handles each request via `handle_request(request, session=session)`
+8. Writes responses to stdout
+9. Returns exit code on EOF or `BrokenPipeError`
 
 For build compatibility, this is also available as `mcp_main()`:
 

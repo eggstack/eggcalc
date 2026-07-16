@@ -480,3 +480,113 @@ class TestAdversarialCaretInput:
 
         with pytest.raises((EvaluationError, ValueError, Exception)):
             evaluate_raw("2 ^")
+
+
+# ---------------------------------------------------------------------------
+# B4: Additional coverage from the plan's "Also cover" list
+# ---------------------------------------------------------------------------
+class TestAdditionalPowerCoverage:
+    """Additional coverage for powers around other operators, unit bases,
+    unit exponents, exponent bounds, and single-file parity."""
+
+    def test_power_around_division(self):
+        from eggcalc.evaluator import evaluate_raw
+
+        # ^ binds tighter than /: 6 / (2**2) = 6/4 = 1.5
+        assert evaluate_raw("6 / 2 ^ 2") == 1.5
+
+    def test_power_around_unary_plus(self):
+        from eggcalc.evaluator import evaluate_raw
+
+        # Unary plus applies after power: +(2**2) = 4
+        assert evaluate_raw("+2 ^ 2") == 4
+
+    def test_unit_valued_base(self):
+        from eggcalc.evaluator import evaluate_raw
+
+        # (3m) ** 2 -> 9.0 m**2 (unit exponentiation)
+        r = evaluate_raw("(3m) ^ 2")
+        from eggcalc.units import UnitValue
+
+        assert isinstance(r, UnitValue)
+        assert r.value == 9.0
+        assert r.unit == "m**2"
+
+    def test_unit_valued_exponent_rejected(self):
+        from eggcalc.evaluator import EvaluationError, evaluate_raw
+
+        with pytest.raises(EvaluationError, match="power with units"):
+            evaluate_raw("2 ** (3m)")
+
+    def test_exponent_bounds_enforced(self):
+        from eggcalc.evaluator import EvaluationError, evaluate_raw
+
+        with pytest.raises(EvaluationError, match="Exponent too large"):
+            evaluate_raw("2 ^ 10001")
+
+    def test_single_file_parity(self):
+        """Single-file eggcalc.py produces the same result as the package."""
+        from eggcalc.evaluator import evaluate_raw
+
+        r1 = evaluate_raw("2 + 3 ^ 2")
+        eggcalc_py = os.path.join(os.path.dirname(__file__), "..", "eggcalc.py")
+        if not os.path.exists(eggcalc_py):
+            pytest.skip("eggcalc.py not found")
+        proc = subprocess.run(
+            [sys.executable, eggcalc_py, "2 + 3 ^ 2"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert proc.returncode == 0
+        r2 = float(proc.stdout.strip())
+        assert r2 == r1
+
+
+# ---------------------------------------------------------------------------
+# E2: Adversarial long-quote and backslash sequences near input limit
+# ---------------------------------------------------------------------------
+class TestAdversarialQuoteBackslash:
+    """Long sequences of quotes and backslashes near the input limit do not
+    cause unbounded scanning or crashes."""
+
+    def test_long_quote_sequence(self):
+        from eggcalc.evaluator import EvaluationError, evaluate_raw
+
+        # 500 single quotes — should be rejected or handled without hanging
+        expr = "'" * 500
+        with pytest.raises(EvaluationError):
+            evaluate_raw(expr)
+
+    def test_long_backslash_sequence(self):
+        from eggcalc.evaluator import EvaluationError, evaluate_raw
+
+        # 500 backslashes — should be rejected or handled without hanging
+        expr = "\\" * 500
+        with pytest.raises(EvaluationError):
+            evaluate_raw(expr)
+
+    def test_mixed_quotes_and_parens_near_limit(self):
+        from eggcalc.evaluator import EvaluationError, evaluate_raw
+
+        # Combination of parens and carets — deeply nested right-associative
+        # power may hit recursion limits; verify it doesn't hang.
+        parts = []
+        for _ in range(20):
+            parts.append("(1 + 2)")
+        expr = " ^ ".join(parts)
+        try:
+            r = evaluate_raw(expr)
+            assert r > 0
+        except (RecursionError, OverflowError, EvaluationError):
+            pass  # deep nesting may exceed recursion/overflow limits — acceptable
+
+    def test_backslash_at_input_limit(self):
+        from eggcalc.evaluator import EvaluationError, evaluate_raw
+
+        # Fill most of the input limit with backslashes, then a valid expression
+        budget = 90_000
+        padding = "\\" * budget
+        expr = padding + " + 1"
+        with pytest.raises(EvaluationError):
+            evaluate_raw(expr)

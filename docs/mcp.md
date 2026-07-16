@@ -56,6 +56,60 @@ The server uses JSON-RPC 2.0 over stdio:
  "params": {"name": "math_eval", "arguments": {"expression": "5 + 3"}}}
 ```
 
+### Supported Protocol Versions
+
+The server supports MCP protocol version `2024-11-05`. Version negotiation happens during the `initialize` handshake:
+
+- If the client requests a supported version, the server responds with that version.
+- If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version (`2024-11-05`).
+
+Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS` in `eggcalc/mcp/server.py`.
+
+### Session Lifecycle
+
+Clients **must** complete the full initialization handshake before calling tools:
+
+1. Send an `initialize` request with `protocolVersion`, `capabilities`, and `clientInfo`.
+2. Receive the `initialize` response with `protocolVersion`, `capabilities`, and `serverInfo`.
+3. Send `notifications/initialized` to acknowledge the handshake.
+4. After step 3, the session is in **READY** state and tools can be called.
+
+```
+UNINITIALIZED --initialize request--> INITIALIZING
+INITIALIZING  --notifications/initialized--> READY
+READY         --EOF/shutdown/close--> CLOSED
+```
+
+Tool requests (`tools/list`, `tools/call`) before the session reaches READY state return JSON-RPC error `-32600` ("Server not initialized"). Duplicate `initialize` requests return `-32600` ("Server already initialized").
+
+### Notification Handling
+
+The server handles these notifications silently (no response is returned):
+
+- `notifications/initialized` — Transitions the session from INITIALIZING to READY.
+- `notifications/cancelled` — Records a cancellation request for pre-dispatch rejection.
+
+Unknown notifications are silently ignored per the JSON-RPC 2.0 spec. The server never returns a response to a notification.
+
+### Error Codes
+
+| Code | Name | When Returned |
+|------|------|---------------|
+| `-32700` | Parse error | Invalid JSON in request |
+| `-32600` | Invalid request | Non-object request, missing `jsonrpc`/`method`, invalid ID type, batch requests, server already initialized, server not initialized |
+| `-32601` | Method not found | Unknown top-level method (e.g., `foo/bar`) |
+| `-32602` | Invalid params | Invalid method parameters, profile violation, schema validation error |
+| `-32603` | Internal error | Unhandled server exception |
+| `-32000` | Tool error | Tool execution failure (handler exception, timeout) |
+
+### Migration Notes
+
+**Callers using `handle_request()` without a session:** The `handle_request(request, session=None)` function still works without an explicit `McpSession`. When `session` is `None`, a module-level default session (starting in READY state) is used for backward compatibility. This preserves behavior for callers that did not perform the handshake.
+
+**Callers that need full lifecycle enforcement:** Pass an explicit `McpSession(initial_state=McpSessionState.UNINITIALIZED)` to `handle_request()`. This enables initialize-first enforcement and lifecycle state tracking.
+
+**`main()` entry point:** Now creates one `McpSession(initial_state=UNINITIALIZED)` per connection, enabling full lifecycle management for stdio-based server usage.
+
 ## Selected Tool Examples
 
 ### math_eval

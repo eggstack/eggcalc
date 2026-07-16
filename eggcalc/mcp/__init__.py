@@ -8,6 +8,22 @@ from __future__ import annotations
 
 from . import tools
 from .schemas import TOOL_SCHEMAS
-from .server import handle_request, main
+from .server import (
+    LATEST_SUPPORTED_PROTOCOL_VERSION,
+    SUPPORTED_PROTOCOL_VERSIONS,
+    McpSession,
+    McpSessionState,
+    handle_request,
+    main,
+)
 
-__all__ = ["main", "handle_request", "TOOL_SCHEMAS", "tools"]
+__all__ = [
+    "main",
+    "handle_request",
+    "TOOL_SCHEMAS",
+    "tools",
+    "McpSession",
+    "McpSessionState",
+    "SUPPORTED_PROTOCOL_VERSIONS",
+    "LATEST_SUPPORTED_PROTOCOL_VERSION",
+]

@@ -208,37 +208,18 @@ class UnitValue:
         if isinstance(other, UnitValue):
             if other.value == 0:
                 raise ZeroDivisionError("Cannot divide UnitValue by zero")
-            if self.unit and other.unit:
-                if self.unit == other.unit:
-                    result = self.value // other.value
-                    unit = None
-                else:
-                    # Different but compatible units (e.g., m vs cm): scale
-                    # left up to right's unit to avoid float-precision loss.
-                    # 1 m // 1 cm becomes 100 cm // 1 cm = 100, not
-                    # 1 m // 0.01 m = 99.
-                    try:
-                        factor = get_conversion_factor(self.unit, other.unit)
-                    except (KeyError, ValueError):
-                        raise ValueError(
-                            f"Cannot floor-divide incompatible units: "
-                            f"'{self.unit}' and '{other.unit}'"
-                        )
-                    else:
-                        result = (self.value * factor) // other.value
-                        unit = None
-            elif other.unit:
-                raise ValueError(f"Cannot floor-divide a number by a unit value ('{other.unit}')")
-            else:
-                result = self.value // other.value
-                unit = self.unit
-        else:
-            if other == 0:
-                raise ZeroDivisionError("Cannot divide UnitValue by zero")
-            result = self.value // other  # type: ignore[operator]
-            unit = self.unit
+            if self.unit or other.unit:
+                quotient = _floor_divide_quantities(self, other)
+                UnitValue._check_overflow(quotient)
+                return UnitValue(quotient, None)
+            result = self.value // other.value
+            UnitValue._check_overflow(result)
+            return UnitValue(result, None)
+        if other == 0:
+            raise ZeroDivisionError("Cannot divide UnitValue by zero")
+        result = self.value // other  # type: ignore[operator]
         UnitValue._check_overflow(result)
-        return UnitValue(result, unit)
+        return UnitValue(result, self.unit)
 
     def __rfloordiv__(self, other: Numeric) -> UnitValue:
         if self.unit:
@@ -253,38 +234,18 @@ class UnitValue:
         if isinstance(other, UnitValue):
             if other.value == 0:
                 raise ZeroDivisionError("Cannot mod UnitValue by zero")
-            if self.unit and other.unit:
-                if self.unit == other.unit:
-                    result = self.value % other.value
-                    # Remainder carries the divisor unit (same-unit modulo).
-                    unit = other.unit
-                else:
-                    # Different but compatible units: scale left up to
-                    # right's unit to avoid float-precision loss.
-                    try:
-                        factor = get_conversion_factor(self.unit, other.unit)
-                    except (KeyError, ValueError):
-                        raise ValueError(
-                            f"Cannot compute modulo of incompatible units: "
-                            f"'{self.unit}' and '{other.unit}'"
-                        )
-                    else:
-                        scaled = self.value * factor
-                        result = scaled % other.value
-                        # Remainder is in right.unit; express in right's unit.
-                        unit = other.unit
-            elif other.unit:
-                raise ValueError(f"Cannot compute modulo by a unit value ('{other.unit}')")
-            else:
-                result = self.value % other.value
-                unit = self.unit
-        else:
-            if other == 0:
-                raise ZeroDivisionError("Cannot mod UnitValue by zero")
-            result = self.value % other  # type: ignore[operator]
-            unit = self.unit
+            if self.unit or other.unit:
+                remainder = _modulo_quantities(self, other)
+                UnitValue._check_overflow(remainder.value)
+                return remainder
+            result = self.value % other.value
+            UnitValue._check_overflow(result)
+            return UnitValue(result, None)
+        if other == 0:
+            raise ZeroDivisionError("Cannot mod UnitValue by zero")
+        result = self.value % other  # type: ignore[operator]
         UnitValue._check_overflow(result)
-        return UnitValue(result, unit)
+        return UnitValue(result, self.unit)
 
     def __rmod__(self, other: Numeric) -> UnitValue:
         if self.unit:
