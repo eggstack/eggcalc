@@ -2,6 +2,24 @@
 
 All notable changes to eggcalc are documented here.
 
+## [1.2.0] - 2026-07-16
+
+### Fixed
+- Calculator caret (`^`) rewritten to exponentiation before AST parsing in `evaluate_raw()` and CLI
+- `evaluate()` now correctly treats `^` as bitwise XOR (Python AST semantics)
+- Same-unit modulo returns dimensioned remainder in divisor unit (e.g., `5m % 2m` → `1 m`)
+- Cross-unit modulo converts dividend to divisor unit (e.g., `1m % 30cm` → `10 cm`)
+- Incompatible-dimension floor/mod now rejected (no misleading compound unit strings)
+
+### Added
+- `_rewrite_calculator_caret()` tokenizer-aware helper for safe `^` → `**` rewriting
+- `_floor_divide_quantities()` and `_modulo_quantities()` shared helpers in units.py
+- 59 new tests in `test_calculator_operator_semantics.py` covering precedence, associativity, word-form XOR, unit floor/mod, CLI subprocess, and adversarial input
+
+### Changed
+- Caret rewrite placed after `_normalize_spaced_unit_caret_exponents` to preserve unit caret shorthand (`5 m ^ 2`)
+- Documentation updated: README, AGENTS.md, architecture docs, API docs, functions.md, CLI docs, quickstart
+
 ## [1.1.4] - 2026-06-30
 
 ### Fixed

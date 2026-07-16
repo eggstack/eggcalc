@@ -52,6 +52,35 @@ calc "temp(100, C, F)"
 # 212 F (temperature conversion)
 ```
 
+### Powers and Exponentiation
+
+```bash
+calc "2 ^ 10"
+# 1024 (^ is exponentiation)
+
+calc "2 ** 10"
+# 1024 (** also works)
+
+calc "2 + 3 ^ 2"
+# 11 (power before addition)
+
+calc "5 xor 3"
+# 6 (bitwise XOR via word form)
+```
+
+### Floor Division and Modulo with Units
+
+```bash
+calc "6 m // 3 m"
+# 2 (dimensionless quotient)
+
+calc "5 m % 2 m"
+# 1 m (remainder in divisor unit)
+
+calc "1 m % 30 cm"
+# 10 cm (converts to divisor unit)
+```
+
 ### Scientific Functions
 
 ```bash
@@ -63,9 +92,6 @@ calc "sqrt(144)"
 
 calc "log(e)"
 # 1.0
-
-calc "2^10"
-# 1024
 ```
 
 ### Physical Constants
@@ -131,6 +157,8 @@ result = evaluate_raw("30m + 100ft")      # 60.48 m
 from eggcalc import evaluate  # Note: different import path
 
 result = evaluate("5+3")  # 8 - valid Python math syntax
+# Note: evaluate() treats ^ as bitwise XOR, not exponentiation
+# Use ** for exponentiation, or evaluate_raw() for calculator syntax
 ```
 
 **For untrusted input (with timeout):**

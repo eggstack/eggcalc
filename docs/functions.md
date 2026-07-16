@@ -242,6 +242,123 @@ calc 'setvar("x", 10)'
 calc "x + 5"          # 15
 ```
 
+## Operators
+
+eggcalc supports standard arithmetic, power, bitwise, floor division, and modulo operators. Operator semantics differ between the direct `evaluate()` function and the user-facing `evaluate_raw()` / CLI pipeline.
+
+### Arithmetic
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `+` | Addition | `5 + 3` → `8` |
+| `-` | Subtraction | `5 - 3` → `2` |
+| `*` | Multiplication | `5 * 3` → `15` |
+| `/` | Division | `10 / 3` → `3.333...` |
+
+### Power (`^` / `**`)
+
+The caret (`^`) has different semantics depending on the evaluation path:
+
+**`evaluate()` (direct AST evaluation):**
+
+- `^` is **bitwise XOR** (Python semantics): `5 ^ 3` → `6`
+- `**` is exponentiation: `2 ** 10` → `1024`
+
+**`evaluate_raw()` and CLI (user-facing):**
+
+- `^` is **rewritten to `**`** (exponentiation): `2 ^ 10` → `1024`
+- `**` is exponentiation: `2 ** 10` → `1024`
+- Malformed caret sequences (`^^`, `^*`, `*^`) are rejected
+
+```bash
+calc "2 ^ 10"          # 1024 (caret = exponentiation)
+calc "2 + 3 ^ 2"       # 11 (^ has higher precedence)
+calc "2 ^ 3 ^ 2"       # 512 (right-associative)
+```
+
+To perform bitwise XOR through the user-facing pipeline, use the `xor` or `bitxor` word forms:
+
+```bash
+calc "5 xor 3"         # 6
+calc "5 bitxor 3"      # 6
+```
+
+### Bitwise XOR (direct `evaluate()`)
+
+When using `evaluate()` directly, `^` is bitwise XOR:
+
+```python
+from eggcalc import evaluate
+evaluate("5 ^ 3")      # 6 (bitwise XOR)
+evaluate("2 ** 10")    # 1024 (exponentiation)
+```
+
+### Floor Division
+
+| Operator | Description |
+|----------|-------------|
+| `//` | Floor division |
+
+For plain numbers, `//` returns the floor quotient:
+
+```bash
+calc "7 // 2"          # 3
+```
+
+For quantities, floor division returns a **dimensionless** result:
+
+```bash
+calc "6 m // 3 m"      # 2
+calc "1 m // 30 cm"    # 3 (converts to same unit first)
+```
+
+Incompatible units are rejected:
+
+```bash
+calc "5 m // 2 s"      # Error (incompatible dimensions)
+```
+
+### Modulo
+
+| Operator | Description |
+|----------|-------------|
+| `%` | Modulo (remainder) |
+
+For plain numbers, `%` returns the remainder:
+
+```bash
+calc "10 % 3"          # 1
+```
+
+For quantities, modulo returns a result **in the divisor unit**:
+
+```bash
+calc "5 m % 2 m"       # 1 m
+calc "1 m % 30 cm"     # 10 cm (converts to divisor unit)
+```
+
+Incompatible units are rejected:
+
+```bash
+calc "5 m % 2 s"       # Error (incompatible dimensions)
+```
+
+### Precedence
+
+Operators follow standard mathematical precedence:
+
+1. `()` — Parentheses
+2. `**` / `^` — Power (right-associative)
+3. `*`, `/`, `//`, `%` — Multiplicative
+4. `+`, `-` — Additive
+
+```bash
+calc "2 + 3 * 4"       # 14 (multiplication first)
+calc "(2 + 3) * 4"     # 20 (parentheses override)
+calc "2 + 3 ^ 2"       # 11 (power before addition)
+calc "2 * 3 ^ 2"       # 18 (power before multiplication)
+```
+
 ## Utility
 
 | Function | Description |

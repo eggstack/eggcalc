@@ -152,6 +152,7 @@ The CLI does not expose environment variable overrides for calculator input leng
 calc "2 + 2"           # 4
 calc "10 / 3"          # 3.333...
 calc "2 ** 10"         # 1024
+calc "2 ^ 10"          # 1024 (^ is exponentiation in CLI)
 calc "100 % 7"         # 2 (modulo)
 ```
 
@@ -163,7 +164,24 @@ calc "5 + 3 * 2"
 
 calc "(5 + 3) * 2"
 # 16 (parentheses override)
+
+calc "2 + 3 ^ 2"
+# 11 (power before addition)
+
+calc "2 ^ 3 ^ 2"
+# 512 (power is right-associative)
 ```
+
+### Bitwise XOR
+
+Use `xor` or `bitxor` word forms for bitwise XOR:
+
+```bash
+calc "5 xor 3"         # 6
+calc "5 bitxor 3"      # 6
+```
+
+The `^` operator in CLI is exponentiation, not bitwise XOR. Use `xor`/`bitxor` for XOR.
 
 ### Natural Language
 
@@ -201,6 +219,23 @@ calc "100C in F"       # 212 F
 calc "30m + 100ft"     # 60.48 m (auto-converts)
 calc "2h + 30min"      # 2.5 h
 calc "60mi / h"        # 60 mi/h (compound)
+```
+
+### Floor Division and Modulo with Units
+
+Floor division of quantities returns a dimensionless quotient. Modulo returns a remainder in the divisor unit:
+
+```bash
+calc "6 m // 3 m"      # 2 (dimensionless)
+calc "5 m % 2 m"       # 1 m (remainder in divisor unit)
+calc "1 m % 30 cm"     # 10 cm (converts to divisor unit)
+```
+
+Incompatible units are rejected:
+
+```bash
+calc "5 m // 2 s"      # Error: incompatible dimensions
+calc "5 m % 2 s"       # Error: incompatible dimensions
 ```
 
 ### Functions
