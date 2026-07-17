@@ -36,10 +36,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `handle_request()` now accepts an optional `session` parameter for lifecycle enforcement
 - `main()` creates one `McpSession` per connection for lifecycle management
 
+- `_Finding` TypedDict (`code`, `severity`, `message`, `line`, `column`) for structured inspection findings with closed severity vocabulary (`error`, `warning`, `info`)
+- `build_requirements`, `build_backend_path`, `dynamic`, `entry_points`, `gui_scripts`, `urls` fields to `pyproject_inspect()` result
+- `requirement_includes`, `index_options`, `hash_options` fields to `requirements_inspect()` result
+- Conservative lexical classifier for requirements-line classification (replaces broad suspicious-character regex)
+- Multiline continuation support for compiled requirements with backslash continuation
+- Stable finding codes for Cargo inspections (`CARGO_PARSE_ERROR`, `CARGO_MISSING_PACKAGE_NAME`, etc.)
+- Unicode confusable detection for Cargo dependency names
+- 37 fixture files across Python, Cargo, JavaScript, Go, requirements, and lockfile ecosystems
+- 257 comprehensive inspection tests with field-level assertions, negative/boundary tests, and invariant tests
+
 ### Changed
-- Tool requests before initialization now return `-32600` ("Server not initialized") instead of being silently accepted
-- Duplicate `initialize` requests return `-32600` ("Server already initialized")
-- Documentation updated for protocol version support, session lifecycle, error taxonomy, and migration notes
+- `pyproject_inspect()` now reads `build-backend` from `build-system.build-backend` instead of deriving it from requires[0]
+- `pyproject_inspect()` tool sections read nested `data["tool"]` dict instead of flat `tool.`-prefixed keys
+- `pyproject_inspect()` parse-error location uses `col_offset` with fallback for Python 3.11 compatibility
+- `requirements_inspect()` suspicious-character matching replaced with conservative checks targeting shell metacharacters, unbalanced brackets, and control characters
+- Cargo findings migrated from `list[str]` to `list[_Finding]` with stable codes
+- Cargo inspection no longer flags valid virtual workspaces as missing package metadata
+- MCP output schemas updated with new inspection result fields
+- Documentation updated: architecture/exact.md, AGENTS.md field conventions, tool_inventory.md
 
 ## [1.1.6] - 2026-07-14
 
