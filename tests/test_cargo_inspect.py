@@ -153,6 +153,17 @@ common = { workspace = true }
 serde = { version = "1.0", workspace = true }
 """
 
+VIRTUAL_WORKSPACE_TOML = """\
+[workspace]
+members = [
+    "crates/core",
+    "crates/cli",
+]
+"""
+
+EMPTY_VIRTUAL_WORKSPACE_TOML = """\
+"""
+
 
 class TestNormalizeIdent:
     """Tests for identifier normalization."""
@@ -349,7 +360,7 @@ class TestCargoTomlInspectMissingEdition:
     def test_missing_edition_finding(self):
         result = cargo_toml_inspect(MISSING_EDITION_TOML)
         assert result["parse_ok"] is True
-        assert any("edition" in f.lower() for f in result["findings"])
+        assert any("edition" in f["message"].lower() for f in result["findings"])
 
     def test_missing_edition_package(self):
         result = cargo_toml_inspect(MISSING_EDITION_TOML)
@@ -360,15 +371,15 @@ class TestCargoTomlInspectMissingEdition:
             '[package]\n' 'name = "member"\n' 'version = "0.1.0"\n' 'edition.workspace = true\n'
         )
         result = cargo_toml_inspect(toml_text)
-        edition_findings = [f for f in result["findings"] if "edition" in f.lower()]
+        edition_findings = [f for f in result["findings"] if "edition" in f["message"].lower()]
         assert edition_findings == []
 
     def test_cargo_toml_missing_edition_message_updated(self):
         toml_text = '[package]\n' 'name = "lib"\n' 'version = "0.1.0"\n'
         result = cargo_toml_inspect(toml_text)
-        edition_findings = [f for f in result["findings"] if "edition" in f.lower()]
+        edition_findings = [f for f in result["findings"] if "edition" in f["message"].lower()]
         assert len(edition_findings) == 1
-        assert "workspace" in edition_findings[0].lower()
+        assert "workspace" in edition_findings[0]["message"].lower()
 
 
 @_needs_tomllib
@@ -383,7 +394,7 @@ class TestCargoTomlInspectConfusables:
 
     def test_confusable_finding(self):
         result = cargo_toml_inspect(CONFUSABLE_DEPS_TOML)
-        assert any("confusable" in f.lower() for f in result["findings"])
+        assert any("confusable" in f["message"].lower() for f in result["findings"])
 
 
 @_needs_tomllib
@@ -437,13 +448,16 @@ class TestCargoTomlInspectInvalid:
     def test_invalid_toml(self):
         result = cargo_toml_inspect(INVALID_TOML)
         assert result["parse_ok"] is False
-        assert any("parse" in f.lower() for f in result["findings"])
+        assert any("parse" in f["message"].lower() for f in result["findings"])
 
     def test_empty_toml(self):
         result = cargo_toml_inspect(EMPTY_TOML)
         assert result["parse_ok"] is True
         assert result["package"].get("name") is None
-        assert any("missing" in f.lower() for f in result["findings"])
+        assert any(
+            "missing" in f["message"].lower() or "no" in f["message"].lower()
+            for f in result["findings"]
+        )
 
 
 class TestCargoTomlInspectInputLimits:
@@ -453,7 +467,7 @@ class TestCargoTomlInspectInputLimits:
         huge = "[package]\n" + "x" * 200_001
         result = cargo_toml_inspect(huge)
         assert result["parse_ok"] is False
-        assert any("exceeds" in f.lower() for f in result["findings"])
+        assert any("exceeds" in f["message"].lower() for f in result["findings"])
 
 
 @_needs_tomllib
@@ -484,3 +498,38 @@ class TestCargoTomlInspectMCP:
         response = cargo_toml_inspect_mcp(huge)
         assert response["ok"] is False
         assert response["error_type"] == "input_too_large"
+
+    def test_mcp_findings_are_structured(self):
+        response = cargo_toml_inspect_mcp(MISSING_EDITION_TOML)
+        assert response["ok"] is True
+        for f in response["findings"]:
+            assert "code" in f
+            assert "severity" in f
+            assert "message" in f
+
+
+@_needs_tomllib
+class TestCargoTomlInspectVirtualWorkspace:
+    """Tests for virtual workspace handling."""
+
+    def test_virtual_workspace_no_findings(self):
+        result = cargo_toml_inspect(VIRTUAL_WORKSPACE_TOML)
+        assert result["parse_ok"] is True
+        assert result["workspace"]["present"] is True
+        no_pkg_ws = [f for f in result["findings"] if f["code"] == "CARGO_NO_PACKAGE_OR_WORKSPACE"]
+        assert no_pkg_ws == []
+
+    def test_empty_no_package_or_workspace(self):
+        result = cargo_toml_inspect(EMPTY_VIRTUAL_WORKSPACE_TOML)
+        assert result["parse_ok"] is True
+        assert any(f["code"] == "CARGO_NO_PACKAGE_OR_WORKSPACE" for f in result["findings"])
+
+    def test_structured_finding_codes(self):
+        result = cargo_toml_inspect(MISSING_EDITION_TOML)
+        codes = [f["code"] for f in result["findings"]]
+        assert "CARGO_MISSING_EDITION" in codes
+
+    def test_structured_finding_severity(self):
+        result = cargo_toml_inspect(INVALID_TOML)
+        severities = [f["severity"] for f in result["findings"]]
+        assert "error" in severities

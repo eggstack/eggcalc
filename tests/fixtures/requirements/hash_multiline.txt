@@ -1,0 +1,6 @@
+# Hash-pinned packages (hash options on their own lines)
+requests==2.31.0
+--hash=sha256:abc123def456
+--hash=sha256:7890123456789012345678
+click==8.1.7
+--hash=sha256:fedcba987654

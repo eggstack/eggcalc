@@ -1,0 +1,9 @@
+[package]
+name = "confusable-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+my_lib = "1.0"
+my-lib = "2.0"
+mylib = "3.0"

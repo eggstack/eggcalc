@@ -4836,33 +4836,14 @@ def cargo_toml_inspect_mcp(
     try:
         result = _cargo_toml_inspect(text, check_workspace, check_dependencies)
 
-        findings: list[dict] = []
-        for msg in result.get("findings", []):
-            if "parse error" in msg.lower() or "not a table" in msg.lower():
-                severity = "error"
-                code = "CARGO_PARSE_ERROR"
-            elif "missing" in msg.lower():
-                severity = "warn"
-                code = "CARGO_MISSING_FIELD"
-            elif "confusable" in msg.lower():
-                severity = "warn"
-                code = "CARGO_CONFUSABLE_NAMES"
-            elif "suspicious" in msg.lower():
-                severity = "warn"
-                code = "CARGO_SUSPICIOUS_NAME"
-            elif "unrecognized" in msg.lower():
-                severity = "warn"
-                code = "CARGO_UNRECOGNIZED_VALUE"
-            else:
-                severity = "info"
-                code = "CARGO_NOTE"
-            findings.append(
-                {
-                    "code": code,
-                    "severity": severity,
-                    "message": msg,
-                }
-            )
+        findings = [
+            {
+                "code": f.get("code", "UNKNOWN"),
+                "severity": f.get("severity", "info"),
+                "message": f.get("message", ""),
+            }
+            for f in result.get("findings", [])
+        ]
 
         machine_code: str | None = None
         if not result.get("parse_ok"):

@@ -1,0 +1,4 @@
+# Environment markers
+pywin32>=1.0; sys_platform == "win32"
+uvicorn[standard]>=0.20; python_version >= "3.10"
+asyncio; python_version < "3.10" and sys_platform != "win32"

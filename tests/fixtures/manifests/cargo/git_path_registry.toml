@@ -1,0 +1,10 @@
+[package]
+name = "source-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+local_lib = { path = "../local-lib", version = "0.1.0" }
+remote = { git = "https://github.com/example/repo", branch = "main" }
+pinned = { git = "https://github.com/example/other", tag = "v1.0" }
+from_registry = { version = "2.0", registry = "crates-io" }

@@ -1,0 +1,5 @@
+# Malformed extras
+pkg[unclosed
+pkg[missing_bracket
+pkg[]empty
+pkg[valid]=1.0

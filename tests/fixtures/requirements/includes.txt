@@ -1,0 +1,6 @@
+# Requirement and constraint includes
+-r base-requirements.txt
+-r ../shared/requirements.txt
+-c constraints.txt
+--constraint pins.txt
+--requirement test-requirements.txt

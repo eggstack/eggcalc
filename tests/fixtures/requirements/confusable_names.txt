@@ -1,0 +1,6 @@
+# Unicode confusable package names
+requests
+rеquеsts
+рequеsts
+httpx
+httрх

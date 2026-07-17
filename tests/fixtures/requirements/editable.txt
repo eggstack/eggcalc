@@ -1,0 +1,4 @@
+# Editable installs
+-e ./my-package
+-e git+https://github.com/user/repo.git@main#egg=repo
+--editable ./local-lib

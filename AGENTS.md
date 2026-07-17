@@ -119,6 +119,10 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 - `validate.py` enforces `MAX_INPUT_LENGTH = 100_000` on `check_brackets()` and `validate_json()`.
 - `visible_repr()` check order is correct: variation selector (U+FE00-FE0F) **before** combining mark check.
 - `utf8_bytes()` returns `bytes`, not an int count.
+- `manifests.py` functions (`pyproject_inspect`, `requirements_inspect`, etc.) are NOT re-exported from `__init__.py`. Import directly.
+- `cargo.py` `cargo_toml_inspect()` IS re-exported from `__init__.py`.
+- Both modules use the shared `_Finding` TypedDict from `manifests.py` for structured findings.
+- Inspection is lexical/structural, not dependency resolution. Package-manager signals are heuristic.
 
 ## TypedDict Field Conventions
 
@@ -128,6 +132,9 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - `ScriptInfo`: `index`, `char`, `script`, `codepoint` (not `count`, `start`, `end`)
 - `detect_mixed_scripts` returns `MixedScriptsResult` with keys `mixed_scripts`, `scripts`, `positions`
 - `CommonPrefixSuffix`: `common_prefix_len`, `common_suffix_len` (not `prefix`, `suffix`)
+- `InspectionFinding` (used in `_Finding`): `code`, `severity`, `message`, `line`, `column`
+  - Severity vocabulary: `error`, `warning`, `info`
+  - Finding codes use stable identifiers: `TOML_PARSE_ERROR`, `INPUT_TOO_LONG`, `CARGO_MISSING_PACKAGE_NAME`, etc.
 
 ## MCP Server
 

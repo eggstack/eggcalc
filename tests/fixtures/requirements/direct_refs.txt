@@ -1,0 +1,3 @@
+# Direct URL references
+mypkg @ https://files.pythonhosted.org/packages/mypkg-1.0.0.tar.gz
+otherpkg @ https://example.com/otherpkg-2.0.0.whl

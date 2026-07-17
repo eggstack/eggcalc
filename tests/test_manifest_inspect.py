@@ -149,7 +149,7 @@ git+https://github.com/user/repo.git@main
         assert r["parse_ok"] is True
         assert "requests>=2.28" in r["package_specs"]
         assert "click" in r["package_specs"]
-        assert any("-r" in e for e in r["constraints_includes"])
+        assert any("-r" in e for e in r["requirement_includes"])
         assert any("-e" in e for e in r["editable_refs"])
         assert any("git+" in v for v in r["vcs_refs"])
 

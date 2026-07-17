@@ -1280,6 +1280,15 @@ UnicodePolicyCheckResult(
 |----------|---------|-------------|
 | `cargo_toml_inspect(text)` | CargoInspectResult | Analyze Cargo.toml structure |
 
+### Notes
+
+- `cargo_toml_inspect()` IS re-exported from `__init__.py`.
+- `CargoInspectResult.findings` is `list[_Finding]` (structured, not `list[str]`). Uses the shared `_Finding` TypedDict from `manifests.py`.
+- Virtual workspace handling: no `[package]` is intentional when `[workspace]` is present.
+- Finding codes are stable identifiers: `CARGO_PARSE_ERROR`, `CARGO_MISSING_PACKAGE_NAME`, etc.
+- Both `cargo.py` and `manifests.py` use the shared `_Finding` TypedDict for structured findings.
+- Inspection is lexical/structural, not dependency resolution. Package-manager signals are heuristic.
+
 ### CargoInspectResult TypedDict
 
 ```python
@@ -1291,7 +1300,7 @@ CargoInspectResult(
     path_dependencies=list[str],
     suspicious_dependency_names=list[str],
     duplicate_or_confusable_dependency_names=list[str],
-    findings=list[str],
+    findings=list[_Finding],
 )
 ```
 
@@ -1416,6 +1425,52 @@ Lexical/structural inspection of project manifests without network or filesystem
 | `requirements_inspect(text)` | RequirementsInspectResult | Inspect requirements.txt content |
 | `go_mod_inspect(text)` | GoModInspectResult | Inspect go.mod content |
 | `lockfile_summary(text, kind)` | LockfileSummaryResult | Summarize a lockfile |
+
+### TypedDicts
+
+```python
+class _Finding(TypedDict, total=False):
+    code: str           # Stable identifier (e.g. TOML_PARSE_ERROR, INPUT_TOO_LONG)
+    severity: str       # "error", "warning", or "info"
+    message: str
+    line: int
+    column: int
+
+class PyprojectInspectResult(TypedDict, total=False):
+    parse_ok: bool
+    project_name: str | None
+    project_version: str | None
+    build_backend: str | None        # From build-system.build-backend
+    build_requirements: list[str]    # From build-system.requires
+    build_backend_path: list[str] | None
+    requires_python: str | None
+    dependencies_count: int
+    optional_dependency_groups: dict[str, int]
+    scripts: dict[str, str]
+    tool_sections: list[str]         # From nested data["tool"] dict
+    package_manager_signals: list[str]
+    dynamic: list[str] | None
+    entry_points: dict[str, str] | None
+    gui_scripts: dict[str, str] | None
+    urls: dict[str, str] | None
+    findings: list[_Finding]
+
+class RequirementsInspectResult(TypedDict, total=False):
+    parse_ok: bool
+    total_lines: int
+    package_specs: list[str]
+    editable_refs: list[str]
+    direct_urls: list[str]
+    vcs_refs: list[str]
+    comments: list[str]
+    requirement_includes: list[str]   # -r/--requirement lines
+    constraints_includes: list[str]   # -c/--constraint lines only
+    index_options: list[str]          # --index-url, --find-links, --trusted-host
+    hash_options: list[str]           # --hash=... lines
+    environment_markers: list[str]
+    suspicious_lines: list[str]
+    findings: list[_Finding]
+```
 
 ---
 

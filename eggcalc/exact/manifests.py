@@ -8,7 +8,6 @@ filesystem access. All functions are pure and side-effect-free.
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, TypedDict, cast
 
 _MAX_INPUT_LENGTH = 500_000
@@ -20,6 +19,7 @@ class _Finding(TypedDict, total=False):
     severity: str
     message: str
     line: int
+    column: int
 
 
 class PyprojectInspectResult(TypedDict, total=False):
@@ -27,12 +27,18 @@ class PyprojectInspectResult(TypedDict, total=False):
     project_name: str | None
     project_version: str | None
     build_backend: str | None
+    build_requirements: list[str]
+    build_backend_path: list[str] | None
     requires_python: str | None
     dependencies_count: int
     optional_dependency_groups: dict[str, int]
     scripts: dict[str, str]
     tool_sections: list[str]
     package_manager_signals: list[str]
+    dynamic: list[str] | None
+    entry_points: dict[str, str] | None
+    gui_scripts: dict[str, str] | None
+    urls: dict[str, str] | None
     findings: list[_Finding]
 
 
@@ -61,7 +67,10 @@ class RequirementsInspectResult(TypedDict, total=False):
     direct_urls: list[str]
     vcs_refs: list[str]
     comments: list[str]
+    requirement_includes: list[str]
     constraints_includes: list[str]
+    index_options: list[str]
+    hash_options: list[str]
     environment_markers: list[str]
     suspicious_lines: list[str]
     findings: list[_Finding]
@@ -87,10 +96,12 @@ class LockfileSummaryResult(TypedDict, total=False):
     findings: list[_Finding]
 
 
-def _finding(code: str, severity: str, message: str, line: int = 0) -> _Finding:
+def _finding(code: str, severity: str, message: str, line: int = 0, column: int = 0) -> _Finding:
     f: _Finding = {"code": code, "severity": severity, "message": message}
     if line:
         f["line"] = line
+    if column:
+        f["column"] = column
     return f
 
 
@@ -144,8 +155,9 @@ def pyproject_inspect(text: str) -> PyprojectInspectResult:
     try:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
-        line_no = getattr(e, " lineno", 0) or 0
-        findings.append(_finding("TOML_PARSE_ERROR", "error", str(e), line_no))
+        line_no = getattr(e, "lineno", None) or getattr(e, "line", 0) or 0
+        col_no = getattr(e, "colno", None) or getattr(e, "column", None) or 0
+        findings.append(_finding("TOML_PARSE_ERROR", "error", str(e), line_no, col_no))
         return PyprojectInspectResult(parse_ok=False, findings=findings)
 
     result: dict[str, Any] = {"parse_ok": True}
@@ -156,11 +168,10 @@ def pyproject_inspect(text: str) -> PyprojectInspectResult:
     result["requires_python"] = project.get("requires-python")
 
     build_system = data.get("build-system", {})
-    build_backend = build_system.get("requires")
-    if isinstance(build_backend, list) and build_backend:
-        result["build_backend"] = build_backend[0]
-    else:
-        result["build_backend"] = None
+    result["build_backend"] = build_system.get("build-backend")
+    build_requires = build_system.get("requires", [])
+    result["build_requirements"] = build_requires if isinstance(build_requires, list) else []
+    result["build_backend_path"] = build_system.get("backend-path")
 
     deps = project.get("dependencies", [])
     result["dependencies_count"] = len(deps) if isinstance(deps, list) else 0
@@ -173,7 +184,23 @@ def pyproject_inspect(text: str) -> PyprojectInspectResult:
     scripts = project.get("scripts", {})
     result["scripts"] = dict(scripts) if isinstance(scripts, dict) else {}
 
-    tool_sections = [k for k in data if k.startswith("tool.")]
+    dynamic = project.get("dynamic")
+    result["dynamic"] = dynamic if isinstance(dynamic, list) else None
+
+    entry_points = project.get("entry-points", {})
+    result["entry_points"] = dict(entry_points) if isinstance(entry_points, dict) else None
+
+    gui_scripts = project.get("gui-scripts", {})
+    result["gui_scripts"] = dict(gui_scripts) if isinstance(gui_scripts, dict) else None
+
+    urls = project.get("urls", {})
+    result["urls"] = dict(urls) if isinstance(urls, dict) else None
+
+    tool_data = data.get("tool", {})
+    if isinstance(tool_data, dict):
+        tool_sections = sorted(f"tool.{k}" for k in tool_data.keys())
+    else:
+        tool_sections = []
     result["tool_sections"] = tool_sections
 
     pm_signals: list[str] = []
@@ -195,8 +222,15 @@ def pyproject_inspect(text: str) -> PyprojectInspectResult:
         findings.append(_finding("MISSING_PROJECT_NAME", "warning", "No [project] name found"))
     if not project.get("version"):
         findings.append(_finding("MISSING_PROJECT_VERSION", "info", "No [project] version found"))
-    if not build_system.get("requires"):
-        findings.append(_finding("MISSING_BUILD_BACKEND", "info", "No build-system requires found"))
+    if "build-system" in data and not build_system.get("build-backend"):
+        if not any(f["code"] == "MISSING_BUILD_BACKEND" for f in findings):
+            findings.append(
+                _finding(
+                    "MISSING_BUILD_BACKEND",
+                    "warning",
+                    "No build-system.build-backend found",
+                )
+            )
 
     result["findings"] = _truncate_findings(findings)
     return cast(PyprojectInspectResult, result)
@@ -273,6 +307,125 @@ def _extract_workspaces(data: dict) -> list[str] | None:
     return None
 
 
+_KNOWN_PIP_OPTIONS = frozenset(
+    {
+        "-c",
+        "--constraint",
+        "-e",
+        "--editable",
+        "-f",
+        "--find-links",
+        "-i",
+        "--index-url",
+        "-r",
+        "--requirement",
+        "--extra-index-url",
+        "--global-option",
+        "--hash",
+        "--implementation",
+        "--no-binary",
+        "--no-clean",
+        "--no-compile",
+        "--no-deps",
+        "--no-index",
+        "--no-warn-script-location",
+        "--only-binary",
+        "--platform",
+        "--prefix",
+        "--pre",
+        "--prefer-binary",
+        "--python-version",
+        "--require-hashes",
+        "--resolver",
+        "--target",
+        "--trusted-host",
+        "--upgrade",
+        "--user",
+    }
+)
+
+
+def _check_req_suspicious(
+    check_line: str,
+    line_no: int,
+    findings: list[_Finding],
+    suspicious_lines: list[str],
+    raw: str,
+    has_url: bool,
+    has_markers: bool,
+) -> None:
+    if not has_url and not has_markers:
+        if "`" in check_line:
+            suspicious_lines.append(raw)
+            findings.append(
+                _finding(
+                    "SUSPICIOUS_LINE",
+                    "warning",
+                    f"Shell backtick in line: {check_line[:80]}",
+                    line_no,
+                )
+            )
+            return
+        if "$(" in check_line or "${" in check_line:
+            suspicious_lines.append(raw)
+            findings.append(
+                _finding(
+                    "SUSPICIOUS_LINE",
+                    "warning",
+                    f"Shell substitution in line: {check_line[:80]}",
+                    line_no,
+                )
+            )
+            return
+
+    if check_line.count("(") != check_line.count(")"):
+        suspicious_lines.append(raw)
+        findings.append(
+            _finding(
+                "SUSPICIOUS_LINE",
+                "warning",
+                f"Unbalanced parentheses: {check_line[:80]}",
+                line_no,
+            )
+        )
+        return
+    if check_line.count("[") != check_line.count("]"):
+        suspicious_lines.append(raw)
+        findings.append(
+            _finding(
+                "SUSPICIOUS_LINE",
+                "warning",
+                f"Unbalanced brackets: {check_line[:80]}",
+                line_no,
+            )
+        )
+        return
+    if check_line.count("{") != check_line.count("}"):
+        suspicious_lines.append(raw)
+        findings.append(
+            _finding(
+                "SUSPICIOUS_LINE",
+                "warning",
+                f"Unbalanced braces: {check_line[:80]}",
+                line_no,
+            )
+        )
+        return
+
+    for ch in check_line:
+        if ord(ch) < 0x20 and ch not in ("\t", "\n", "\r"):
+            suspicious_lines.append(raw)
+            findings.append(
+                _finding(
+                    "SUSPICIOUS_LINE",
+                    "warning",
+                    f"Embedded control character in line: {check_line[:80]}",
+                    line_no,
+                )
+            )
+            return
+
+
 def requirements_inspect(text: str) -> RequirementsInspectResult:
     """Inspect requirements.txt-style content without network access."""
     if not isinstance(text, str):
@@ -299,57 +452,127 @@ def requirements_inspect(text: str) -> RequirementsInspectResult:
     direct_urls: list[str] = []
     vcs_refs: list[str] = []
     comments: list[str] = []
+    requirement_includes: list[str] = []
     constraints_includes: list[str] = []
+    index_options: list[str] = []
+    hash_options: list[str] = []
     environment_markers: list[str] = []
     suspicious_lines: list[str] = []
 
+    in_continuation = False
+
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            if stripped.startswith("#"):
-                comments.append(stripped)
+
+        if not stripped:
+            in_continuation = False
             continue
 
-        if stripped.startswith("-r ") or stripped.startswith("--requirement "):
+        if stripped.startswith("#"):
+            comments.append(stripped)
+            in_continuation = False
+            continue
+
+        if in_continuation:
+            in_continuation = stripped.endswith("\\")
+            continue
+
+        in_continuation = stripped.endswith("\\")
+        check_line = stripped[:-1].rstrip() if in_continuation else stripped
+
+        if check_line.startswith("-r ") or check_line.startswith("--requirement "):
+            requirement_includes.append(stripped)
+            continue
+
+        if check_line.startswith("-c ") or check_line.startswith("--constraint "):
             constraints_includes.append(stripped)
             continue
-        if stripped.startswith("-c ") or stripped.startswith("--constraint "):
-            constraints_includes.append(stripped)
-            continue
-        if stripped.startswith("-e ") or stripped.startswith("--editable "):
+
+        if check_line.startswith("-e ") or check_line.startswith("--editable "):
             editable_refs.append(stripped)
             continue
-        if stripped.startswith("-i ") or stripped.startswith("--index-url "):
-            constraints_includes.append(stripped)
-            continue
-        if stripped.startswith("--"):
-            constraints_includes.append(stripped)
+
+        if (
+            check_line.startswith("-i ")
+            or check_line.startswith("--index-url ")
+            or check_line.startswith("--extra-index-url ")
+            or check_line.startswith("-f ")
+            or check_line.startswith("--find-links ")
+            or check_line.startswith("--trusted-host ")
+            or check_line == "--no-index"
+        ):
+            index_options.append(stripped)
             continue
 
-        has_url = "://" in stripped
-        has_vcs = any(stripped.startswith(f"{v}+") for v in ("git", "hg", "svn", "bzr"))
-        has_markers = ";" in stripped
+        if check_line.startswith("--hash="):
+            hash_options.append(stripped)
+            continue
+
+        has_url = "://" in check_line
+        has_vcs = any(check_line.startswith(f"{v}+") for v in ("git", "hg", "svn", "bzr"))
+        has_markers = ";" in check_line
 
         if has_vcs:
             vcs_refs.append(stripped)
-        elif has_url:
-            direct_urls.append(stripped)
-        else:
-            package_specs.append(stripped)
+            if has_markers:
+                environment_markers.append(stripped)
+            _check_req_suspicious(
+                check_line,
+                i,
+                findings,
+                suspicious_lines,
+                stripped,
+                has_url=has_url,
+                has_markers=has_markers,
+            )
+            continue
 
+        if has_url:
+            direct_urls.append(stripped)
+            if has_markers:
+                environment_markers.append(stripped)
+            _check_req_suspicious(
+                check_line,
+                i,
+                findings,
+                suspicious_lines,
+                stripped,
+                has_url=has_url,
+                has_markers=has_markers,
+            )
+            continue
+
+        if check_line.startswith("-"):
+            first_token = check_line.split()[0] if check_line.split() else check_line
+            if first_token not in _KNOWN_PIP_OPTIONS:
+                suspicious_lines.append(stripped)
+                findings.append(
+                    _finding(
+                        "UNKNOWN_OPTION",
+                        "warning",
+                        f"Unknown option: {check_line[:80]}",
+                        i,
+                    )
+                )
+                continue
+            if check_line.startswith("--"):
+                index_options.append(stripped)
+            else:
+                index_options.append(stripped)
+            continue
+
+        package_specs.append(stripped)
         if has_markers:
             environment_markers.append(stripped)
-
-        if re.search(r"[{}\[\]<>|;]", stripped) and not has_url and not has_markers:
-            suspicious_lines.append(stripped)
-            findings.append(
-                _finding(
-                    "SUSPICIOUS_LINE",
-                    "warning",
-                    f"Unusual characters in line: {stripped[:80]}",
-                    i,
-                )
-            )
+        _check_req_suspicious(
+            check_line,
+            i,
+            findings,
+            suspicious_lines,
+            stripped,
+            has_url=has_url,
+            has_markers=has_markers,
+        )
 
     result: dict[str, Any] = {
         "parse_ok": True,
@@ -359,7 +582,10 @@ def requirements_inspect(text: str) -> RequirementsInspectResult:
         "direct_urls": direct_urls,
         "vcs_refs": vcs_refs,
         "comments": comments,
+        "requirement_includes": requirement_includes,
         "constraints_includes": constraints_includes,
+        "index_options": index_options,
+        "hash_options": hash_options,
         "environment_markers": environment_markers,
         "suspicious_lines": suspicious_lines,
     }

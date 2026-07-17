@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "my-setuptools-pkg"
+version = "1.0.0"
+requires-python = ">=3.10"
+dependencies = ["requests>=2.0", "click"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+docs = ["sphinx"]
+
+[project.scripts]
+my-cli = "mypkg.cli:main"
+
+[project.entry-points.my_plugin]
+hello = "mypkg.plugins:hello"
+
+[project.urls]
+Homepage = "https://example.com"
+Repository = "https://github.com/example/my-setuptools-pkg"
+
+[tool.setuptools]
+packages = ["mypkg"]

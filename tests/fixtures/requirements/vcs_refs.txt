@@ -1,0 +1,5 @@
+# VCS references
+git+https://github.com/user/repo.git@main
+git+https://github.com/user/other.git@v1.0.0#egg=pkg
+hg+https://hg.example.com/repo@tip
+svn+https://svn.example.com/repo/trunk

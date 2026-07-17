@@ -1,0 +1,6 @@
+# Shell metacharacter attack input
+evil_pkg; rm -rf /
+backtick_pkg`whoami`
+sub_pkg$(whoami)
+var_pkg${HOME}
+pipe_pkg|cat /etc/passwd

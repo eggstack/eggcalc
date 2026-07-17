@@ -1,0 +1,6 @@
+# Packages with extras and version specifiers
+requests[security]>=2.28
+urllib3[socks]>=1.26,<2.0
+pytest[testing]>=7.0
+pillow>=10.0.0
+httpx[http2]>=0.24

@@ -1,0 +1,16 @@
+[workspace]
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[package]
+name = "my-crate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = "1.0"

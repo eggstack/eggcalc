@@ -11,6 +11,12 @@ import re
 import unicodedata
 from typing import TypedDict
 
+from eggcalc.exact.manifests import (
+    _Finding,
+    _finding,
+    _truncate_findings,
+)
+
 _MAX_INPUT_LENGTH = 200_000
 
 _CARGO_PACKAGE_FIELDS = {"name", "version", "edition", "license", "repository", "readme"}
@@ -23,7 +29,6 @@ _SUSPICIOUS_NAME_PATTERNS = [
     re.compile(r"_{2,}"),
     re.compile(r"--"),
     re.compile(r"\."),
-    re.compile(r"[A-Z]"),
 ]
 
 _CARGO_TOML_PATH_RE = re.compile(r"^[a-zA-Z0-9_\-]+(?:/[a-zA-Z0-9_\-]+)*\.toml$")
@@ -83,7 +88,7 @@ class CargoInspectResult(TypedDict):
     path_dependencies: list[str]
     suspicious_dependency_names: list[str]
     duplicate_or_confusable_dependency_names: list[str]
-    findings: list[str]
+    findings: list[_Finding]
 
 
 def _is_cargo_toml_path(path: str) -> bool:
@@ -91,11 +96,25 @@ def _is_cargo_toml_path(path: str) -> bool:
     return bool(_CARGO_TOML_PATH_RE.match(path))
 
 
+def _has_confusable_unicode(name: str) -> bool:
+    """Check if a name contains confusable Unicode characters (non-Latin letters)."""
+    for ch in name:
+        cat = unicodedata.category(ch)
+        if cat.startswith("L"):
+            cp = ord(ch)
+            # Latin ranges: U+0000-U+024F (Basic Latin through Latin Extended-B)
+            if cp > 0x024F:
+                return True
+    return False
+
+
 def _detect_suspicious_name(name: str) -> bool:
     """Check if a dependency name has suspicious patterns."""
     for pat in _SUSPICIOUS_NAME_PATTERNS:
         if pat.search(name):
             return True
+    if _has_confusable_unicode(name):
+        return True
     return False
 
 
@@ -191,7 +210,13 @@ def cargo_toml_inspect(
             path_dependencies=[],
             suspicious_dependency_names=[],
             duplicate_or_confusable_dependency_names=[],
-            findings=[f"Input length {len(text)} exceeds maximum {_MAX_INPUT_LENGTH}"],
+            findings=[
+                _finding(
+                    "INPUT_TOO_LONG",
+                    "error",
+                    f"Input length {len(text)} exceeds maximum {_MAX_INPUT_LENGTH}",
+                ),
+            ],
         )
 
     try:
@@ -210,7 +235,13 @@ def cargo_toml_inspect(
             path_dependencies=[],
             suspicious_dependency_names=[],
             duplicate_or_confusable_dependency_names=[],
-            findings=["tomllib not available - Python 3.11+ required"],
+            findings=[
+                _finding(
+                    "TOML_NOT_AVAILABLE",
+                    "error",
+                    "tomllib not available - Python 3.11+ required",
+                ),
+            ],
         )
 
     try:
@@ -229,15 +260,24 @@ def cargo_toml_inspect(
             path_dependencies=[],
             suspicious_dependency_names=[],
             duplicate_or_confusable_dependency_names=[],
-            findings=[f"TOML parse error: {e}"],
+            findings=[
+                _finding(
+                    "TOML_PARSE_ERROR",
+                    "error",
+                    f"TOML parse error: {e}",
+                ),
+            ],
         )
 
-    findings: list[str] = []
+    findings: list[_Finding] = []
 
     # --- Package section ---
+    has_package = "package" in parsed
     pkg_raw = parsed.get("package", {})
-    if not isinstance(pkg_raw, dict):
-        findings.append("'[package]' section is not a table")
+    if has_package and not isinstance(pkg_raw, dict):
+        findings.append(
+            _finding("CARGO_INVALID_TABLE", "error", "'[package]' section is not a table")
+        )
         pkg_raw = {}
 
     package: CargoPackageInfo = {}
@@ -246,23 +286,53 @@ def cargo_toml_inspect(
         if val is not None:
             package[field] = str(val)  # type: ignore[literal-required]
 
-    if not package.get("name"):
-        findings.append("Missing or empty 'name' in [package]")
-    if not package.get("version"):
-        findings.append("Missing or empty 'version' in [package]")
-    edition = package.get("edition")
-    raw_edition = pkg_raw.get("edition")
-    if edition is None:
-        findings.append(
-            "Missing 'edition' in [package] " "(inherits workspace edition or defaults to 2015)"
-        )
-    elif isinstance(raw_edition, dict) and raw_edition.get("workspace") is True:
-        pass
-    elif not isinstance(edition, str) or edition not in _EDITION_VALUES:
-        findings.append(
-            f"Unrecognized edition '{edition!r}; "
-            f"expected one of: {', '.join(sorted(_EDITION_VALUES))}"
-        )
+    if has_package:
+        if not package.get("name"):
+            findings.append(
+                _finding(
+                    "CARGO_MISSING_PACKAGE_NAME", "warning", "Missing or empty 'name' in [package]"
+                )
+            )
+        if not package.get("version"):
+            findings.append(
+                _finding(
+                    "CARGO_MISSING_PACKAGE_VERSION",
+                    "warning",
+                    "Missing or empty 'version' in [package]",
+                )
+            )
+        edition = package.get("edition")
+        raw_edition = pkg_raw.get("edition")
+        if edition is None:
+            findings.append(
+                _finding(
+                    "CARGO_MISSING_EDITION",
+                    "info",
+                    "Missing 'edition' in [package] (inherits workspace edition or defaults to 2015)",
+                )
+            )
+        elif isinstance(raw_edition, dict) and raw_edition.get("workspace") is True:
+            pass
+        elif not isinstance(edition, str) or edition not in _EDITION_VALUES:
+            findings.append(
+                _finding(
+                    "CARGO_INVALID_EDITION",
+                    "warning",
+                    f"Unrecognized edition '{edition!r}'; "
+                    f"expected one of: {', '.join(sorted(_EDITION_VALUES))}",
+                )
+            )
+    else:
+        # Virtual workspace — no [package] is intentional
+        # Only flag if [workspace] is also absent
+        if "workspace" not in parsed:
+            findings.append(
+                _finding(
+                    "CARGO_NO_PACKAGE_OR_WORKSPACE",
+                    "warning",
+                    "No [package] or [workspace] section found",
+                )
+            )
 
     # --- Workspace section ---
     workspace: CargoWorkspaceInfo = {"present": False, "members": [], "exclude": []}
@@ -278,7 +348,9 @@ def cargo_toml_inspect(
                 if isinstance(exclude, list):
                     workspace["exclude"] = [str(e) for e in exclude]
             else:
-                findings.append("'[workspace]' is not a table")
+                findings.append(
+                    _finding("CARGO_INVALID_TABLE", "error", "'[workspace]' is not a table")
+                )
 
     # --- Dependencies ---
     dep_section = CargoDepSection(
@@ -301,7 +373,9 @@ def cargo_toml_inspect(
             raw_deps = parsed.get(table_key, {})
             if not isinstance(raw_deps, dict):
                 if table_key in parsed:
-                    findings.append(f"'[{table_key}]' is not a table")
+                    findings.append(
+                        _finding("CARGO_INVALID_TABLE", "error", f"'[{table_key}]' is not a table")
+                    )
                 continue
 
             parsed_deps: dict[str, CargoDependencyForm] = {}
@@ -313,7 +387,13 @@ def cargo_toml_inspect(
                 if path:
                     path_deps.append(path)
                 if form.get("git") and _detect_suspicious_name(str(dep_name)):
-                    findings.append(f"Git dependency '{dep_name}' has suspicious name pattern")
+                    findings.append(
+                        _finding(
+                            "CARGO_SUSPICIOUS_NAME",
+                            "warning",
+                            f"Git dependency '{dep_name}' has suspicious name pattern",
+                        )
+                    )
 
             dep_section[section_key] = parsed_deps  # type: ignore[literal-required]
 
@@ -342,7 +422,13 @@ def cargo_toml_inspect(
     # --- Duplicate/confusable names ---
     dupes = _detect_duplicates(all_dep_names)
     if dupes:
-        findings.append(f"Confusable dependency names detected: {', '.join(dupes)}")
+        findings.append(
+            _finding(
+                "CARGO_CONFUSABLE_NAMES",
+                "warning",
+                f"Confusable dependency names detected: {', '.join(dupes)}",
+            )
+        )
 
     return CargoInspectResult(
         parse_ok=True,
@@ -352,5 +438,5 @@ def cargo_toml_inspect(
         path_dependencies=path_deps,
         suspicious_dependency_names=suspicious,
         duplicate_or_confusable_dependency_names=dupes,
-        findings=findings,
+        findings=_truncate_findings(findings),
     )
