@@ -26,12 +26,16 @@ def _restore_evaluator_defaults():
     orig_allow_side_effects = ev._allow_side_effects
     orig_mcp_defaults_configured = _server_mod._mcp_defaults_configured
     orig_default_session = _server_mod._default_session
+    orig_McpSession = _server_mod.McpSession
+    orig_McpSessionState = _server_mod.McpSessionState
     yield
     _evaluator._mcp_mode = orig_mcp_mode
     ev._allow_random = orig_allow_random
     ev._allow_side_effects = orig_allow_side_effects
     _server_mod._mcp_defaults_configured = orig_mcp_defaults_configured
     _server_mod._default_session = orig_default_session
+    _server_mod.McpSession = orig_McpSession
+    _server_mod.McpSessionState = orig_McpSessionState
 
 
 @pytest.fixture

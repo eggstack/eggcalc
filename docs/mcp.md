@@ -58,12 +58,14 @@ The server uses JSON-RPC 2.0 over stdio:
 
 ### Supported Protocol Versions
 
-The server supports MCP protocol version `2024-11-05`. Version negotiation happens during the `initialize` handshake:
+The server supports MCP protocol versions `2025-11-25` (latest stable) and `2024-11-05` (legacy compatibility). Version negotiation happens during the `initialize` handshake:
 
 - If the client requests a supported version, the server responds with that version.
-- If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version (`2024-11-05`).
+- If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version (`2025-11-25`).
 
 Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS` in `eggcalc/mcp/server.py`.
+
+The draft `2026-07-28` stateless protocol revision is intentionally not supported until final publication.
 
 ### Session Lifecycle
 
@@ -81,6 +83,8 @@ READY         --EOF/shutdown/close--> CLOSED
 ```
 
 Tool requests (`tools/list`, `tools/call`) before the session reaches READY state return JSON-RPC error `-32600` ("Server not initialized"). Duplicate `initialize` requests return `-32600` ("Server already initialized").
+
+**Note:** Calling `handle_request()` without an explicit `McpSession` uses a legacy compatibility path that bypasses the initialization handshake. This path is deprecated and will be removed in a future version. Production stdio usage always creates an uninitialized session.
 
 ### Notification Handling
 

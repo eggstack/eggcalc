@@ -35,6 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session-aware test helpers (`ready_session()`, `session_request()`) for clean handshake setup
 - `handle_request()` now accepts an optional `session` parameter for lifecycle enforcement
 - `main()` creates one `McpSession` per connection for lifecycle management
+- MCP protocol version `2025-11-25` support (latest stable) with backward compatibility for `2024-11-05`
+- `SUPPORTED_PROTOCOL_VERSIONS` now includes both `2024-11-05` and `2025-11-25`
+- `McpSession` now stores `requested_version`, `client_name`, `client_version` per session
+- Initialization requires `protocolVersion`, `capabilities`, and `clientInfo` fields (returns `-32602` for missing/invalid)
+- `TestInitializeValidation` — 11 tests for initialization parameter validation
+- `TestLifecycleMisuse` — 8 tests for lifecycle state machine enforcement
+- `TestErrorNotificationConformance` — 6 tests for error codes and notification behavior
+- `TestInspectionContract` — 7 tests for finding structure invariants
+- `TestCargoScriptDetection` — 9 tests for Unicode/confusable detection with distinct finding codes
+- Cargo dependency finding codes: `CARGO_NON_ASCII_DEPENDENCY_NAME`, `CARGO_MIXED_SCRIPT_DEPENDENCY_NAME`, `CARGO_CONFUSABLE_DEPENDENCY_COLLISION`, `CARGO_SUSPICIOUS_DEPENDENCY_NAME`
 
 - `_Finding` TypedDict (`code`, `severity`, `message`, `line`, `column`) for structured inspection findings with closed severity vocabulary (`error`, `warning`, `info`)
 - `build_requirements`, `build_backend_path`, `dynamic`, `entry_points`, `gui_scripts`, `urls` fields to `pyproject_inspect()` result
@@ -55,6 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cargo inspection no longer flags valid virtual workspaces as missing package metadata
 - MCP output schemas updated with new inspection result fields
 - Documentation updated: architecture/exact.md, AGENTS.md field conventions, tool_inventory.md
+- `_has_confusable_unicode()` now uses actual Unicode confusables table instead of codepoint range heuristic
+- `_detect_suspicious_name()` returns `list[_Finding]` with distinct finding codes instead of `bool`
+- Initialization validation tightened: `protocolVersion`, `capabilities`, `clientInfo` are now required
+- `handle_request(session=None)` now emits `DeprecationWarning` — callers should pass an explicit `McpSession`
+
+### Deprecated
+- Sessionless `handle_request()` compatibility path (pass an explicit `McpSession` instead)
 
 ## [1.1.6] - 2026-07-14
 

@@ -122,7 +122,16 @@ class TestCancellationFIFOCap:
         # Create a ready session
         session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
         handle_request(
-            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
+            },
             session=session,
         )
         handle_request(

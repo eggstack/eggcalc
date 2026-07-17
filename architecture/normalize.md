@@ -99,7 +99,7 @@ OPERATOR_CONVERSIONS = {
     ",": [],
     "&": ["bitand", "bit and"],
     "|": ["OR", "or", "bitor", "bit or"],
-    "^": ["XOR", "xor", "bitxor", "bit xor"],
+    "^": [],
     "<<": ["left shift", "shift left", "lshift"],
     ">>": ["right shift", "shift right", "rshift"],
     "~": ["NOT", "not", "bitnot", "bit not"],
@@ -109,7 +109,7 @@ OPERATOR_CONVERSIONS = {
 }
 ```
 
-Note: `^` is mapped to bitwise XOR, not exponentiation. Power is handled by `**`.
+Note: `^` maps to an empty word-form list. Calculator caret rewriting (`_rewrite_calculator_caret`) rewrites `^` to `**` (exponentiation) for user-facing syntax. Word-form XOR (`xor`, `bitxor`) is rewritten to `bitxor()` function calls by `_normalize_xor_word_to_bitxor_call`.
 
 ### `FUNCTION_MAPPINGS`
 
@@ -521,7 +521,7 @@ Normalizes unit exponent shorthand while preserving `^` as XOR. Handles `"5 m ^ 
 
 ### `_rewrite_calculator_caret(expression: str) -> str`
 
-Rewrites `^` to `**` (exponentiation) for user-facing calculator syntax. Called during normalization so that `evaluate_raw()` and CLI treat `^` as power, while direct `evaluate()` calls keep `^` as bitwise XOR (Python AST semantics). Word forms `xor` and `bitxor` are not affected by this rewrite — they remain mapped to the `^` operator token and are handled as bitwise XOR by the evaluator.
+Rewrites `^` to `**` (exponentiation) for user-facing calculator syntax. Called during normalization so that `evaluate_raw()` and CLI treat `^` as power, while direct `evaluate()` calls keep `^` as bitwise XOR (Python AST semantics). Word forms `xor` and `bitxor` are not affected by this rewrite — they are rewritten to `bitxor()` function calls by `_normalize_xor_word_to_bitxor_call` and handled as bitwise XOR by the evaluator.
 
 ### `_canonical_power_unit(unit: str, exponent: str) -> str`
 

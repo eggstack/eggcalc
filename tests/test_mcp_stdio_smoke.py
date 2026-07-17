@@ -16,6 +16,21 @@ def _make_request(method: str, req_id: int = 1) -> str:
     return json.dumps({"jsonrpc": "2.0", "id": req_id, "method": method})
 
 
+def _make_initialize_request(req_id: int = 1, protocol_version: str = "2025-11-25") -> str:
+    return json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": protocol_version,
+                "capabilities": {},
+                "clientInfo": {"name": "test-client", "version": "0.1.0"},
+            },
+        }
+    )
+
+
 def test_mcp_tools_list_subprocess_smoke():
     proc = subprocess.Popen(
         [sys.executable, "-m", "eggcalc", "--mcp"],
@@ -25,7 +40,7 @@ def test_mcp_tools_list_subprocess_smoke():
     )
     try:
         # Send initialize, notifications/initialized, then tools/list
-        init_req = _make_request("initialize", 1) + "\n"
+        init_req = _make_initialize_request(1) + "\n"
         notif_req = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
         list_req = _make_request("tools/list", 2) + "\n"
         stdout, stderr = proc.communicate(
@@ -102,7 +117,7 @@ def test_mcp_broken_pipe_exits_cleanly():
     )
     try:
         # Send initialize, then close stdin to simulate broken pipe
-        init_req = _make_request("initialize", 1) + "\n"
+        init_req = _make_initialize_request(1) + "\n"
         proc.stdin.write(init_req.encode())
         proc.stdin.flush()
         proc.stdin.close()
@@ -153,7 +168,9 @@ def test_mcp_single_file_eof_exits_cleanly():
     )
 
 
-def _run_mcp_transcript(cmd: list[str], timeout: int = 15) -> list[dict]:
+def _run_mcp_transcript(
+    cmd: list[str], timeout: int = 15, protocol_version: str = "2025-11-25"
+) -> list[dict]:
     """Run a full MCP transcript against a server command and return parsed responses.
 
     Transcript: initialize → notifications/initialized → ping → tools/list →
@@ -161,7 +178,7 @@ def _run_mcp_transcript(cmd: list[str], timeout: int = 15) -> list[dict]:
     notifications which produce no response).
     """
     requests = [
-        _make_request("initialize", 1),
+        _make_initialize_request(1, protocol_version),
         json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}),
         _make_request("ping", 2),
         _make_request("tools/list", 3),
@@ -237,7 +254,7 @@ def test_package_mcp_transcript():
     init_resp = responses[0]
     assert init_resp["id"] == 1
     assert "result" in init_resp
-    assert init_resp["result"]["protocolVersion"] == "2024-11-05"
+    assert init_resp["result"]["protocolVersion"] == "2025-11-25"
     assert "tools" in init_resp["result"]["capabilities"]
     assert init_resp["result"]["serverInfo"]["name"] == "eggcalc"
 
@@ -277,7 +294,7 @@ def test_single_file_mcp_transcript():
     init_resp = responses[0]
     assert init_resp["id"] == 1
     assert "result" in init_resp
-    assert init_resp["result"]["protocolVersion"] == "2024-11-05"
+    assert init_resp["result"]["protocolVersion"] == "2025-11-25"
 
     ping_resp = responses[1]
     assert ping_resp["id"] == 2
@@ -320,3 +337,36 @@ def test_package_and_single_file_transcripts_match():
             f"  package:      {json.dumps(p, indent=2)}\n"
             f"  single-file:  {json.dumps(s, indent=2)}"
         )
+
+
+def test_package_mcp_transcript_2024_11_05():
+    """Verify backward compatibility with 2024-11-05."""
+    responses = _run_mcp_transcript(
+        [sys.executable, "-m", "eggcalc", "--mcp"],
+        protocol_version="2024-11-05",
+    )
+
+    assert len(responses) == 4, f"Expected 4 responses, got {len(responses)}: {responses}"
+
+    init_resp = responses[0]
+    assert init_resp["id"] == 1
+    assert "result" in init_resp
+    assert init_resp["result"]["protocolVersion"] == "2024-11-05"
+    assert "tools" in init_resp["result"]["capabilities"]
+    assert init_resp["result"]["serverInfo"]["name"] == "eggcalc"
+
+    ping_resp = responses[1]
+    assert ping_resp["id"] == 2
+    assert ping_resp["result"] == {}
+
+    list_resp = responses[2]
+    assert list_resp["id"] == 3
+    tools = list_resp["result"]["tools"]
+    tool_names = {t["name"] for t in tools}
+    assert "math_eval" in tool_names
+
+    call_resp = responses[3]
+    assert call_resp["id"] == 4
+    content = json.loads(call_resp["result"]["content"][0]["text"])
+    assert content["ok"] is True
+    assert content["result"]["value"] == "8"

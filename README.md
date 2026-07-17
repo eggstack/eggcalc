@@ -80,7 +80,7 @@ See [docs/api.md](docs/api.md) for the full API reference including `EggCalcApp`
 
 eggcalc runs as an MCP server exposing deterministic tools across 18 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo). All results are deterministic — same input always produces the same output.
 
-**Protocol version:** Supports MCP protocol `2024-11-05`. Clients must complete the `initialize` handshake before calling tools — tool requests before initialization are rejected. See [docs/mcp.md](docs/mcp.md) for protocol details and lifecycle requirements.
+**Protocol version:** Supports MCP protocol `2025-11-25` (latest stable) with backward compatibility for `2024-11-05`. Clients must complete the `initialize` handshake before calling tools — tool requests before initialization are rejected. See [docs/mcp.md](docs/mcp.md) for protocol details and lifecycle requirements.
 
 ```bash
 calc --mcp

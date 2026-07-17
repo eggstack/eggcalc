@@ -25,7 +25,6 @@ _EDITION_VALUES = {"2015", "2018", "2021", "2024"}
 
 _SUSPICIOUS_NAME_PATTERNS = [
     re.compile(r"^\d"),
-    re.compile(r"[^a-zA-Z0-9_\-]"),
     re.compile(r"_{2,}"),
     re.compile(r"--"),
     re.compile(r"\."),
@@ -97,25 +96,82 @@ def _is_cargo_toml_path(path: str) -> bool:
 
 
 def _has_confusable_unicode(name: str) -> bool:
-    """Check if a name contains confusable Unicode characters (non-Latin letters)."""
+    """Check if a name contains Unicode confusables (not just non-ASCII letters)."""
+    from .unicode_tools import detect_confusables
+
+    confusables = detect_confusables(name)
+    return len(confusables) > 0
+
+
+def _detect_suspicious_name(name: str) -> list[_Finding]:
+    """Detect suspicious patterns in a dependency name.
+
+    Returns a list of findings with distinct codes.
+    """
+    from .unicode_tools import unicode_script
+
+    findings: list[_Finding] = []
+
+    # Check for non-ASCII characters and script mixing
+    has_non_ascii = False
+    has_latin = False
+    has_non_latin_scripts: set[str] = set()
+
+    for ch in name:
+        cp = ord(ch)
+        if cp < 128:
+            if ch.isalpha():
+                has_latin = True
+        elif cp > 127:
+            has_non_ascii = True
+            script = unicode_script(ch)
+            if script == "Latin":
+                has_latin = True
+            elif script not in ("Common", "Unknown"):
+                has_non_latin_scripts.add(script)
+
+    if has_non_ascii and has_latin and has_non_latin_scripts:
+        findings.append(
+            _finding(
+                "CARGO_MIXED_SCRIPT_DEPENDENCY_NAME",
+                "warning",
+                f"Mixed-script dependency name '{name}' contains characters from multiple scripts",
+            )
+        )
+    elif has_non_ascii:
+        if _has_confusable_unicode(name):
+            findings.append(
+                _finding(
+                    "CARGO_NON_ASCII_DEPENDENCY_NAME",
+                    "info",
+                    f"Non-ASCII dependency name '{name}'",
+                )
+            )
+
+    # Check for non-standard characters (non-letter, non-digit, non-separator)
+    has_suspicious_pattern = False
     for ch in name:
         cat = unicodedata.category(ch)
-        if cat.startswith("L"):
-            cp = ord(ch)
-            # Latin ranges: U+0000-U+024F (Basic Latin through Latin Extended-B)
-            if cp > 0x024F:
-                return True
-    return False
+        if not cat.startswith("L") and not cat.startswith("D") and ch not in "-_":
+            has_suspicious_pattern = True
+            break
 
+    if not has_suspicious_pattern:
+        for pat in _SUSPICIOUS_NAME_PATTERNS:
+            if pat.search(name):
+                has_suspicious_pattern = True
+                break
 
-def _detect_suspicious_name(name: str) -> bool:
-    """Check if a dependency name has suspicious patterns."""
-    for pat in _SUSPICIOUS_NAME_PATTERNS:
-        if pat.search(name):
-            return True
-    if _has_confusable_unicode(name):
-        return True
-    return False
+    if has_suspicious_pattern:
+        findings.append(
+            _finding(
+                "CARGO_SUSPICIOUS_DEPENDENCY_NAME",
+                "warning",
+                f"Suspicious dependency name pattern in '{name}'",
+            )
+        )
+
+    return findings
 
 
 def _normalize_ident(name: str) -> str:
@@ -386,14 +442,16 @@ def cargo_toml_inspect(
                 path = form.get("path")
                 if path:
                     path_deps.append(path)
-                if form.get("git") and _detect_suspicious_name(str(dep_name)):
-                    findings.append(
-                        _finding(
-                            "CARGO_SUSPICIOUS_NAME",
-                            "warning",
-                            f"Git dependency '{dep_name}' has suspicious name pattern",
+                if form.get("git"):
+                    git_name_findings = _detect_suspicious_name(str(dep_name))
+                    if git_name_findings:
+                        findings.append(
+                            _finding(
+                                "CARGO_SUSPICIOUS_NAME",
+                                "warning",
+                                f"Git dependency '{dep_name}' has suspicious name pattern",
+                            )
                         )
-                    )
 
             dep_section[section_key] = parsed_deps  # type: ignore[literal-required]
 
@@ -417,7 +475,15 @@ def cargo_toml_inspect(
                         dep_section["target_specific"][target_key] = target_deps
 
     # --- Suspicious names ---
-    suspicious = sorted({name for name in all_dep_names if _detect_suspicious_name(name)})
+    suspicious_names: list[str] = []
+    suspicious_findings: list[_Finding] = []
+    for n in all_dep_names:
+        name_findings = _detect_suspicious_name(n)
+        if name_findings:
+            suspicious_findings.extend(name_findings)
+            if any(f.get("severity") in ("warning", "error") for f in name_findings):
+                suspicious_names.append(n)
+    findings.extend(suspicious_findings)
 
     # --- Duplicate/confusable names ---
     dupes = _detect_duplicates(all_dep_names)
@@ -436,7 +502,7 @@ def cargo_toml_inspect(
         workspace=workspace,
         dependencies=dep_section,
         path_dependencies=path_deps,
-        suspicious_dependency_names=suspicious,
+        suspicious_dependency_names=sorted(set(suspicious_names)),
         duplicate_or_confusable_dependency_names=dupes,
         findings=_truncate_findings(findings),
     )

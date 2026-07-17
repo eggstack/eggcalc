@@ -158,7 +158,7 @@ calc "convert 100 meters to feet"   # 328.084 ft
 | `point` | `.` | "three point one four" → 3.14 |
 | `AND`, `and`, `bitand`, `bit and` | `&` | "five and three" → 5&3 |
 | `OR`, `or`, `bitor`, `bit or` | `\|` | "five or three" → 5\|3 |
-| `XOR`, `xor`, `bitxor`, `bit xor` | `^` | "five xor three" → 5^3 |
+| `XOR`, `xor`, `bitxor`, `bit xor` | `bitxor()` | "five xor three" → bitxor(5, 3) |
 | `NOT`, `not`, `bitnot`, `bit not` | `~` | "bitnot five" → ~5 |
 | `left shift`, `shift left`, `lshift` | `<<` | "five left shift two" → 5<<2 |
 | `right shift`, `shift right`, `rshift` | `>>` | "five right shift two" → 5>>2 |
@@ -168,7 +168,7 @@ calc "convert 100 meters to feet"   # 328.084 ft
 **Notes:**
 - **"of"** maps to multiplication because that's how English works—"half of a pie" means "half times a pie". This allows natural expressions like "quarter of twenty".
 - **Bitwise operators** (`&`, `|`, `^`, `~`, `<<`, `>>`) work on integer bit patterns.
-- **`^` has dual meaning:** `^` as a word maps to XOR, while `^` as a symbol maps to exponentiation (`**`). The parser disambiguates by context.
+- **`^` has dual meaning:** `^` as a symbol maps to exponentiation (`**`). Word forms `xor`/`bitxor` are rewritten to `bitxor()` function calls for bitwise XOR.
 - **Unit conversion operators** (`in`/`into`, `to`/`as`) are not regular math operators—they trigger unit conversion between compatible measurements (e.g., "5 kilometers in meters").
 - **Spacing is normalized inside unit expressions** so forms like `30 km / h in mph` and `2 ft / s in m / s` parse the same as their compact equivalents. Spaced unit products such as `5 N m` and `5 m s` are preserved as multiplied units instead of collapsing into prefixed names. Inch conversions stay unambiguous, so `5 in in cm` is treated as `5 inch in cm`.
 

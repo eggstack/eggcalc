@@ -9,6 +9,7 @@ from eggcalc.exact.identifier import identifier_analyze
 from eggcalc.mcp.server import (
     TOOL_HANDLERS,
     McpSession,
+    McpSessionState,
     handle_request,
 )
 from eggcalc.mcp.tools import MAX_TEXT_LENGTH
@@ -21,7 +22,16 @@ def ready_session() -> McpSession:
 
     session = SM(initial_state=SS.UNINITIALIZED)
     handle_request(
-        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test-client", "version": "0.1.0"},
+            },
+        },
         session=session,
     )
     handle_request(
@@ -56,7 +66,11 @@ class TestProtocolHandshake:
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "initialize",
-                "params": {},
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
             },
             session=session,
         )
@@ -71,7 +85,11 @@ class TestProtocolHandshake:
                 "jsonrpc": "2.0",
                 "id": None,
                 "method": "initialize",
-                "params": {},
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
             }
         )
         assert response["id"] is None
@@ -10465,7 +10483,11 @@ class TestMCPSecurityGuards:
                     "jsonrpc": "2.0",
                     "id": 1,
                     "method": "initialize",
-                    "params": {},
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                    },
                 }
             )
 
@@ -10504,7 +10526,11 @@ class TestMCPSecurityGuards:
                     "jsonrpc": "2.0",
                     "id": 1,
                     "method": "initialize",
-                    "params": {},
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                    },
                 }
             )
 
@@ -10535,7 +10561,11 @@ class TestMCPSecurityGuards:
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "initialize",
-                "params": {},
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
             }
         )
 
@@ -10591,7 +10621,18 @@ class TestSubprocessSmoke:
         )
         try:
             # Send initialize request
-            init_req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+            init_req = json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                    },
+                }
+            )
             # Send notifications/initialized
             notif_req = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
             # Send tools/list request
@@ -10811,7 +10852,16 @@ class TestSessionLifecycle:
 
         session = SM(initial_state=SS.UNINITIALIZED)
         response = handle_request(
-            {"jsonrpc": "2.0", "id": "i1", "method": "initialize", "params": {}},
+            {
+                "jsonrpc": "2.0",
+                "id": "i1",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
+            },
             session=session,
         )
         assert "result" in response
@@ -10823,7 +10873,16 @@ class TestSessionLifecycle:
 
         session = SM(initial_state=SS.UNINITIALIZED)
         handle_request(
-            {"jsonrpc": "2.0", "id": "i1", "method": "initialize", "params": {}},
+            {
+                "jsonrpc": "2.0",
+                "id": "i1",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
+            },
             session=session,
         )
         handle_request(
@@ -10843,7 +10902,16 @@ class TestSessionLifecycle:
 
         session = ready_session()
         response = handle_request(
-            {"jsonrpc": "2.0", "id": "i2", "method": "initialize", "params": {}},
+            {
+                "jsonrpc": "2.0",
+                "id": "i2",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
+            },
             session=session,
         )
         assert "error" in response
@@ -10915,11 +10983,35 @@ class TestProtocolVersionNegotiation:
                 "jsonrpc": "2.0",
                 "id": "v1",
                 "method": "initialize",
-                "params": {"protocolVersion": "2024-11-05"},
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
             },
             session=session,
         )
         assert response["result"]["protocolVersion"] == "2024-11-05"
+
+    def test_supported_version_2025_accepted(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.UNINITIALIZED)
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "v1b",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
+            },
+            session=session,
+        )
+        assert response["result"]["protocolVersion"] == "2025-11-25"
 
     def test_unsupported_version_falls_back(self):
         from eggcalc.mcp.server import McpSession as SM
@@ -10931,13 +11023,17 @@ class TestProtocolVersionNegotiation:
                 "jsonrpc": "2.0",
                 "id": "v2",
                 "method": "initialize",
-                "params": {"protocolVersion": "2099-01-01"},
+                "params": {
+                    "protocolVersion": "2099-01-01",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
             },
             session=session,
         )
-        assert response["result"]["protocolVersion"] == "2024-11-05"
+        assert response["result"]["protocolVersion"] == "2025-11-25"
 
-    def test_no_version_uses_latest(self):
+    def test_no_version_rejected(self):
         from eggcalc.mcp.server import McpSession as SM
         from eggcalc.mcp.server import McpSessionState as SS
 
@@ -10946,12 +11042,174 @@ class TestProtocolVersionNegotiation:
             {"jsonrpc": "2.0", "id": "v3", "method": "initialize", "params": {}},
             session=session,
         )
-        assert response["result"]["protocolVersion"] == "2024-11-05"
+        assert response["error"]["code"] == -32602
 
     def test_supported_protocol_versions_constant(self):
         from eggcalc.mcp.server import SUPPORTED_PROTOCOL_VERSIONS
 
         assert "2024-11-05" in SUPPORTED_PROTOCOL_VERSIONS
+        assert "2025-11-25" in SUPPORTED_PROTOCOL_VERSIONS
+
+    def test_latest_version_is_2025_11_25(self):
+        from eggcalc.mcp.server import LATEST_SUPPORTED_PROTOCOL_VERSION
+
+        assert LATEST_SUPPORTED_PROTOCOL_VERSION == "2025-11-25"
+
+
+class TestInitializeValidation:
+    """Test strict initialization parameter validation."""
+
+    def _init_request(self, **overrides):
+        """Build an initialize request with valid defaults, overridden by kwargs."""
+        params = {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "0.1.0"},
+        }
+        params.update(overrides)
+        return {
+            "jsonrpc": "2.0",
+            "id": "val1",
+            "method": "initialize",
+            "params": params,
+        }
+
+    def _new_session(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        return SM(initial_state=SS.UNINITIALIZED)
+
+    def test_missing_protocol_version(self):
+        session = self._new_session()
+        req = self._init_request()
+        del req["params"]["protocolVersion"]
+        response = handle_request(req, session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_non_string_protocol_version(self):
+        session = self._new_session()
+        response = handle_request(self._init_request(protocolVersion=123), session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_empty_string_protocol_version(self):
+        session = self._new_session()
+        response = handle_request(self._init_request(protocolVersion=""), session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_whitespace_only_protocol_version(self):
+        session = self._new_session()
+        response = handle_request(self._init_request(protocolVersion="   "), session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_missing_capabilities(self):
+        session = self._new_session()
+        req = self._init_request()
+        del req["params"]["capabilities"]
+        response = handle_request(req, session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_non_object_capabilities(self):
+        session = self._new_session()
+        response = handle_request(self._init_request(capabilities="bad"), session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_missing_clientInfo(self):
+        session = self._new_session()
+        req = self._init_request()
+        del req["params"]["clientInfo"]
+        response = handle_request(req, session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_non_object_clientInfo(self):
+        session = self._new_session()
+        response = handle_request(self._init_request(clientInfo="bad"), session=session)
+        assert response["error"]["code"] == -32602
+
+    def test_missing_clientInfo_name(self):
+        session = self._new_session()
+        response = handle_request(
+            self._init_request(clientInfo={"version": "1.0"}), session=session
+        )
+        assert response["error"]["code"] == -32602
+
+    def test_non_string_clientInfo_name(self):
+        session = self._new_session()
+        response = handle_request(
+            self._init_request(clientInfo={"name": 42, "version": "1.0"}),
+            session=session,
+        )
+        assert response["error"]["code"] == -32602
+
+    def test_empty_clientInfo_name(self):
+        session = self._new_session()
+        response = handle_request(
+            self._init_request(clientInfo={"name": "", "version": "1.0"}),
+            session=session,
+        )
+        assert response["error"]["code"] == -32602
+
+
+def test_per_session_metadata_isolation():
+    """Two sessions initialized with different client info must not leak metadata."""
+    from eggcalc.mcp.server import McpSession as SM
+    from eggcalc.mcp.server import McpSessionState as SS
+
+    session_a = SM(initial_state=SS.UNINITIALIZED)
+    session_b = SM(initial_state=SS.UNINITIALIZED)
+
+    handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": "a1",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "client-a", "version": "1.0"},
+            },
+        },
+        session=session_a,
+    )
+    handle_request(
+        {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {},
+        },
+        session=session_a,
+    )
+
+    handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": "b1",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {"sampling": True},
+                "clientInfo": {"name": "client-b", "version": "2.0"},
+            },
+        },
+        session=session_b,
+    )
+    handle_request(
+        {
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {},
+        },
+        session=session_b,
+    )
+
+    assert session_a.client_name == "client-a"
+    assert session_a.client_version == "1.0"
+    assert session_a.negotiated_version == "2024-11-05"
+
+    assert session_b.client_name == "client-b"
+    assert session_b.client_version == "2.0"
+    assert session_b.negotiated_version == "2025-11-25"
+    assert session_b.client_capabilities == {"sampling": True}
 
 
 class TestErrorClassification:
@@ -11045,3 +11303,164 @@ class TestNotificationDispatch:
             session=session,
         )
         assert response is None
+
+
+class TestLifecycleMisuse:
+    """Test session lifecycle enforcement and edge cases."""
+
+    def test_tools_list_before_initialize_rejected(self):
+        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
+        response = session_request(session, "tools/list")
+        assert response["error"]["code"] == -32600
+        assert "not initialized" in response["error"]["message"].lower()
+
+    def test_tools_call_before_initialize_rejected(self):
+        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
+        response = session_request(session, "tools/call", {"name": "ping", "arguments": {}})
+        assert response["error"]["code"] == -32600
+
+    def test_initialized_notification_before_initialize_accepted(self):
+        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
+        response = handle_request(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            session=session,
+        )
+        assert response is None
+
+    def test_duplicate_initialize_rejected(self):
+        session = ready_session()
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
+            },
+            session=session,
+        )
+        assert response["error"]["code"] == -32600
+        assert "already initialized" in response["error"]["message"].lower()
+
+    def test_operation_during_initializing_rejected(self):
+        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
+        handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "0.1.0"},
+                },
+            },
+            session=session,
+        )
+        assert session.state == McpSessionState.INITIALIZING
+        response = session_request(session, "tools/list")
+        assert response["error"]["code"] == -32600
+
+    def test_operation_after_close_rejected(self):
+        session = ready_session()
+        session.state = McpSessionState.CLOSED
+        response = session_request(session, "tools/list")
+        assert response["error"]["code"] == -32600
+
+    def test_sessionless_deprecation_warning(self):
+        import warnings as _warnings
+
+        with _warnings.catch_warnings(record=True) as w:
+            _warnings.simplefilter("always")
+            handle_request({"jsonrpc": "2.0", "id": 1, "method": "ping"})
+            dep_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(dep_warnings) >= 1
+            assert "session" in str(dep_warnings[0].message).lower()
+
+    def test_sessionless_still_works(self):
+        import warnings as _warnings
+
+        with _warnings.catch_warnings():
+            _warnings.simplefilter("ignore", DeprecationWarning)
+            response = handle_request({"jsonrpc": "2.0", "id": 1, "method": "ping"})
+        assert "result" in response
+
+
+class TestErrorNotificationConformance:
+    """Test error code conformance and notification behavior."""
+
+    def test_explicit_null_id_rejected(self):
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": None,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0.1.0"},
+                },
+            }
+        )
+        assert response is not None
+        assert response["error"]["code"] == -32600
+
+    def test_notification_no_response(self):
+        from eggcalc.mcp.server import McpSession as SM
+        from eggcalc.mcp.server import McpSessionState as SS
+
+        session = SM(initial_state=SS.INITIALIZING)
+        response = handle_request(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            session=session,
+        )
+        assert response is None
+
+    def test_unknown_notification_no_response(self):
+        session = ready_session()
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/unknown_thing",
+                "params": {},
+            },
+            session=session,
+        )
+        assert response is None
+
+    def test_malformed_initialize_params_uses_32602(self):
+        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": "not_an_object",
+            },
+            session=session,
+        )
+        assert response is not None
+        assert response["error"]["code"] == -32602
+
+    def test_unknown_method_returns_32601(self):
+        session = ready_session()
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "foo/bar",
+                "params": {},
+            },
+            session=session,
+        )
+        assert response is not None
+        assert response["error"]["code"] == -32601
+
+    def test_internal_error_code_exists(self):
+        from eggcalc.mcp.server import _internal_error
+
+        resp = _internal_error(42, "boom")
+        assert resp["error"]["code"] == -32603

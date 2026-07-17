@@ -11,6 +11,7 @@ Tests for:
 - Invalid TOML input
 """
 
+import json
 import sys
 
 import pytest
@@ -20,6 +21,7 @@ from eggcalc.exact.cargo import (
     _normalize_ident,
     cargo_toml_inspect,
 )
+from eggcalc.exact.manifests import pyproject_inspect, requirements_inspect
 from eggcalc.mcp.tools import cargo_toml_inspect_mcp
 
 _needs_tomllib = pytest.mark.skipif(
@@ -162,6 +164,79 @@ members = [
 """
 
 EMPTY_VIRTUAL_WORKSPACE_TOML = """\
+"""
+
+CYRILLIC_CARGO_TOML = """
+[package]
+name = "привет"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"кириллица" = "1.0"
+"""
+
+GREEK_CARGO_TOML = """
+[package]
+name = "myapp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"αλφα" = "1.0"
+"""
+
+MIXED_SCRIPT_CARGO_TOML = """
+[package]
+name = "myapp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"привет_lib" = "1.0"
+"""
+
+CONFUSABLE_COLLISION_TOML = """
+[package]
+name = "myapp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0"
+"ＳＥＲＤＥ" = "1.0"
+"""
+
+RENAMED_DEPENDENCY_TOML = """
+[package]
+name = "myapp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+my_dep = { package = "original-name", version = "1.0" }
+"""
+
+UPPERCASE_CARGO_TOML = """
+[package]
+name = "myapp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+Serde = "1.0"
+Tokio = "1.0"
+"""
+
+HYPHEN_UNDERSCORE_TOML = """
+[package]
+name = "myapp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+my-lib = "1.0"
+my_lib = "1.0"
 """
 
 
@@ -533,3 +608,174 @@ class TestCargoTomlInspectVirtualWorkspace:
         result = cargo_toml_inspect(INVALID_TOML)
         severities = [f["severity"] for f in result["findings"]]
         assert "error" in severities
+
+
+@_needs_tomllib
+class TestCargoScriptDetection:
+    """Tests for script-based detection of dependency names."""
+
+    def test_cyrillic_identifier_not_flagged_suspicious(self):
+        result = cargo_toml_inspect(CYRILLIC_CARGO_TOML)
+        suspicious = result["suspicious_dependency_names"]
+        assert "кириллица" not in suspicious
+        findings = [
+            f for f in result["findings"] if f["code"] == "CARGO_SUSPICIOUS_DEPENDENCY_NAME"
+        ]
+        assert findings == []
+
+    def test_greek_identifier_not_flagged_suspicious(self):
+        result = cargo_toml_inspect(GREEK_CARGO_TOML)
+        suspicious = result["suspicious_dependency_names"]
+        assert "αλφα" not in suspicious
+        findings = [
+            f for f in result["findings"] if f["code"] == "CARGO_SUSPICIOUS_DEPENDENCY_NAME"
+        ]
+        assert findings == []
+
+    def test_mixed_script_detection(self):
+        result = cargo_toml_inspect(MIXED_SCRIPT_CARGO_TOML)
+        codes = [f["code"] for f in result["findings"]]
+        assert "CARGO_MIXED_SCRIPT_DEPENDENCY_NAME" in codes
+
+    def test_confusable_collision_detection(self):
+        result = cargo_toml_inspect(CONFUSABLE_COLLISION_TOML)
+        dupes = result["duplicate_or_confusable_dependency_names"]
+        assert "serde" in dupes
+        codes = [f["code"] for f in result["findings"]]
+        assert "CARGO_CONFUSABLE_NAMES" in codes
+
+    def test_renamed_dependency_not_suspicious(self):
+        result = cargo_toml_inspect(RENAMED_DEPENDENCY_TOML)
+        suspicious = result["suspicious_dependency_names"]
+        assert "my_dep" not in suspicious
+
+    def test_uppercase_ascii_not_flagged(self):
+        result = cargo_toml_inspect(UPPERCASE_CARGO_TOML)
+        suspicious = result["suspicious_dependency_names"]
+        assert "Serde" not in suspicious
+        assert "Tokio" not in suspicious
+
+    def test_hyphen_underscore_confusable(self):
+        result = cargo_toml_inspect(HYPHEN_UNDERSCORE_TOML)
+        dupes = result["duplicate_or_confusable_dependency_names"]
+        assert "my_lib" in dupes
+        assert "my-lib" in dupes
+
+    def test_all_findings_have_valid_codes(self):
+        known_codes = {
+            "INPUT_TOO_LONG",
+            "TOML_NOT_AVAILABLE",
+            "TOML_PARSE_ERROR",
+            "CARGO_INVALID_TABLE",
+            "CARGO_MISSING_PACKAGE_NAME",
+            "CARGO_MISSING_PACKAGE_VERSION",
+            "CARGO_MISSING_EDITION",
+            "CARGO_INVALID_EDITION",
+            "CARGO_NO_PACKAGE_OR_WORKSPACE",
+            "CARGO_CONFUSABLE_NAMES",
+            "CARGO_SUSPICIOUS_NAME",
+            "CARGO_MIXED_SCRIPT_DEPENDENCY_NAME",
+            "CARGO_NON_ASCII_DEPENDENCY_NAME",
+            "CARGO_SUSPICIOUS_DEPENDENCY_NAME",
+        }
+        for toml_text in [
+            BASIC_CARGO_TOML,
+            SUSPICIOUS_DEPS_TOML,
+            CONFUSABLE_DEPS_TOML,
+            CYRILLIC_CARGO_TOML,
+            GREEK_CARGO_TOML,
+            MIXED_SCRIPT_CARGO_TOML,
+        ]:
+            result = cargo_toml_inspect(toml_text)
+            for f in result["findings"]:
+                assert f["code"] in known_codes, f"Unknown finding code: {f['code']}"
+
+    def test_findings_are_json_serializable(self):
+        result = cargo_toml_inspect(CYRILLIC_CARGO_TOML)
+        json_str = json.dumps(result["findings"])
+        assert isinstance(json_str, str)
+
+
+MANY_SUSPICIOUS_DEPS = """\
+[package]
+name = "truncation-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+""" + "\n".join(f'bad_{i}__x = "1.0"' for i in range(210))
+
+
+@_needs_tomllib
+class TestInspectionContract:
+    """Contract tests for inspection function return shapes."""
+
+    def test_all_findings_are_mappings(self):
+        for fn in (cargo_toml_inspect, pyproject_inspect, requirements_inspect):
+            result = fn(BASIC_CARGO_TOML if fn is cargo_toml_inspect else "")
+            for f in result["findings"]:
+                assert isinstance(f, dict)
+
+    def test_finding_has_required_fields(self):
+        for fn, inp in (
+            (cargo_toml_inspect, MISSING_EDITION_TOML),
+            (pyproject_inspect, ""),
+            (requirements_inspect, ""),
+        ):
+            result = fn(inp)
+            for f in result["findings"]:
+                assert "code" in f, f"Missing 'code' in {f}"
+                assert "severity" in f, f"Missing 'severity' in {f}"
+                assert "message" in f, f"Missing 'message' in {f}"
+
+    def test_severity_vocabulary(self):
+        for fn, inp in (
+            (cargo_toml_inspect, INVALID_TOML),
+            (pyproject_inspect, "[invalid"),
+            (requirements_inspect, ""),
+        ):
+            result = fn(inp)
+            for f in result["findings"]:
+                assert f["severity"] in (
+                    "error",
+                    "warning",
+                    "info",
+                ), f"Bad severity {f['severity']!r} in {f['code']}"
+
+    def test_findings_json_serializable(self):
+        for fn, inp in (
+            (cargo_toml_inspect, SUSPICIOUS_DEPS_TOML),
+            (pyproject_inspect, ""),
+            (requirements_inspect, ""),
+        ):
+            result = fn(inp)
+            json_str = json.dumps(result["findings"])
+            assert isinstance(json_str, str)
+
+    def test_max_findings_truncation(self):
+        result = cargo_toml_inspect(MANY_SUSPICIOUS_DEPS)
+        assert len(result["findings"]) == 201
+        assert result["findings"][-1]["code"] == "FINDINGS_TRUNCATED"
+        assert result["findings"][-1]["severity"] == "warning"
+
+    def test_parse_failure_produces_error_finding(self):
+        for fn, inp in (
+            (cargo_toml_inspect, INVALID_TOML),
+            (pyproject_inspect, "[invalid"),
+            (requirements_inspect, 12345),
+        ):
+            result = fn(inp)
+            severities = [f["severity"] for f in result["findings"]]
+            assert "error" in severities, f"{fn.__name__} did not produce an error finding"
+
+    def test_empty_input_behavior(self):
+        for fn, inp in (
+            (cargo_toml_inspect, EMPTY_TOML),
+            (pyproject_inspect, ""),
+            (requirements_inspect, ""),
+        ):
+            result = fn(inp)
+            assert "findings" in result
+            for f in result["findings"]:
+                assert isinstance(f, dict)
+                assert "code" in f

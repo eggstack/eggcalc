@@ -16,6 +16,7 @@ import os
 import sys
 import threading
 import time
+import warnings
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -249,7 +250,7 @@ MAX_CANCELLED_REQUESTS = _parse_env_int(
     "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", 10_000, 100, 1_000_000
 )
 
-SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05",)
+SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")
 LATEST_SUPPORTED_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[-1]
 
 SUPPORTED_SCHEMA_KEYWORDS = frozenset(
@@ -496,6 +497,9 @@ class McpSession:
     def __init__(self, *, initial_state: McpSessionState = McpSessionState.READY):
         self.state = initial_state
         self.negotiated_version: str | None = None
+        self.requested_version: str | None = None
+        self.client_name: str | None = None
+        self.client_version: str | None = None
         self.client_info: dict | None = None
         self.client_capabilities: dict | None = None
         self.request_id: str | None = None
@@ -568,43 +572,38 @@ class McpSession:
 
     def _handle_initialize(self, request: dict) -> dict:
         """Handle an initialize MCP request with parameter validation."""
-        params = request.get("params", {})
+        params = request.get("params")
         if not isinstance(params, dict):
-            return _invalid_params(request.get("id"), "Invalid params: expected object")
+            return _invalid_params(request.get("id"), "initialize params must be an object")
 
-        # Validate protocolVersion
         protocol_version = params.get("protocolVersion")
-        if protocol_version is not None and not isinstance(protocol_version, str):
-            return _invalid_params(
-                request.get("id"), "Invalid params: protocolVersion must be a string"
-            )
+        if not isinstance(protocol_version, str) or not protocol_version.strip():
+            return _invalid_params(request.get("id"), "protocolVersion must be a non-empty string")
 
-        # Validate capabilities
         capabilities = params.get("capabilities")
-        if capabilities is not None and not isinstance(capabilities, dict):
-            return _invalid_params(
-                request.get("id"), "Invalid params: capabilities must be an object"
-            )
+        if not isinstance(capabilities, dict):
+            return _invalid_params(request.get("id"), "capabilities must be an object")
 
-        # Validate clientInfo
         client_info = params.get("clientInfo")
-        if client_info is not None:
-            if not isinstance(client_info, dict):
-                return _invalid_params(
-                    request.get("id"), "Invalid params: clientInfo must be an object"
-                )
-            if "name" not in client_info or not isinstance(client_info["name"], str):
-                return _invalid_params(
-                    request.get("id"),
-                    "Invalid params: clientInfo.name must be a string",
-                )
+        if not isinstance(client_info, dict):
+            return _invalid_params(request.get("id"), "clientInfo must be an object")
 
-        # Negotiate protocol version
-        if protocol_version and protocol_version in SUPPORTED_PROTOCOL_VERSIONS:
-            self.negotiated_version = protocol_version
+        client_name = client_info.get("name")
+        if not isinstance(client_name, str) or not client_name.strip():
+            return _invalid_params(request.get("id"), "clientInfo.name must be a non-empty string")
+
+        client_version = client_info.get("version", "")
+
+        # Version negotiation
+        if protocol_version in SUPPORTED_PROTOCOL_VERSIONS:
+            negotiated = protocol_version
         else:
-            self.negotiated_version = LATEST_SUPPORTED_PROTOCOL_VERSION
+            negotiated = LATEST_SUPPORTED_PROTOCOL_VERSION
 
+        self.negotiated_version = negotiated
+        self.requested_version = protocol_version
+        self.client_name = client_name
+        self.client_version = client_version if isinstance(client_version, str) else ""
         self.client_info = client_info
         self.client_capabilities = capabilities
         self.state = McpSessionState.INITIALIZING
@@ -613,7 +612,7 @@ class McpSession:
             "jsonrpc": "2.0",
             "id": request.get("id"),
             "result": {
-                "protocolVersion": self.negotiated_version,
+                "protocolVersion": negotiated,
                 "capabilities": {
                     "tools": {"listChanged": False},
                 },
@@ -1345,11 +1344,39 @@ def _handle_list_tools(request: dict) -> dict:
 
 def _handle_initialize(request: dict) -> dict:
     """Handle an initialize MCP request."""
+    params = request.get("params")
+    if not isinstance(params, dict):
+        return _invalid_params(request.get("id"), "initialize params must be an object")
+
+    protocol_version = params.get("protocolVersion")
+    if not isinstance(protocol_version, str) or not protocol_version.strip():
+        return _invalid_params(request.get("id"), "protocolVersion must be a non-empty string")
+
+    capabilities = params.get("capabilities")
+    if not isinstance(capabilities, dict):
+        return _invalid_params(request.get("id"), "capabilities must be an object")
+
+    client_info = params.get("clientInfo")
+    if not isinstance(client_info, dict):
+        return _invalid_params(request.get("id"), "clientInfo must be an object")
+
+    client_name = client_info.get("name")
+    if not isinstance(client_name, str) or not client_name.strip():
+        return _invalid_params(request.get("id"), "clientInfo.name must be a non-empty string")
+
+    client_version = client_info.get("version", "")
+
+    # Version negotiation
+    if protocol_version in SUPPORTED_PROTOCOL_VERSIONS:
+        negotiated = protocol_version
+    else:
+        negotiated = LATEST_SUPPORTED_PROTOCOL_VERSION
+
     return {
         "jsonrpc": "2.0",
         "id": request.get("id"),
         "result": {
-            "protocolVersion": LATEST_SUPPORTED_PROTOCOL_VERSION,
+            "protocolVersion": negotiated,
             "capabilities": {
                 "tools": {"listChanged": False},
             },
@@ -1462,6 +1489,13 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
 
     # Get or create session for backward compatibility
     if session is None:
+        warnings.warn(
+            "Calling handle_request() without an explicit session is deprecated. "
+            "Pass a McpSession instance for full lifecycle enforcement. "
+            "This compatibility path will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if _default_session is None:
             _default_session = McpSession()
         session = _default_session

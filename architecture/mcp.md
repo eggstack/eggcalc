@@ -298,7 +298,7 @@ Tool requests before initialization return `-32600` ("Server not initialized"). 
 
 ### Protocol Version Negotiation
 
-Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05",)` with `LATEST_SUPPORTED_PROTOCOL_VERSION` derived from it. The `initialize` handler inspects the client's `protocolVersion`:
+Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")` with `LATEST_SUPPORTED_PROTOCOL_VERSION = "2025-11-25"`. The `initialize` handler inspects the client's `protocolVersion`:
 
 - If the client requests a supported version, the server responds with that version.
 - If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version.
@@ -330,7 +330,8 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
     """Route MCP request to appropriate handler.
     
     When session is None, a module-level default session (starting in
-    READY state) is used for backward compatibility.
+    READY state) is used for backward compatibility. This path is
+    deprecated and emits a DeprecationWarning.
     """
 ```
 

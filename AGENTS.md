@@ -149,8 +149,8 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - `full` profile uses `llm_exposure != "hidden"` filter (not `TOOL_PROFILES["full"]`). `EGGCALC_MCP_SCHEMA_DETAIL` controls schema verbosity (compact/normal/full).
 - Resource audit: `docs/mcp_resource_limits.md` covers all 77 tools.
 - **Session lifecycle:** `McpSession` class manages protocol state (UNINITIALIZED → INITIALIZING → READY → CLOSED). `McpSessionState` enum tracks the lifecycle. Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`.
-- **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05",)`. Version negotiation happens in `initialize`. Constants exported from `eggcalc.mcp`.
-- **`handle_request(request, session=None)`**: When `session` is `None`, a module-level default session (starting in READY state) is used for backward compatibility. Callers that pass an explicit `McpSession` get full lifecycle enforcement.
+- **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`. Version negotiation happens in `initialize`. Constants exported from `eggcalc.mcp`.
+- **`handle_request(request, session=None)`**: When `session` is `None`, a module-level default session (starting in READY state) is used for backward compatibility. **Deprecated** — emits `DeprecationWarning`. Callers should pass an explicit `McpSession` instance.
 - **`main()`**: Creates one `McpSession(initial_state=UNINITIALIZED)` per connection for lifecycle management.
 - **Centralized error helpers:** `_jsonrpc_error()`, `_parse_error()`, `_method_not_found()`, `_invalid_params()`, `_internal_error()` in server.py.
 - **Schema validation:** `SUPPORTED_SCHEMA_KEYWORDS` frozenset defines which JSON Schema keywords the validator supports. `tests/test_mcp_schema_lint.py` walks all `TOOL_SCHEMAS` and fails on unsupported keywords.
