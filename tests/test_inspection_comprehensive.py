@@ -1304,6 +1304,7 @@ class TestSecurityAdversarial:
         r = requirements_inspect(text)
         assert r["parse_ok"] is True
 
+    @_needs_tomllib
     def test_cargo_confusable_unicode_name(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1313,6 +1314,7 @@ class TestSecurityAdversarial:
         assert r["parse_ok"] is True
         assert len(r["suspicious_dependency_names"]) >= 1
 
+    @_needs_tomllib
     def test_cargo_suspicious_starting_with_digit(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1321,6 +1323,7 @@ class TestSecurityAdversarial:
         r = cargo_toml_inspect(text)
         assert "0package" in r["suspicious_dependency_names"]
 
+    @_needs_tomllib
     def test_cargo_suspicious_double_hyphen(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1329,6 +1332,7 @@ class TestSecurityAdversarial:
         r = cargo_toml_inspect(text)
         assert "my--lib" in r["suspicious_dependency_names"]
 
+    @_needs_tomllib
     def test_cargo_suspicious_dot(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1337,6 +1341,7 @@ class TestSecurityAdversarial:
         r = cargo_toml_inspect(text)
         assert "my.lib" in r["suspicious_dependency_names"]
 
+    @_needs_tomllib
     def test_pyproject_many_tool_sections(self):
         sections = "".join(f"[tool.tool{i}]\nkey = 1\n" for i in range(100))
         r = pyproject_inspect(sections)

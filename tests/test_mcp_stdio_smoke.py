@@ -116,12 +116,12 @@ def test_mcp_broken_pipe_exits_cleanly():
         stderr=subprocess.PIPE,
     )
     try:
-        # Send initialize, then close stdin to simulate broken pipe
+        # Send initialize, then close stdin to simulate broken pipe.
+        # Use communicate(input=...) so the write and close are atomic,
+        # avoiding a race where flush() raises ValueError on Linux if
+        # the server exits before the flush completes.
         init_req = _make_initialize_request(1) + "\n"
-        proc.stdin.write(init_req.encode())
-        proc.stdin.flush()
-        proc.stdin.close()
-        stdout, stderr = proc.communicate(timeout=10)
+        stdout, stderr = proc.communicate(input=init_req.encode(), timeout=10)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
