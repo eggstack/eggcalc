@@ -6990,25 +6990,24 @@ class TestLineRangeCompareValidation:
 
 
 class TestCancelledRequests:
-    """Test _cancelled_requests deque behavior in MCP server."""
+    """Test session-scoped cancellation behavior in MCP server."""
 
     def test_cancelled_request_returns_cancelled_error(self):
         """Sending a cancelled notification then a tool call with same ID returns cancelled error."""
-        from eggcalc.mcp.server import _cancelled_requests
-
-        _cancelled_requests.clear()
+        session = ready_session()
         cancelled_id = "test_cancelled_1"
 
-        # Send cancelled notification
+        # Send cancelled notification through session
         handle_request(
             {
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": {"requestId": cancelled_id},
-            }
+            },
+            session=session,
         )
 
-        # Send tool call with same ID
+        # Send tool call with same ID through same session
         response = handle_request(
             {
                 "jsonrpc": "2.0",
@@ -7018,7 +7017,8 @@ class TestCancelledRequests:
                     "name": "math_eval",
                     "arguments": {"expression": "1 + 1"},
                 },
-            }
+            },
+            session=session,
         )
         assert "result" in response
         content = json.loads(response["result"]["content"][0]["text"])
@@ -7028,9 +7028,7 @@ class TestCancelledRequests:
 
     def test_cancelled_request_removed_from_deque(self):
         """After matching a tool call, the cancelled ID is removed from the deque."""
-        from eggcalc.mcp.server import _cancelled_requests
-
-        _cancelled_requests.clear()
+        session = ready_session()
         cancelled_id = "test_cancelled_2"
 
         # Send cancelled notification
@@ -7039,9 +7037,10 @@ class TestCancelledRequests:
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": {"requestId": cancelled_id},
-            }
+            },
+            session=session,
         )
-        assert cancelled_id in _cancelled_requests
+        assert cancelled_id in session._cancelled_requests
 
         # Send tool call with same ID
         handle_request(
@@ -7053,17 +7052,16 @@ class TestCancelledRequests:
                     "name": "math_eval",
                     "arguments": {"expression": "1 + 1"},
                 },
-            }
+            },
+            session=session,
         )
 
         # ID should be removed from deque
-        assert cancelled_id not in _cancelled_requests
+        assert cancelled_id not in session._cancelled_requests
 
     def test_non_string_non_int_request_id_ignored(self):
         """Cancelled notifications with non-string/non-int requestId are ignored."""
-        from eggcalc.mcp.server import _cancelled_requests
-
-        _cancelled_requests.clear()
+        session = ready_session()
 
         # Send cancelled notification with float requestId
         handle_request(
@@ -7071,9 +7069,10 @@ class TestCancelledRequests:
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": {"requestId": 3.14},
-            }
+            },
+            session=session,
         )
-        assert len(_cancelled_requests) == 0
+        assert len(session._cancelled_requests) == 0
 
         # Send cancelled notification with list requestId
         handle_request(
@@ -7081,9 +7080,10 @@ class TestCancelledRequests:
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": {"requestId": [1, 2, 3]},
-            }
+            },
+            session=session,
         )
-        assert len(_cancelled_requests) == 0
+        assert len(session._cancelled_requests) == 0
 
         # Send cancelled notification with dict requestId
         handle_request(
@@ -7091,30 +7091,28 @@ class TestCancelledRequests:
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": {"requestId": {"id": "test"}},
-            }
+            },
+            session=session,
         )
-        assert len(_cancelled_requests) == 0
+        assert len(session._cancelled_requests) == 0
 
     def test_non_object_cancelled_params_ignored(self):
         """Cancelled notifications with non-object params are ignored."""
-        from eggcalc.mcp.server import _cancelled_requests
-
-        _cancelled_requests.clear()
+        session = ready_session()
         response = handle_request(
             {
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": [],
-            }
+            },
+            session=session,
         )
         assert response is None
-        assert len(_cancelled_requests) == 0
+        assert len(session._cancelled_requests) == 0
 
     def test_non_cancelled_id_not_affected(self):
-        """A tool call with an ID not in _cancelled_requests proceeds normally."""
-        from eggcalc.mcp.server import _cancelled_requests
-
-        _cancelled_requests.clear()
+        """A tool call with an ID not in the session's cancelled set proceeds normally."""
+        session = ready_session()
         non_cancelled_id = "test_not_cancelled"
 
         response = handle_request(
@@ -7126,7 +7124,8 @@ class TestCancelledRequests:
                     "name": "math_eval",
                     "arguments": {"expression": "5 + 3"},
                 },
-            }
+            },
+            session=session,
         )
         assert "result" in response
         content = json.loads(response["result"]["content"][0]["text"])
@@ -7135,9 +7134,7 @@ class TestCancelledRequests:
 
     def test_cancelled_int_id_stored_and_checked(self):
         """Cancelled notifications with integer requestId work correctly."""
-        from eggcalc.mcp.server import _cancelled_requests
-
-        _cancelled_requests.clear()
+        session = ready_session()
         cancelled_id = 42
 
         # Send cancelled notification
@@ -7146,9 +7143,10 @@ class TestCancelledRequests:
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": {"requestId": cancelled_id},
-            }
+            },
+            session=session,
         )
-        assert cancelled_id in _cancelled_requests
+        assert cancelled_id in session._cancelled_requests
 
         # Send tool call with same ID
         response = handle_request(
@@ -7160,11 +7158,47 @@ class TestCancelledRequests:
                     "name": "math_eval",
                     "arguments": {"expression": "1 + 1"},
                 },
-            }
+            },
+            session=session,
         )
         content = json.loads(response["result"]["content"][0]["text"])
         assert content["ok"] is False
         assert content["error_type"] == "cancelled"
+
+    def test_cancellation_is_session_scoped(self):
+        """Cancellation in one session does not affect another session."""
+        session1 = ready_session()
+        session2 = ready_session()
+        cancelled_id = "session-scoped-test"
+
+        # Cancel in session1
+        handle_request(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/cancelled",
+                "params": {"requestId": cancelled_id},
+            },
+            session=session1,
+        )
+        assert cancelled_id in session1._cancelled_requests
+        assert cancelled_id not in session2._cancelled_requests
+
+        # Tool call in session2 should NOT be cancelled
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": cancelled_id,
+                "method": "tools/call",
+                "params": {
+                    "name": "math_eval",
+                    "arguments": {"expression": "1 + 1"},
+                },
+            },
+            session=session2,
+        )
+        assert "result" in response
+        content = json.loads(response["result"]["content"][0]["text"])
+        assert content["ok"] is True
 
 
 class TestProductionReviewFixes:
@@ -7334,22 +7368,23 @@ class TestProductionReview2026_06:
 
     def test_cancelled_request_id_rejects_bool(self):
         """notifications/cancelled should ignore bool requestId (subclass of int)."""
-        from eggcalc.mcp import server
+        session = ready_session()
 
         # Pre: deque empty.
-        before = list(server._cancelled_requests)
+        before = list(session._cancelled_requests)
         # Send a cancellation with a bool requestId.
         response = handle_request(
             {
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",
                 "params": {"requestId": True},
-            }
+            },
+            session=session,
         )
         # notifications return None.
         assert response is None
         # The bool must not have been treated as the integer 1.
-        after = list(server._cancelled_requests)
+        after = list(session._cancelled_requests)
         assert len(after) - len(before) == 0
         assert 1 not in after
 
@@ -7470,7 +7505,8 @@ class TestJSONRPCIdValidation:
         assert "result" in response
         assert response["id"] == "test"
 
-    def test_null_id_accepted(self):
+    def test_null_id_rejected(self):
+        """Explicit null id on a request is rejected per JSON-RPC 2.0 spec."""
         response = handle_request(
             {
                 "jsonrpc": "2.0",
@@ -7478,8 +7514,9 @@ class TestJSONRPCIdValidation:
                 "method": "ping",
             }
         )
-        assert "result" in response
-        assert response["id"] is None
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+        assert "null" in response["error"]["message"].lower()
 
     def test_none_id_no_response_field(self):
         response = handle_request(
@@ -7491,6 +7528,37 @@ class TestJSONRPCIdValidation:
         assert "result" in response
         # Response should include id from request (None via .get("id"))
         assert "id" in response
+
+    def test_oversized_id_rejected(self):
+        """String id exceeding MAX_REQUEST_ID_LENGTH is rejected."""
+        from eggcalc.mcp.server import MAX_REQUEST_ID_LENGTH
+
+        oversized_id = "x" * (MAX_REQUEST_ID_LENGTH + 1)
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": oversized_id,
+                "method": "ping",
+            }
+        )
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+        assert "maximum length" in response["error"]["message"].lower()
+
+    def test_exact_limit_id_accepted(self):
+        """String id at exactly MAX_REQUEST_ID_LENGTH is accepted."""
+        from eggcalc.mcp.server import MAX_REQUEST_ID_LENGTH
+
+        exact_id = "a" * MAX_REQUEST_ID_LENGTH
+        response = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": exact_id,
+                "method": "ping",
+            }
+        )
+        assert "result" in response
+        assert response["id"] == exact_id
 
 
 class TestProductionReview2026_07:

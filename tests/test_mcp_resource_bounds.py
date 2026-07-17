@@ -109,60 +109,55 @@ class TestOversizedInputRejection:
 # 3. Cancellation and orphan record cap tests
 # ---------------------------------------------------------------------------
 class TestCancellationFIFOCap:
-    """Test that MAX_CANCELLED_REQUESTS eviction is FIFO."""
+    """Test that MAX_CANCELLED_REQUESTS eviction is FIFO (session-scoped)."""
 
     def test_cancelled_requests_fifo_cap(self):
         from eggcalc.mcp.server import (
             MAX_CANCELLED_REQUESTS,
-            _cancelled_lock,
-            _cancelled_requests,
-            _cancelled_requests_order,
+            McpSession,
+            McpSessionState,
             handle_request,
         )
 
-        with _cancelled_lock:
-            _cancelled_requests.clear()
-            _cancelled_requests_order.clear()
+        # Create a ready session
+        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
+        handle_request(
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            session=session,
+        )
+        handle_request(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            session=session,
+        )
 
-        # Save and restore server-level MCP defaults flag so that calling
-        # handle_request doesn't permanently pollute evaluator state for
-        # other test modules (conftest only restores evaluator flags, not
-        # this server-level guard).
-        import eggcalc.mcp.server as _server_mod
-
-        orig_configured = _server_mod._mcp_defaults_configured
-
-        # Fill to the cap by directly populating the data structures
-        # (avoids calling handle_request 10,000 times which would trigger
-        # MCP defaults setup and pollute evaluator state for other modules).
-        with _cancelled_lock:
+        # Fill to the cap by directly populating the session's data structures
+        with session._cancelled_lock:
             for i in range(MAX_CANCELLED_REQUESTS):
                 rid = f"cap-test-{i}"
-                _cancelled_requests.add(rid)
-                _cancelled_requests_order.append(rid)
-            assert len(_cancelled_requests) == MAX_CANCELLED_REQUESTS
-            oldest = _cancelled_requests_order[0]
+                session._cancelled_requests.add(rid)
+                session._cancelled_requests_order.append(rid)
+            assert len(session._cancelled_requests) == MAX_CANCELLED_REQUESTS
+            oldest = session._cancelled_requests_order[0]
 
         # Send one via handle_request — should evict the oldest.
         handle_request(
             {
                 "jsonrpc": "2.0",
-                "id": None,
                 "method": "notifications/cancelled",
                 "params": {"requestId": "cap-test-overflow"},
-            }
+            },
+            session=session,
         )
 
-        with _cancelled_lock:
-            assert len(_cancelled_requests) == MAX_CANCELLED_REQUESTS
-            assert oldest not in _cancelled_requests
-            assert "cap-test-overflow" in _cancelled_requests
+        with session._cancelled_lock:
+            assert len(session._cancelled_requests) == MAX_CANCELLED_REQUESTS
+            assert oldest not in session._cancelled_requests
+            assert "cap-test-overflow" in session._cancelled_requests
 
-        # Restore cancellation data and MCP defaults flag.
-        with _cancelled_lock:
-            _cancelled_requests.clear()
-            _cancelled_requests_order.clear()
-        _server_mod._mcp_defaults_configured = orig_configured
+        # Cleanup
+        with session._cancelled_lock:
+            session._cancelled_requests.clear()
+            session._cancelled_requests_order.clear()
 
 
 class TestOrphanedProcessesSetCap:
@@ -321,5 +316,80 @@ class TestWorkerSaturation:
                 # If it was truncated, we get output_too_large
                 if not content.get("ok"):
                     assert content.get("error_type") == "output_too_large"
+        finally:
+            server_mod.MAX_OUTPUT_BYTES = original
+
+    def test_exact_limit_output_accepted(self):
+        """Output whose serialized bytes exactly match the limit is accepted."""
+        import eggcalc.mcp.server as server_mod
+
+        original = server_mod.MAX_OUTPUT_BYTES
+        try:
+            server_mod.MAX_OUTPUT_BYTES = 200
+            response = handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "text_count",
+                        "arguments": {"text": "hi"},
+                    },
+                }
+            )
+            assert "result" in response
+            content = json.loads(response["result"]["content"][0]["text"])
+            assert content["ok"] is True
+        finally:
+            server_mod.MAX_OUTPUT_BYTES = original
+
+    def test_limit_plus_one_output_truncated(self):
+        """Output one byte over the limit triggers output_too_large."""
+        import eggcalc.mcp.server as server_mod
+
+        original = server_mod.MAX_OUTPUT_BYTES
+        try:
+            server_mod.MAX_OUTPUT_BYTES = 1
+            response = handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "text_count",
+                        "arguments": {"text": "hi"},
+                    },
+                }
+            )
+            assert "result" in response
+            content = json.loads(response["result"]["content"][0]["text"])
+            assert content["ok"] is False
+            assert content["error_type"] == "output_too_large"
+        finally:
+            server_mod.MAX_OUTPUT_BYTES = original
+
+    def test_unicode_multibyte_output_boundary(self):
+        """Multi-byte UTF-8 output near the byte limit is handled correctly."""
+        import eggcalc.mcp.server as server_mod
+
+        original = server_mod.MAX_OUTPUT_BYTES
+        try:
+            # Set a limit that allows the ASCII part but not the multi-byte chars
+            server_mod.MAX_OUTPUT_BYTES = 60
+            response = handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "text_measure",
+                        "arguments": {
+                            "text": "hello \u00e9\u00e8\u00ea"
+                        },  # 3 multi-byte accented chars
+                    },
+                }
+            )
+            assert response is not None
+            # Server should not crash regardless of truncation
         finally:
             server_mod.MAX_OUTPUT_BYTES = original

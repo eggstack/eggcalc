@@ -277,13 +277,8 @@ SUPPORTED_SCHEMA_KEYWORDS = frozenset(
     }
 )
 
-# FIFO eviction order for cancellation records. We use deque + set
-# so we can pop the oldest entry deterministically when the cap is
-# exceeded (set.pop() would be non-deterministic and could evict the
-# record for a still-relevant request).
-_cancelled_requests_order: deque[Any] = deque()
-_cancelled_requests: set[Any] = set()
-_cancelled_lock = threading.Lock()
+# Per-session cancellation records are owned by McpSession instances.
+# Module-level lock is no longer needed; each session has its own lock.
 
 # Active MCP profile.  Set by set_active_profile() or read from
 # EGGCALC_MCP_PROFILE env var at startup.  "full" is the default for
@@ -504,6 +499,11 @@ class McpSession:
         self.client_info: dict | None = None
         self.client_capabilities: dict | None = None
         self.request_id: str | None = None
+        # Session-scoped cancellation records. Each session owns its own
+        # set + deque + lock so sessions are isolated from each other.
+        self._cancelled_requests: set[Any] = set()
+        self._cancelled_requests_order: deque[Any] = deque()
+        self._cancelled_lock = threading.Lock()
 
     def handle_message(self, request: dict) -> dict | None:
         """Route MCP request to appropriate handler with lifecycle enforcement."""
@@ -529,7 +529,12 @@ class McpSession:
         elif method == "tools/list":
             return _handle_list_tools(request)
         elif method == "tools/call":
-            return _handle_call_tool(request)
+            return _handle_call_tool(
+                request,
+                cancelled_set=self._cancelled_requests,
+                cancelled_order=self._cancelled_requests_order,
+                cancelled_lock=self._cancelled_lock,
+            )
         elif method == "profiles/list":
             return _handle_list_profiles(request)
         elif method.startswith("notifications/"):
@@ -625,7 +630,7 @@ class McpSession:
             self.state = McpSessionState.READY
 
     def _handle_cancelled(self, request: dict) -> None:
-        """Handle notifications/cancelled using module-level cancellation state."""
+        """Handle notifications/cancelled using session-scoped cancellation state."""
         params = request.get("params", {})
         if not isinstance(params, dict):
             return None
@@ -635,13 +640,13 @@ class McpSession:
             and isinstance(cancelled_id, (str, int))
             and not isinstance(cancelled_id, bool)
         ):
-            with _cancelled_lock:
-                if cancelled_id not in _cancelled_requests:
-                    _cancelled_requests.add(cancelled_id)
-                    _cancelled_requests_order.append(cancelled_id)
-                while len(_cancelled_requests) > MAX_CANCELLED_REQUESTS:
-                    oldest = _cancelled_requests_order.popleft()
-                    _cancelled_requests.discard(oldest)
+            with self._cancelled_lock:
+                if cancelled_id not in self._cancelled_requests:
+                    self._cancelled_requests.add(cancelled_id)
+                    self._cancelled_requests_order.append(cancelled_id)
+                while len(self._cancelled_requests) > MAX_CANCELLED_REQUESTS:
+                    oldest = self._cancelled_requests_order.popleft()
+                    self._cancelled_requests.discard(oldest)
 
 
 def _levenshtein_distance(s1: str, s2: str) -> int:
@@ -996,7 +1001,12 @@ def _validate_arguments_schema(name: str, arguments: dict[str, Any]) -> str | No
     return None
 
 
-def _handle_call_tool(request: dict) -> dict:
+def _handle_call_tool(
+    request: dict,
+    cancelled_set: set[Any] | None = None,
+    cancelled_order: deque[Any] | None = None,
+    cancelled_lock: threading.Lock | None = None,
+) -> dict:
     """Handle a tools/call MCP request."""
     # Lazily clean up any orphaned processes from previous timed-out requests
     _cleanup_orphaned_processes()
@@ -1077,36 +1087,41 @@ def _handle_call_tool(request: dict) -> dict:
         }
 
     req_id = request.get("id")
-    with _cancelled_lock:
-        if req_id is not None and req_id in _cancelled_requests:
-            # Remove from both the set and the FIFO order queue
-            _cancelled_requests.discard(req_id)
-            try:
-                _cancelled_requests_order.remove(req_id)
-            except ValueError:
-                pass
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(
-                                {
-                                    "ok": False,
-                                    "error": f"Tool '{name}' request was cancelled",
-                                    "error_type": "cancelled",
-                                    "hints": [],
-                                    "tool": name,
-                                    "warnings": [],
-                                }
-                            ),
-                        }
-                    ],
-                    "isError": True,
-                },
-            }
+    _c_lock = cancelled_lock
+    _c_set = cancelled_set
+    _c_order = cancelled_order
+    if _c_lock is not None and _c_set is not None:
+        with _c_lock:
+            if req_id is not None and req_id in _c_set:
+                # Remove from both the set and the FIFO order queue
+                _c_set.discard(req_id)
+                if _c_order is not None:
+                    try:
+                        _c_order.remove(req_id)
+                    except ValueError:
+                        pass
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps(
+                                    {
+                                        "ok": False,
+                                        "error": f"Tool '{name}' request was cancelled",
+                                        "error_type": "cancelled",
+                                        "hints": [],
+                                        "tool": name,
+                                        "warnings": [],
+                                    }
+                                ),
+                            }
+                        ],
+                        "isError": True,
+                    },
+                }
 
     timed_out = False
     result = None
@@ -1414,6 +1429,13 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
 
     # Validate 'id' type before checking 'method' (per JSON-RPC 2.0 spec)
     request_id = request.get("id")
+    # Explicit null id on a request is rejected: requests must have a
+    # non-null string or integer id.  Notifications omit "id" entirely.
+    if "id" in request and request_id is None and "method" in request:
+        return _invalid_request(
+            None,
+            "Invalid Request: 'id' must be a string or integer, not null",
+        )
     if request_id is not None:
         # bool is a subclass of int in Python, so exclude it explicitly
         if not isinstance(request_id, (str, int)) or isinstance(request_id, bool):
