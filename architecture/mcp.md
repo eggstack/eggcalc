@@ -305,6 +305,8 @@ Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", 
 
 This avoids breaking clients that depend on a specific version string while keeping the server future-proof.
 
+The draft `2026-07-28` stateless MCP protocol revision is intentionally out of scope until final publication and a separate migration plan. The current stdio lifecycle implementation remains stateful.
+
 ### Notification Dispatch
 
 Notifications (JSON-RPC messages with no `id`) are handled silently — they never produce a response. The `McpSession.handle_message()` method dispatches `notifications/initialized` and `notifications/cancelled` to their handlers and returns `None`. Unknown notifications are also silently ignored per the protocol.

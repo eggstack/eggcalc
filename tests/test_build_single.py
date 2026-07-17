@@ -114,3 +114,42 @@ class TestBuildSingleFile:
             assert (
                 pkg_result == single_result
             ), f"Mismatch for '{expr}': package={pkg_result!r}, single={single_result!r}"
+
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            # Arithmetic operators
+            "2 + 3",
+            "5 - 3",
+            "4 * 5",
+            "10 / 3",
+            # Floor division and modulo
+            "7 // 2",
+            "7 % 2",
+            # Exponentiation (^ is rewritten to ** by CLI normalization)
+            "2 ^ 3",
+            "2 + 3 ^ 2",
+            "2 * 3 ^ 2",
+            "2 ^ 3 ^ 2",
+            # Unary minus with exponentiation
+            "-2 ^ 2",
+            "(-2) ^ 2",
+            # Word-form XOR
+            "5 xor 3",
+            "5 bitxor 3",
+            # Precedence
+            "2 + 3 * 4",
+            "(2 + 3) * 4",
+            # Functions and constants
+            "sqrt(144)",
+            "abs(-7)",
+            "pi",
+        ],
+    )
+    def test_operator_matrix_parity(self, single_file_path, expr):
+        """Package and single-file should agree across the full operator matrix."""
+        pkg_result = _run_eggcalc_module(expr)
+        single_result = _run_single_file(single_file_path, expr)
+        assert (
+            pkg_result == single_result
+        ), f"Mismatch for '{expr}': package={pkg_result!r}, single={single_result!r}"

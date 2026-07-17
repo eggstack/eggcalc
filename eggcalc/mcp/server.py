@@ -1573,7 +1573,7 @@ def main() -> int:
                 except TypeError:
                     fallback = _internal_error(None, "response not JSON-serializable")
                     print(json.dumps(fallback), flush=True)
-        except BrokenPipeError:
+        except (BrokenPipeError, ValueError):
             return 0
 
     return 0
