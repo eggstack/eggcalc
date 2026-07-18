@@ -1,7 +1,7 @@
 # Releases 1–3 Closure Evidence
 
 Date: 2026-07-17
-Commit: c197028089e501d3a54015bd9279b09bba4f9f6e
+Commit: 79b668bcecc7605b2eb240270c4b48328618f82d
 OS: macOS (darwin)
 Python: 3.14.2 (CI tests 3.10–3.14)
 
@@ -19,7 +19,7 @@ Python: 3.14.2 (CI tests 3.10–3.14)
 
 ## Test Summary
 
-3047 passed, 32 skipped, 598 warnings
+3064 passed, 32 skipped, 598 warnings
 
 ### Skipped Tests (32)
 
@@ -40,7 +40,7 @@ All skips are pre-existing and unrelated to this closure pass:
 
 ## Changes Made
 
-- `eggcalc/mcp/server.py`: Added `2025-11-25` protocol support, tightened initialization validation, added deprecation warning for sessionless path, fixed broken-pipe `ValueError` handling
+- `eggcalc/mcp/server.py`: Added `2025-11-25` protocol support, tightened initialization validation, added deprecation warning for sessionless path, caught `ValueError` alongside `BrokenPipeError` in stdio loop
 - `eggcalc/exact/cargo.py`: Replaced codepoint-range heuristic with proper confusable detection, added distinct finding codes
 - `tests/test_mcp_server.py`: Added lifecycle, validation, error conformance, and protocol version tests
 - `tests/test_mcp_stdio_smoke.py`: Updated transcripts for `2025-11-25`, added backward compatibility test
@@ -50,11 +50,14 @@ All skips are pre-existing and unrelated to this closure pass:
 - `architecture/normalize.md`: Fixed stale `^` → XOR mapping documentation
 - `docs/natural-language.md`: Fixed stale XOR operator table entry
 - `docs/mcp.md`: Updated protocol version, lifecycle, and deprecation notes
-- `architecture/mcp.md`: Updated protocol version and sessionless deprecation
+- `architecture/mcp.md`: Updated protocol version, sessionless deprecation, and 2026-07-28 out-of-scope note
 - `README.md`: Updated MCP protocol version claim
 - `AGENTS.md`: Updated protocol version and sessionless deprecation
 - `CHANGELOG.md`: Added Release 2.0.0 entries
+- `tests/test_build_single.py`: Expanded operator matrix parity tests (18 parametrized cases)
+- `tests/test_inspection_comprehensive.py`: Added `@_needs_tomllib` to 5 `TestSecurityAdversarial` methods
+- `tests/test_mcp_stdio_smoke.py`: Fixed broken pipe test race condition (`communicate()` instead of `stdin.write/flush/close`)
 
 ## Residual Limitations
 
-None. All acceptance criteria in the closure plan are met.
+1. **2 flaky timeout tests on macOS**: `test_evaluate_with_timeout_success` and `test_evaluate_with_timeout_natural_language` in `tests/test_clicalc.py` fail intermittently on macOS due to timing sensitivity. These pass in Linux CI (all 5 Python versions green in run `29621095169`). These are pre-existing and unrelated to this closure pass.
