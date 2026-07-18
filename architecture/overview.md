@@ -368,4 +368,4 @@ Each component has a dedicated architecture document. Use this index to navigate
 - **`build_single.py` compatibility** — all runtime code must live in one of the four core modules or the `exact/` and `mcp/` packages
 - **TypedDict over NamedTuple** — for structured return types
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters
-- **Python ≥3.10** — per `pyproject.toml`
+- **Python ≥3.11** — per `pyproject.toml`

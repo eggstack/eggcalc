@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
-import pytest
-
 from eggcalc.exact.manifests import (
     go_mod_inspect,
     lockfile_summary,
@@ -14,16 +10,11 @@ from eggcalc.exact.manifests import (
     requirements_inspect,
 )
 
-_needs_tomllib = pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="tomllib requires Python 3.11+"
-)
-
 # ---------------------------------------------------------------------------
 # pyproject_inspect
 # ---------------------------------------------------------------------------
 
 
-@_needs_tomllib
 class TestPyprojectInspect:
     def test_basic_pyproject(self):
         text = """
@@ -274,7 +265,6 @@ version = "8.1.7"
 class TestManifestMCPWrappers:
     """Verify MCP wrappers return proper success envelopes."""
 
-    @_needs_tomllib
     def test_pyproject_inspect_mcp(self):
         from eggcalc.mcp.tools import pyproject_inspect_mcp
 

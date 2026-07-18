@@ -23,6 +23,7 @@ Note: load_user_config_extended() is not exported as custom number/operator
 words via external config are not officially supported.
 """
 
+from .capabilities import RuntimeCapabilities, detect_capabilities
 from .evaluator import (
     DEFAULT_CACHE_SIZE,
     MAX_EXPONENT,
@@ -119,6 +120,9 @@ __all__ = [
     "get_default_evaluator",
     "register_constant",
     "register_function",
+    # Capabilities
+    "RuntimeCapabilities",
+    "detect_capabilities",
     # Webapp
     "EggCalcApp",
     # Memory functions

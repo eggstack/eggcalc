@@ -1,7 +1,6 @@
 """Integration tests for MCP server protocol and tools."""
 
 import json
-import sys
 
 import pytest
 
@@ -47,11 +46,6 @@ def session_request(session, method, params=None, request_id=1):
         {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params or {}},
         session=session,
     )
-
-
-_needs_tomllib = pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="tomllib requires Python 3.11+"
-)
 
 
 class TestProtocolHandshake:
@@ -3729,7 +3723,6 @@ class TestDocExamples:
         assert "banana" in content["result"]["missing_in_b"]
         assert "cherry" in content["result"]["missing_in_a"]
 
-    @_needs_tomllib
     def test_validate_toml_valid(self):
         """validate_toml with valid TOML."""
         response = handle_request(
@@ -7926,7 +7919,6 @@ except Exception as e:
         )
         assert "OK:" in result.stdout
 
-    @_needs_tomllib
     def test_toml_shape_max_tables_range(self):
         """M-15: max_tables must be int in [1, 100_000]."""
         # Below range
@@ -8104,7 +8096,6 @@ class TestMCPSecurityFixes:
         regex2 = _get_instruction_re(None)
         assert regex1 is regex2
 
-    @_needs_tomllib
     def test_validate_toml_text_catches_specific_exceptions(self):
         """M5: validate_toml_text catches ValueError, not bare Exception."""
         from eggcalc.exact.validate import validate_toml_text
@@ -8245,7 +8236,6 @@ class TestConstantLookupMCP:
         assert content["ok"] is True
 
 
-@_needs_tomllib
 class TestCargoTomlInspectMCP:
     """Test cargo_toml_inspect tool via MCP protocol."""
 
@@ -9036,7 +9026,6 @@ class TestConfigPreflight:
         content = result["result"]
         assert content["format"] == "json"
 
-    @_needs_tomllib
     def test_auto_detect_toml(self):
         from eggcalc.mcp.tools import config_preflight
 
@@ -9731,7 +9720,6 @@ class TestCompositeToolContracts:
             if os.path.exists(tmp.name):
                 os.unlink(tmp.name)
 
-    @_needs_tomllib
     def test_config_preflight_invalid_toml(self):
         """Invalid TOML like [unclosed -> valid=False."""
         response = handle_request(

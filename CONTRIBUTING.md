@@ -6,7 +6,7 @@ Thank you for your interest in contributing to eggcalc! This document provides g
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - pip
 
 ### Installation

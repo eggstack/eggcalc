@@ -30,6 +30,7 @@ os.environ.setdefault("EGGCALC_NO_CONFIG", "1")
 
 from .. import __version__
 from .. import evaluator as _evaluator
+from ..capabilities import detect_capabilities
 from .schemas import (
     PROFILE_NAMES,
     SCHEMA_DETAIL_FULL,
@@ -608,6 +609,7 @@ class McpSession:
         self.client_capabilities = capabilities
         self.state = McpSessionState.INITIALIZING
 
+        caps = detect_capabilities()
         return {
             "jsonrpc": "2.0",
             "id": request.get("id"),
@@ -615,6 +617,7 @@ class McpSession:
                 "protocolVersion": negotiated,
                 "capabilities": {
                     "tools": {"listChanged": False},
+                    "runtime": caps.to_dict(),
                 },
                 "serverInfo": {
                     "name": "eggcalc",
@@ -1372,6 +1375,7 @@ def _handle_initialize(request: dict) -> dict:
     else:
         negotiated = LATEST_SUPPORTED_PROTOCOL_VERSION
 
+    caps = detect_capabilities()
     return {
         "jsonrpc": "2.0",
         "id": request.get("id"),
@@ -1379,6 +1383,7 @@ def _handle_initialize(request: dict) -> dict:
             "protocolVersion": negotiated,
             "capabilities": {
                 "tools": {"listChanged": False},
+                "runtime": caps.to_dict(),
             },
             "serverInfo": {
                 "name": "eggcalc",

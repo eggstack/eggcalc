@@ -5,7 +5,6 @@ security/adversarial tests, and resource bounds for all inspectors.
 """
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
@@ -26,10 +25,6 @@ from eggcalc.exact.manifests import (
     requirements_inspect,
 )
 
-_needs_tomllib = pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="tomllib requires Python 3.11+"
-)
-
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -42,7 +37,6 @@ def _load_fixture(rel: str) -> str:
 # ========================================================================
 
 
-@_needs_tomllib
 class TestPythonFixtures:
     """Tests using python manifest fixtures."""
 
@@ -131,7 +125,6 @@ class TestPythonFixtures:
         assert any(f["code"] == "TOML_PARSE_ERROR" for f in r["findings"])
 
 
-@_needs_tomllib
 class TestCargoFixtures:
     """Tests using cargo manifest fixtures."""
 
@@ -375,7 +368,6 @@ class TestLockfileFixtures:
 # ========================================================================
 
 
-@_needs_tomllib
 class TestPyprojectFieldLevel:
     """Field-level assertions for pyproject_inspect."""
 
@@ -706,7 +698,6 @@ class TestRequirementsFieldLevel:
         assert r["suspicious_lines"] == []
 
 
-@_needs_tomllib
 class TestGoModFieldLevel:
     """Field-level assertions for go_mod_inspect."""
 
@@ -762,7 +753,6 @@ class TestGoModFieldLevel:
         assert r["exclude_directives"] == []
 
 
-@_needs_tomllib
 class TestCargoFieldLevel:
     """Field-level assertions for cargo_toml_inspect."""
 
@@ -884,7 +874,6 @@ class TestCargoFieldLevel:
         assert r["duplicate_or_confusable_dependency_names"] == []
 
 
-@_needs_tomllib
 class TestLockfileFieldLevel:
     """Field-level assertions for lockfile_summary."""
 
@@ -930,7 +919,6 @@ class TestLockfileFieldLevel:
 # ========================================================================
 
 
-@_needs_tomllib
 class TestNegativeBoundary:
     """Non-string input, empty input, and size limits."""
 
@@ -1111,7 +1099,6 @@ class TestNegativeBoundary:
 # ========================================================================
 
 
-@_needs_tomllib
 class TestInvariants:
     """Structural invariants that must hold for all inspectors."""
 
@@ -1304,7 +1291,6 @@ class TestSecurityAdversarial:
         r = requirements_inspect(text)
         assert r["parse_ok"] is True
 
-    @_needs_tomllib
     def test_cargo_confusable_unicode_name(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1314,7 +1300,6 @@ class TestSecurityAdversarial:
         assert r["parse_ok"] is True
         assert len(r["suspicious_dependency_names"]) >= 1
 
-    @_needs_tomllib
     def test_cargo_suspicious_starting_with_digit(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1323,7 +1308,6 @@ class TestSecurityAdversarial:
         r = cargo_toml_inspect(text)
         assert "0package" in r["suspicious_dependency_names"]
 
-    @_needs_tomllib
     def test_cargo_suspicious_double_hyphen(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1332,7 +1316,6 @@ class TestSecurityAdversarial:
         r = cargo_toml_inspect(text)
         assert "my--lib" in r["suspicious_dependency_names"]
 
-    @_needs_tomllib
     def test_cargo_suspicious_dot(self):
         text = (
             '[package]\nname = "x"\nversion = "1.0"\nedition = "2021"\n\n'
@@ -1341,7 +1324,6 @@ class TestSecurityAdversarial:
         r = cargo_toml_inspect(text)
         assert "my.lib" in r["suspicious_dependency_names"]
 
-    @_needs_tomllib
     def test_pyproject_many_tool_sections(self):
         sections = "".join(f"[tool.tool{i}]\nkey = 1\n" for i in range(100))
         r = pyproject_inspect(sections)
@@ -1364,7 +1346,6 @@ class TestSecurityAdversarial:
 # ========================================================================
 
 
-@_needs_tomllib
 class TestResourceBounds:
     """Resource bounds enforcement tests."""
 

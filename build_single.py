@@ -21,6 +21,7 @@ MODULES_CALC = [
     "units",
     "evaluator",
     "normalize",
+    "capabilities",
 ]
 
 MODULES_EXACT = [
@@ -395,6 +396,11 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
         "_evaluator.configure_default_evaluator(",
         "configure_default_evaluator(",
     )
+    # MCP server: capabilities module reference
+    code = code.replace(
+        "from ..capabilities import detect_capabilities",
+        "# detect_capabilities is inlined",
+    )
 
     # Synthesis imports from exact submodules
     code = code.replace(
@@ -744,7 +750,7 @@ if __name__ == "__main__":
     # Post-process: convert local `from <module> import` to global variable assignments.
     # In the single file, modules don't exist as separate packages.
     EXACT_MODULE_NAMES = {m.split("/")[-1] for m in MODULES_EXACT}
-    INLINED_NAMES = EXACT_MODULE_NAMES | {"evaluator", "units", "normalize"}
+    INLINED_NAMES = EXACT_MODULE_NAMES | {"evaluator", "units", "normalize", "capabilities"}
 
     def _replace_local_imports(text: str) -> str:
         """Replace local `from <module> import` with global variable assignments."""

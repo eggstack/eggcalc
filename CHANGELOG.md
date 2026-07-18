@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCP protocol version `2025-11-25` support (latest stable) with backward compatibility for `2024-11-05`
 - `SUPPORTED_PROTOCOL_VERSIONS` now includes both `2024-11-05` and `2025-11-25`
 - `McpSession` now stores `requested_version`, `client_name`, `client_version` per session
+- `RuntimeCapabilities` frozen dataclass for immutable runtime capability detection (platform, Python version, tomllib, fork/spawn support)
+- `detect_capabilities()` function for probing observable runtime facts
+- `capability_summary()` for human-readable runtime diagnostics
+- MCP server `initialize` response now includes `runtime` key with capability information
 - Initialization requires `protocolVersion`, `capabilities`, and `clientInfo` fields (returns `-32602` for missing/invalid)
 - `TestInitializeValidation` — 11 tests for initialization parameter validation
 - `TestLifecycleMisuse` — 8 tests for lifecycle state machine enforcement
@@ -57,6 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 257 comprehensive inspection tests with field-level assertions, negative/boundary tests, and invariant tests
 
 ### Changed
+- Minimum supported Python version raised from 3.10 to 3.11 (Release 4 — Runtime Compatibility)
+- Removed `_needs_tomllib` skip decorators from 5 test files (no longer needed on Python 3.11+)
+- Removed `math.cbrt` version skip from `test_clicalc.py`
+- Updated `build_single.py` to include `capabilities` module in single-file build
 - `pyproject_inspect()` now reads `build-backend` from `build-system.build-backend` instead of deriving it from requires[0]
 - `pyproject_inspect()` tool sections read nested `data["tool"]` dict instead of flat `tool.`-prefixed keys
 - `pyproject_inspect()` parse-error location uses `col_offset` with fallback for Python 3.11 compatibility

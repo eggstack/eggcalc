@@ -1377,7 +1377,7 @@ _atanh = _complex_aware(math.atanh, cmath.atanh, use_complex_for_abs_gt_one=True
 
 
 def _cbrt_impl(x: float) -> float:
-    return math.cbrt(x)  # type: ignore[no-any-return,attr-defined]
+    return math.cbrt(x)
 
 
 def _cbrt_complex(x: complex) -> complex:

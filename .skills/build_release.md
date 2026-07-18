@@ -68,7 +68,7 @@ When releasing a new version:
 ## Constraints
 
 - **Standard library only** — no pip packages in `eggcalc/`
-- **Python >=3.10** — CI tests 3.10–3.14
+- **Python >=3.11** — CI tests 3.11–3.14
 - **build_single.py compatibility** — all runtime code must be in core modules, exact/, or mcp/
 - **Import limits** — only these are allowed: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`
 

@@ -91,7 +91,7 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 - **`build_single.py` compatibility** — all runtime code must live in one of the four core modules (`normalize.py`, `evaluator.py`, `units.py`, `__main__.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. Adding imports outside the allowed set will break the build.
 - **TypedDict over NamedTuple** — the codebase uses `TypedDict` for structured return types. TypedDict classes do NOT support `__slots__`.
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters. Applies to both single-expression and REPL modes.
-- **Python requirement** — `>=3.10` per `pyproject.toml`. CI tests 3.10–3.14.
+- **Python requirement** — `>=3.11` per `pyproject.toml`. CI tests 3.11–3.14.
 
 ## Module Map
 
