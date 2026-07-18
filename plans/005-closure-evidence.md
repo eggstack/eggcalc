@@ -1,7 +1,7 @@
 # Releases 1–3 Closure Evidence
 
 Date: 2026-07-17
-Commit: 79b668bcecc7605b2eb240270c4b48328618f82d
+Commit: 161e05a81c94a17403a25e502601d9c0f6f545fa
 OS: macOS (darwin)
 Python: 3.14.2 (CI tests 3.10–3.14)
 
@@ -16,6 +16,8 @@ Python: 3.14.2 (CI tests 3.10–3.14)
 | Full test suite | `python -m pytest tests/ -v` | PASS |
 | Type check | `mypy eggcalc --ignore-missing-imports` | PASS |
 | Release-surface smoke | `python scripts/smoke_release_surfaces.py` | PASS |
+| Working tree clean | `git status --short` | CLEAN |
+| No uncommitted diffs | `git diff --exit-code` | CLEAN |
 
 ## Test Summary
 
