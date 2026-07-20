@@ -684,7 +684,13 @@ def _main():
     parser.add_argument("--verbose", action="store_true", help="Show expression in output")
     parser.add_argument("--mcp-profile", metavar="<profile>", help="MCP server tool profile filter")
     parser.add_argument("--mcp-schema-detail", action="store_true", help="Show full JSON Schema in MCP tools/list")
+    parser.add_argument("--capabilities", action="store_true", help="Show runtime capabilities as JSON and exit")
     args = parser.parse_args()
+
+    if args.capabilities:
+        caps = detect_capabilities()
+        print(caps.to_json(indent=2))
+        return 0
 
     if args.mcp:
         sys.argv = ["eggcalc", "--mcp"]

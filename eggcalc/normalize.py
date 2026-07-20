@@ -3773,8 +3773,20 @@ def main() -> int:
         choices=["compact", "normal", "full"],
         help="MCP schema detail level (default: full, or EGGCALC_MCP_SCHEMA_DETAIL env var)",
     )
+    parser.add_argument(
+        "--capabilities",
+        action="store_true",
+        help="Show runtime capabilities (Python, platform, features) as JSON and exit",
+    )
 
     args = parser.parse_args()
+
+    if args.capabilities:
+        from .capabilities import detect_capabilities
+
+        caps = detect_capabilities()
+        print(caps.to_json(indent=2))
+        return 0
 
     if args.mcp:
         if args.mcp_profile:

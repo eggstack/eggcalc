@@ -15,6 +15,27 @@ Written in pure Python with no external dependencies, it can be used as a CLI to
 - **MCP Server**: deterministic text, JSON, validation, math, path, manifest, patch, and repo-audit tools for AI agents
 - **Pure Python**: Standard library only, no dependencies
 
+## Requirements
+
+- **Python 3.11 or higher** (3.10 is no longer supported)
+- **Operating systems:** Linux, macOS, Windows (tested in CI on all three)
+- All tools and features are fully available on every supported runtime — no reduced capability set
+
+### Migrating from Python 3.10
+
+Python 3.10 reached end-of-life and eggcalc now requires Python 3.11+ for standard-library `tomllib` and `math.cbrt` support. Upgrade your Python before upgrading eggcalc:
+
+```bash
+# Ubuntu/Debian
+sudo apt install python3.11
+
+# macOS (Homebrew)
+brew install python@3.11
+
+# Windows
+winget install Python.Python.3.11
+```
+
 ## Installation
 
 ```bash
@@ -56,6 +77,7 @@ calc --mcp                              # MCP server mode
 | `--json` | Output result as JSON |
 | `-i`, `--interactive` | Start interactive REPL |
 | `--mcp` | Run as MCP server |
+| `--capabilities` | Show runtime capabilities as JSON and exit |
 
 ## Python API
 
@@ -87,6 +109,17 @@ calc --mcp
 ```
 
 See [docs/tool_inventory.md](docs/tool_inventory.md) for the complete generated tool inventory. See [docs/mcp.md](docs/mcp.md) for protocol usage, configuration, profiles, schema detail, and selected tool examples.
+
+### Runtime Capabilities
+
+Query runtime capabilities (Python version, platform, feature detection) from the CLI or Python API:
+
+```bash
+calc --capabilities          # JSON output
+python -c "from eggcalc import detect_capabilities; print(detect_capabilities().to_json(indent=2))"
+```
+
+The MCP server's `initialize` response also includes a `runtime` key with capability information.
 
 ## Supported Operations
 

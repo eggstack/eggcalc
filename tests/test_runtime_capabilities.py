@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -136,3 +138,165 @@ class TestMetadataConsistency:
             3,
             11,
         ), f"Running Python {sys.version_info} does not meet minimum 3.11"
+
+
+class TestCapabilitiesCLI:
+    """Verify --capabilities flag works in CLI."""
+
+    def test_capabilities_module_cli(self) -> None:
+        """python -m eggcalc --capabilities should output valid JSON."""
+        result = subprocess.run(
+            [sys.executable, "-m", "eggcalc", "--capabilities"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        data = json.loads(result.stdout)
+        assert "python_version" in data
+        assert "platform" in data
+        assert isinstance(data["python_version"], list)
+
+    def test_capabilities_single_file_cli(self) -> None:
+        """eggcalc.py --capabilities should output valid JSON."""
+        single_file = Path(__file__).parent.parent / "eggcalc.py"
+        if not single_file.exists():
+            pytest.skip("eggcalc.py not found (run build_single.py)")
+        result = subprocess.run(
+            [sys.executable, str(single_file), "--capabilities"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        data = json.loads(result.stdout)
+        assert "python_version" in data
+        assert "has_tomllib" in data
+
+    def test_capabilities_matches_detect(self) -> None:
+        """CLI --capabilities output should match detect_capabilities()."""
+        result = subprocess.run(
+            [sys.executable, "-m", "eggcalc", "--capabilities"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        cli_caps = json.loads(result.stdout)
+        detected = detect_capabilities()
+        assert cli_caps["python_version"] == list(detected.python_version)
+        assert cli_caps["platform"] == detected.platform
+        assert cli_caps["has_tomllib"] == detected.has_tomllib
+
+
+class TestMultiprocessingCapabilities:
+    """Verify multiprocessing capability detection across platforms."""
+
+    def test_fork_matches_os_module(self) -> None:
+        caps = detect_capabilities()
+        assert caps.supports_fork == hasattr(os, "fork")
+
+    def test_spawn_always_true(self) -> None:
+        caps = detect_capabilities()
+        assert caps.supports_spawn is True
+
+    def test_posix_windows_exclusivity(self) -> None:
+        caps = detect_capabilities()
+        if sys.platform == "win32":
+            assert caps.supports_posix_paths is False
+            assert caps.supports_windows_paths is True
+        else:
+            assert caps.supports_posix_paths is True
+
+
+class TestTimeoutReliability:
+    """Verify timeout behavior works reliably across platforms."""
+
+    def test_evaluate_with_timeout_succeeds(self) -> None:
+        from eggcalc import evaluate_with_timeout
+
+        result = evaluate_with_timeout("2+2", timeout=5.0)
+        val = result.value if hasattr(result, "value") else result
+        assert val == 4
+
+    def test_evaluate_with_timeout_raises_on_slow(self) -> None:
+        import time
+
+        from eggcalc import TimeoutError, evaluate_with_timeout
+
+        start = time.monotonic()
+        try:
+            evaluate_with_timeout("0+0+0+0+0", timeout=0.5)
+        except TimeoutError:
+            pass
+        elapsed = time.monotonic() - start
+        assert elapsed < 5.0, f"Timeout took {elapsed:.2f}s"
+
+
+class TestPackageSingleFileParity:
+    """Verify package and single-file have matching tool inventories."""
+
+    def test_single_file_has_same_handlers(self) -> None:
+        """Single-file TOOL_HANDLERS should match package TOOL_HANDLERS."""
+        single_file = Path(__file__).parent.parent / "eggcalc.py"
+        if not single_file.exists():
+            pytest.skip("eggcalc.py not found (run build_single.py)")
+
+        from eggcalc.mcp.server import TOOL_HANDLERS
+
+        package_tools = sorted(TOOL_HANDLERS.keys())
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import sys; sys.path.insert(0, '{single_file.parent}'); "
+                "ns = {}; exec(open(sys.argv[1]).read(), ns); "
+                "print('\\n'.join(sorted(ns['TOOL_HANDLERS'].keys())))",
+                str(single_file),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, f"Failed to load single-file: {result.stderr}"
+        single_tools = sorted(
+            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+        )
+        assert single_tools == package_tools, (
+            f"Single-file tools differ from package.\n"
+            f"  Missing: {set(package_tools) - set(single_tools)}\n"
+            f"  Extra:   {set(single_tools) - set(package_tools)}"
+        )
+
+    def test_single_file_has_same_schemas(self) -> None:
+        """Single-file TOOL_SCHEMAS should match package TOOL_SCHEMAS."""
+        single_file = Path(__file__).parent.parent / "eggcalc.py"
+        if not single_file.exists():
+            pytest.skip("eggcalc.py not found (run build_single.py)")
+
+        from eggcalc.mcp.schemas import TOOL_SCHEMAS
+
+        package_schemas = sorted(TOOL_SCHEMAS.keys())
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import sys; sys.path.insert(0, '{single_file.parent}'); "
+                "ns = {}; exec(open(sys.argv[1]).read(), ns); "
+                "print('\\n'.join(sorted(ns['TOOL_SCHEMAS'].keys())))",
+                str(single_file),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, f"Failed to load single-file: {result.stderr}"
+        single_schemas = sorted(
+            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+        )
+        assert single_schemas == package_schemas, (
+            f"Single-file schemas differ from package.\n"
+            f"  Missing: {set(package_schemas) - set(single_schemas)}\n"
+            f"  Extra:   {set(single_schemas) - set(package_schemas)}"
+        )

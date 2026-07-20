@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RuntimeCapabilities` frozen dataclass for immutable runtime capability detection (platform, Python version, tomllib, fork/spawn support)
 - `detect_capabilities()` function for probing observable runtime facts
 - `capability_summary()` for human-readable runtime diagnostics
+- `--capabilities` CLI flag to display runtime capabilities as JSON
 - MCP server `initialize` response now includes `runtime` key with capability information
 - Initialization requires `protocolVersion`, `capabilities`, and `clientInfo` fields (returns `-32602` for missing/invalid)
 - `TestInitializeValidation` — 11 tests for initialization parameter validation
@@ -62,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Minimum supported Python version raised from 3.10 to 3.11 (Release 4 — Runtime Compatibility)
+- CI matrix expanded: removed Python 3.10, added macOS and Windows lanes (Linux, macOS, Windows with Python 3.11–3.14)
 - Removed `_needs_tomllib` skip decorators from 5 test files (no longer needed on Python 3.11+)
 - Removed `math.cbrt` version skip from `test_clicalc.py`
 - Updated `build_single.py` to include `capabilities` module in single-file build
