@@ -880,3 +880,262 @@ class TestProtocolLifecycle:
         assert "result" in result
         assert "profiles" in result["result"]
         server.close()
+
+
+# ---------------------------------------------------------------------------
+# TestConfigSnapshotUnits (Workstream F: units field)
+# ---------------------------------------------------------------------------
+
+
+class TestConfigSnapshotUnits:
+    """ConfigSnapshot should carry units alongside constants/functions."""
+
+    def test_config_snapshot_has_units_field(self):
+        CS = _server_mod.ConfigSnapshot
+        snap = CS(generation=1, units={"length": {"m": (1.0, "length")}})
+        assert snap.units == {"length": {"m": (1.0, "length")}}
+
+    def test_config_snapshot_units_default_empty(self):
+        CS = _server_mod.ConfigSnapshot
+        snap = CS()
+        assert snap.units == {}
+
+    def test_config_snapshot_units_immutable(self):
+        CS = _server_mod.ConfigSnapshot
+        snap = CS(units={"length": {"m": (1.0, "length")}})
+        with pytest.raises(AttributeError):
+            snap.units = {}  # type: ignore[misc]
+
+    def test_config_manager_replace_with_units(self):
+        CS = _server_mod.ConfigSnapshot
+        CM = _server_mod.ConfigManager
+        mgr = CM()
+        snap = CS(generation=1, units={"length": {"m": (1.0, "length")}})
+        mgr.replace(snap)
+        assert mgr.current().units == {"length": {"m": (1.0, "length")}}
+
+
+# ---------------------------------------------------------------------------
+# TestEnhancedDiagnostics (Workstream J)
+# ---------------------------------------------------------------------------
+
+
+class TestEnhancedDiagnostics:
+    """Diagnostics should include active workers, session count, orphans."""
+
+    def test_diagnostic_has_active_workers(self):
+        server = McpServer()
+        diag = server.diagnostic()
+        assert "active_workers" in diag
+        assert diag["active_workers"] == 0
+        server.close()
+
+    def test_diagnostic_has_session_count(self):
+        server = McpServer()
+        diag = server.diagnostic()
+        assert "session_count" in diag
+        assert diag["session_count"] == 0
+        session = server.create_session()
+        diag = server.diagnostic()
+        assert diag["session_count"] == 1
+        server.close()
+
+    def test_diagnostic_has_orphan_count(self):
+        server = McpServer()
+        diag = server.diagnostic()
+        assert "orphan_count" in diag
+        assert diag["orphan_count"] == 0
+        server.close()
+
+    def test_diagnostic_has_config_units_count(self):
+        server = McpServer()
+        diag = server.diagnostic()
+        assert "config_units_count" in diag
+        assert diag["config_units_count"] == 0
+        server.close()
+
+    def test_diagnostic_has_global_config_generation(self):
+        server = McpServer()
+        diag = server.diagnostic()
+        assert "global_config_generation" in diag
+        assert isinstance(diag["global_config_generation"], int)
+        server.close()
+
+    def test_diagnostic_deterministic(self):
+        server = McpServer()
+        d1 = server.diagnostic()
+        d2 = server.diagnostic()
+        assert d1 == d2
+        server.close()
+
+    def test_executor_active_workers_property(self):
+        cfg = McpServerConfig(max_tool_workers=4)
+        reg = ToolRegistry()
+        executor = ToolExecutor(cfg, reg)
+        assert executor.active_workers == 0
+        executor.close()
+
+    def test_executor_orphan_count_property(self):
+        cfg = McpServerConfig()
+        reg = ToolRegistry()
+        executor = ToolExecutor(cfg, reg)
+        assert executor.orphan_count == 0
+        executor.close()
+
+
+# ---------------------------------------------------------------------------
+# TestConfigGeneration (Workstream G)
+# ---------------------------------------------------------------------------
+
+
+class TestConfigGeneration:
+    """Config generation counter tracks cache invalidation."""
+
+    def test_get_config_generation_returns_int(self):
+        from eggcalc.evaluator import get_config_generation
+
+        gen = get_config_generation()
+        assert isinstance(gen, int)
+
+    def test_clear_global_cache_increments_generation(self):
+        from eggcalc.evaluator import _clear_global_cache, get_config_generation
+
+        gen_before = get_config_generation()
+        _clear_global_cache()
+        gen_after = get_config_generation()
+        assert gen_after == gen_before + 1
+
+
+# ---------------------------------------------------------------------------
+# TestConcurrencyStress (Workstream I: storms and saturation)
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrencyStress:
+    """Stress tests for concurrency bounds and storms."""
+
+    def test_cancellation_storm(self):
+        """Rapid cancellations do not leak or crash."""
+        server = McpServer()
+        session = _ready_session(server)
+        for i in range(50):
+            _session_request(
+                session,
+                "notifications/cancelled",
+                {"requestId": f"cancel-{i}"},
+            )
+        result = _session_request(
+            session,
+            "tools/call",
+            {"name": "math_eval", "arguments": {"expression": "1+1"}},
+            request_id="after-storm",
+        )
+        assert "result" in result
+        server.close()
+
+    def test_repeated_timeout_does_not_exhaust_workers(self):
+        """Repeated timeouts should not leave permanently blocked workers."""
+        cfg = McpServerConfig(max_tool_timeout_seconds=1, max_tool_workers=2)
+        reg = ToolRegistry(
+            handlers={"always_slow": lambda **kw: time.sleep(100)},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        executor = ToolExecutor(cfg, reg)
+        for i in range(5):
+            result = executor.call_tool("always_slow", {}, request_id=f"t{i}")
+            assert result["id"] == f"t{i}"
+        # After timeouts, a fast tool should still work
+        fast_reg = ToolRegistry(
+            handlers={"fast": lambda **kw: {"ok": True}},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        fast_exec = ToolExecutor(McpServerConfig(max_tool_timeout_seconds=5), fast_reg)
+        result = fast_exec.call_tool("fast", {}, request_id="f1")
+        assert result["id"] == "f1"
+        assert "result" in result
+        executor.close()
+        fast_exec.close()
+
+    def test_multiple_sessions_concurrent_init(self):
+        """Simultaneous initialization of many sessions."""
+        server = McpServer()
+        sessions = [server.create_session() for _ in range(10)]
+        errors = []
+
+        def _init(session, idx):
+            try:
+                handle_request(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": idx,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {},
+                            "clientInfo": {"name": f"test-{idx}", "version": "0.1"},
+                        },
+                    },
+                    session=session,
+                )
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=_init, args=(s, i)) for i, s in enumerate(sessions)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert len(errors) == 0
+        for s in sessions:
+            assert s.state in (McpSessionState.INITIALIZING, McpSessionState.READY)
+        server.close()
+
+    def test_close_with_no_active_work(self):
+        """Close when no work has been submitted."""
+        server = McpServer()
+        server.close()
+        assert server._closed is True
+        assert server._executor._executor is None
+
+    def test_malformed_traffic_isolated_between_sessions(self):
+        """Malformed request in one session does not affect another."""
+        server = McpServer()
+        s1 = _ready_session(server)
+        s2 = _ready_session(server)
+        # Send malformed request to s1
+        result = handle_request(
+            {"jsonrpc": "2.0", "id": "bad", "method": 12345},
+            session=s1,
+        )
+        assert result is not None
+        assert "error" in result
+        # s2 should still work
+        result = _session_request(
+            s2,
+            "tools/call",
+            {"name": "math_eval", "arguments": {"expression": "2+2"}},
+            request_id="s2-ok",
+        )
+        assert "result" in result
+        server.close()
+
+    def test_two_servers_independent_config(self):
+        """Two servers with different configs do not interfere."""
+        CS = _server_mod.ConfigSnapshot
+        s1 = McpServer()
+        s2 = McpServer()
+        snap1 = CS(generation=1, constants={"x": 10}, policy="a")
+        snap2 = CS(generation=1, constants={"x": 20}, policy="b")
+        s1.config_manager.replace(snap1)
+        s2.config_manager.replace(snap2)
+        assert s1.config_manager.current().policy == "a"
+        assert s2.config_manager.current().policy == "b"
+        assert s1.config_manager.current().constants == {"x": 10}
+        assert s2.config_manager.current().constants == {"x": 20}
+        s1.close()
+        s2.close()

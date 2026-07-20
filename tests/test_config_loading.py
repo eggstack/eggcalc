@@ -286,3 +286,68 @@ class TestNoConfigEnvGuard:
             assert ev._config_loaded is True
         finally:
             ev._config_loaded = old_config_loaded
+
+
+# ---------------------------------------------------------------------------
+# C09: Import-error precision (Workstream F)
+# ---------------------------------------------------------------------------
+class TestImportErrorPrecision:
+    """load_user_config must only suppress missing eggcalc_config, not errors inside it."""
+
+    def test_syntax_error_in_config_propagates(self, tmp_path):
+        """Syntax errors inside eggcalc_config.py must propagate."""
+        (tmp_path / "eggcalc_config.py").write_text("def broken(\n")
+        result = _run_in_cwd(
+            [
+                PYTHON,
+                "-c",
+                "from eggcalc.evaluator import load_user_config; load_user_config()",
+            ],
+            cwd=tmp_path,
+        )
+        assert result.returncode != 0
+        assert "SyntaxError" in result.stderr
+
+    def test_runtime_error_in_config_propagates(self, tmp_path):
+        """Runtime exceptions inside eggcalc_config.py must propagate."""
+        (tmp_path / "eggcalc_config.py").write_text("raise RuntimeError('config init failed')\n")
+        result = _run_in_cwd(
+            [
+                PYTHON,
+                "-c",
+                "from eggcalc.evaluator import load_user_config; load_user_config()",
+            ],
+            cwd=tmp_path,
+        )
+        assert result.returncode != 0
+        assert "RuntimeError" in result.stderr
+        assert "config init failed" in result.stderr
+
+    def test_missing_config_module_is_silent(self, tmp_path):
+        """Missing eggcalc_config.py is silently ignored (no error)."""
+        result = _run_in_cwd(
+            [
+                PYTHON,
+                "-c",
+                "from eggcalc.evaluator import load_user_config; load_user_config(); print('ok')",
+            ],
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0
+        assert "ok" in result.stdout
+
+    def test_internal_import_error_in_config_propagates(self, tmp_path):
+        """ImportError raised inside eggcalc_config.py must propagate."""
+        (tmp_path / "eggcalc_config.py").write_text(
+            "from nonexistent_module_xyz import something\n"
+        )
+        result = _run_in_cwd(
+            [
+                PYTHON,
+                "-c",
+                "from eggcalc.evaluator import load_user_config; load_user_config()",
+            ],
+            cwd=tmp_path,
+        )
+        assert result.returncode != 0
+        assert "ModuleNotFoundError" in result.stderr or "ImportError" in result.stderr

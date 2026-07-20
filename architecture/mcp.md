@@ -120,11 +120,33 @@ Owns the bounded thread pool, argument validation, timeout enforcement, cancella
 
 ### ConfigSnapshot / ConfigManager
 
-`ConfigSnapshot` is a frozen dataclass for atomic configuration replacement. `ConfigManager` holds the current snapshot behind a lock, supporting atomic swaps and generation tracking. This allows runtime config changes without corrupting in-flight requests.
+`ConfigSnapshot` is a frozen dataclass for atomic configuration replacement with fields: `generation`, `constants`, `functions`, `units`, and `policy`. `ConfigManager` holds the current snapshot behind a lock, supporting atomic swaps and generation tracking. This allows runtime config changes without corrupting in-flight requests.
 
 ### Evaluator Policy Isolation
 
 `McpServer` creates its own `Evaluator` via `create_evaluator()`. This avoids mutating the module-level `_mcp_mode` or `_default_evaluator`. Two `McpServer` instances can have different evaluator policies (e.g., one with `allow_random=False`, another with `allow_random=True`).
+
+### Cache Isolation
+
+The global evaluation cache (`_cache` in evaluator.py) is generation-keyed: `_clear_global_cache()` increments `_config_generation` on each call. MCP tool handlers use `evaluate_with_timeout()` which spawns subprocesses with independent caches, so the global cache is not consulted during tool execution. For library API callers, `EggCalcApp` provides instance-local caches. The `get_config_generation()` function exposes the current generation counter for diagnostics.
+
+### Diagnostics
+
+`McpServer.diagnostic()` returns a deterministic, JSON-serializable dict with:
+
+| Field | Description |
+|-------|-------------|
+| `config_generation` | Per-server config snapshot generation |
+| `global_config_generation` | Global evaluator config generation counter |
+| `profile` | Active MCP profile name |
+| `registry_tool_count` | Number of tools in registry |
+| `max_tool_workers` | Configured worker pool size |
+| `active_workers` | Currently executing tool calls |
+| `max_tool_timeout` | Configured timeout in seconds |
+| `orphan_count` | Tracked orphaned subprocesses |
+| `session_count` | Active sessions on this server |
+| `config_units_count` | Unit entries in current config snapshot |
+| `closed` | Whether server has been shut down |
 
 ### Backward Compatibility
 

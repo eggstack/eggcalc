@@ -64,11 +64,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `McpServer` class for explicit server ownership of config, registry, executor, evaluator, and sessions
 - `ToolRegistry` class for explicit ownership of tool definitions (handlers, schemas, metadata, profiles)
 - `ToolExecutor` class for owned tool validation, timeout, worker dispatch, and cleanup
-- `ConfigSnapshot` frozen dataclass for atomic configuration replacement
+- `ConfigSnapshot` frozen dataclass for atomic configuration replacement (includes `units` field)
 - `ConfigManager` class for thread-safe configuration snapshot management with generation tracking
 - `create_evaluator()` factory function for isolated evaluator instances with specified policy
-- `McpServer.diagnostic()` for deterministic, JSON-serializable server diagnostics
-- 72 new tests in `test_release5_isolation.py` covering state isolation, concurrency, and lifecycle hardening
+- `get_config_generation()` function for observing configuration generation counter
+- `McpServer.diagnostic()` for deterministic, JSON-serializable server diagnostics (includes `active_workers`, `session_count`, `orphan_count`, `config_units_count`, `global_config_generation`)
+- `ToolExecutor.active_workers` and `ToolExecutor.orphan_count` properties for runtime observability
+- Mutable state inventory document (`architecture/mutable_state_inventory.md`) cataloging all process-global state
+- 96 new tests in `test_release5_isolation.py` covering state isolation, concurrency, lifecycle hardening, diagnostics, and stress scenarios
+- 4 new tests in `test_config_loading.py` for import-error precision (syntax errors, runtime exceptions, internal import errors propagate; missing module is silent)
 - Multi-instance isolation tests: two servers with different configs, evaluators, and registries
 - Multi-session isolation tests: cancellation independence, lifecycle independence, shared request IDs
 - Concurrency tests: parallel tool execution, worker pool bounds, concurrent server creation
@@ -76,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Evaluator policy isolation: server evaluator does not affect default evaluator
 
 ### Changed
+- `load_user_config()` now uses `importlib.util.find_spec()` to precisely detect missing `eggcalc_config`; syntax errors, runtime exceptions, and internal import errors inside the config file now propagate instead of being silently suppressed
 - `McpSession.handle_message()` now accepts optional `server` parameter for server-owned dispatch
 - `eggcalc/mcp/__init__.py` exports `McpServerConfig`, `McpServer`, `ToolRegistry`, `ToolExecutor`, `ConfigSnapshot`, `ConfigManager`
 - Minimum supported Python version raised from 3.10 to 3.11 (Release 4 — Runtime Compatibility)

@@ -653,6 +653,8 @@ class ToolExecutor:
         self._lock = threading.Lock()
         self._orphaned: set[multiprocessing.Process] = set()
         self._orphan_lock = threading.Lock()
+        self._active_workers = 0
+        self._active_workers_lock = threading.Lock()
 
     def _get_executor(self) -> ThreadPoolExecutor:
         if self._executor is None:
@@ -707,7 +709,13 @@ class ToolExecutor:
         try:
             executor = self._get_executor()
             future = executor.submit(_run_handler_in_thread, handler, arguments)
-            result = future.result(timeout=self._config.max_tool_timeout_seconds)
+            with self._active_workers_lock:
+                self._active_workers += 1
+            try:
+                result = future.result(timeout=self._config.max_tool_timeout_seconds)
+            finally:
+                with self._active_workers_lock:
+                    self._active_workers -= 1
         except FuturesTimeoutError:
             timed_out = True
             if future is not None:
@@ -844,6 +852,18 @@ class ToolExecutor:
                         pass
             self._orphaned.clear()
 
+    @property
+    def active_workers(self) -> int:
+        """Number of currently executing tool calls."""
+        with self._active_workers_lock:
+            return self._active_workers
+
+    @property
+    def orphan_count(self) -> int:
+        """Number of tracked orphaned processes."""
+        with self._orphan_lock:
+            return len(self._orphaned)
+
 
 @_dataclass(frozen=True)
 class ConfigSnapshot:
@@ -852,6 +872,7 @@ class ConfigSnapshot:
     generation: int = 0
     constants: dict[str, Any] = _field(default_factory=dict)
     functions: dict[str, Any] = _field(default_factory=dict)
+    units: dict[str, Any] = _field(default_factory=dict)
     policy: str = "default"
 
 
@@ -1099,6 +1120,8 @@ class McpServer:
         )
         self._closed = False
         self._lock = threading.Lock()
+        self._sessions: set[McpSession] = set()
+        self._sessions_lock = threading.Lock()
 
     @property
     def config(self) -> McpServerConfig:
@@ -1120,7 +1143,10 @@ class McpServer:
         self, initial_state: McpSessionState = McpSessionState.UNINITIALIZED
     ) -> McpSession:
         """Create a new session owned by this server."""
-        return McpSession(initial_state=initial_state)
+        session = McpSession(initial_state=initial_state)
+        with self._sessions_lock:
+            self._sessions.add(session)
+        return session
 
     def handle_request(self, request: Any, session: McpSession | None = None) -> dict | None:
         """Handle a JSON-RPC request with server-owned dispatch."""
@@ -1139,15 +1165,23 @@ class McpServer:
                 return
             self._closed = True
         self._executor.close()
+        with self._sessions_lock:
+            self._sessions.clear()
 
     def diagnostic(self) -> dict[str, Any]:
         """Return deterministic diagnostic information."""
+        config_snap = self._config_manager.current()
         return {
-            "config_generation": self._config_manager.current().generation,
+            "config_generation": config_snap.generation,
+            "global_config_generation": _evaluator.get_config_generation(),
             "profile": self._config.profile,
             "registry_tool_count": len(self._registry.tool_names),
             "max_tool_workers": self._config.max_tool_workers,
+            "active_workers": self._executor.active_workers,
             "max_tool_timeout": self._config.max_tool_timeout_seconds,
+            "orphan_count": self._executor.orphan_count,
+            "session_count": len(self._sessions),
+            "config_units_count": len(config_snap.units),
             "closed": self._closed,
         }
 

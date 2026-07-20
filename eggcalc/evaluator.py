@@ -46,6 +46,7 @@ __all__ = [
     "evaluate_async",
     "evaluate_with_timeout",
     "get_default_evaluator",
+    "get_config_generation",
     "register_constant",
     "register_function",
     "load_user_config",
@@ -71,6 +72,7 @@ _mcp_mode = False
 _MAX_CONCURRENT_EVAL_SPAWNS = 4
 _EVAL_SPAWN_SEMAPHORE = multiprocessing.BoundedSemaphore(_MAX_CONCURRENT_EVAL_SPAWNS)
 _EVAL_SPAWN_ACQUIRE_TIMEOUT = 10  # seconds to wait for a spawn slot before failing
+_config_generation = 0
 
 
 class _EvalSpawnPermit:
@@ -368,9 +370,18 @@ def load_user_config() -> None:
         _config_loaded = True
         return
     config_changed = False
-    try:
+    # Only suppress the precise case where eggcalc_config is absent.
+    # Syntax errors, internal import errors, and runtime exceptions
+    # inside the config file propagate to the caller.
+    import importlib.util
+
+    spec = importlib.util.find_spec("eggcalc_config")
+    if spec is None:
+        # Config module doesn't exist — nothing to load.
+        pass
+    else:
         import eggcalc.normalize as normalize_mod  # noqa: F401
-        import eggcalc_config as config
+        import eggcalc_config as config  # type: ignore[import-not-found]
 
         for name, value in getattr(config, "CUSTOM_CONSTANTS", {}).items():
             _default_evaluator.CONSTANTS[name] = value
@@ -415,9 +426,6 @@ def load_user_config() -> None:
                 config_changed = True
 
         units._rebuild_conversions()
-
-    except ImportError:
-        pass
 
     _config_loaded = True
     if config_changed:
@@ -485,8 +493,13 @@ def _remove_cache_entry(expression: str) -> None:
 
 
 def _clear_global_cache() -> None:
-    """Clear the module-level evaluation cache after evaluator state changes."""
-    global _cache_bytes
+    """Clear the module-level evaluation cache after evaluator state changes.
+
+    Increments the config generation counter so that any cached results
+    from a prior configuration are treated as stale.
+    """
+    global _cache_bytes, _config_generation
+    _config_generation += 1
     cache = globals().get("_cache")
     cache_lock = globals().get("_cache_lock")
     if cache is None or cache_lock is None:
@@ -494,6 +507,15 @@ def _clear_global_cache() -> None:
     with cache_lock:
         cache.clear()
         _cache_bytes = 0
+
+
+def get_config_generation() -> int:
+    """Return the current configuration generation counter.
+
+    Increments each time user configuration is loaded or cleared.
+    Useful for detecting whether cached results may be stale.
+    """
+    return _config_generation
 
 
 def _store_cache_entry(expression: str, result: Any) -> None:
