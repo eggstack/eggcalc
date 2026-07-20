@@ -369,3 +369,16 @@ Each component has a dedicated architecture document. Use this index to navigate
 - **TypedDict over NamedTuple** — for structured return types
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters
 - **Python ≥3.11** — per `pyproject.toml`
+
+---
+
+## Ownership Model (Release 5)
+
+The codebase establishes explicit ownership of mutable state:
+
+- `McpServer` owns: `McpServerConfig`, `ToolRegistry`, `ToolExecutor`, `ConfigManager`, dedicated `Evaluator`, session creation
+- `McpSession` owns: lifecycle state, negotiated protocol version, client info, cancellation records
+- `EggCalcApp` owns: instance-local `Evaluator`, instance-local cache
+- Module-level functions (`evaluate`, `evaluate_raw`, `evaluate_cached`) use the global `_default_evaluator` and `_cache`
+
+Multiple `McpServer` instances can coexist safely with different configs, registries, and evaluator policies. Two `McpSession` instances on one server do not share cancellation or lifecycle state.

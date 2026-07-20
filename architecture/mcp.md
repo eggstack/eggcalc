@@ -29,6 +29,14 @@ MCP server providing AI agent tool access to eggcalc's text analysis functions v
   - [Enforcement](#enforcement)
   - [Schema Detail](#schema-detail)
 - [Usage](#usage)
+- [State Isolation (Release 5)](#state-isolation-release-5)
+  - [McpServerConfig](#mcpserverconfig)
+  - [McpServer](#mcpserver)
+  - [ToolRegistry](#toolregistry)
+  - [ToolExecutor](#toolexecutor)
+  - [ConfigSnapshot / ConfigManager](#configsnapshot--configmanager)
+  - [Evaluator Policy Isolation](#evaluator-policy-isolation)
+  - [Backward Compatibility](#backward-compatibility)
 - [Architecture Notes](#architecture-notes)
 
 ## Module Structure
@@ -68,6 +76,59 @@ AI Agent <--JSON-RPC--> MCP Server <---> eggcalc exact tools
                               +-- measure
                               +-- synthesis
 ```
+
+## State Isolation (Release 5)
+
+Release 5 replaces implicit module-level state with explicit objects that own their dependencies. Each `McpServer` instance is self-contained and can run independently of other instances or module-level globals.
+
+### McpServerConfig
+
+Frozen dataclass containing all server policy:
+
+- `profile`, `schema_detail`, `limits`, `timeouts`, `protocol versions`
+- Constructed once via `McpServerConfig()` or `McpServerConfig.from_environment()`
+- Immutable after construction; values validated and clamped in `__post_init__`
+
+```python
+config = McpServerConfig()                    # defaults from environment
+config = McpServerConfig(profile="default")   # explicit overrides
+```
+
+### McpServer
+
+Explicit server object owning all components:
+
+- `McpServerConfig` — immutable policy
+- `ToolRegistry` — tool definitions
+- `ToolExecutor` — execution engine with bounded thread pool
+- `ConfigManager` — atomic configuration snapshots
+- `Evaluator` — dedicated instance with MCP-safe policy
+- Session creation via `create_session()`
+
+```python
+server = McpServer(config=McpServerConfig())
+session = server.create_session()
+```
+
+### ToolRegistry
+
+Owns tool handlers, schemas, metadata, and profiles. Wraps the module-level `TOOL_HANDLERS`, `TOOL_SCHEMAS`, etc. Provides lookup by name, profile filtering, and close-match suggestions without relying on module globals.
+
+### ToolExecutor
+
+Owns the bounded thread pool, argument validation, timeout enforcement, cancellation checking, and orphan cleanup. Does not depend on session globals. Each `McpServer` instance gets its own executor with independently configurable worker count and timeout.
+
+### ConfigSnapshot / ConfigManager
+
+`ConfigSnapshot` is a frozen dataclass for atomic configuration replacement. `ConfigManager` holds the current snapshot behind a lock, supporting atomic swaps and generation tracking. This allows runtime config changes without corrupting in-flight requests.
+
+### Evaluator Policy Isolation
+
+`McpServer` creates its own `Evaluator` via `create_evaluator()`. This avoids mutating the module-level `_mcp_mode` or `_default_evaluator`. Two `McpServer` instances can have different evaluator policies (e.g., one with `allow_random=False`, another with `allow_random=True`).
+
+### Backward Compatibility
+
+Module-level `handle_request()` continues to work but emits `DeprecationWarning` when called without an explicit session. It routes through a compatibility path that does not affect explicitly constructed servers.
 
 ## schemas.py — Tool Schemas
 

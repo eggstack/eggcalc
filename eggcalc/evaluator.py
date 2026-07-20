@@ -2861,6 +2861,27 @@ def get_default_evaluator() -> Evaluator:
     return _default_evaluator
 
 
+def create_evaluator(
+    allow_random: bool = False,
+    allow_side_effects: bool = False,
+) -> Evaluator:
+    """Create an isolated Evaluator instance with specified policy.
+
+    This is the recommended way to create evaluator instances for MCP
+    servers or other contexts that need dedicated evaluation policy
+    without mutating the global default evaluator.
+
+    Args:
+        allow_random: If False, random functions raise EvaluationError.
+        allow_side_effects: If False, state-mutating functions raise EvaluationError.
+
+    Returns:
+        A new Evaluator instance with independent constants, functions,
+        user variables, and memory.
+    """
+    return Evaluator(allow_random=allow_random, allow_side_effects=allow_side_effects)
+
+
 class EggCalcApp:
     """Thread-safe wrapper for eggcalc, optimized for webapp usage.
 

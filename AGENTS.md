@@ -102,7 +102,7 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 | `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class |
 | `eggcalc/__main__.py` | Module entry, delegates to `normalize.main()` |
 | `eggcalc/exact/` | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
-| `eggcalc/mcp/` | MCP server: schemas, tools, server |
+| `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor |
 | `build_single.py` | Assembles everything into `eggcalc.py` |
 
 ## Unit Conventions
@@ -155,6 +155,14 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - **Centralized error helpers:** `_jsonrpc_error()`, `_parse_error()`, `_method_not_found()`, `_invalid_params()`, `_internal_error()` in server.py.
 - **Schema validation:** `SUPPORTED_SCHEMA_KEYWORDS` frozenset defines which JSON Schema keywords the validator supports. `tests/test_mcp_schema_lint.py` walks all `TOOL_SCHEMAS` and fails on unsupported keywords.
 - **Session-aware test helpers:** `ready_session()` and `session_request(session, method, params, request_id)` in `tests/test_mcp_server.py`.
+- `McpServerConfig` frozen dataclass for immutable server configuration (profile, limits, timeouts, protocol versions)
+- `McpServer` class owns config, `ToolRegistry`, `ToolExecutor`, evaluator instance, `ConfigManager`, and session creation
+- `ToolRegistry` wraps tool handlers, schemas, metadata, and profiles with lookup methods
+- `ToolExecutor` owns thread pool, validation, timeout, cancellation, and cleanup
+- `ConfigSnapshot` / `ConfigManager` for atomic configuration replacement with generation tracking
+- `create_evaluator()` factory for isolated evaluator instances (avoids mutating global `_mcp_mode`)
+- `McpServer.handle_request(request, session)` replaces module-level `handle_request()` for new code
+- Sessionless `handle_request(session=None)` emits `DeprecationWarning` and routes through compatibility server
 
 ## Architecture Docs
 
@@ -205,3 +213,5 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 7. **Caret (`^`) contract mismatch** — `evaluate("5^3")` returns `6` (XOR), but `evaluate_raw("5^3")` returns `125` (exponentiation). Use `evaluate()` for XOR, `evaluate_raw()` or CLI for exponentiation. Use `xor`/`bitxor` word forms when you need XOR through the full pipeline.
 8. **Floor/mod with incompatible units** — `evaluate_raw("5m % 2s")` raises `EvaluationError`. Floor division and modulo require dimensionally compatible operands.
 9. **MCP handshake before tools** — `main()` creates an UNINITIALIZED session. Clients must send `initialize` then `notifications/initialized` before `tools/list` or `tools/call`. Tool requests before init return `-32600`.
+10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning`. Use `McpServer` + `McpSession` for new code.
+11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.

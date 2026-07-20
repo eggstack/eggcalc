@@ -11,8 +11,14 @@ from .schemas import TOOL_SCHEMAS
 from .server import (
     LATEST_SUPPORTED_PROTOCOL_VERSION,
     SUPPORTED_PROTOCOL_VERSIONS,
+    ConfigManager,
+    ConfigSnapshot,
+    McpServer,
+    McpServerConfig,
     McpSession,
     McpSessionState,
+    ToolExecutor,
+    ToolRegistry,
     handle_request,
     main,
 )
@@ -26,4 +32,10 @@ __all__ = [
     "McpSessionState",
     "SUPPORTED_PROTOCOL_VERSIONS",
     "LATEST_SUPPORTED_PROTOCOL_VERSION",
+    "McpServerConfig",
+    "McpServer",
+    "ToolRegistry",
+    "ToolExecutor",
+    "ConfigSnapshot",
+    "ConfigManager",
 ]

@@ -60,8 +60,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unicode confusable detection for Cargo dependency names
 - 37 fixture files across Python, Cargo, JavaScript, Go, requirements, and lockfile ecosystems
 - 257 comprehensive inspection tests with field-level assertions, negative/boundary tests, and invariant tests
+- `McpServerConfig` frozen dataclass for immutable MCP server configuration with validation and clamping
+- `McpServer` class for explicit server ownership of config, registry, executor, evaluator, and sessions
+- `ToolRegistry` class for explicit ownership of tool definitions (handlers, schemas, metadata, profiles)
+- `ToolExecutor` class for owned tool validation, timeout, worker dispatch, and cleanup
+- `ConfigSnapshot` frozen dataclass for atomic configuration replacement
+- `ConfigManager` class for thread-safe configuration snapshot management with generation tracking
+- `create_evaluator()` factory function for isolated evaluator instances with specified policy
+- `McpServer.diagnostic()` for deterministic, JSON-serializable server diagnostics
+- 72 new tests in `test_release5_isolation.py` covering state isolation, concurrency, and lifecycle hardening
+- Multi-instance isolation tests: two servers with different configs, evaluators, and registries
+- Multi-session isolation tests: cancellation independence, lifecycle independence, shared request IDs
+- Concurrency tests: parallel tool execution, worker pool bounds, concurrent server creation
+- Shutdown tests: resource reclamation, idempotent close, post-close rejection
+- Evaluator policy isolation: server evaluator does not affect default evaluator
 
 ### Changed
+- `McpSession.handle_message()` now accepts optional `server` parameter for server-owned dispatch
+- `eggcalc/mcp/__init__.py` exports `McpServerConfig`, `McpServer`, `ToolRegistry`, `ToolExecutor`, `ConfigSnapshot`, `ConfigManager`
 - Minimum supported Python version raised from 3.10 to 3.11 (Release 4 — Runtime Compatibility)
 - CI matrix expanded: removed Python 3.10, added macOS and Windows lanes (Linux, macOS, Windows with Python 3.11–3.14)
 - Removed `_needs_tomllib` skip decorators from 5 test files (no longer needed on Python 3.11+)

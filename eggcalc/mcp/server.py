@@ -20,6 +20,8 @@ import warnings
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass as _dataclass
+from dataclasses import field as _field
 from typing import Any
 
 # Disable any user-supplied config loading at import time, before any
@@ -478,6 +480,406 @@ def _internal_error(request_id: Any, message: str) -> dict:
     return _jsonrpc_error(request_id, -32603, f"Internal error: {message}")
 
 
+@_dataclass(frozen=True)
+class McpServerConfig:
+    """Immutable MCP server configuration.
+
+    Constructed once at server creation. All values are validated and
+    clamped during construction. Environment variables serve as input
+    adapters via ``from_environment()`` but are not authoritative at runtime.
+    """
+
+    profile: str = "full"
+    schema_detail: str = "full"
+    max_request_bytes: int = 1_000_000
+    max_output_bytes: int = 1_000_000
+    max_requests_per_second: float = 10.0
+    max_request_id_length: int = 1024
+    max_tool_timeout_seconds: int = 30
+    max_cancelled_requests: int = 10_000
+    max_tool_workers: int = 16
+    supported_protocol_versions: tuple[str, ...] = ("2024-11-05", "2025-11-25")
+    allow_random: bool = False
+    allow_side_effects: bool = False
+
+    def __post_init__(self) -> None:
+        """Validate and clamp values after construction."""
+        object.__setattr__(self, 'profile', self._clamp_profile(self.profile))
+        object.__setattr__(self, 'schema_detail', self._clamp_schema_detail(self.schema_detail))
+        object.__setattr__(
+            self, 'max_request_bytes', max(1000, min(self.max_request_bytes, 100_000_000))
+        )
+        object.__setattr__(
+            self, 'max_output_bytes', max(1000, min(self.max_output_bytes, 100_000_000))
+        )
+        object.__setattr__(
+            self, 'max_requests_per_second', max(0.1, min(self.max_requests_per_second, 1000.0))
+        )
+        object.__setattr__(
+            self, 'max_request_id_length', max(64, min(self.max_request_id_length, 65536))
+        )
+        object.__setattr__(
+            self, 'max_tool_timeout_seconds', max(1, min(self.max_tool_timeout_seconds, 300))
+        )
+        object.__setattr__(
+            self, 'max_cancelled_requests', max(100, min(self.max_cancelled_requests, 1_000_000))
+        )
+        object.__setattr__(self, 'max_tool_workers', max(1, min(self.max_tool_workers, 128)))
+
+    @staticmethod
+    def _clamp_profile(profile: str) -> str:
+        if profile != "full" and profile not in TOOL_PROFILES:
+            available = ", ".join(sorted(TOOL_PROFILES))
+            raise ValueError(f"Unknown profile: {profile!r}. Available: {available}")
+        return profile
+
+    @staticmethod
+    def _clamp_schema_detail(detail: str) -> str:
+        if detail not in ("compact", "normal", "full"):
+            raise ValueError(f"Invalid schema detail: {detail!r}. Use compact, normal, or full.")
+        return detail
+
+    @classmethod
+    def from_environment(cls) -> McpServerConfig:
+        """Create a config from environment variables."""
+        return cls(
+            profile=os.environ.get("EGGCALC_MCP_PROFILE", "full"),
+            schema_detail=os.environ.get("EGGCALC_MCP_SCHEMA_DETAIL", "full"),
+            max_request_bytes=_parse_env_int(
+                "EGGCALC_MCP_MAX_REQUEST_BYTES", 1_000_000, 1_000, 100_000_000
+            ),
+            max_output_bytes=_parse_env_int(
+                "EGGCALC_MCP_MAX_OUTPUT_BYTES", 1_000_000, 1_000, 100_000_000
+            ),
+            max_requests_per_second=_parse_env_float(
+                "EGGCALC_MCP_MAX_REQUESTS_PER_SECOND", 10, 0.1, 1000
+            ),
+            max_tool_timeout_seconds=_parse_env_int(
+                "EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS", 30, 1, 300
+            ),
+            max_cancelled_requests=_parse_env_int(
+                "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", 10_000, 100, 1_000_000
+            ),
+            max_tool_workers=_parse_env_int("EGGCALC_MCP_MAX_TOOL_WORKERS", 16, 1, 128),
+        )
+
+    @property
+    def latest_protocol_version(self) -> str:
+        return self.supported_protocol_versions[-1]
+
+
+class ToolRegistry:
+    """Explicit ownership of tool definitions.
+
+    Owns tool names, handlers, input schemas, output schemas,
+    profiles/tags, and exposure policy. Construction is deterministic;
+    duplicate tool names fail at construction.
+    """
+
+    def __init__(
+        self,
+        handlers: dict[str, Any] | None = None,
+        schemas: dict[str, dict[str, Any]] | None = None,
+        metadata: dict[str, dict[str, Any]] | None = None,
+        profiles: dict[str, list[str]] | None = None,
+    ) -> None:
+        self._handlers = dict(handlers or TOOL_HANDLERS)
+        self._schemas = dict(schemas or TOOL_SCHEMAS)
+        self._metadata = dict(metadata or TOOL_METADATA)
+        self._profiles = dict(profiles or TOOL_PROFILES)
+
+    @property
+    def handlers(self) -> dict[str, Any]:
+        return self._handlers
+
+    @property
+    def schemas(self) -> dict[str, dict[str, Any]]:
+        return self._schemas
+
+    @property
+    def metadata(self) -> dict[str, dict[str, Any]]:
+        return self._metadata
+
+    @property
+    def profiles(self) -> dict[str, list[str]]:
+        return self._profiles
+
+    @property
+    def tool_names(self) -> list[str]:
+        return sorted(self._handlers.keys())
+
+    def has_tool(self, name: str) -> bool:
+        return name in self._handlers
+
+    def get_handler(self, name: str) -> Any | None:
+        return self._handlers.get(name)
+
+    def get_schema(self, name: str) -> dict[str, Any] | None:
+        return self._schemas.get(name)
+
+    def get_metadata(self, name: str) -> dict[str, Any]:
+        return self._metadata.get(name, {})
+
+    def get_profile_tools(self, profile: str | None = None) -> list[str]:
+        """Return sorted tool names for a profile."""
+        if profile is None:
+            profile = "full"
+        if profile == "full":
+            return sorted(
+                name
+                for name, meta in self._metadata.items()
+                if meta.get("llm_exposure") != "hidden"
+            )
+        if profile not in self._profiles:
+            available = ", ".join(sorted(self._profiles))
+            raise ValueError(f"Unknown profile: {profile!r}. Available: {available}")
+        return list(self._profiles[profile])
+
+    def find_close_match(self, name: str) -> str | None:
+        """Find a case-insensitive close match for a tool name."""
+        return _find_close_match(name, self._handlers)
+
+
+class ToolExecutor:
+    """Owns tool validation, timeout, worker dispatch, and cleanup.
+
+    Does not depend on session globals. Session state is passed explicitly.
+    """
+
+    def __init__(self, config: McpServerConfig, registry: ToolRegistry) -> None:
+        self._config = config
+        self._registry = registry
+        self._executor: ThreadPoolExecutor | None = None
+        self._lock = threading.Lock()
+        self._orphaned: set[multiprocessing.Process] = set()
+        self._orphan_lock = threading.Lock()
+
+    def _get_executor(self) -> ThreadPoolExecutor:
+        if self._executor is None:
+            with self._lock:
+                if self._executor is None:
+                    self._executor = ThreadPoolExecutor(
+                        max_workers=self._config.max_tool_workers,
+                        thread_name_prefix="mcp-tool",
+                    )
+        return self._executor
+
+    def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        request_id: Any = None,
+        cancelled_set: set[Any] | None = None,
+        cancelled_order: deque[Any] | None = None,
+        cancelled_lock: threading.Lock | None = None,
+    ) -> dict:
+        """Execute a tool call with validation, timeout, and cancellation."""
+        handler = self._registry.get_handler(name)
+        if handler is None:
+            return self._tool_not_found(request_id, name)
+
+        if cancelled_lock is not None and cancelled_set is not None:
+            with cancelled_lock:
+                if request_id is not None and request_id in cancelled_set:
+                    cancelled_set.discard(request_id)
+                    if cancelled_order is not None:
+                        try:
+                            cancelled_order.remove(request_id)
+                        except ValueError:
+                            pass
+                    return self._cancelled_response(request_id, name)
+
+        validation_error = _validate_arguments(handler, arguments)
+        if validation_error is not None:
+            return self._invalid_arguments(request_id, name, validation_error)
+
+        schema = self._registry.get_schema(name)
+        if schema:
+            input_schema = schema.get("inputSchema")
+            if input_schema:
+                schema_error = _validate_arguments_schema(name, arguments)
+                if schema_error is not None:
+                    return self._invalid_arguments(request_id, name, schema_error)
+
+        timed_out = False
+        result = None
+        future = None
+        try:
+            executor = self._get_executor()
+            future = executor.submit(_run_handler_in_thread, handler, arguments)
+            result = future.result(timeout=self._config.max_tool_timeout_seconds)
+        except FuturesTimeoutError:
+            timed_out = True
+            if future is not None:
+                future.cancel()
+        except Exception as e:
+            message = _sanitize_error(str(e))[:2000]
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {"code": -32000, "message": f"Tool execution error: {message}"},
+            }
+
+        if timed_out:
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": f"Tool '{name}' execution timed out after {self._config.max_tool_timeout_seconds}s",
+                                    "error_type": "timeout",
+                                    "hints": ["Try a simpler input or shorter text"],
+                                    "tool": name,
+                                    "warnings": [],
+                                }
+                            ),
+                        }
+                    ],
+                    "isError": True,
+                },
+            }
+
+        if isinstance(result, dict) and result.get("ok") is False:
+            serialized = json.dumps(result)
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {"content": [{"type": "text", "text": serialized}], "isError": True},
+            }
+
+        serialized = json.dumps(result)
+        if len(serialized.encode("utf-8")) > self._config.max_output_bytes:
+            truncated = {
+                "ok": False,
+                "tool": name,
+                "error_type": "output_too_large",
+                "error": f"Output exceeds {self._config.max_output_bytes} bytes and was truncated",
+                "hints": ["Try reducing input size or using a summary/detail option"],
+                "warnings": ["Output was truncated due to size limit"],
+            }
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "content": [{"type": "text", "text": json.dumps(truncated)}],
+                    "isError": True,
+                },
+            }
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {"content": [{"type": "text", "text": serialized}]},
+        }
+
+    def _tool_not_found(self, request_id: Any, name: str) -> dict:
+        close = self._registry.find_close_match(name)
+        msg = f"Unknown tool: {name}"
+        if close:
+            msg += f". Did you mean: {close}?"
+        return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": msg}}
+
+    def _cancelled_response(self, request_id: Any, name: str) -> dict:
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "ok": False,
+                                "error": f"Tool '{name}' request was cancelled",
+                                "error_type": "cancelled",
+                                "hints": [],
+                                "tool": name,
+                                "warnings": [],
+                            }
+                        ),
+                    }
+                ],
+                "isError": True,
+            },
+        }
+
+    def _invalid_arguments(self, request_id: Any, name: str, error: str) -> dict:
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {"code": -32602, "message": f"Invalid arguments for tool '{name}': {error}"},
+        }
+
+    def close(self) -> None:
+        """Shut down the thread pool and clean up orphaned processes."""
+        with self._lock:
+            if self._executor is not None:
+                self._executor.shutdown(wait=True, cancel_futures=True)
+                self._executor = None
+        self._cleanup_orphans()
+
+    def _cleanup_orphans(self) -> None:
+        with self._orphan_lock:
+            for proc in list(self._orphaned):
+                if proc.is_alive():
+                    try:
+                        proc.terminate()
+                        proc.join(timeout=1)
+                    except Exception:
+                        pass
+                    if proc.is_alive():
+                        try:
+                            proc.kill()
+                            proc.join(timeout=1)
+                        except Exception:
+                            pass
+                    try:
+                        proc.close()
+                    except Exception:
+                        pass
+            self._orphaned.clear()
+
+
+@_dataclass(frozen=True)
+class ConfigSnapshot:
+    """Immutable configuration snapshot for atomic replacement."""
+
+    generation: int = 0
+    constants: dict[str, Any] = _field(default_factory=dict)
+    functions: dict[str, Any] = _field(default_factory=dict)
+    policy: str = "default"
+
+
+class ConfigManager:
+    """Thread-safe manager for atomic configuration snapshots.
+
+    Configuration changes become visible atomically, never field-by-field.
+    Failed loads leave the prior valid snapshot active.
+    """
+
+    def __init__(self) -> None:
+        self._snapshot = ConfigSnapshot()
+        self._lock = threading.Lock()
+
+    def current(self) -> ConfigSnapshot:
+        return self._snapshot
+
+    def replace(self, snapshot: ConfigSnapshot) -> int:
+        """Atomically replace the current snapshot. Returns new generation."""
+        with self._lock:
+            self._snapshot = snapshot
+            return snapshot.generation
+
+    def invalidate(self) -> None:
+        with self._lock:
+            self._snapshot = ConfigSnapshot(generation=self._snapshot.generation + 1)
+
+
 class McpSessionState(enum.Enum):
     """MCP protocol session lifecycle states."""
 
@@ -510,7 +912,7 @@ class McpSession:
         self._cancelled_requests_order: deque[Any] = deque()
         self._cancelled_lock = threading.Lock()
 
-    def handle_message(self, request: dict) -> dict | None:
+    def handle_message(self, request: dict, server: McpServer | None = None) -> dict | None:
         """Route MCP request to appropriate handler with lifecycle enforcement."""
         method = request.get("method", "")
         request_id = request.get("id")
@@ -534,6 +936,8 @@ class McpSession:
         elif method == "tools/list":
             return _handle_list_tools(request)
         elif method == "tools/call":
+            if server is not None:
+                return self._handle_call_tool_server(request, server)
             return _handle_call_tool(
                 request,
                 cancelled_set=self._cancelled_requests,
@@ -548,6 +952,28 @@ class McpSession:
         else:
             display = method[:100] + "..." if len(method) > 100 else method
             return _method_not_found(request_id, display)
+
+    def _handle_call_tool_server(self, request: dict, server: McpServer) -> dict:
+        """Handle tools/call using server-owned executor for state isolation."""
+        params = request.get("params", {})
+        if not isinstance(params, dict):
+            return _invalid_request(request.get("id"), "Invalid params: expected object")
+
+        name = params.get("name", "")
+        arguments = params.get("arguments", {})
+        if not isinstance(name, str) or not name:
+            return _invalid_request(request.get("id"), "Invalid params: missing tool name")
+        if not isinstance(arguments, dict):
+            return _invalid_request(request.get("id"), "Invalid arguments: expected object")
+
+        return server._executor.call_tool(
+            name=name,
+            arguments=arguments,
+            request_id=request.get("id"),
+            cancelled_set=self._cancelled_requests,
+            cancelled_order=self._cancelled_requests_order,
+            cancelled_lock=self._cancelled_lock,
+        )
 
     def _check_ready_for_dispatch(self, method: str, request_id: Any) -> dict | None:
         """Check if session state allows this method to be dispatched."""
@@ -649,6 +1075,81 @@ class McpSession:
                 while len(self._cancelled_requests) > MAX_CANCELLED_REQUESTS:
                     oldest = self._cancelled_requests_order.popleft()
                     self._cancelled_requests.discard(oldest)
+
+
+class McpServer:
+    """Explicit MCP server owning all mutable state.
+
+    Owns configuration, tool registry, tool executor, evaluator policy,
+    and session creation. Multiple instances can coexist safely.
+    """
+
+    def __init__(
+        self,
+        config: McpServerConfig | None = None,
+        registry: ToolRegistry | None = None,
+    ) -> None:
+        self._config = config or McpServerConfig()
+        self._registry = registry or ToolRegistry()
+        self._executor = ToolExecutor(self._config, self._registry)
+        self._config_manager = ConfigManager()
+        self._evaluator = _evaluator.Evaluator(
+            allow_random=self._config.allow_random,
+            allow_side_effects=self._config.allow_side_effects,
+        )
+        self._closed = False
+        self._lock = threading.Lock()
+
+    @property
+    def config(self) -> McpServerConfig:
+        return self._config
+
+    @property
+    def registry(self) -> ToolRegistry:
+        return self._registry
+
+    @property
+    def config_manager(self) -> ConfigManager:
+        return self._config_manager
+
+    @property
+    def evaluator(self) -> _evaluator.Evaluator:
+        return self._evaluator
+
+    def create_session(
+        self, initial_state: McpSessionState = McpSessionState.UNINITIALIZED
+    ) -> McpSession:
+        """Create a new session owned by this server."""
+        return McpSession(initial_state=initial_state)
+
+    def handle_request(self, request: Any, session: McpSession | None = None) -> dict | None:
+        """Handle a JSON-RPC request with server-owned dispatch."""
+        if self._closed:
+            return _invalid_request(None, "Server is closed")
+
+        if session is None:
+            session = self.create_session()
+
+        return session.handle_message(request, server=self)
+
+    def close(self) -> None:
+        """Shut down the server, releasing workers and cleaning up."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        self._executor.close()
+
+    def diagnostic(self) -> dict[str, Any]:
+        """Return deterministic diagnostic information."""
+        return {
+            "config_generation": self._config_manager.current().generation,
+            "profile": self._config.profile,
+            "registry_tool_count": len(self._registry.tool_names),
+            "max_tool_workers": self._config.max_tool_workers,
+            "max_tool_timeout": self._config.max_tool_timeout_seconds,
+            "closed": self._closed,
+        }
 
 
 def _levenshtein_distance(s1: str, s2: str) -> int:
