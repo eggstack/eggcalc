@@ -28,11 +28,12 @@ Created for Release 5 (State Isolation and Concurrency Hardening).
 |------|----------|------|----------------|--------|-------|
 | 69 | `_config_loaded` | `bool` | policy | **Shared** | Written without lock; race under concurrent `load_user_config()` calls |
 | 70 | `_mcp_mode` | `bool` | policy | **Shared** | Mutated by `server.py`, no lock; read everywhere |
-| 72 | `_EVAL_SPAWN_SEMAPHORE` | `BoundedSemaphore` | infrastructure | **Global-safe** | Bounded concurrency control; inherently thread-safe |
+| 72 | `_server_evaluator` | `ContextVar` | infrastructure | **Global-safe** | Context-isolated; binds server evaluator to `evaluate_raw()`/`evaluate_with_timeout()` |
+| 75 | `_EVAL_SPAWN_SEMAPHORE` | `BoundedSemaphore` | infrastructure | **Global-safe** | Bounded concurrency control; inherently thread-safe |
 | 219-221 | `_orphaned_eval_processes`, `_orphaned_eval_order`, `_orphaned_eval_lock` | set, list, Lock | infrastructure | **Global-safe** | Protected by `_orphaned_eval_lock` |
 | 445-447 | `_cache`, `_cache_lock`, `_cache_bytes` | OrderedDict, Lock, int | cache | **Shared** | Process-global LRU; all instances share one cache; cleared on config change |
 | 1189 | `_random_generator` | `random.Random` | user_state | **Shared** | Global RNG with no lock; `seed()` affects all evaluators |
-| 1400 | `_current_evaluator` | `ContextVar` | infrastructure | **Global-safe** | Context-isolated by design |
+| 1400 | `_current_evaluator` | `ContextVar` | infrastructure | **Global-safe** | Context-isolated by design (used by `evaluate()` for function calls) |
 | 1557 | `_memory` (per-instance) | `Memory` | user_state | **Isolated** | Per-Evaluator; internal lock |
 | 1738 | `Evaluator.CONSTANTS` | class var dict | policy | **Shared** | Class-level dict mutated by `register_constant()` and `load_user_config()` |
 | 1804 | `Evaluator.FUNCTIONS` | class var dict | policy | **Shared** | Class-level dict mutated by `register_function()` and `load_user_config()` |
@@ -69,6 +70,9 @@ Created for Release 5 (State Isolation and Concurrency Hardening).
 | 1924 | `_default_session` | `McpSession` | protocol | **Shared** | Deprecated compat path; replaced by explicit `McpSession` per-server |
 | — | `os.environ.setdefault` | env mutation | policy | **Removed** | Import-time mutation removed; config suppression now handled by `McpServerConfig.from_environment()` and `main()` setup |
 | — | `ConfigSnapshot` dicts | dict fields | policy | **Isolated** | `__post_init__()` defensively copies all dict fields to prevent external mutation |
+| — | `ToolRegistry` dicts | dict fields | policy | **Isolated** | `MappingProxyType` wrapping prevents external mutation after construction |
+| — | `ToolExecutor._closed` | `bool` | infrastructure | **Isolated** | Per-executor; prevents pool recreation after `close()` |
+| — | `ToolExecutor._total_inflight` | `int` | infrastructure | **Isolated** | Per-executor; released via `Future.add_done_callback()` on true completion |
 
 ## eggcalc/mcp/tools.py
 
@@ -100,8 +104,9 @@ After Release 5, the following shared state is **justified and safe**:
 The following are **fully isolated by Release 5**:
 
 - `McpServerConfig` (frozen dataclass)
-- `ToolRegistry` (per-server copy of tool definitions)
-- `ToolExecutor` (per-server thread pool and orphan tracking)
-- `ConfigSnapshot` / `ConfigManager` (per-server atomic config; dicts deeply copied in `__post_init__`)
-- `McpSession` (per-connection lifecycle, cancellation, protocol state)
-- `Evaluator` instances (per-server via `create_evaluator()`)
+- `ToolRegistry` (per-server; `MappingProxyType` prevents external mutation)
+- `ToolExecutor` (per-server thread pool, orphan tracking, closed-state sealing)
+- `ConfigSnapshot` / `ConfigManager` (per-server atomic config with generation validation; dicts deeply copied in `__post_init__`)
+- `McpSession` (per-connection lifecycle, cancellation, protocol state; CLOSED on server shutdown)
+- `Evaluator` instances (per-server via `create_evaluator()`; `_server_evaluator` ContextVar binds server evaluator to math execution)
+- `ToolExecutor._total_inflight` accounting (released via `Future.add_done_callback()` on true completion, not caller timeout)

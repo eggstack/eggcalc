@@ -10,10 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Removed import-time `os.environ.setdefault("EGGCALC_NO_CONFIG", "1")` from `server.py`; config suppression now handled by `McpServerConfig.from_environment()` and explicit `main()` setup
 - `main()` now creates `McpServer(config=config)` per connection instead of bare `McpSession`, with `server.handle_request()` and guaranteed `server.close()` in try/finally
-- `McpSession.handle_message()` passes `server=server` to `_handle_list_tools()` and `_handle_list_profiles()` when available; these functions use `server.config.*` and `server.registry.*` instead of module-level globals
-- `_handle_cancelled()` uses `server.config.max_cancelled_requests` when a server is provided
+- `McpSession.handle_message()` passes `server=server` to all handlers when available; `_handle_list_tools()`, `_handle_list_profiles()`, `_handle_initialize()`, and `_handle_cancelled()` use `server.config.*` and `server.registry.*`
 - `ConfigSnapshot.__post_init__()` defensively copies all dict fields to prevent external mutation (deeply immutable)
-- `build_single.py` updated: `_evaluator.Evaluator(` → `Evaluator(`, `_evaluator.get_config_generation()` → `get_config_generation()`, `_evaluator.Evaluator:` → `Evaluator:`
+- `ConfigManager.replace()` now validates that generation is strictly increasing; stale/decreasing generations raise `ValueError`
+- `ToolRegistry` internal dicts wrapped in `MappingProxyType` — properties return immutable views
+- `ToolExecutor` gains closed-state sealing: `_get_executor()` and `call_tool()` raise/return errors after `close()`
+- `ToolExecutor.call_tool()` timeout accounting uses `Future.add_done_callback()` so `_total_inflight` is released only when the future truly completes, not on caller timeout
+- `McpServer.close()` transitions all owned sessions to `CLOSED` state and clears the session set (idempotent)
+- `McpSession.close()` method added for explicit session closure
+
+### Added
+- `_server_evaluator` ContextVar in `evaluator.py` — binds server-owned evaluator to `evaluate_raw()` and `evaluate_with_timeout()` so MCP math execution uses the server's evaluator instead of the global default
+- `_evaluate_with_timeout_worker()` creates a local `Evaluator` instance with the given policy flags instead of mutating `configure_default_evaluator()` — child processes no longer mutate parent evaluator state
+- `evaluate_raw()` and `evaluate_with_timeout()` accept optional `_evaluator` parameter for direct evaluator injection
+- `ToolExecutor` stores server evaluator and sets `_server_evaluator` ContextVar via `_run_handler_in_thread()` before calling handlers
+- Request ID length validation in `McpServer.handle_request()` using `server.config.max_request_id_length`
+- `_handle_initialize()` uses `server.config.supported_protocol_versions` when server is available
+- `McpSession.close()` method for explicit session lifecycle management
+- 23 new tests covering Workstreams B, C3, D, E2, G, H (config authority, registry immutability, evaluator binding, config validation, executor accounting, session lifecycle)
 
 ## [1.2.0] - 2026-07-16
 

@@ -22,6 +22,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass as _dataclass
 from dataclasses import field as _field
+from types import MappingProxyType
 from typing import Any
 
 from .. import __version__
@@ -570,7 +571,8 @@ class ToolRegistry:
 
     Owns tool names, handlers, input schemas, output schemas,
     profiles/tags, and exposure policy. Construction is deterministic;
-    duplicate tool names fail at construction.
+    duplicate tool names fail at construction. Internal state is
+    immutable after construction (MappingProxyType).
     """
 
     def __init__(
@@ -580,25 +582,25 @@ class ToolRegistry:
         metadata: dict[str, dict[str, Any]] | None = None,
         profiles: dict[str, list[str]] | None = None,
     ) -> None:
-        self._handlers = dict(handlers or TOOL_HANDLERS)
-        self._schemas = dict(schemas or TOOL_SCHEMAS)
-        self._metadata = dict(metadata or TOOL_METADATA)
-        self._profiles = dict(profiles or TOOL_PROFILES)
+        self._handlers = MappingProxyType(dict(handlers or TOOL_HANDLERS))
+        self._schemas = MappingProxyType(dict(schemas or TOOL_SCHEMAS))
+        self._metadata = MappingProxyType(dict(metadata or TOOL_METADATA))
+        self._profiles = MappingProxyType(dict(profiles or TOOL_PROFILES))
 
     @property
-    def handlers(self) -> dict[str, Any]:
+    def handlers(self) -> MappingProxyType[str, Any]:
         return self._handlers
 
     @property
-    def schemas(self) -> dict[str, dict[str, Any]]:
+    def schemas(self) -> MappingProxyType[str, dict[str, Any]]:
         return self._schemas
 
     @property
-    def metadata(self) -> dict[str, dict[str, Any]]:
+    def metadata(self) -> MappingProxyType[str, dict[str, Any]]:
         return self._metadata
 
     @property
-    def profiles(self) -> dict[str, list[str]]:
+    def profiles(self) -> MappingProxyType[str, list[str]]:
         return self._profiles
 
     @property
@@ -643,9 +645,15 @@ class ToolExecutor:
     Does not depend on session globals. Session state is passed explicitly.
     """
 
-    def __init__(self, config: McpServerConfig, registry: ToolRegistry) -> None:
+    def __init__(
+        self,
+        config: McpServerConfig,
+        registry: ToolRegistry,
+        evaluator: _evaluator.Evaluator | None = None,
+    ) -> None:
         self._config = config
         self._registry = registry
+        self._evaluator = evaluator
         self._executor: ThreadPoolExecutor | None = None
         self._lock = threading.Lock()
         self._orphaned: set[multiprocessing.Process] = set()
@@ -654,10 +662,15 @@ class ToolExecutor:
         self._active_workers_lock = threading.Lock()
         self._total_inflight = 0
         self._inflight_lock = threading.Lock()
+        self._closed = False
 
     def _get_executor(self) -> ThreadPoolExecutor:
+        if self._closed:
+            raise RuntimeError("ToolExecutor is closed")
         if self._executor is None:
             with self._lock:
+                if self._closed:
+                    raise RuntimeError("ToolExecutor is closed")
                 if self._executor is None:
                     self._executor = ThreadPoolExecutor(
                         max_workers=self._config.max_tool_workers,
@@ -675,6 +688,13 @@ class ToolExecutor:
         cancelled_lock: threading.Lock | None = None,
     ) -> dict:
         """Execute a tool call with validation, timeout, and cancellation."""
+        if self._closed:
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {"code": -32600, "message": "ToolExecutor is closed"},
+            }
+
         handler = self._registry.get_handler(name)
         if handler is None:
             return self._tool_not_found(request_id, name)
@@ -723,7 +743,17 @@ class ToolExecutor:
                 self._total_inflight += 1
             try:
                 executor = self._get_executor()
-                future = executor.submit(_run_handler_in_thread, handler, arguments)
+                future = executor.submit(
+                    _run_handler_in_thread, handler, arguments, self._evaluator
+                )
+
+                def _on_future_done(f: Future) -> None:
+                    """Release inflight reservation when the future truly completes."""
+                    with self._inflight_lock:
+                        self._total_inflight -= 1
+
+                future.add_done_callback(_on_future_done)
+
                 with self._active_workers_lock:
                     self._active_workers += 1
                 try:
@@ -732,11 +762,17 @@ class ToolExecutor:
                     with self._active_workers_lock:
                         self._active_workers -= 1
             except BaseException:
-                with self._inflight_lock:
-                    self._total_inflight -= 1
+                # If we get here before the done_callback was registered
+                # (e.g., submit failed), release the inflight reservation.
+                if future is None or future.done():
+                    with self._inflight_lock:
+                        self._total_inflight -= 1
                 raise
         except FuturesTimeoutError:
             timed_out = True
+            # Best-effort cancel: returns False if the task is already running.
+            # The done_callback will release _total_inflight when the future
+            # actually completes (success, error, or cancellation).
             if future is not None:
                 future.cancel()
         except Exception as e:
@@ -746,9 +782,6 @@ class ToolExecutor:
                 "id": request_id,
                 "error": {"code": -32000, "message": f"Tool execution error: {message}"},
             }
-
-        with self._inflight_lock:
-            self._total_inflight -= 1
 
         if timed_out:
             return {
@@ -848,6 +881,7 @@ class ToolExecutor:
     def close(self) -> None:
         """Shut down the thread pool and clean up orphaned processes."""
         with self._lock:
+            self._closed = True
             if self._executor is not None:
                 self._executor.shutdown(wait=True, cancel_futures=True)
                 self._executor = None
@@ -921,7 +955,8 @@ class ConfigManager:
     """Thread-safe manager for atomic configuration snapshots.
 
     Configuration changes become visible atomically, never field-by-field.
-    Failed loads leave the prior valid snapshot active.
+    Failed loads leave the prior valid snapshot active. Generation numbers
+    increase monotonically; stale or decreasing generations are rejected.
     """
 
     def __init__(self) -> None:
@@ -932,8 +967,20 @@ class ConfigManager:
         return self._snapshot
 
     def replace(self, snapshot: ConfigSnapshot) -> int:
-        """Atomically replace the current snapshot. Returns new generation."""
+        """Atomically replace the current snapshot.
+
+        The new snapshot's generation must be greater than the current one.
+        Returns the new generation on success.
+
+        Raises:
+            ValueError: If the snapshot generation is not greater than current.
+        """
         with self._lock:
+            if snapshot.generation <= self._snapshot.generation:
+                raise ValueError(
+                    f"Snapshot generation {snapshot.generation} must be greater "
+                    f"than current {self._snapshot.generation}"
+                )
             self._snapshot = snapshot
             return snapshot.generation
 
@@ -986,7 +1033,7 @@ class McpSession:
 
         # Dispatch
         if method == "initialize":
-            return self._handle_initialize(request)
+            return self._handle_initialize(request, server=server)
         elif method == "notifications/initialized":
             self._handle_notifications_initialized()
             return None
@@ -1041,6 +1088,10 @@ class McpSession:
             cancelled_lock=self._cancelled_lock,
         )
 
+    def close(self) -> None:
+        """Close this session, transitioning to CLOSED state."""
+        self.state = McpSessionState.CLOSED
+
     def _check_ready_for_dispatch(self, method: str, request_id: Any) -> dict | None:
         """Check if session state allows this method to be dispatched."""
         if method == "initialize":
@@ -1063,7 +1114,7 @@ class McpSession:
 
         return None
 
-    def _handle_initialize(self, request: dict) -> dict:
+    def _handle_initialize(self, request: dict, server: McpServer | None = None) -> dict:
         """Handle an initialize MCP request with parameter validation."""
         params = request.get("params")
         if not isinstance(params, dict):
@@ -1087,11 +1138,19 @@ class McpSession:
 
         client_version = client_info.get("version", "")
 
-        # Version negotiation
-        if protocol_version in SUPPORTED_PROTOCOL_VERSIONS:
+        # Version negotiation: use server config when available
+        supported_versions = (
+            server.config.supported_protocol_versions
+            if server is not None
+            else SUPPORTED_PROTOCOL_VERSIONS
+        )
+        latest_version = (
+            supported_versions[-1] if supported_versions else LATEST_SUPPORTED_PROTOCOL_VERSION
+        )
+        if protocol_version in supported_versions:
             negotiated = protocol_version
         else:
-            negotiated = LATEST_SUPPORTED_PROTOCOL_VERSION
+            negotiated = latest_version
 
         self.negotiated_version = negotiated
         self.requested_version = protocol_version
@@ -1160,12 +1219,12 @@ class McpServer:
     ) -> None:
         self._config = config or McpServerConfig()
         self._registry = registry or ToolRegistry()
-        self._executor = ToolExecutor(self._config, self._registry)
-        self._config_manager = ConfigManager()
         self._evaluator = _evaluator.Evaluator(
             allow_random=self._config.allow_random,
             allow_side_effects=self._config.allow_side_effects,
         )
+        self._executor = ToolExecutor(self._config, self._registry, self._evaluator)
+        self._config_manager = ConfigManager()
         self._closed = False
         self._lock = threading.Lock()
         self._sessions: set[McpSession] = set()
@@ -1201,6 +1260,17 @@ class McpServer:
         if self._closed:
             return _invalid_request(None, "Server is closed")
 
+        # Validate request ID length using server config
+        if isinstance(request, dict):
+            request_id = request.get("id")
+            if request_id is not None:
+                id_str = str(request_id)
+                if len(id_str) > self._config.max_request_id_length:
+                    return _invalid_request(
+                        None,
+                        f"Invalid Request: 'id' exceeds maximum length of {self._config.max_request_id_length}",
+                    )
+
         if session is None:
             session = self.create_session()
 
@@ -1214,6 +1284,8 @@ class McpServer:
             self._closed = True
         self._executor.close()
         with self._sessions_lock:
+            for session in self._sessions:
+                session.close()
             self._sessions.clear()
 
     def diagnostic(self) -> dict[str, Any]:
@@ -1260,7 +1332,9 @@ def _levenshtein_distance(s1: str, s2: str) -> int:
 _MAX_TOOL_NAME_LENGTH = 200
 
 
-def _find_close_match(name: str, handlers: dict[str, Any]) -> str | None:
+def _find_close_match(
+    name: str, handlers: MappingProxyType[str, Any] | dict[str, Any]
+) -> str | None:
     """Find a case-insensitive close match for tool name using edit distance.
 
     Returns the best matching tool name, or None if no good match found.
@@ -1338,8 +1412,24 @@ def _validate_arguments(handler: Any, arguments: dict[str, Any]) -> str | None:
     return None
 
 
-def _run_handler_in_thread(handler: Any, arguments: dict[str, Any]) -> Any:
-    """Run a tool handler on a pool thread, returning the result or raising."""
+def _run_handler_in_thread(
+    handler: Any,
+    arguments: dict[str, Any],
+    evaluator: _evaluator.Evaluator | None = None,
+) -> Any:
+    """Run a tool handler on a pool thread, returning the result or raising.
+
+    If an evaluator is provided, sets the ``_current_evaluator`` ContextVar
+    so that ``evaluate_raw`` and ``evaluate_with_timeout`` use it instead of
+    the module-level default. This binds MCP math execution to the
+    server-owned evaluator without modifying handler signatures.
+    """
+    if evaluator is not None:
+        token = _evaluator._server_evaluator.set(evaluator)
+        try:
+            return handler(**arguments)
+        finally:
+            _evaluator._server_evaluator.reset(token)
     return handler(**arguments)
 
 
@@ -2006,7 +2096,9 @@ def _handle_list_profiles(request: dict, server: McpServer | None = None) -> dic
 
     if server is not None:
         active = server.config.profile
-        registry_profiles = server.registry.profiles
+        registry_profiles: MappingProxyType[str, list[str]] | dict[str, list[str]] = (
+            server.registry.profiles
+        )
     else:
         active = get_active_profile()
         registry_profiles = TOOL_PROFILES

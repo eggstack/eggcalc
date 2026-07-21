@@ -410,6 +410,11 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
         "_evaluator.Evaluator:",
         "Evaluator:",
     )
+    # In single file, _server_evaluator is a module-level ContextVar
+    code = code.replace(
+        "_evaluator._server_evaluator",
+        "_server_evaluator",
+    )
     # MCP server: capabilities module reference
     code = code.replace(
         "from ..capabilities import detect_capabilities",

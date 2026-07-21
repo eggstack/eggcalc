@@ -14,6 +14,7 @@ Covers:
 
 from __future__ import annotations
 
+import itertools
 import os
 import threading
 import time
@@ -753,15 +754,17 @@ class TestConcurrency:
         mgr = CM()
         barrier = threading.Barrier(10)
         errors = []
+        gen_counter = itertools.count(1)
 
-        def _replace(gen):
+        def _replace():
             try:
                 barrier.wait(timeout=5)
+                gen = next(gen_counter)
                 mgr.replace(CS(generation=gen))
             except Exception as e:
                 errors.append(e)
 
-        threads = [threading.Thread(target=_replace, args=(i,)) for i in range(10)]
+        threads = [threading.Thread(target=_replace) for _ in range(10)]
         for t in threads:
             t.start()
         for t in threads:
@@ -770,6 +773,7 @@ class TestConcurrency:
         assert len(errors) == 0
         final = mgr.current()
         assert isinstance(final.generation, int)
+        assert final.generation == 10
 
 
 # ---------------------------------------------------------------------------
@@ -815,10 +819,11 @@ class TestShutdown:
         exec1 = executor._get_executor()
         executor.close()
         assert executor._executor is None
-        exec2 = executor._get_executor()
-        assert exec2 is not None
-        assert exec2 is not exec1
-        executor.close()
+        assert executor._closed is True
+        with pytest.raises(RuntimeError, match="closed"):
+            executor._get_executor()
+        result = executor.call_tool("math_eval", {"expression": "1+1"})
+        assert result["error"]["code"] == -32600
 
     def test_close_cleans_up_all_servers(self):
         servers = [McpServer() for _ in range(5)]
@@ -1291,3 +1296,359 @@ class TestOversizedOutputStorm:
         payload = json.loads(result["result"]["content"][0]["text"])
         assert payload["val"] == 42
         executor.close()
+
+
+# ---------------------------------------------------------------------------
+# Corrective closure pass tests (Workstreams B, C3, D, E2, G, H)
+# ---------------------------------------------------------------------------
+
+
+class TestWorkstreamB_ConfigAuthority:
+    """Workstream B: every McpServerConfig field is enforced or removed."""
+
+    def test_custom_protocol_versions_negotiated_independently(self):
+        """Two servers with different protocol versions negotiate differently."""
+        s1 = McpServer(
+            config=McpServerConfig(
+                supported_protocol_versions=("2024-11-05",),
+            )
+        )
+        s2 = McpServer(
+            config=McpServerConfig(
+                supported_protocol_versions=("2024-11-05", "2025-11-25"),
+            )
+        )
+        try:
+            init_req = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            }
+            r1 = s1.handle_request(init_req)
+            r2 = s2.handle_request(init_req)
+            # s1 only supports 2024-11-05, so it falls back to that
+            assert r1["result"]["protocolVersion"] == "2024-11-05"
+            # s2 supports 2025-11-25, so it negotiates it
+            assert r2["result"]["protocolVersion"] == "2025-11-25"
+        finally:
+            s1.close()
+            s2.close()
+
+    def test_max_request_id_length_enforced(self):
+        """Request ID exceeding max_request_id_length is rejected."""
+        s = McpServer(config=McpServerConfig(max_request_id_length=64))
+        try:
+            long_id = "x" * 65
+            result = s.handle_request({"jsonrpc": "2.0", "id": long_id, "method": "ping"})
+            assert result is not None
+            assert "error" in result
+        finally:
+            s.close()
+
+    def test_max_request_id_length_accepts_valid(self):
+        """Request ID within max_request_id_length is accepted."""
+        s = McpServer(config=McpServerConfig(max_request_id_length=64))
+        try:
+            result = s.handle_request({"jsonrpc": "2.0", "id": "short", "method": "ping"})
+            assert result is not None
+            assert "result" in result
+        finally:
+            s.close()
+
+    def test_two_servers_independent_config(self):
+        """Two servers with conflicting configs operate independently."""
+        s1 = McpServer(config=McpServerConfig(profile="full"))
+        s2 = McpServer(config=McpServerConfig(profile="default"))
+        try:
+            sess1 = s1.create_session()
+            sess2 = s2.create_session()
+            init_req = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            }
+            s1.handle_request(init_req, session=sess1)
+            s2.handle_request(init_req, session=sess2)
+            s1.handle_request(
+                {"jsonrpc": "2.0", "id": 2, "method": "notifications/initialized"}, session=sess1
+            )
+            s2.handle_request(
+                {"jsonrpc": "2.0", "id": 2, "method": "notifications/initialized"}, session=sess2
+            )
+
+            r1 = s1.handle_request(
+                {"jsonrpc": "2.0", "id": 3, "method": "tools/list"}, session=sess1
+            )
+            r2 = s2.handle_request(
+                {"jsonrpc": "2.0", "id": 3, "method": "tools/list"}, session=sess2
+            )
+            assert len(r1["result"]["tools"]) >= len(r2["result"]["tools"])
+        finally:
+            s1.close()
+            s2.close()
+
+
+class TestWorkstreamC3_RegistryImmutability:
+    """Workstream C3: ToolRegistry data cannot be mutated externally."""
+
+    def test_handlers_is_mapping_proxy(self):
+        from types import MappingProxyType
+
+        reg = ToolRegistry()
+        assert isinstance(reg.handlers, MappingProxyType)
+
+    def test_schemas_is_mapping_proxy(self):
+        from types import MappingProxyType
+
+        reg = ToolRegistry()
+        assert isinstance(reg.schemas, MappingProxyType)
+
+    def test_metadata_is_mapping_proxy(self):
+        from types import MappingProxyType
+
+        reg = ToolRegistry()
+        assert isinstance(reg.metadata, MappingProxyType)
+
+    def test_profiles_is_mapping_proxy(self):
+        from types import MappingProxyType
+
+        reg = ToolRegistry()
+        assert isinstance(reg.profiles, MappingProxyType)
+
+    def test_external_mutation_rejected(self):
+        """Attempting to mutate the returned mappings raises TypeError."""
+        reg = ToolRegistry()
+        with pytest.raises(TypeError):
+            reg.handlers["new_tool"] = lambda **kw: None  # type: ignore[misc]
+        with pytest.raises(TypeError):
+            reg.schemas["new_tool"] = {}  # type: ignore[misc]
+        with pytest.raises(TypeError):
+            reg.metadata["new_tool"] = {}  # type: ignore[misc]
+        with pytest.raises(TypeError):
+            reg.profiles["new_profile"] = []  # type: ignore[misc]
+
+
+class TestWorkstreamD_EvaluatorBinding:
+    """Workstream D: MCP math execution uses server-owned evaluator."""
+
+    def test_server_evaluator_rejects_random(self):
+        """Server with allow_random=False rejects random functions via math_eval."""
+        server = McpServer(config=McpServerConfig(allow_random=False))
+        try:
+            session = server.create_session()
+            init_req = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            }
+            server.handle_request(init_req, session=session)
+            server.handle_request(
+                {"jsonrpc": "2.0", "id": 2, "method": "notifications/initialized"}, session=session
+            )
+            result = server.handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {"name": "math_eval", "arguments": {"expression": "randint(1,10)"}},
+                },
+                session=session,
+            )
+            assert result is not None
+            assert result["result"]["isError"] is True
+        finally:
+            server.close()
+
+    def test_two_servers_independent_evaluator_policy(self):
+        """Two servers with opposite evaluator policies remain independent."""
+        s_restrict = McpServer(config=McpServerConfig(allow_random=False))
+        s_permit = McpServer(config=McpServerConfig(allow_random=True))
+        try:
+            sess_r = s_restrict.create_session()
+            sess_p = s_permit.create_session()
+            init_req = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            }
+            for s, sess in ((s_restrict, sess_r), (s_permit, sess_p)):
+                s.handle_request(init_req, session=sess)
+                s.handle_request(
+                    {"jsonrpc": "2.0", "id": 2, "method": "notifications/initialized"}, session=sess
+                )
+
+            r1 = s_restrict.handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {"name": "math_eval", "arguments": {"expression": "randint(1,10)"}},
+                },
+                session=sess_r,
+            )
+            r2 = s_permit.handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {"name": "math_eval", "arguments": {"expression": "randint(1,10)"}},
+                },
+                session=sess_p,
+            )
+            assert r1["result"]["isError"] is True
+            assert r2["result"].get("isError") is not True
+        finally:
+            s_restrict.close()
+            s_permit.close()
+
+    def test_default_evaluator_unchanged_after_server_creation(self):
+        """Creating servers does not alter the default evaluator policy."""
+        from eggcalc.evaluator import _default_evaluator
+
+        orig_random = _default_evaluator._allow_random
+        orig_se = _default_evaluator._allow_side_effects
+        try:
+            _ = McpServer(config=McpServerConfig(allow_random=False, allow_side_effects=False))
+            assert _default_evaluator._allow_random == orig_random
+            assert _default_evaluator._allow_side_effects == orig_se
+        finally:
+            _default_evaluator._allow_random = orig_random
+            _default_evaluator._allow_side_effects = orig_se
+
+    def test_server_evaluator_is_separate_instance(self):
+        """Server evaluator is a different object from the global default."""
+        from eggcalc.evaluator import _default_evaluator
+
+        server = McpServer()
+        try:
+            assert server.evaluator is not _default_evaluator
+        finally:
+            server.close()
+
+
+class TestWorkstreamE2_ConfigManagerValidation:
+    """Workstream E2: ConfigManager.replace() validates generation."""
+
+    def test_replace_rejects_stale_generation(self):
+        CS = _server_mod.ConfigSnapshot
+        CM = _server_mod.ConfigManager
+        mgr = CM()
+        mgr.replace(CS(generation=5))
+        with pytest.raises(ValueError, match="must be greater"):
+            mgr.replace(CS(generation=5))
+
+    def test_replace_rejects_decreasing_generation(self):
+        CS = _server_mod.ConfigSnapshot
+        CM = _server_mod.ConfigManager
+        mgr = CM()
+        mgr.replace(CS(generation=10))
+        with pytest.raises(ValueError, match="must be greater"):
+            mgr.replace(CS(generation=3))
+
+    def test_generation_increases_monotonically(self):
+        CS = _server_mod.ConfigSnapshot
+        CM = _server_mod.ConfigManager
+        mgr = CM()
+        for i in range(1, 6):
+            gen = mgr.replace(CS(generation=i))
+            assert gen == i
+        assert mgr.current().generation == 5
+
+    def test_failed_replace_preserves_prior(self):
+        CS = _server_mod.ConfigSnapshot
+        CM = _server_mod.ConfigManager
+        mgr = CM()
+        mgr.replace(CS(generation=3, constants={"pi": 3.14}))
+        with pytest.raises(ValueError):
+            mgr.replace(CS(generation=2))
+        assert mgr.current().constants == {"pi": 3.14}
+        assert mgr.current().generation == 3
+
+
+class TestWorkstreamG_ExecutorAccounting:
+    """Workstream G: executor accounting, closed-state, lifecycle."""
+
+    def test_closed_executor_rejects_get_executor(self):
+        executor = ToolExecutor(McpServerConfig(), ToolRegistry())
+        executor.close()
+        with pytest.raises(RuntimeError, match="closed"):
+            executor._get_executor()
+
+    def test_closed_executor_rejects_call_tool(self):
+        executor = ToolExecutor(McpServerConfig(), ToolRegistry())
+        executor.close()
+        result = executor.call_tool("math_eval", {"expression": "1+1"})
+        assert result["error"]["code"] == -32600
+
+    def test_timeout_worker_retains_capacity(self):
+        """After timeout, capacity is released only when the future completes."""
+        import threading as _threading
+
+        barrier = _threading.Barrier(2)
+        slow_handler = lambda **kw: (barrier.wait(timeout=30), 42)[1]
+        reg = ToolRegistry(
+            handlers={"slow": slow_handler},
+            schemas={"slow": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"slow": {"llm_exposure": "full"}},
+            profiles={"full": ["slow"]},
+        )
+        executor = ToolExecutor(
+            McpServerConfig(max_tool_timeout_seconds=1, max_tool_workers=1, max_tool_queue_size=0),
+            reg,
+        )
+        try:
+            # First call will time out
+            result = executor.call_tool("slow", {}, request_id="t1")
+            assert "error" not in result or result["result"].get("error_type") == "timeout"
+            # Wait for the worker to actually finish
+            barrier.wait(timeout=10)
+            # Now capacity should be recovered
+            result2 = executor.call_tool("slow", {}, request_id="t2")
+            assert "error" not in result2 or result2.get("error") is None
+        finally:
+            executor.close()
+
+    def test_server_close_transitions_sessions(self):
+        """Server close transitions all owned sessions to CLOSED state."""
+        server = McpServer()
+        s1 = server.create_session()
+        s2 = server.create_session()
+        assert s1.state != McpSessionState.CLOSED
+        assert s2.state != McpSessionState.CLOSED
+        server.close()
+        assert s1.state == McpSessionState.CLOSED
+        assert s2.state == McpSessionState.CLOSED
+
+    def test_server_close_is_idempotent(self):
+        server = McpServer()
+        server.close()
+        server.close()  # Should not raise
+        assert server._closed is True
+
+    def test_request_after_server_close_rejected(self):
+        server = McpServer()
+        server.close()
+        result = server.handle_request({"jsonrpc": "2.0", "id": 1, "method": "ping"})
+        assert result is not None
+        assert "error" in result
+        assert result["error"]["code"] == -32600

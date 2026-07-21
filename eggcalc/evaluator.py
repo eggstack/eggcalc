@@ -69,6 +69,9 @@ __all__ = [
 _lock = threading.Lock()
 _config_loaded = False
 _mcp_mode = False
+_server_evaluator: contextvars.ContextVar[Evaluator | None] = contextvars.ContextVar(
+    "_server_evaluator", default=None
+)
 _MAX_CONCURRENT_EVAL_SPAWNS = 4
 _EVAL_SPAWN_SEMAPHORE = multiprocessing.BoundedSemaphore(_MAX_CONCURRENT_EVAL_SPAWNS)
 _EVAL_SPAWN_ACQUIRE_TIMEOUT = 10  # seconds to wait for a spawn slot before failing
@@ -2621,7 +2624,7 @@ def evaluate(expression: str) -> Any:
     return _default_evaluator.evaluate(expression)
 
 
-def evaluate_raw(expression: str) -> Any:
+def evaluate_raw(expression: str, _evaluator: Evaluator | None = None) -> Any:
     """Evaluate a raw expression with spaces and/or natural language.
 
     This function processes the expression through the full normalization
@@ -2633,6 +2636,9 @@ def evaluate_raw(expression: str) -> Any:
 
     Args:
         expression: A raw expression string (e.g., "(2 * 3)" or "five plus three")
+        _evaluator: Optional evaluator instance. When provided, this evaluator
+            is used instead of the module-level default. This enables MCP servers
+            to use server-owned evaluators with independent policy.
 
     Returns:
         The result of the evaluation (int, float, str, or UnitValue).
@@ -2648,7 +2654,8 @@ def evaluate_raw(expression: str) -> Any:
     )
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
-    return _default_evaluator.evaluate(normalized)
+    ev = _evaluator or _server_evaluator.get() or _default_evaluator
+    return ev.evaluate(normalized)
 
 
 class TimeoutError(Exception):
@@ -2668,10 +2675,9 @@ def _evaluate_with_timeout_worker(
     Must be a module-level function (not nested) so it can be pickled
     by the 'spawn' multiprocessing start method.
 
-    The ``allow_random`` and ``allow_side_effects`` flags configure the
-    child process's default evaluator to match the parent's policy. In
-    MCP mode the parent passes ``False`` for both, so children inherit
-    the same restrictions without sharing any module-level state.
+    Creates a local ``Evaluator`` instance with the given policy flags
+    instead of mutating the module-level ``_default_evaluator``. This
+    ensures child processes do not share or alter parent evaluator state.
 
     Note: ``resource.setrlimit(RLIMIT_AS, ...)`` is a Linux/POSIX feature.
     On macOS, the kernel silently ignores ``RLIMIT_AS`` and the
@@ -2690,11 +2696,11 @@ def _evaluate_with_timeout_worker(
         pass
     try:
         _ensure_config_loaded()
-        configure_default_evaluator(
+        child_evaluator = Evaluator(
             allow_random=allow_random,
             allow_side_effects=allow_side_effects,
         )
-        result = evaluate_raw(expr)
+        result = evaluate_raw(expr, _evaluator=child_evaluator)
         result_queue.put(("ok", result))
     except Exception as exc:
         result_queue.put(("error", f"{type(exc).__name__}: {exc}"))
@@ -2719,6 +2725,7 @@ def evaluate_with_timeout(
     timeout: float = 5.0,
     allow_random: bool | None = None,
     allow_side_effects: bool | None = None,
+    _evaluator: Evaluator | None = None,
 ) -> Any:
     """Evaluate an expression with a timeout for untrusted input.
 
@@ -2735,14 +2742,19 @@ def evaluate_with_timeout(
     Args:
         expression: A raw expression string (with spaces, natural language, etc.)
         timeout: Maximum time in seconds (default: 5.0)
-        allow_random: If provided, configures the child process's default
-            evaluator to permit or deny random functions (random, randint,
-            ...). When ``None`` (the default), the parent process's current
-            setting is forwarded.
+        allow_random: If provided, configures the child process's evaluator
+            to permit or deny random functions (random, randint, ...).
+            When ``None`` (the default), checks the thread-local
+            ``_current_evaluator`` ContextVar, then falls back to the
+            module-level default evaluator's setting.
         allow_side_effects: If provided, configures the child process's
-            default evaluator to permit or deny state-mutating functions
-            (setvar, store, ...). When ``None``, the parent process's
-            current setting is forwarded.
+            evaluator to permit or deny state-mutating functions
+            (setvar, store, ...). Same fallback as ``allow_random``.
+        _evaluator: Optional evaluator instance. When provided, its
+            ``allow_random`` and ``allow_side_effects`` flags are used
+            to configure the child process's evaluator instead of the
+            module-level default. The evaluator itself is not passed to
+            the child (it cannot be pickled across process boundaries).
 
     Returns:
         The result of the evaluation (int, float, str, or UnitValue).
@@ -2759,10 +2771,17 @@ def evaluate_with_timeout(
         >>> result = evaluate_with_timeout("sum([i**2 for i in range(100)])", timeout=1.0)
         # May raise TimeoutError for slow expressions
     """
+    effective = _evaluator or _server_evaluator.get()
     if allow_random is None:
-        allow_random = _default_evaluator._allow_random
+        allow_random = (
+            effective._allow_random if effective is not None else _default_evaluator._allow_random
+        )
     if allow_side_effects is None:
-        allow_side_effects = _default_evaluator._allow_side_effects
+        allow_side_effects = (
+            effective._allow_side_effects
+            if effective is not None
+            else _default_evaluator._allow_side_effects
+        )
     ctx = _get_eval_multiprocessing_context()
     queue: multiprocessing.Queue = ctx.Queue()
     proc: Any = None
