@@ -8,9 +8,14 @@ can depend on.
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import sys
 from dataclasses import dataclass
+
+# Protocol versions supported by this eggcalc release.
+# Duplicated here to avoid a circular import with mcp.server.
+_SUPPORTED_PROTOCOL_VERSIONS: tuple[str, ...] = ("2024-11-05", "2025-11-25")
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,10 @@ class RuntimeCapabilities:
     supports_spawn: bool
     supports_posix_paths: bool
     supports_windows_paths: bool
+    eggcalc_version: str
+    supported_protocol_versions: tuple[str, ...]
+    multiprocessing_start_method: str
+    mode: str
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable dictionary of capabilities."""
@@ -39,11 +48,26 @@ class RuntimeCapabilities:
             "supports_spawn": self.supports_spawn,
             "supports_posix_paths": self.supports_posix_paths,
             "supports_windows_paths": self.supports_windows_paths,
+            "eggcalc_version": self.eggcalc_version,
+            "supported_protocol_versions": list(self.supported_protocol_versions),
+            "multiprocessing_start_method": self.multiprocessing_start_method,
+            "mode": self.mode,
         }
 
     def to_json(self, *, indent: int | None = None) -> str:
         """Return a JSON string of capabilities."""
         return json.dumps(self.to_dict(), indent=indent)
+
+
+def _detect_mode() -> str:
+    """Detect whether running as package or single-file distribution."""
+    main_mod = sys.modules.get("__main__")
+    main_file = getattr(main_mod, "__file__", None)
+    if main_file is None:
+        return "package"
+    if os.path.basename(main_file) == "eggcalc.py":
+        return "single-file"
+    return "package"
 
 
 def detect_capabilities() -> RuntimeCapabilities:
@@ -64,6 +88,18 @@ def detect_capabilities() -> RuntimeCapabilities:
     supports_posix_paths = plat != "win32"
     supports_windows_paths = plat == "win32" or "msys" in plat or "cygwin" in plat
 
+    try:
+        from importlib.metadata import version as _pkg_version
+
+        eggcalc_version = _pkg_version("eggcalc")
+    except Exception:
+        eggcalc_version = "unknown"
+
+    try:
+        start_method = multiprocessing.get_start_method()
+    except RuntimeError:
+        start_method = "unknown"
+
     return RuntimeCapabilities(
         python_version=(ver.major, ver.minor, ver.micro),
         platform=plat,
@@ -74,6 +110,10 @@ def detect_capabilities() -> RuntimeCapabilities:
         supports_spawn=supports_spawn,
         supports_posix_paths=supports_posix_paths,
         supports_windows_paths=supports_windows_paths,
+        eggcalc_version=eggcalc_version,
+        supported_protocol_versions=_SUPPORTED_PROTOCOL_VERSIONS,
+        multiprocessing_start_method=start_method,
+        mode=_detect_mode(),
     )
 
 
@@ -82,13 +122,17 @@ def capability_summary() -> str:
     caps = detect_capabilities()
     lines = [
         "eggcalc runtime capabilities",
+        f"  Version: {caps.eggcalc_version}",
         f"  Python: {'.'.join(str(v) for v in caps.python_version)} ({caps.implementation})",
         f"  Platform: {caps.platform}",
+        f"  Mode: {caps.mode}",
         f"  tomllib: {'yes' if caps.has_tomllib else 'no'}",
         f"  math.cbrt: {'yes' if caps.has_math_cbrt else 'no'}",
         f"  fork: {'yes' if caps.supports_fork else 'no'}",
         f"  spawn: {'yes' if caps.supports_spawn else 'no'}",
         f"  POSIX paths: {'yes' if caps.supports_posix_paths else 'no'}",
         f"  Windows paths: {'yes' if caps.supports_windows_paths else 'no'}",
+        f"  Protocol versions: {', '.join(caps.supported_protocol_versions)}",
+        f"  Multiprocessing start method: {caps.multiprocessing_start_method}",
     ]
     return "\n".join(lines)

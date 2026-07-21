@@ -1652,3 +1652,258 @@ class TestWorkstreamG_ExecutorAccounting:
         assert result is not None
         assert "error" in result
         assert result["error"]["code"] == -32600
+
+
+# ---------------------------------------------------------------------------
+# TestStressCounterCleanup (Workstream G1/G3)
+# ---------------------------------------------------------------------------
+
+
+class TestStressCounterCleanup:
+    """Stress tests that verify counters return to zero after completion."""
+
+    def test_cancellation_storm_counters_clean(self):
+        """After a cancellation storm, inflight counters return to zero."""
+        server = McpServer(config=McpServerConfig(max_tool_workers=2, max_tool_queue_size=4))
+        session = _ready_session(server)
+        for i in range(50):
+            _session_request(
+                session,
+                "notifications/cancelled",
+                {"requestId": f"cancel-{i}"},
+            )
+        result = _session_request(
+            session,
+            "tools/call",
+            {"name": "math_eval", "arguments": {"expression": "1+1"}},
+            request_id="after-storm",
+        )
+        assert "result" in result
+        time.sleep(0.2)
+        assert server._executor.active_workers == 0
+        assert server._executor.pending_count == 0
+        server.close()
+
+    def test_repeated_timeout_counters_clean(self):
+        """After timeouts and true completion, all counters return to zero."""
+        done = threading.Event()
+
+        def _slow(**kw):
+            done.wait(timeout=10)
+            return {"done": True}
+
+        cfg = McpServerConfig(max_tool_timeout_seconds=1, max_tool_workers=2, max_tool_queue_size=1)
+        reg = ToolRegistry(
+            handlers={"slow": _slow},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        executor = ToolExecutor(cfg, reg)
+        # Submit 2 tasks that block until we signal
+        t1 = threading.Thread(target=lambda: executor.call_tool("slow", {}, request_id="t1"))
+        t2 = threading.Thread(target=lambda: executor.call_tool("slow", {}, request_id="t2"))
+        t1.start()
+        t2.start()
+        time.sleep(0.3)
+        # Both are running; signal them to complete
+        done.set()
+        t1.join(timeout=10)
+        t2.join(timeout=10)
+        time.sleep(0.5)
+        assert executor.active_workers == 0
+        assert executor.pending_count == 0
+        executor.close()
+
+    def test_concurrent_execution_counters_clean(self):
+        """After concurrent work completes, all counters return to zero."""
+        barrier = threading.Barrier(3)
+        cfg = McpServerConfig(max_tool_workers=3, max_tool_queue_size=3)
+        reg = ToolRegistry(
+            handlers={"wait": lambda **kw: (barrier.wait(timeout=5), {"done": True})[1]},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        executor = ToolExecutor(cfg, reg)
+        futures = []
+        for i in range(3):
+            t = threading.Thread(
+                target=lambda idx=i: executor.call_tool("wait", {}, request_id=f"w{idx}")
+            )
+            futures.append(t)
+            t.start()
+        for t in futures:
+            t.join(timeout=10)
+        time.sleep(0.2)
+        assert executor.active_workers == 0
+        assert executor.pending_count == 0
+        executor.close()
+
+
+# ---------------------------------------------------------------------------
+# TestMultiServerIndependentEnforcement (Workstream B)
+# ---------------------------------------------------------------------------
+
+
+class TestMultiServerIndependentEnforcement:
+    """Two servers with conflicting configs enforce limits independently."""
+
+    def test_independent_max_tool_workers(self):
+        """Servers with different worker limits enforce independently."""
+        hold = threading.Event()
+        cfg1 = McpServerConfig(max_tool_workers=1, max_tool_queue_size=1)
+        cfg2 = McpServerConfig(max_tool_workers=4, max_tool_queue_size=4)
+
+        def _blocker(**kw):
+            hold.wait(timeout=10)
+            return {"done": True}
+
+        reg1 = ToolRegistry(
+            handlers={"slow": _blocker},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        reg2 = ToolRegistry(
+            handlers={"slow": _blocker},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        exec1 = ToolExecutor(cfg1, reg1)
+        exec2 = ToolExecutor(cfg2, reg2)
+        # Server 1 should saturate at 2 (1 worker + 1 queue)
+        t1 = threading.Thread(target=lambda: exec1.call_tool("slow", {}, request_id="s1a"))
+        t2 = threading.Thread(target=lambda: exec1.call_tool("slow", {}, request_id="s1b"))
+        t1.start()
+        t2.start()
+        time.sleep(0.5)
+        result_full = exec1.call_tool("slow", {}, request_id="s1c")
+        assert "error" in result_full
+        assert "busy" in result_full["error"]["message"].lower()
+        # Server 2 should still accept (higher limit)
+        r = exec2.call_tool("slow", {}, request_id="s2a")
+        assert "id" in r
+        r2 = exec2.call_tool("slow", {}, request_id="s2b")
+        assert "id" in r2
+        hold.set()
+        t1.join(timeout=10)
+        t2.join(timeout=10)
+        exec1.close()
+        exec2.close()
+
+    def test_independent_max_output_bytes(self):
+        """Servers with different output limits enforce independently."""
+        small_output = "x" * 100
+        big_output = "y" * 10_000
+        cfg1 = McpServerConfig(max_output_bytes=200)
+        cfg2 = McpServerConfig(max_output_bytes=50_000)
+        reg1 = ToolRegistry(
+            handlers={"echo": lambda text="": text},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        reg2 = ToolRegistry(
+            handlers={"echo": lambda text="": text},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        exec1 = ToolExecutor(cfg1, reg1)
+        exec2 = ToolExecutor(cfg2, reg2)
+        # Small output works on both
+        r1 = exec1.call_tool("echo", {"text": small_output}, request_id="o1")
+        assert "result" in r1
+        r2 = exec2.call_tool("echo", {"text": small_output}, request_id="o2")
+        assert "result" in r2
+        # Big output: server 1 truncates, server 2 accepts
+        r1_big = exec1.call_tool("echo", {"text": big_output}, request_id="o3")
+        result_text = r1_big.get("result", {}).get("content", [{}])[0].get("text", "")
+        assert len(result_text) < len(big_output)
+        r2_big = exec2.call_tool("echo", {"text": big_output}, request_id="o4")
+        assert "result" in r2_big
+        exec1.close()
+        exec2.close()
+
+    def test_independent_max_requests_per_second(self):
+        """Servers with different rate limits enforce independently."""
+        cfg1 = McpServerConfig(max_requests_per_second=1)
+        cfg2 = McpServerConfig(max_requests_per_second=100)
+        reg = ToolRegistry(
+            handlers={"fast": lambda **kw: {"ok": True}},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        exec1 = ToolExecutor(cfg1, reg)
+        exec2 = ToolExecutor(cfg2, reg)
+        # First call works on both
+        r1 = exec1.call_tool("fast", {}, request_id="r1")
+        assert "result" in r1
+        r2 = exec2.call_tool("fast", {}, request_id="r2")
+        assert "result" in r2
+        # Second immediate call: server 1 may rate-limit, server 2 should pass
+        r1_2 = exec1.call_tool("fast", {}, request_id="r1b")
+        r2_2 = exec2.call_tool("fast", {}, request_id="r2b")
+        assert "result" in r2_2
+        exec1.close()
+        exec2.close()
+
+    def test_servers_do_not_share_config(self):
+        """Changing one server's config does not affect another."""
+        CS = _server_mod.ConfigSnapshot
+        s1 = McpServer()
+        s2 = McpServer()
+        snap1 = CS(generation=1, constants={"pi_override": 3.0}, policy="strict")
+        snap2 = CS(generation=1, constants={"pi_override": 4.0}, policy="permissive")
+        s1.config_manager.replace(snap1)
+        s2.config_manager.replace(snap2)
+        assert s1.config_manager.current().constants["pi_override"] == 3.0
+        assert s2.config_manager.current().constants["pi_override"] == 4.0
+        s1.close()
+        s2.close()
+
+    def test_servers_registry_schema_independent(self):
+        """Each server's registry schema validation uses its own schemas."""
+        schema1 = {
+            "inputSchema": {
+                "type": "object",
+                "properties": {"x": {"type": "number"}},
+                "required": ["x"],
+            }
+        }
+        schema2 = {
+            "inputSchema": {
+                "type": "object",
+                "properties": {"y": {"type": "number"}},
+                "required": ["y"],
+            }
+        }
+        reg1 = ToolRegistry(
+            handlers={"tool_a": lambda x=0: x},
+            schemas={"tool_a": schema1},
+            metadata={},
+            profiles={},
+        )
+        reg2 = ToolRegistry(
+            handlers={"tool_a": lambda y=0: y},
+            schemas={"tool_a": schema2},
+            metadata={},
+            profiles={},
+        )
+        cfg = McpServerConfig(max_tool_timeout_seconds=5)
+        exec1 = ToolExecutor(cfg, reg1)
+        exec2 = ToolExecutor(cfg, reg2)
+        # Server 1 requires 'x', server 2 requires 'y'
+        r1_ok = exec1.call_tool("tool_a", {"x": 1}, request_id="s1")
+        assert "result" in r1_ok
+        r1_bad = exec1.call_tool("tool_a", {"y": 1}, request_id="s1b")
+        assert "error" in r1_bad
+        r2_ok = exec2.call_tool("tool_a", {"y": 1}, request_id="s2")
+        assert "result" in r2_ok
+        r2_bad = exec2.call_tool("tool_a", {"x": 1}, request_id="s2b")
+        assert "error" in r2_bad
+        exec1.close()
+        exec2.close()

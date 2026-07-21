@@ -204,18 +204,29 @@ class TestCLILoadsConfig:
 # C06: MCP hardening preserved
 # ---------------------------------------------------------------------------
 class TestMCPHardening:
-    """MCP server must set EGGCALC_NO_CONFIG before imports."""
+    """MCP server config suppression behavior."""
 
-    def test_server_sets_no_config_at_module_level(self):
-        """mcp/server.py sets EGGCALC_NO_CONFIG=1 via setdefault at import time."""
-        server_source_path = os.path.join(
-            os.path.dirname(__file__), "..", "eggcalc", "mcp", "server.py"
+    def test_server_no_import_time_env_mutation(self):
+        """mcp/server.py does NOT set EGGCALC_NO_CONFIG at import time."""
+        import subprocess
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import os; before = dict(os.environ); "
+                "import eggcalc.mcp.server; after = dict(os.environ); "
+                "added = {k for k in after if k not in before}; "
+                "print('\\n'.join(sorted(added)))",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
-        with open(server_source_path) as f:
-            content = f.read()
-
-        assert "EGGCALC_NO_CONFIG" in content
-        assert "setdefault" in content
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        assert result.stdout.strip() == "", (
+            f"Import added env vars: {result.stdout.strip()}"
+        )
 
     def test_server_hard_sets_no_config_in_main(self):
         """mcp/server.py mcp_main() hard-sets EGGCALC_NO_CONFIG=1."""

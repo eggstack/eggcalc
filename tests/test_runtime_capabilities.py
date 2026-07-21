@@ -44,6 +44,10 @@ class TestCapabilitySerialization:
             "supports_spawn",
             "supports_posix_paths",
             "supports_windows_paths",
+            "eggcalc_version",
+            "supported_protocol_versions",
+            "multiprocessing_start_method",
+            "mode",
         }
         assert expected_keys == set(d.keys())
 
@@ -103,6 +107,25 @@ class TestCapabilityValues:
             pytest.skip("Windows path test only on Windows")
         caps = detect_capabilities()
         assert caps.supports_windows_paths is True
+
+    def test_eggcalc_version_is_string(self) -> None:
+        caps = detect_capabilities()
+        assert isinstance(caps.eggcalc_version, str)
+        assert len(caps.eggcalc_version) > 0
+
+    def test_supported_protocol_versions_is_tuple(self) -> None:
+        caps = detect_capabilities()
+        assert isinstance(caps.supported_protocol_versions, tuple)
+        assert len(caps.supported_protocol_versions) > 0
+        assert all(isinstance(v, str) for v in caps.supported_protocol_versions)
+
+    def test_multiprocessing_start_method_is_string(self) -> None:
+        caps = detect_capabilities()
+        assert isinstance(caps.multiprocessing_start_method, str)
+
+    def test_mode_is_package_or_single_file(self) -> None:
+        caps = detect_capabilities()
+        assert caps.mode in ("package", "single-file")
 
 
 class TestCapabilitySummary:

@@ -43,6 +43,53 @@ EGGCALC_MCP_MAX_TOOL_WORKERS=32 \
 calc --mcp
 ```
 
+## Programmatic Multi-Instance Usage
+
+For embedding eggcalc in applications that need multiple isolated MCP servers, use the Python API directly:
+
+```python
+from eggcalc.mcp.server import McpServer, McpServerConfig, ToolRegistry
+
+# Each server gets its own config, registry, evaluator, and executor
+config_a = McpServerConfig(
+    profile="full",
+    max_tool_workers=4,
+    max_tool_timeout_seconds=30,
+    allow_random=False,
+)
+config_b = McpServerConfig(
+    profile="human_math",
+    max_tool_workers=2,
+    max_tool_timeout_seconds=10,
+    allow_random=True,
+)
+
+server_a = McpServer(config=config_a)
+server_b = McpServer(config=config_b)
+
+# Each server has independent sessions, policies, and state
+session_a = server_a.create_session()
+session_b = server_b.create_session()
+
+# Servers are fully isolated — changing one does not affect the other
+try:
+    # Use sessions for tool calls...
+    pass
+finally:
+    server_a.close()
+    server_b.close()
+```
+
+Each `McpServer` instance owns:
+- An immutable `McpServerConfig` controlling all policy fields
+- A `ToolRegistry` with its own tool definitions, schemas, and profiles
+- A `ToolExecutor` with its own thread pool and saturation bounds
+- A dedicated `Evaluator` with isolated constants, functions, and user variables
+- A `ConfigManager` with atomic snapshot replacement
+- Tracked `McpSession` instances with independent lifecycle state
+
+Servers constructed in the same process are fully independent. Changing one server's configuration, evaluator policy, or registry does not affect any other server or the package defaults.
+
 ## Protocol Basics
 
 The server uses JSON-RPC 2.0 over stdio:

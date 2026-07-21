@@ -108,11 +108,13 @@ eggcalc runs as an MCP server exposing deterministic tools across 18 categories 
 calc --mcp
 ```
 
+**Programmatic multi-instance usage:** Each `McpServer` instance owns its own `McpServerConfig`, `ToolRegistry`, `ToolExecutor`, evaluator, and session set. Multiple servers in one process are fully isolated. See [docs/mcp.md](docs/mcp.md#programmatic-multi-instance-usage) for embedding examples.
+
 See [docs/tool_inventory.md](docs/tool_inventory.md) for the complete generated tool inventory. See [docs/mcp.md](docs/mcp.md) for protocol usage, configuration, profiles, schema detail, and selected tool examples.
 
 ### Runtime Capabilities
 
-Query runtime capabilities (Python version, platform, feature detection) from the CLI or Python API:
+Query runtime capabilities (Python version, platform, feature detection, eggcalc version, supported protocol modes) from the CLI or Python API:
 
 ```bash
 calc --capabilities          # JSON output

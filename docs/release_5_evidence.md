@@ -95,6 +95,7 @@
 - [x] Cancellation/timeout storms bounded (test_cancellation_storm: 50 rapid cancels, test_repeated_timeout)
 - [x] Shutdown deterministic and idempotent (TestShutdown: 5)
 - [x] No worker threads or orphan processes remain after shutdown (test_close_cleans_up_all_servers)
+- [x] Stress counter cleanup verified (TestStressCounterCleanup: 3 tests assert active_workers == 0 and pending_count == 0 after completion)
 
 ### Compatibility and Documentation (4/4)
 
@@ -102,6 +103,21 @@
 - [x] Sessionless API deprecation documented (DeprecationWarning, architecture/mcp.md, AGENTS.md)
 - [x] Architecture documentation describes ownership and thread-safety (architecture/mcp.md, overview.md, mutable_state_inventory.md)
 - [x] Changelog records public API and behavior changes (CHANGELOG.md)
+
+### Registry Authority (4/4)
+
+- [x] `_validate_arguments_schema()` validates against server registry schemas, not global `TOOL_SCHEMAS`
+- [x] ToolExecutor.call_tool() passes registry schemas to schema validation
+- [x] Custom/minimal registries use only their own schemas for validation
+- [x] Registry data immutable after construction (MappingProxyType)
+
+### Multi-Server Enforcement (5/5)
+
+- [x] Independent max_tool_workers enforced across servers (test_independent_max_tool_workers)
+- [x] Independent max_output_bytes enforced across servers (test_independent_max_output_bytes)
+- [x] Independent max_requests_per_second enforced across servers (test_independent_max_requests_per_second)
+- [x] Server configs do not cross-pollinate (test_servers_do_not_share_config)
+- [x] Server registry schemas are independent (test_servers_registry_schema_independent)
 
 ### Evidence (3/3)
 
@@ -120,10 +136,11 @@
 
 | Object | Owner | Justification |
 |--------|-------|---------------|
-| `_cache` (evaluator LRU) | Module-level, cleared atomically | Shared lookup cache with generation tracking; cleared on config change |
-| `_mcp_mode` (evaluator flag) | Module-level, set once at startup | Process-wide mode; safe under singleton-usage assumption |
+| `_cache` (evaluator LRU) | Module-level, cleared atomically | Shared lookup cache with generation tracking; cleared on config change; not used by MCP (child processes) |
+| `_mcp_mode` (evaluator flag) | Module-level, set once at startup | Process-wide mode; safe under singleton-usage assumption; MCP production path does not set this |
 | `_config_loaded` (evaluator) | Module-level, set once | Prevents re-entry; safe under single-threaded init |
 | `_random_generator` (evaluator) | Module-level, seed-once | Deterministic RNG for non-MCP use; MCP uses dedicated evaluator |
 | `_UNIT_ALIASES`, `_CONSTANTS` | Module-level, immutable | Read-only lookup tables; never mutated after import |
+| `TOOL_SCHEMAS` (global schemas) | Module-level, immutable | Used only as fallback in legacy `_handle_call_tool()` path; server-owned path uses `ToolRegistry.schemas` |
 
 All residual state is documented in `architecture/mutable_state_inventory.md` with per-item justification.

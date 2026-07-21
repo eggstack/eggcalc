@@ -223,8 +223,9 @@ def _run_mcp_transcript(
 def _normalize_transcript(responses: list[dict]) -> list[dict]:
     """Normalize a transcript for comparison.
 
-    Strips variable fields (server version, exact id values) so transcripts
-    from package and single-file modes can be compared structurally.
+    Strips variable fields (server version, exact id values, mode-specific
+    capabilities) so transcripts from package and single-file modes can be
+    compared structurally.
     """
     normalized = []
     for resp in responses:
@@ -238,6 +239,14 @@ def _normalize_transcript(responses: list[dict]) -> list[dict]:
                 result["serverInfo"] = info
             if "protocolVersion" in result:
                 result["protocolVersion"] = "<normalized>"
+            # Normalize runtime capabilities that legitimately differ
+            caps = result.get("capabilities", {})
+            if isinstance(caps, dict) and "runtime" in caps:
+                rt = dict(caps["runtime"])
+                rt["mode"] = "<normalized>"
+                new_caps = dict(caps)
+                new_caps["runtime"] = rt
+                result["capabilities"] = new_caps
             n["result"] = result
         normalized.append(n)
     return normalized

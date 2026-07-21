@@ -18,6 +18,7 @@ import threading
 import time
 import warnings
 from collections import deque
+from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass as _dataclass
@@ -718,7 +719,9 @@ class ToolExecutor:
         if schema:
             input_schema = schema.get("inputSchema")
             if input_schema:
-                schema_error = _validate_arguments_schema(name, arguments)
+                schema_error = _validate_arguments_schema(
+                    name, arguments, schemas=self._registry.schemas
+                )
                 if schema_error is not None:
                     return self._invalid_arguments(request_id, name, schema_error)
 
@@ -1646,12 +1649,19 @@ def _validate_value_against_schema(
     return None
 
 
-def _validate_arguments_schema(name: str, arguments: dict[str, Any]) -> str | None:
-    """Validate arguments against the tool's inputSchema from TOOL_SCHEMAS.
+def _validate_arguments_schema(
+    name: str,
+    arguments: dict[str, Any],
+    schemas: Mapping[str, dict[str, Any]] | None = None,
+) -> str | None:
+    """Validate arguments against the tool's inputSchema.
 
+    When *schemas* is provided (the server registry's schemas mapping),
+    validation uses that mapping instead of the global ``TOOL_SCHEMAS``.
     Returns None if valid, or an error message string if invalid.
     """
-    schema = TOOL_SCHEMAS.get(name, {}).get("inputSchema")
+    source = schemas if schemas is not None else TOOL_SCHEMAS
+    schema = source.get(name, {}).get("inputSchema")
     if not schema:
         return None
 
