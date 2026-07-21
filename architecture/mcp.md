@@ -142,6 +142,8 @@ The global evaluation cache (`_cache` in evaluator.py) is generation-keyed: `_cl
 | `registry_tool_count` | Number of tools in registry |
 | `max_tool_workers` | Configured worker pool size |
 | `active_workers` | Currently executing tool calls |
+| `max_tool_queue_size` | Maximum queued requests before rejection |
+| `pending_count` | Requests waiting to start execution |
 | `max_tool_timeout` | Configured timeout in seconds |
 | `orphan_count` | Tracked orphaned subprocesses |
 | `session_count` | Active sessions on this server |

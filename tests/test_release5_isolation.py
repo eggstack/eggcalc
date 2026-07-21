@@ -1139,3 +1139,155 @@ class TestConcurrencyStress:
         assert s2.config_manager.current().constants == {"x": 20}
         s1.close()
         s2.close()
+
+
+# ---------------------------------------------------------------------------
+# TestSaturationRejection (Workstream I3)
+# ---------------------------------------------------------------------------
+
+
+class TestSaturationRejection:
+    """Bounded queue saturation and backpressure."""
+
+    def test_queue_full_rejects_new_requests(self):
+        """When queue is full, new requests get rejected immediately."""
+        hold = threading.Event()
+        call_count = [0]
+        count_lock = threading.Lock()
+
+        def _blocker(**kw):
+            with count_lock:
+                call_count[0] += 1
+            hold.wait(timeout=10)
+
+        cfg = McpServerConfig(max_tool_workers=1, max_tool_queue_size=2)
+        reg = ToolRegistry(
+            handlers={"blocker": _blocker},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        executor = ToolExecutor(cfg, reg)
+        max_inflight = cfg.max_tool_workers + cfg.max_tool_queue_size
+        threads = [
+            threading.Thread(target=lambda i=i: executor.call_tool("blocker", {}, request_id=i))
+            for i in range(max_inflight)
+        ]
+        for t in threads:
+            t.start()
+        time.sleep(0.5)
+        with count_lock:
+            assert call_count[0] >= 1
+        result = executor.call_tool("blocker", {}, request_id="rejected")
+        assert "error" in result
+        assert "busy" in result["error"]["message"].lower()
+        hold.set()
+        for t in threads:
+            t.join(timeout=15)
+        executor.close()
+
+    def test_queue_rejects_then_recovers(self):
+        """After rejection, requests succeed once queue drains."""
+        cfg = McpServerConfig(max_tool_workers=1, max_tool_queue_size=1)
+        hold = threading.Event()
+
+        def _slow(**kw):
+            hold.wait(timeout=10)
+
+        reg = ToolRegistry(
+            handlers={"slow": _slow, "fast": lambda **kw: {"ok": True}},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        executor = ToolExecutor(cfg, reg)
+        max_inflight = cfg.max_tool_workers + cfg.max_tool_queue_size
+        # Fill: 1 active + 1 queued = 2 in flight (= max)
+        threads = [
+            threading.Thread(target=lambda i=i: executor.call_tool("slow", {}, request_id=f"s{i}"))
+            for i in range(max_inflight)
+        ]
+        for t in threads:
+            t.start()
+        time.sleep(0.5)
+        result = executor.call_tool("fast", {}, request_id="c")
+        assert "error" in result
+        assert "busy" in result["error"]["message"].lower()
+        hold.set()
+        for t in threads:
+            t.join(timeout=15)
+        result = executor.call_tool("fast", {}, request_id="d")
+        assert "result" in result
+        executor.close()
+
+    def test_queue_size_config_clamped(self):
+        """max_tool_queue_size is clamped during construction."""
+        cfg1 = McpServerConfig(max_tool_queue_size=0)
+        assert cfg1.max_tool_queue_size == 1
+        cfg2 = McpServerConfig(max_tool_queue_size=9999)
+        assert cfg2.max_tool_queue_size == 1000
+        cfg3 = McpServerConfig(max_tool_queue_size=50)
+        assert cfg3.max_tool_queue_size == 50
+
+    def test_diagnostic_includes_queue_info(self):
+        """Diagnostic output includes queue size and pending count."""
+        cfg = McpServerConfig(max_tool_workers=2, max_tool_queue_size=8)
+        server = McpServer(config=cfg)
+        diag = server.diagnostic()
+        assert "max_tool_queue_size" in diag
+        assert "pending_count" in diag
+        assert diag["max_tool_queue_size"] == 8
+        assert diag["pending_count"] == 0
+        server.close()
+
+
+# ---------------------------------------------------------------------------
+# TestOversizedOutputStorm (Workstream I3)
+# ---------------------------------------------------------------------------
+
+
+class TestOversizedOutputStorm:
+    """Repeated oversized outputs are truncated without corruption."""
+
+    def test_oversized_output_truncated(self):
+        """Output exceeding max_output_bytes returns truncation error."""
+        big = "x" * 2_000_000
+        reg = ToolRegistry(
+            handlers={"big_out": lambda **kw: {"data": big}},
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        executor = ToolExecutor(McpServerConfig(max_output_bytes=1000), reg)
+        result = executor.call_tool("big_out", {}, request_id="big1")
+        assert result["id"] == "big1"
+        assert "result" in result
+        assert result["result"]["isError"] is True
+        assert "truncated" in result["result"]["content"][0]["text"].lower()
+        executor.close()
+
+    def test_oversized_output_storm_no_corruption(self):
+        """Repeated oversized outputs do not corrupt subsequent normal results."""
+        big = "y" * 2_000_000
+        reg = ToolRegistry(
+            handlers={
+                "big_out": lambda **kw: {"data": big},
+                "normal": lambda **kw: {"ok": True, "val": 42},
+            },
+            schemas={},
+            metadata={},
+            profiles={},
+        )
+        executor = ToolExecutor(McpServerConfig(max_output_bytes=1000), reg)
+        for i in range(5):
+            result = executor.call_tool("big_out", {}, request_id=f"big-{i}")
+            assert result["result"]["isError"] is True
+        # Normal tool still works correctly after oversized outputs
+        result = executor.call_tool("normal", {}, request_id="norm1")
+        assert "result" in result
+        assert result["result"].get("isError") is not True
+        import json
+
+        payload = json.loads(result["result"]["content"][0]["text"])
+        assert payload["val"] == 42
+        executor.close()

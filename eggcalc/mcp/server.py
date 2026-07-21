@@ -498,6 +498,7 @@ class McpServerConfig:
     max_tool_timeout_seconds: int = 30
     max_cancelled_requests: int = 10_000
     max_tool_workers: int = 16
+    max_tool_queue_size: int = 32
     supported_protocol_versions: tuple[str, ...] = ("2024-11-05", "2025-11-25")
     allow_random: bool = False
     allow_side_effects: bool = False
@@ -525,6 +526,7 @@ class McpServerConfig:
             self, 'max_cancelled_requests', max(100, min(self.max_cancelled_requests, 1_000_000))
         )
         object.__setattr__(self, 'max_tool_workers', max(1, min(self.max_tool_workers, 128)))
+        object.__setattr__(self, 'max_tool_queue_size', max(1, min(self.max_tool_queue_size, 1000)))
 
     @staticmethod
     def _clamp_profile(profile: str) -> str:
@@ -561,6 +563,7 @@ class McpServerConfig:
                 "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", 10_000, 100, 1_000_000
             ),
             max_tool_workers=_parse_env_int("EGGCALC_MCP_MAX_TOOL_WORKERS", 16, 1, 128),
+            max_tool_queue_size=_parse_env_int("EGGCALC_MCP_MAX_TOOL_QUEUE_SIZE", 32, 1, 1000),
         )
 
     @property
@@ -655,6 +658,8 @@ class ToolExecutor:
         self._orphan_lock = threading.Lock()
         self._active_workers = 0
         self._active_workers_lock = threading.Lock()
+        self._total_inflight = 0
+        self._inflight_lock = threading.Lock()
 
     def _get_executor(self) -> ThreadPoolExecutor:
         if self._executor is None:
@@ -707,15 +712,35 @@ class ToolExecutor:
         result = None
         future = None
         try:
-            executor = self._get_executor()
-            future = executor.submit(_run_handler_in_thread, handler, arguments)
-            with self._active_workers_lock:
-                self._active_workers += 1
+            max_inflight = self._config.max_tool_workers + self._config.max_tool_queue_size
+            with self._inflight_lock:
+                if self._total_inflight >= max_inflight:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32000,
+                            "message": (
+                                f"Server busy: {self._total_inflight} requests in flight "
+                                f"(limit {max_inflight})"
+                            ),
+                        },
+                    }
+                self._total_inflight += 1
             try:
-                result = future.result(timeout=self._config.max_tool_timeout_seconds)
-            finally:
+                executor = self._get_executor()
+                future = executor.submit(_run_handler_in_thread, handler, arguments)
                 with self._active_workers_lock:
-                    self._active_workers -= 1
+                    self._active_workers += 1
+                try:
+                    result = future.result(timeout=self._config.max_tool_timeout_seconds)
+                finally:
+                    with self._active_workers_lock:
+                        self._active_workers -= 1
+            except BaseException:
+                with self._inflight_lock:
+                    self._total_inflight -= 1
+                raise
         except FuturesTimeoutError:
             timed_out = True
             if future is not None:
@@ -727,6 +752,9 @@ class ToolExecutor:
                 "id": request_id,
                 "error": {"code": -32000, "message": f"Tool execution error: {message}"},
             }
+
+        with self._inflight_lock:
+            self._total_inflight -= 1
 
         if timed_out:
             return {
@@ -863,6 +891,13 @@ class ToolExecutor:
         """Number of tracked orphaned processes."""
         with self._orphan_lock:
             return len(self._orphaned)
+
+    @property
+    def pending_count(self) -> int:
+        """Number of requests waiting to start execution."""
+        with self._inflight_lock:
+            with self._active_workers_lock:
+                return max(0, self._total_inflight - self._active_workers)
 
 
 @_dataclass(frozen=True)
@@ -1178,6 +1213,8 @@ class McpServer:
             "registry_tool_count": len(self._registry.tool_names),
             "max_tool_workers": self._config.max_tool_workers,
             "active_workers": self._executor.active_workers,
+            "max_tool_queue_size": self._config.max_tool_queue_size,
+            "pending_count": self._executor.pending_count,
             "max_tool_timeout": self._config.max_tool_timeout_seconds,
             "orphan_count": self._executor.orphan_count,
             "session_count": len(self._sessions),

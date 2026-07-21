@@ -381,7 +381,7 @@ def load_user_config() -> None:
         pass
     else:
         import eggcalc.normalize as normalize_mod  # noqa: F401
-        import eggcalc_config as config  # type: ignore[import-not-found]
+        import eggcalc_config as config
 
         for name, value in getattr(config, "CUSTOM_CONSTANTS", {}).items():
             _default_evaluator.CONSTANTS[name] = value

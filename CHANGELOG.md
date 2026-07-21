@@ -68,11 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ConfigManager` class for thread-safe configuration snapshot management with generation tracking
 - `create_evaluator()` factory function for isolated evaluator instances with specified policy
 - `get_config_generation()` function for observing configuration generation counter
-- `McpServer.diagnostic()` for deterministic, JSON-serializable server diagnostics (includes `active_workers`, `session_count`, `orphan_count`, `config_units_count`, `global_config_generation`)
-- `ToolExecutor.active_workers` and `ToolExecutor.orphan_count` properties for runtime observability
+- `McpServer.diagnostic()` for deterministic, JSON-serializable server diagnostics (includes `active_workers`, `session_count`, `orphan_count`, `config_units_count`, `global_config_generation`, `max_tool_queue_size`, `pending_count`)
+- `ToolExecutor.active_workers`, `ToolExecutor.orphan_count`, and `ToolExecutor.pending_count` properties for runtime observability
+- `McpServerConfig.max_tool_queue_size` for bounded worker queue with saturation rejection (default 32, clamped 1–1000)
 - Mutable state inventory document (`architecture/mutable_state_inventory.md`) cataloging all process-global state
-- 96 new tests in `test_release5_isolation.py` covering state isolation, concurrency, lifecycle hardening, diagnostics, and stress scenarios
-- 4 new tests in `test_config_loading.py` for import-error precision (syntax errors, runtime exceptions, internal import errors propagate; missing module is silent)
+- 98 tests in `test_release5_isolation.py` covering state isolation, concurrency, lifecycle hardening, diagnostics, stress scenarios, saturation rejection, and oversized output storms
+- 4 tests in `test_config_loading.py` for import-error precision (syntax errors, runtime exceptions, internal import errors propagate; missing module is silent)
+- Release 5 evidence file (`docs/release_5_evidence.md`) with full-suite, stress-suite, platform, and acceptance criteria verification
 - Multi-instance isolation tests: two servers with different configs, evaluators, and registries
 - Multi-session isolation tests: cancellation independence, lifecycle independence, shared request IDs
 - Concurrency tests: parallel tool execution, worker pool bounds, concurrent server creation
