@@ -2002,13 +2002,14 @@ class Evaluator(ast.NodeVisitor):
         self,
         allow_random: bool = True,
         allow_side_effects: bool = True,
+        random_seed: int | None = None,
     ) -> None:
         """Initialize evaluator with instance-level state.
 
         Each Evaluator instance has its own copy of constants, functions,
-        user variables, and memory registers. This enables true instance
-        isolation in EggCalcApp: variables set on one instance are not
-        visible to other instances or the module-level default evaluator.
+        user variables, memory registers, and random state. This enables
+        true instance isolation in EggCalcApp and multi-server MCP: random
+        calls on one evaluator do not affect another.
 
         Args:
             allow_random: If False, calls to random functions (random,
@@ -2018,6 +2019,9 @@ class Evaluator(ast.NodeVisitor):
                 (store/recall/M/Mplus/.../setvar/getvar/clearvars/...) raise
                 EvaluationError. Use to prevent cross-request state pollution
                 in long-running servers.
+            random_seed: Optional seed for this instance's random generator.
+                Each evaluator gets its own ``random.Random`` instance so
+                seeding one does not affect others.
         """
         self.CONSTANTS = self.__class__.CONSTANTS.copy()
         self.FUNCTIONS = self.__class__.FUNCTIONS.copy()
@@ -2027,6 +2031,46 @@ class Evaluator(ast.NodeVisitor):
         self._depth = 0
         self._allow_random = allow_random
         self._allow_side_effects = allow_side_effects
+        # Instance-owned random generator — never shared across instances.
+        self._instance_random = random.Random(random_seed)
+        # Bind random functions to this instance's generator
+        self._bind_instance_random()
+
+    def _bind_instance_random(self) -> None:
+        """Replace class-level random function entries with instance-bound closures."""
+        rng = self._instance_random
+
+        def _inst_random() -> float:
+            return rng.random()
+
+        def _inst_randint(a: int, b: int) -> int:
+            return rng.randint(_require_int(a, "randint"), _require_int(b, "randint"))
+
+        def _inst_randrange(a: int, b: int | None = None) -> int:
+            if b is None:
+                return rng.randrange(_require_int(a, "randrange"))
+            return rng.randrange(_require_int(a, "randrange"), _require_int(b, "randrange"))
+
+        def _inst_uniform(a: float, b: float) -> float:
+            return rng.uniform(float(a), float(b))
+
+        def _inst_randn() -> float:
+            return rng.gauss(0, 1)
+
+        def _inst_gauss(mu: float, sigma: float) -> float:
+            return rng.gauss(float(mu), float(sigma))
+
+        def _inst_seed(s: int | None = None) -> None:
+            rng.seed(s)
+            return None
+
+        self.FUNCTIONS["random"] = _inst_random
+        self.FUNCTIONS["randint"] = _inst_randint
+        self.FUNCTIONS["randrange"] = _inst_randrange
+        self.FUNCTIONS["uniform"] = _inst_uniform
+        self.FUNCTIONS["randn"] = _inst_randn
+        self.FUNCTIONS["gauss"] = _inst_gauss
+        self.FUNCTIONS["seed"] = _inst_seed
 
     def visit(self, node: ast.AST) -> Any:
         """Visit a node with depth tracking to prevent deep recursion."""

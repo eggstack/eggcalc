@@ -92,6 +92,7 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 - **TypedDict over NamedTuple** — the codebase uses `TypedDict` for structured return types. TypedDict classes do NOT support `__slots__`.
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters. Applies to both single-expression and REPL modes.
 - **Python requirement** — `>=3.11` per `pyproject.toml`. CI tests 3.11–3.14.
+- **`McpServerConfig` clamps `max_output_bytes` to min 1** — was previously 1000.
 
 ## Module Map
 
@@ -147,26 +148,28 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - 11 tool profiles: `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
 - Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Tools outside active profile rejected at `tools/call` with JSON-RPC `-32602`. Per-request `profile` param overrides in `tools/list`.
 - `full` profile uses `llm_exposure != "hidden"` filter (not `TOOL_PROFILES["full"]`). `EGGCALC_MCP_SCHEMA_DETAIL` controls schema verbosity (compact/normal/full).
+- `close_compatibility_server()` is exported from `eggcalc.mcp`.
+- `McpServer.diagnostic()` now counts only live (non-closed) sessions.
 - Resource audit: `docs/mcp_resource_limits.md` covers all 77 tools.
-- **Session lifecycle:** `McpServer` creates one `McpSession(initial_state=UNINITIALIZED)` per connection via `server.create_session()`. The `McpSession` class manages protocol state (UNINITIALIZED → INITIALIZING → READY → CLOSED). `McpSessionState` enum tracks the lifecycle. Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`. Server close transitions all owned sessions to `CLOSED`.
+- **Session lifecycle:** `McpServer` creates one `McpSession(initial_state=UNINITIALIZED)` per connection via `server.create_session()`. The `McpSession` class manages protocol state (UNINITIALIZED → INITIALIZING → READY → CLOSED). `McpSessionState` enum tracks the lifecycle. Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`. Server close transitions all owned sessions to `CLOSED`. `McpSession` has `_owner_id` binding and `_closed` flag; `_check_ready_for_dispatch` uses `.name` comparison for `importlib.reload` safety.
 - **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`. Version negotiation uses `server.config.supported_protocol_versions` when available.
-- **`handle_request(request, session=None)`**: When `session` is `None`, a module-level default session (starting in READY state) is used for backward compatibility. **Deprecated** — emits `DeprecationWarning`. Callers should pass an explicit `McpSession` instance.
+- **`handle_request(request, session=None)`**: When `session` is `None`, routes through an isolated compatibility `McpServer` for backward compatibility. **Deprecated** — emits `DeprecationWarning`. Callers should pass an explicit `McpSession` instance.
 - **`main()`**: Creates one `McpServer` per connection, which owns a `McpSession` for lifecycle management.
 - **Centralized error helpers:** `_jsonrpc_error()`, `_parse_error()`, `_method_not_found()`, `_invalid_params()`, `_internal_error()` in server.py.
-- **`ConfigSnapshot`**: Deeply immutable — `__post_init__()` defensively copies all dict fields to prevent external mutation.
-- **`ConfigManager.replace()`**: Validates generation is strictly increasing; stale/decreasing generations raise `ValueError`.
+- **`ConfigSnapshot`**: Deeply immutable — fields are `MappingProxyType`, has `to_dict()` method.
+- **`ConfigManager.replace()`**: Validates generation is strictly increasing; stale/decreasing generations raise `ValueError`. `replace_validated()` uses manager-assigned monotonic generations.
 - **Schema validation:** `SUPPORTED_SCHEMA_KEYWORDS` frozenset defines which JSON Schema keywords the validator supports. `tests/test_mcp_schema_lint.py` walks all `TOOL_SCHEMAS` and fails on unsupported keywords.
 - **Session-aware test helpers:** `ready_session()` and `session_request(session, method, params, request_id)` in `tests/test_mcp_server.py`.
 - `McpServerConfig` frozen dataclass for immutable server configuration (profile, limits, timeouts, protocol versions)
 - `McpServer` class owns config, `ToolRegistry`, `ToolExecutor`, evaluator instance, `ConfigManager`, and session creation
-- `ToolRegistry` wraps tool handlers, schemas, metadata, and profiles with lookup methods; internal dicts are `MappingProxyType` (immutable after construction)
-- `ToolExecutor` owns thread pool, validation, timeout, cancellation, and cleanup; has closed-state sealing preventing pool recreation after `close()`
-- **Evaluator binding:** `ToolExecutor` stores the server evaluator and sets `_server_evaluator` ContextVar via `_run_handler_in_thread()`. `evaluate_raw()` and `evaluate_with_timeout()` check this ContextVar, so `math_eval` uses the server's evaluator policy (allow_random, allow_side_effects) instead of the global default.
+- `ToolRegistry` wraps tool handlers, schemas, metadata, and profiles with lookup methods; internal dicts are `MappingProxyType` (immutable after construction), nested schemas use `MappingProxyType`, profiles use tuples, accessors return copies; has `is_tool_visible(name, profile)` method.
+- `ToolExecutor` owns thread pool, validation, timeout, cancellation, and cleanup; has closed-state sealing preventing pool recreation after `close()`; has three counters: `_total_inflight`, `_queued_count`, `_active_count` with worker-wrapper lifecycle transitions.
+- **Evaluator binding:** `ToolExecutor` stores the server evaluator and sets `_server_evaluator` ContextVar via `_run_handler_in_thread()`. `evaluate_raw()` and `evaluate_with_timeout()` check this ContextVar, so `math_eval` uses the server's evaluator policy (allow_random, allow_side_effects) instead of the global default. `Evaluator` has instance-owned `_instance_random` generator via `random_seed` parameter.
 - **Timeout accounting:** `call_tool()` uses `Future.add_done_callback()` to release `_total_inflight` only when the future truly completes (not on caller timeout). Timed-out-but-still-running handlers continue consuming capacity until they finish.
 - `ConfigSnapshot` / `ConfigManager` for atomic configuration replacement with generation tracking
 - `create_evaluator()` factory for isolated evaluator instances (avoids mutating global `_mcp_mode`)
 - `McpServer.handle_request(request, session)` replaces module-level `handle_request()` for new code
-- Sessionless `handle_request(session=None)` emits `DeprecationWarning` and routes through compatibility server
+- Sessionless `handle_request(session=None)` emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`).
 
 ## Architecture Docs
 
@@ -217,5 +220,5 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 7. **Caret (`^`) contract mismatch** — `evaluate("5^3")` returns `6` (XOR), but `evaluate_raw("5^3")` returns `125` (exponentiation). Use `evaluate()` for XOR, `evaluate_raw()` or CLI for exponentiation. Use `xor`/`bitxor` word forms when you need XOR through the full pipeline.
 8. **Floor/mod with incompatible units** — `evaluate_raw("5m % 2s")` raises `EvaluationError`. Floor division and modulo require dimensionally compatible operands.
 9. **MCP handshake before tools** — `main()` creates an UNINITIALIZED session. Clients must send `initialize` then `notifications/initialized` before `tools/list` or `tools/call`. Tool requests before init return `-32600`.
-10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning`. Use `McpServer` + `McpSession` for new code.
+10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`). Use `McpServer` + `McpSession` for new code.
 11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.

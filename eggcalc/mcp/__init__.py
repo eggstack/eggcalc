@@ -19,6 +19,7 @@ from .server import (
     McpSessionState,
     ToolExecutor,
     ToolRegistry,
+    close_compatibility_server,
     handle_request,
     main,
 )
@@ -26,6 +27,7 @@ from .server import (
 __all__ = [
     "main",
     "handle_request",
+    "close_compatibility_server",
     "TOOL_SCHEMAS",
     "tools",
     "McpSession",

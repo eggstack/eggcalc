@@ -10,11 +10,10 @@ from eggcalc.normalize import NORMALIZE, PATTERNS
 def _restore_evaluator_defaults():
     """Save and restore the default evaluator state after each test module.
 
-    handle_request() in mcp/server.py permanently sets _mcp_mode=True and
-    configure_default_evaluator(allow_random=False, allow_side_effects=False)
-    on first call. This fixture saves the original state before each module
-    runs and restores it after, so that non-MCP modules (e.g. test_clicalc)
-    are not affected by MCP state changes.
+    The compatibility handle_request() path now routes through an isolated
+    McpServer and no longer mutates _mcp_mode or _default_evaluator.
+    This fixture preserves the original state for modules that still test
+    legacy behavior.
     """
     import eggcalc.mcp.server as _server_mod
     from eggcalc import evaluator as _evaluator
@@ -24,16 +23,24 @@ def _restore_evaluator_defaults():
     orig_mcp_mode = _evaluator._mcp_mode
     orig_allow_random = ev._allow_random
     orig_allow_side_effects = ev._allow_side_effects
-    orig_mcp_defaults_configured = _server_mod._mcp_defaults_configured
-    orig_default_session = _server_mod._default_session
+    orig_compat_server = _server_mod._compat_server
     orig_McpSession = _server_mod.McpSession
     orig_McpSessionState = _server_mod.McpSessionState
     yield
     _evaluator._mcp_mode = orig_mcp_mode
     ev._allow_random = orig_allow_random
     ev._allow_side_effects = orig_allow_side_effects
-    _server_mod._mcp_defaults_configured = orig_mcp_defaults_configured
-    _server_mod._default_session = orig_default_session
+    # Close any compat server created during the module, then restore
+    if (
+        _server_mod._compat_server is not None
+        and _server_mod._compat_server is not orig_compat_server
+    ):
+        try:
+            _server_mod._compat_server.close()
+        except Exception:
+            pass
+    _server_mod._compat_server = orig_compat_server
+    # Restore classes that may have been recreated by importlib.reload()
     _server_mod.McpSession = orig_McpSession
     _server_mod.McpSessionState = orig_McpSessionState
 

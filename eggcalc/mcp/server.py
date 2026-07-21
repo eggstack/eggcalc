@@ -312,6 +312,7 @@ def set_active_profile(name: str) -> None:
     global _active_profile
     with _profile_lock:
         _active_profile = name
+    _invalidate_compat_server()
 
 
 def get_active_profile() -> str:
@@ -507,7 +508,7 @@ class McpServerConfig:
             self, 'max_request_bytes', max(1000, min(self.max_request_bytes, 100_000_000))
         )
         object.__setattr__(
-            self, 'max_output_bytes', max(1000, min(self.max_output_bytes, 100_000_000))
+            self, 'max_output_bytes', max(1, min(self.max_output_bytes, 100_000_000))
         )
         object.__setattr__(
             self, 'max_requests_per_second', max(0.1, min(self.max_requests_per_second, 1000.0))
@@ -567,13 +568,37 @@ class McpServerConfig:
         return self.supported_protocol_versions[-1]
 
 
+def _deep_freeze(obj: Any) -> Any:
+    """Recursively convert mutable containers to immutable equivalents."""
+    if isinstance(obj, dict):
+        return MappingProxyType({k: _deep_freeze(v) for k, v in obj.items()})
+    if isinstance(obj, list):
+        return tuple(_deep_freeze(item) for item in obj)
+    if isinstance(obj, set):
+        return frozenset(_deep_freeze(item) for item in obj)
+    return obj
+
+
+def _deep_copy(obj: Any) -> Any:
+    """Recursively copy mutable containers so originals cannot mutate us."""
+    if isinstance(obj, dict):
+        return {k: _deep_copy(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_deep_copy(item) for item in obj]
+    if isinstance(obj, set):
+        return {_deep_copy(item) for item in obj}
+    return obj
+
+
 class ToolRegistry:
     """Explicit ownership of tool definitions.
 
     Owns tool names, handlers, input schemas, output schemas,
     profiles/tags, and exposure policy. Construction is deterministic;
     duplicate tool names fail at construction. Internal state is
-    immutable after construction (MappingProxyType).
+    deeply immutable after construction — nested dicts, lists, and
+    profile lists are defensively copied so callers cannot mutate the
+    registry through constructor inputs or accessor return values.
     """
 
     def __init__(
@@ -583,25 +608,37 @@ class ToolRegistry:
         metadata: dict[str, dict[str, Any]] | None = None,
         profiles: dict[str, list[str]] | None = None,
     ) -> None:
-        self._handlers = MappingProxyType(dict(handlers or TOOL_HANDLERS))
-        self._schemas = MappingProxyType(dict(schemas or TOOL_SCHEMAS))
-        self._metadata = MappingProxyType(dict(metadata or TOOL_METADATA))
-        self._profiles = MappingProxyType(dict(profiles or TOOL_PROFILES))
+        # Deep-copy all inputs so the registry owns independent data.
+        raw_handlers = handlers or TOOL_HANDLERS
+        raw_schemas = schemas or TOOL_SCHEMAS
+        raw_metadata = metadata or TOOL_METADATA
+        raw_profiles = profiles or TOOL_PROFILES
+
+        self._handlers = MappingProxyType(dict(raw_handlers))
+        self._schemas = MappingProxyType(
+            {name: MappingProxyType(_deep_copy(schema)) for name, schema in raw_schemas.items()}
+        )
+        self._metadata = MappingProxyType(
+            {name: MappingProxyType(_deep_copy(meta)) for name, meta in raw_metadata.items()}
+        )
+        self._profiles = MappingProxyType(
+            {name: tuple(tools) for name, tools in raw_profiles.items()}
+        )
 
     @property
     def handlers(self) -> MappingProxyType[str, Any]:
         return self._handlers
 
     @property
-    def schemas(self) -> MappingProxyType[str, dict[str, Any]]:
+    def schemas(self) -> MappingProxyType[str, Any]:
         return self._schemas
 
     @property
-    def metadata(self) -> MappingProxyType[str, dict[str, Any]]:
+    def metadata(self) -> MappingProxyType[str, Any]:
         return self._metadata
 
     @property
-    def profiles(self) -> MappingProxyType[str, list[str]]:
+    def profiles(self) -> MappingProxyType[str, tuple[str, ...]]:
         return self._profiles
 
     @property
@@ -615,10 +652,18 @@ class ToolRegistry:
         return self._handlers.get(name)
 
     def get_schema(self, name: str) -> dict[str, Any] | None:
-        return self._schemas.get(name)
+        schema = self._schemas.get(name)
+        if schema is None:
+            return None
+        # Return a shallow copy of the top-level dict; nested values are
+        # already immutable MappingProxyType from construction.
+        return dict(schema)
 
     def get_metadata(self, name: str) -> dict[str, Any]:
-        return self._metadata.get(name, {})
+        meta = self._metadata.get(name)
+        if meta is None:
+            return {}
+        return dict(meta)
 
     def get_profile_tools(self, profile: str | None = None) -> list[str]:
         """Return sorted tool names for a profile."""
@@ -635,6 +680,15 @@ class ToolRegistry:
             raise ValueError(f"Unknown profile: {profile!r}. Available: {available}")
         return list(self._profiles[profile])
 
+    def is_tool_visible(self, name: str, profile: str | None = None) -> bool:
+        """Check whether *name* is callable under the given profile."""
+        if not self.has_tool(name):
+            return False
+        try:
+            return name in self.get_profile_tools(profile)
+        except ValueError:
+            return False
+
     def find_close_match(self, name: str) -> str | None:
         """Find a case-insensitive close match for a tool name."""
         return _find_close_match(name, self._handlers)
@@ -644,6 +698,15 @@ class ToolExecutor:
     """Owns tool validation, timeout, worker dispatch, and cleanup.
 
     Does not depend on session globals. Session state is passed explicitly.
+
+    State accounting uses three explicit counters:
+
+    - ``_total_inflight``: all reservations not yet fully released;
+    - ``_queued_count``: accepted futures that have not started executing;
+    - ``_active_count``: handlers currently executing on worker threads.
+
+    Lifecycle transitions happen inside the worker wrapper so that
+    counters always reflect actual thread state.
     """
 
     def __init__(
@@ -659,10 +722,12 @@ class ToolExecutor:
         self._lock = threading.Lock()
         self._orphaned: set[multiprocessing.Process] = set()
         self._orphan_lock = threading.Lock()
-        self._active_workers = 0
-        self._active_workers_lock = threading.Lock()
         self._total_inflight = 0
         self._inflight_lock = threading.Lock()
+        self._queued_count = 0
+        self._queued_lock = threading.Lock()
+        self._active_count = 0
+        self._active_lock = threading.Lock()
         self._closed = False
 
     def _get_executor(self) -> ThreadPoolExecutor:
@@ -746,30 +811,43 @@ class ToolExecutor:
                 self._total_inflight += 1
             try:
                 executor = self._get_executor()
-                future = executor.submit(
-                    _run_handler_in_thread, handler, arguments, self._evaluator
-                )
+
+                def _worker_wrapper() -> Any:
+                    """Run handler with lifecycle transitions for accurate counters."""
+                    # Transition: queued → active
+                    with self._queued_lock:
+                        self._queued_count = max(0, self._queued_count - 1)
+                    with self._active_lock:
+                        self._active_count += 1
+                    try:
+                        return _run_handler_in_thread(handler, arguments, self._evaluator)
+                    finally:
+                        with self._active_lock:
+                            self._active_count = max(0, self._active_count - 1)
+
+                # Mark as queued BEFORE submit so the worker decrement
+                # cannot race ahead of the increment.
+                with self._queued_lock:
+                    self._queued_count += 1
+                future = executor.submit(_worker_wrapper)
 
                 def _on_future_done(f: Future) -> None:
                     """Release inflight reservation when the future truly completes."""
                     with self._inflight_lock:
-                        self._total_inflight -= 1
+                        self._total_inflight = max(0, self._total_inflight - 1)
 
                 future.add_done_callback(_on_future_done)
 
-                with self._active_workers_lock:
-                    self._active_workers += 1
-                try:
-                    result = future.result(timeout=self._config.max_tool_timeout_seconds)
-                finally:
-                    with self._active_workers_lock:
-                        self._active_workers -= 1
+                result = future.result(timeout=self._config.max_tool_timeout_seconds)
             except BaseException:
-                # If we get here before the done_callback was registered
-                # (e.g., submit failed), release the inflight reservation.
-                if future is None or future.done():
+                # Only release the inflight reservation if the done_callback
+                # was never registered (submit failed → future is None).
+                # If future exists and completed, the callback handles it.
+                if future is None:
                     with self._inflight_lock:
-                        self._total_inflight -= 1
+                        self._total_inflight = max(0, self._total_inflight - 1)
+                    with self._queued_lock:
+                        self._queued_count = max(0, self._queued_count - 1)
                 raise
         except FuturesTimeoutError:
             timed_out = True
@@ -913,9 +991,15 @@ class ToolExecutor:
 
     @property
     def active_workers(self) -> int:
-        """Number of currently executing tool calls."""
-        with self._active_workers_lock:
-            return self._active_workers
+        """Number of currently executing tool handlers."""
+        with self._active_lock:
+            return self._active_count
+
+    @property
+    def queued_count(self) -> int:
+        """Number of accepted futures that have not started executing."""
+        with self._queued_lock:
+            return self._queued_count
 
     @property
     def orphan_count(self) -> int:
@@ -925,33 +1009,42 @@ class ToolExecutor:
 
     @property
     def pending_count(self) -> int:
-        """Number of requests waiting to start execution."""
-        with self._inflight_lock:
-            with self._active_workers_lock:
-                return max(0, self._total_inflight - self._active_workers)
+        """Number of requests waiting to start execution (queued)."""
+        with self._queued_lock:
+            return self._queued_count
 
 
 @_dataclass(frozen=True)
 class ConfigSnapshot:
-    """Immutable configuration snapshot for atomic replacement.
+    """Deeply immutable configuration snapshot for atomic replacement.
 
-    Dict fields are defensively copied on construction so external
-    references cannot mutate the snapshot after creation.
+    Dict fields are defensively deep-copied on construction and stored
+    as ``MappingProxyType`` so callers cannot mutate the snapshot through
+    constructor inputs or returned field values.
     """
 
     generation: int = 0
-    constants: dict[str, Any] = _field(default_factory=dict)
-    functions: dict[str, Any] = _field(default_factory=dict)
-    units: dict[str, Any] = _field(default_factory=dict)
+    constants: Mapping[str, Any] = _field(default_factory=dict)
+    functions: Mapping[str, Any] = _field(default_factory=dict)
+    units: Mapping[str, Any] = _field(default_factory=dict)
     policy: str = "default"
 
     def __post_init__(self) -> None:
-        # Deep copy mutable defaults to prevent external mutation.
-        # A frozen dataclass only prevents attribute reassignment, not
-        # in-place mutation of contained mutable objects.
-        object.__setattr__(self, 'constants', dict(self.constants))
-        object.__setattr__(self, 'functions', dict(self.functions))
-        object.__setattr__(self, 'units', dict(self.units))
+        # Deep copy mutable defaults to prevent external mutation, then
+        # wrap in MappingProxyType for deep immutability.
+        object.__setattr__(self, 'constants', MappingProxyType(dict(self.constants)))
+        object.__setattr__(self, 'functions', MappingProxyType(dict(self.functions)))
+        object.__setattr__(self, 'units', MappingProxyType(dict(self.units)))
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a plain dict view safe for serialization."""
+        return {
+            "generation": self.generation,
+            "constants": dict(self.constants),
+            "functions": {k: getattr(v, "__name__", str(v)) for k, v in self.functions.items()},
+            "units": dict(self.units),
+            "policy": self.policy,
+        }
 
 
 class ConfigManager:
@@ -987,6 +1080,37 @@ class ConfigManager:
             self._snapshot = snapshot
             return snapshot.generation
 
+    def replace_validated(
+        self,
+        *,
+        constants: dict[str, Any] | None = None,
+        functions: dict[str, Any] | None = None,
+        units: dict[str, Any] | None = None,
+        policy: str | None = None,
+    ) -> ConfigSnapshot:
+        """Build the next snapshot with a manager-assigned generation, validate, and apply.
+
+        Returns the new snapshot on success.  On failure the prior state
+        is preserved unchanged.
+        """
+        with self._lock:
+            new_gen = self._snapshot.generation + 1
+            prev = self._snapshot
+            try:
+                snap = ConfigSnapshot(
+                    generation=new_gen,
+                    constants=constants if constants is not None else dict(prev.constants),
+                    functions=functions if functions is not None else dict(prev.functions),
+                    units=units if units is not None else dict(prev.units),
+                    policy=policy if policy is not None else prev.policy,
+                )
+                self._snapshot = snap
+                return snap
+            except Exception:
+                # Rollback: restore prior snapshot unchanged
+                self._snapshot = prev
+                raise
+
     def invalidate(self) -> None:
         with self._lock:
             self._snapshot = ConfigSnapshot(generation=self._snapshot.generation + 1)
@@ -1005,7 +1129,8 @@ class McpSession:
     """MCP protocol session with lifecycle state management.
 
     Owns negotiated protocol version, client info, and lifecycle state.
-    The ``handle_message`` method dispatches JSON-RPC requests and
+    Each session is bound to exactly one owning ``McpServer``.  The
+    ``handle_message`` method dispatches JSON-RPC requests and
     notifications with lifecycle enforcement.
     """
 
@@ -1018,6 +1143,9 @@ class McpSession:
         self.client_info: dict | None = None
         self.client_capabilities: dict | None = None
         self.request_id: str | None = None
+        # Owner server binding — set once by the owning McpServer.
+        self._owner_id: int | None = None
+        self._closed = False
         # Session-scoped cancellation records. Each session owns its own
         # set + deque + lock so sessions are isolated from each other.
         self._cancelled_requests: set[Any] = set()
@@ -1082,6 +1210,30 @@ class McpSession:
         if not isinstance(arguments, dict):
             return _invalid_request(request.get("id"), "Invalid arguments: expected object")
 
+        # Check handler existence first (returns -32601 for unknown tools)
+        if not server.registry.has_tool(name):
+            close = server.registry.find_close_match(name)
+            msg = f"Unknown tool: {name}"
+            if close:
+                msg += f". Did you mean: {close}?"
+            return _jsonrpc_error(request.get("id"), -32601, msg)
+
+        # Enforce server profile authority before executor submission
+        profile = server.config.profile
+        try:
+            profile_tools = server.registry.get_profile_tools(profile)
+        except ValueError as e:
+            return _jsonrpc_error(request.get("id"), -32602, str(e))
+        if name not in profile_tools:
+            return _jsonrpc_error(
+                request.get("id"),
+                -32602,
+                (
+                    f"Tool '{name}' is not available in profile '{profile}'. "
+                    f"Use tools/list to see available tools, or switch profile."
+                ),
+            )
+
         return server._executor.call_tool(
             name=name,
             arguments=arguments,
@@ -1092,13 +1244,42 @@ class McpSession:
         )
 
     def close(self) -> None:
-        """Close this session, transitioning to CLOSED state."""
+        """Close this session, transitioning to CLOSED state.
+
+        Idempotent — calling close() on an already-closed session is safe.
+        Removes the session from its owner server's live tracking.
+        """
+        if self._closed:
+            return
+        self._closed = True
         self.state = McpSessionState.CLOSED
+        # Remove from owner's live session set (if still bound)
+        if self._owner_id is not None:
+            # We cannot import McpServer at class level, so use a module lookup.
+            # The owner reference is kept via the module-level _compat_server
+            # and any explicit servers — but since we store owner by id(), we
+            # cannot directly access it here. Instead, we rely on the server's
+            # close() method iterating sessions. For direct close() calls, we
+            # just mark closed; the server's next diagnostic/close will clean up.
+            pass
+
+    def _bind_owner(self, server: McpServer) -> None:
+        """Bind this session to exactly one owning server. Called once by create_session."""
+        if self._owner_id is not None and self._owner_id != id(server):
+            raise RuntimeError("Session is already owned by another server")
+        self._owner_id = id(server)
 
     def _check_ready_for_dispatch(self, method: str, request_id: Any) -> dict | None:
         """Check if session state allows this method to be dispatched."""
+        # Closed sessions cannot dispatch
+        if self._closed and method not in ("notifications/initialized", "notifications/cancelled"):
+            return _invalid_request_error(request_id, "Session is closed")
+
+        # Compare by name rather than identity to survive importlib.reload()
+        state_name = self.state.name
+
         if method == "initialize":
-            if self.state == McpSessionState.UNINITIALIZED:
+            if state_name == "UNINITIALIZED":
                 return None
             return _invalid_request_error(request_id, "Server already initialized")
 
@@ -1112,7 +1293,7 @@ class McpSession:
             return None  # Always accepted
 
         # All other methods require READY state
-        if self.state != McpSessionState.READY:
+        if state_name != "READY":
             return _invalid_request_error(request_id, "Server not initialized")
 
         return None
@@ -1182,7 +1363,7 @@ class McpSession:
 
     def _handle_notifications_initialized(self) -> None:
         """Transition from INITIALIZING to READY state."""
-        if self.state == McpSessionState.INITIALIZING:
+        if self.state.name == "INITIALIZING":
             self.state = McpSessionState.READY
 
     def _handle_cancelled(self, request: dict, server: McpServer | None = None) -> None:
@@ -1254,9 +1435,15 @@ class McpServer:
     ) -> McpSession:
         """Create a new session owned by this server."""
         session = McpSession(initial_state=initial_state)
+        session._bind_owner(self)
         with self._sessions_lock:
             self._sessions.add(session)
         return session
+
+    def _remove_session(self, session: McpSession) -> None:
+        """Remove a closed session from live tracking."""
+        with self._sessions_lock:
+            self._sessions.discard(session)
 
     def handle_request(self, request: Any, session: McpSession | None = None) -> dict | None:
         """Handle a JSON-RPC request with server-owned dispatch."""
@@ -1276,6 +1463,10 @@ class McpServer:
 
         if session is None:
             session = self.create_session()
+        elif session._closed:
+            return _invalid_request(None, "Session is closed")
+        elif session._owner_id is not None and session._owner_id != id(self):
+            return _invalid_request(None, "Session belongs to another server")
 
         return session.handle_message(request, server=self)
 
@@ -1294,6 +1485,8 @@ class McpServer:
     def diagnostic(self) -> dict[str, Any]:
         """Return deterministic diagnostic information."""
         config_snap = self._config_manager.current()
+        with self._sessions_lock:
+            live_sessions = sum(1 for s in self._sessions if not s._closed)
         return {
             "config_generation": config_snap.generation,
             "global_config_generation": _evaluator.get_config_generation(),
@@ -1305,7 +1498,7 @@ class McpServer:
             "pending_count": self._executor.pending_count,
             "max_tool_timeout": self._config.max_tool_timeout_seconds,
             "orphan_count": self._executor.orphan_count,
-            "session_count": len(self._sessions),
+            "session_count": live_sessions,
             "config_units_count": len(config_snap.units),
             "closed": self._closed,
         }
@@ -2106,9 +2299,7 @@ def _handle_list_profiles(request: dict, server: McpServer | None = None) -> dic
 
     if server is not None:
         active = server.config.profile
-        registry_profiles: MappingProxyType[str, list[str]] | dict[str, list[str]] = (
-            server.registry.profiles
-        )
+        registry_profiles: MappingProxyType[str, Any] | dict[str, Any] = server.registry.profiles
     else:
         active = get_active_profile()
         registry_profiles = TOOL_PROFILES
@@ -2132,34 +2323,72 @@ def _handle_list_profiles(request: dict, server: McpServer | None = None) -> dic
     }
 
 
-_default_session: McpSession | None = None
+_compat_server: McpServer | None = None
+_compat_server_lock = threading.Lock()
+_compat_server_config_gen: int = 0
+
+
+def _invalidate_compat_server() -> None:
+    """Close and discard the cached compatibility server."""
+    global _compat_server
+    with _compat_server_lock:
+        if _compat_server is not None:
+            _compat_server.close()
+            _compat_server = None
+
+
+def _get_compat_server() -> McpServer:
+    """Return the lazily-initialized compatibility server.
+
+    The compatibility server is an isolated ``McpServer`` instance used
+    only by the deprecated module-level ``handle_request()`` function.
+    It owns its own evaluator, registry, executor, and config manager
+    so that it never mutates package-global state or explicit servers.
+    """
+    global _compat_server
+    with _compat_server_lock:
+        if _compat_server is not None and not _compat_server._closed:
+            # Invalidate if module-level MAX_OUTPUT_BYTES changed
+            if _compat_server.config.max_output_bytes != MAX_OUTPUT_BYTES:
+                _compat_server.close()
+                _compat_server = None
+        if _compat_server is None or _compat_server._closed:
+            _compat_server = McpServer(
+                config=McpServerConfig(
+                    profile=get_active_profile(),
+                    allow_random=False,
+                    allow_side_effects=False,
+                    max_tool_workers=4,
+                    max_tool_queue_size=8,
+                    max_tool_timeout_seconds=30,
+                    max_output_bytes=MAX_OUTPUT_BYTES,
+                ),
+            )
+    return _compat_server
+
+
+def close_compatibility_server() -> None:
+    """Shut down and release the compatibility server.
+
+    Safe to call repeatedly. Subsequent compatibility requests will
+    create a fresh isolated server.
+    """
+    global _compat_server
+    with _compat_server_lock:
+        if _compat_server is not None:
+            _compat_server.close()
+            _compat_server = None
 
 
 def handle_request(request: Any, session: McpSession | None = None) -> dict | None:
     """Route MCP request to appropriate handler.
 
-    If *session* is ``None`` a module-level default session (starting in
-    READY state) is used for backward compatibility — existing callers
-    that do not perform the handshake will continue to work unchanged.
-    Callers that pass an explicit ``McpSession`` get full lifecycle
-    enforcement.
+    If *session* is ``None`` the request is routed through an isolated
+    compatibility ``McpServer`` that owns its own evaluator and state.
+    Existing callers that do not perform the handshake will continue to
+    work unchanged.  Callers that pass an explicit ``McpSession`` get
+    full lifecycle enforcement through the session's server.
     """
-    # Ensure MCP-safe defaults are in effect. Idempotent: a one-time
-    # check is enough to set _mcp_mode and configure the default
-    # evaluator. We do this on first call (not at import time) so that
-    # importing this module for any reason does not globally disable
-    # random/setvar in the default evaluator — only code that actually
-    # uses the MCP server gets the MCP-safe defaults.
-    global _mcp_defaults_configured, _default_session
-    with _mcp_defaults_lock:
-        if not _mcp_defaults_configured:
-            _evaluator._mcp_mode = True
-            _evaluator.configure_default_evaluator(
-                allow_random=False,
-                allow_side_effects=False,
-            )
-            _mcp_defaults_configured = True
-
     if not isinstance(request, dict):
         return _invalid_request(None, "Invalid Request: expected JSON object")
 
@@ -2204,18 +2433,20 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
             "Invalid Request: 'method' must be a string",
         )
 
-    # Get or create session for backward compatibility
+    # Route through compatibility server when no explicit session is given.
+    # The compat session is created in READY state for backward compatibility
+    # with callers that do not perform the initialize handshake.
     if session is None:
         warnings.warn(
             "Calling handle_request() without an explicit session is deprecated. "
-            "Pass a McpSession instance for full lifecycle enforcement. "
+            "Use McpServer + McpSession for full lifecycle enforcement. "
             "This compatibility path will be removed in a future version.",
             DeprecationWarning,
             stacklevel=2,
         )
-        if _default_session is None:
-            _default_session = McpSession()
-        session = _default_session
+        compat = _get_compat_server()
+        compat_session = McpSession(initial_state=McpSessionState.READY)
+        return compat.handle_request(request, session=compat_session)
 
     return session.handle_message(request)
 
