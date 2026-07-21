@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Removed import-time `os.environ.setdefault("EGGCALC_NO_CONFIG", "1")` from `server.py`; config suppression now handled by `McpServerConfig.from_environment()` and explicit `main()` setup
+- `main()` now creates `McpServer(config=config)` per connection instead of bare `McpSession`, with `server.handle_request()` and guaranteed `server.close()` in try/finally
+- `McpSession.handle_message()` passes `server=server` to `_handle_list_tools()` and `_handle_list_profiles()` when available; these functions use `server.config.*` and `server.registry.*` instead of module-level globals
+- `_handle_cancelled()` uses `server.config.max_cancelled_requests` when a server is provided
+- `ConfigSnapshot.__post_init__()` defensively copies all dict fields to prevent external mutation (deeply immutable)
+- `build_single.py` updated: `_evaluator.Evaluator(` → `Evaluator(`, `_evaluator.get_config_generation()` → `get_config_generation()`, `_evaluator.Evaluator:` → `Evaluator:`
+
 ## [1.2.0] - 2026-07-16
 
 ### Fixed

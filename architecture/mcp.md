@@ -120,7 +120,7 @@ Owns the bounded thread pool, argument validation, timeout enforcement, cancella
 
 ### ConfigSnapshot / ConfigManager
 
-`ConfigSnapshot` is a frozen dataclass for atomic configuration replacement with fields: `generation`, `constants`, `functions`, `units`, and `policy`. `ConfigManager` holds the current snapshot behind a lock, supporting atomic swaps and generation tracking. This allows runtime config changes without corrupting in-flight requests.
+`ConfigSnapshot` is a frozen dataclass for atomic configuration replacement with fields: `generation`, `constants`, `functions`, `units`, and `policy`. `__post_init__()` defensively copies all dict fields to prevent external mutation. `ConfigManager` holds the current snapshot behind a lock, supporting atomic swaps and generation tracking. This allows runtime config changes without corrupting in-flight requests.
 
 ### Evaluator Policy Isolation
 
@@ -663,9 +663,9 @@ Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it d
 
 ### Enforcement
 
-- **`tools/list`** (server.py:1006–1106): Filters `TOOL_SCHEMAS` by `get_profile_tools(profile_filter)`. Additional filters (`tier`, `tags`, `names`) are applied after profile selection.
+- **`tools/list`** (server.py:1006–1106): Filters `TOOL_SCHEMAS` by `get_profile_tools(profile_filter)`. When a `McpServer` is available, `McpSession.handle_message()` passes `server=server` and the handler uses `server.config.*` and `server.registry.*` instead of module-level globals. Additional filters (`tier`, `tags`, `names`) are applied after profile selection.
 - **`tools/call`** (server.py:807–831): Rejects tools not in the active profile with JSON-RPC error `-32602` before the handler executes.
-- **`profiles/list`**: Returns all profile names, their tool lists, and tool counts.
+- **`profiles/list`**: Returns all profile names, their tool lists, and tool counts. When a `McpServer` is available, routes through `server.registry.*` instead of module-level globals.
 
 ### Schema Detail
 
@@ -739,7 +739,7 @@ Then send JSON-RPC requests via stdio:
 7. **Rate Limiting** — Sliding window rate limiter (default 10 req/s)
 8. **Orphan Cleanup** — Tracks and terminates orphaned child processes from timed-out tools
 9. **MCP-Safe Defaults** — `allow_random=False`, `allow_side_effects=False` set on first request
-10. **Config Security** — `EGGCALC_NO_CONFIG=1` blocks cwd-local config loading at import time
+10. **Config Security** — Config suppression handled by `McpServerConfig.from_environment()` and `main()` setup (no import-time env mutation)
 
 ### Cancellation Semantics
 
@@ -766,15 +766,17 @@ Cancellation is best-effort. The server checks cancellation records before dispa
 ### `main() -> int`
 
 Main entry point:
-1. Sets `EGGCALC_NO_CONFIG=1`
-2. Creates one `McpSession(initial_state=UNINITIALIZED)` per connection
-3. Reads JSON-RPC requests from stdin (line by line)
-4. Validates JSON-RPC version, ID, method
-5. Enforces rate limiting (sliding window)
-6. Rejects oversized requests and batch requests
-7. Handles each request via `handle_request(request, session=session)`
-8. Writes responses to stdout
-9. Returns exit code on EOF or `BrokenPipeError`
+1. Creates `McpServerConfig.from_environment()` for policy
+2. Instantiates `McpServer(config=config)` per connection
+3. Creates a session via `server.create_session()`
+4. Reads JSON-RPC requests from stdin (line by line)
+5. Validates JSON-RPC version, ID, method
+6. Enforces rate limiting (sliding window)
+7. Rejects oversized requests and batch requests
+8. Handles each request via `server.handle_request(request, session=session)`
+9. Writes responses to stdout
+10. Returns exit code on EOF or `BrokenPipeError`
+11. Guaranteed `server.close()` in try/finally block
 
 For build compatibility, this is also available as `mcp_main()`:
 

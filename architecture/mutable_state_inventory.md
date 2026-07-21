@@ -67,6 +67,8 @@ Created for Release 5 (State Isolation and Concurrency Hardening).
 | 365 | `_tool_executor` | `ThreadPoolExecutor` | infrastructure | **Shared** | Process-global; replaced by `ToolExecutor` per-server |
 | 387 | `_orphaned_processes` | set | infrastructure | **Shared** | Process-global; replaced by `ToolExecutor._orphaned` per-server |
 | 1924 | `_default_session` | `McpSession` | protocol | **Shared** | Deprecated compat path; replaced by explicit `McpSession` per-server |
+| — | `os.environ.setdefault` | env mutation | policy | **Removed** | Import-time mutation removed; config suppression now handled by `McpServerConfig.from_environment()` and `main()` setup |
+| — | `ConfigSnapshot` dicts | dict fields | policy | **Isolated** | `__post_init__()` defensively copies all dict fields to prevent external mutation |
 
 ## eggcalc/mcp/tools.py
 
@@ -100,6 +102,6 @@ The following are **fully isolated by Release 5**:
 - `McpServerConfig` (frozen dataclass)
 - `ToolRegistry` (per-server copy of tool definitions)
 - `ToolExecutor` (per-server thread pool and orphan tracking)
-- `ConfigSnapshot` / `ConfigManager` (per-server atomic config)
+- `ConfigSnapshot` / `ConfigManager` (per-server atomic config; dicts deeply copied in `__post_init__`)
 - `McpSession` (per-connection lifecycle, cancellation, protocol state)
 - `Evaluator` instances (per-server via `create_evaluator()`)

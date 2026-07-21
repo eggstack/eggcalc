@@ -396,6 +396,20 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
         "_evaluator.configure_default_evaluator(",
         "configure_default_evaluator(",
     )
+    # In single file, Evaluator class and get_config_generation are module-level
+    code = code.replace(
+        "_evaluator.Evaluator(",
+        "Evaluator(",
+    )
+    code = code.replace(
+        "_evaluator.get_config_generation()",
+        "get_config_generation()",
+    )
+    # Type annotations referencing _evaluator.Evaluator
+    code = code.replace(
+        "_evaluator.Evaluator:",
+        "Evaluator:",
+    )
     # MCP server: capabilities module reference
     code = code.replace(
         "from ..capabilities import detect_capabilities",

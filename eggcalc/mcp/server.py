@@ -24,12 +24,6 @@ from dataclasses import dataclass as _dataclass
 from dataclasses import field as _field
 from typing import Any
 
-# Disable any user-supplied config loading at import time, before any
-# other eggcalc modules have a chance to read the env var. The MCP
-# server is a tool surface for agents, not a user REPL, and loading
-# arbitrary code from the working directory would be a security risk.
-os.environ.setdefault("EGGCALC_NO_CONFIG", "1")
-
 from .. import __version__
 from .. import evaluator as _evaluator
 from ..capabilities import detect_capabilities
@@ -902,13 +896,25 @@ class ToolExecutor:
 
 @_dataclass(frozen=True)
 class ConfigSnapshot:
-    """Immutable configuration snapshot for atomic replacement."""
+    """Immutable configuration snapshot for atomic replacement.
+
+    Dict fields are defensively copied on construction so external
+    references cannot mutate the snapshot after creation.
+    """
 
     generation: int = 0
     constants: dict[str, Any] = _field(default_factory=dict)
     functions: dict[str, Any] = _field(default_factory=dict)
     units: dict[str, Any] = _field(default_factory=dict)
     policy: str = "default"
+
+    def __post_init__(self) -> None:
+        # Deep copy mutable defaults to prevent external mutation.
+        # A frozen dataclass only prevents attribute reassignment, not
+        # in-place mutation of contained mutable objects.
+        object.__setattr__(self, 'constants', dict(self.constants))
+        object.__setattr__(self, 'functions', dict(self.functions))
+        object.__setattr__(self, 'units', dict(self.units))
 
 
 class ConfigManager:
@@ -985,11 +991,13 @@ class McpSession:
             self._handle_notifications_initialized()
             return None
         elif method == "notifications/cancelled":
-            self._handle_cancelled(request)
+            self._handle_cancelled(request, server=server)
             return None
         elif method == "ping":
             return {"jsonrpc": "2.0", "id": request_id, "result": {}}
         elif method == "tools/list":
+            if server is not None:
+                return _handle_list_tools(request, server=server)
             return _handle_list_tools(request)
         elif method == "tools/call":
             if server is not None:
@@ -1001,6 +1009,8 @@ class McpSession:
                 cancelled_lock=self._cancelled_lock,
             )
         elif method == "profiles/list":
+            if server is not None:
+                return _handle_list_profiles(request, server=server)
             return _handle_list_profiles(request)
         elif method.startswith("notifications/"):
             # Unknown notifications are silently ignored per MCP spec
@@ -1113,7 +1123,7 @@ class McpSession:
         if self.state == McpSessionState.INITIALIZING:
             self.state = McpSessionState.READY
 
-    def _handle_cancelled(self, request: dict) -> None:
+    def _handle_cancelled(self, request: dict, server: McpServer | None = None) -> None:
         """Handle notifications/cancelled using session-scoped cancellation state."""
         params = request.get("params", {})
         if not isinstance(params, dict):
@@ -1124,11 +1134,14 @@ class McpSession:
             and isinstance(cancelled_id, (str, int))
             and not isinstance(cancelled_id, bool)
         ):
+            max_cancelled = (
+                server.config.max_cancelled_requests if server else MAX_CANCELLED_REQUESTS
+            )
             with self._cancelled_lock:
                 if cancelled_id not in self._cancelled_requests:
                     self._cancelled_requests.add(cancelled_id)
                     self._cancelled_requests_order.append(cancelled_id)
-                while len(self._cancelled_requests) > MAX_CANCELLED_REQUESTS:
+                while len(self._cancelled_requests) > max_cancelled:
                     oldest = self._cancelled_requests_order.popleft()
                     self._cancelled_requests.discard(oldest)
 
@@ -1814,8 +1827,12 @@ def _handle_call_tool(
     }
 
 
-def _handle_list_tools(request: dict) -> dict:
-    """Handle a tools/list MCP request with optional filtering."""
+def _handle_list_tools(request: dict, server: McpServer | None = None) -> dict:
+    """Handle a tools/list MCP request with optional filtering.
+
+    When *server* is provided, its config and registry are used instead
+    of module-level globals, giving callers full state isolation.
+    """
     params = request.get("params", {})
     request_id = request.get("id")
     if not isinstance(params, dict):
@@ -1844,14 +1861,22 @@ def _handle_list_tools(request: dict) -> dict:
             request_id, "Invalid 'schema_detail' parameter: expected compact, normal, or full"
         )
 
-    # Schema detail: per-request override or global default
-    detail = schema_detail_param or get_schema_detail()
+    # Schema detail: per-request override or global default (server-aware)
+    if server is not None:
+        default_detail = server.config.schema_detail
+    else:
+        default_detail = get_schema_detail()
+    detail = schema_detail_param or default_detail
     use_compact = detail == "compact"
     schema_detail = detail
 
-    # Determine profile-visible tools
+    # Determine profile-visible tools (server-aware)
     try:
-        profile_tools = set(get_profile_tools(profile_filter))
+        if server is not None:
+            default_profile = profile_filter or server.config.profile
+            profile_tools = set(server.registry.get_profile_tools(default_profile))
+        else:
+            profile_tools = set(get_profile_tools(profile_filter))
     except ValueError as e:
         return {
             "jsonrpc": "2.0",
@@ -1862,8 +1887,12 @@ def _handle_list_tools(request: dict) -> dict:
             },
         }
 
+    # Use server registry when available, fall back to globals
+    schemas_src = server.registry.schemas if server is not None else TOOL_SCHEMAS
+    metadata_src = server.registry.metadata if server is not None else TOOL_METADATA
+
     tools = []
-    for name, schema in TOOL_SCHEMAS.items():
+    for name, schema in schemas_src.items():
         if name not in profile_tools:
             continue
 
@@ -1880,7 +1909,7 @@ def _handle_list_tools(request: dict) -> dict:
             if not all(tag in tool_tags for tag in tags_filter):
                 continue
 
-        meta = TOOL_METADATA.get(name, {})
+        meta = metadata_src.get(name, {})
         if use_compact:
             entry = compact_schema(schema)
             entry["name"] = name
@@ -1965,17 +1994,26 @@ def _handle_initialize(request: dict) -> dict:
     }
 
 
-def _handle_list_profiles(request: dict) -> dict:
-    """Handle a profiles/list MCP request."""
+def _handle_list_profiles(request: dict, server: McpServer | None = None) -> dict:
+    """Handle a profiles/list MCP request.
+
+    When *server* is provided, its config and registry are used instead
+    of module-level globals.
+    """
     params = request.get("params", {})
     if not isinstance(params, dict):
         return _invalid_request(request.get("id"), "Invalid params: expected object")
 
-    active = get_active_profile()
+    if server is not None:
+        active = server.config.profile
+        registry_profiles = server.registry.profiles
+    else:
+        active = get_active_profile()
+        registry_profiles = TOOL_PROFILES
 
     profiles_info = {}
     for name in PROFILE_NAMES:
-        tool_list = TOOL_PROFILES.get(name, [])
+        tool_list = registry_profiles.get(name, [])
         profiles_info[name] = {
             "tools": tool_list,
             "tool_count": len(tool_list),
@@ -2084,76 +2122,77 @@ def main() -> int:
     """Main entry point for MCP server.
 
     Reads JSON-RPC requests from stdin and writes responses to stdout.
-    Creates one McpSession per connection for lifecycle management.
+    Creates one McpServer and McpSession per connection for lifecycle
+    management and state isolation.
     """
     os.environ["EGGCALC_NO_CONFIG"] = "1"
-    # MCP-safe defaults are configured by handle_request() on first call,
-    # so the very first request also sets them. We do not need to
-    # configure them here.
+    config = McpServerConfig.from_environment()
+    server = McpServer(config=config)
+    session = server.create_session(McpSessionState.UNINITIALIZED)
     request_times: deque[float] = deque()
     window = 1.0  # sliding window in seconds
-    session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
-
-    for line in sys.stdin:
-        try:
-            line = line.strip()
-            if not line:
-                continue
-
-            response: dict[str, Any] | None = None
-            if len(line.encode('utf-8')) > MAX_REQUEST_BYTES:
-                response = _parse_error(
-                    None,
-                    f"Request exceeds maximum size of {MAX_REQUEST_BYTES} bytes",
-                )
-                print(json.dumps(response), flush=True)
-                continue
-
-            if line.startswith('['):
-                response = _invalid_request_error(None, "Batch requests are not supported")
-                print(json.dumps(response), flush=True)
-                continue
-
+    try:
+        for line in sys.stdin:
             try:
-                request = json.loads(line)
-            except json.JSONDecodeError:
-                response = _parse_error(None, "Parse error: invalid JSON")
-                print(json.dumps(response), flush=True)
-                continue
+                line = line.strip()
+                if not line:
+                    continue
 
-            now = time.monotonic()
-            while request_times and request_times[0] < now - window:
-                request_times.popleft()
-
-            if len(request_times) >= MAX_REQUESTS_PER_SECOND:
-                response = _invalid_request_error(
-                    request.get("id") if isinstance(request, dict) else None,
-                    f"Rate limit exceeded: max {MAX_REQUESTS_PER_SECOND} requests per second",
-                )
-                print(json.dumps(response), flush=True)
-                continue
-
-            request_times.append(now)
-
-            try:
-                response = handle_request(request, session=session)
-            except Exception as e:
-                message = _sanitize_error(str(e))[:2000]
-                response = _internal_error(
-                    request.get("id") if isinstance(request, dict) else None,
-                    message,
-                )
-
-            if response is not None:
-                try:
+                response: dict[str, Any] | None = None
+                if len(line.encode('utf-8')) > config.max_request_bytes:
+                    response = _parse_error(
+                        None,
+                        f"Request exceeds maximum size of {config.max_request_bytes} bytes",
+                    )
                     print(json.dumps(response), flush=True)
-                except TypeError:
-                    fallback = _internal_error(None, "response not JSON-serializable")
-                    print(json.dumps(fallback), flush=True)
-        except (BrokenPipeError, ValueError):
-            return 0
+                    continue
 
-    return 0
+                if line.startswith('['):
+                    response = _invalid_request_error(None, "Batch requests are not supported")
+                    print(json.dumps(response), flush=True)
+                    continue
+
+                try:
+                    request = json.loads(line)
+                except json.JSONDecodeError:
+                    response = _parse_error(None, "Parse error: invalid JSON")
+                    print(json.dumps(response), flush=True)
+                    continue
+
+                now = time.monotonic()
+                while request_times and request_times[0] < now - window:
+                    request_times.popleft()
+
+                if len(request_times) >= config.max_requests_per_second:
+                    response = _invalid_request_error(
+                        request.get("id") if isinstance(request, dict) else None,
+                        f"Rate limit exceeded: max {config.max_requests_per_second} requests per second",
+                    )
+                    print(json.dumps(response), flush=True)
+                    continue
+
+                request_times.append(now)
+
+                try:
+                    response = server.handle_request(request, session=session)
+                except Exception as e:
+                    message = _sanitize_error(str(e))[:2000]
+                    response = _internal_error(
+                        request.get("id") if isinstance(request, dict) else None,
+                        message,
+                    )
+
+                if response is not None:
+                    try:
+                        print(json.dumps(response), flush=True)
+                    except TypeError:
+                        fallback = _internal_error(None, "response not JSON-serializable")
+                        print(json.dumps(fallback), flush=True)
+            except (BrokenPipeError, ValueError):
+                return 0
+        return 0
+    finally:
+        server.close()
 
 
 if __name__ == "__main__":

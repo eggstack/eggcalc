@@ -148,11 +148,12 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Tools outside active profile rejected at `tools/call` with JSON-RPC `-32602`. Per-request `profile` param overrides in `tools/list`.
 - `full` profile uses `llm_exposure != "hidden"` filter (not `TOOL_PROFILES["full"]`). `EGGCALC_MCP_SCHEMA_DETAIL` controls schema verbosity (compact/normal/full).
 - Resource audit: `docs/mcp_resource_limits.md` covers all 77 tools.
-- **Session lifecycle:** `McpSession` class manages protocol state (UNINITIALIZED → INITIALIZING → READY → CLOSED). `McpSessionState` enum tracks the lifecycle. Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`.
+- **Session lifecycle:** `McpServer` creates one `McpSession(initial_state=UNINITIALIZED)` per connection via `server.create_session()`. The `McpSession` class manages protocol state (UNINITIALIZED → INITIALIZING → READY → CLOSED). `McpSessionState` enum tracks the lifecycle. Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`.
 - **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`. Version negotiation happens in `initialize`. Constants exported from `eggcalc.mcp`.
 - **`handle_request(request, session=None)`**: When `session` is `None`, a module-level default session (starting in READY state) is used for backward compatibility. **Deprecated** — emits `DeprecationWarning`. Callers should pass an explicit `McpSession` instance.
-- **`main()`**: Creates one `McpSession(initial_state=UNINITIALIZED)` per connection for lifecycle management.
+- **`main()`**: Creates one `McpServer` per connection, which owns a `McpSession` for lifecycle management.
 - **Centralized error helpers:** `_jsonrpc_error()`, `_parse_error()`, `_method_not_found()`, `_invalid_params()`, `_internal_error()` in server.py.
+- **`ConfigSnapshot`**: Deeply immutable — `__post_init__()` defensively copies all dict fields to prevent external mutation.
 - **Schema validation:** `SUPPORTED_SCHEMA_KEYWORDS` frozenset defines which JSON Schema keywords the validator supports. `tests/test_mcp_schema_lint.py` walks all `TOOL_SCHEMAS` and fails on unsupported keywords.
 - **Session-aware test helpers:** `ready_session()` and `session_request(session, method, params, request_id)` in `tests/test_mcp_server.py`.
 - `McpServerConfig` frozen dataclass for immutable server configuration (profile, limits, timeouts, protocol versions)
@@ -194,7 +195,7 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 |------|-------------|------|
 | CLI | `maybe_load_cli_config()` in normalize.py | Once at CLI startup (`main()`) |
 | API (opt-in) | `_ensure_config_loaded()` in evaluator.py | Only when `EGGCALC_LOAD_CONFIG=1` is set |
-| MCP server | Blocked by `EGGCALC_NO_CONFIG=1` | Never |
+| MCP server | Handled by `McpServerConfig.from_environment()` and `main()` | `EGGCALC_NO_CONFIG=1` set in `main()` setup |
 
 Library APIs (`evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`) do **not** load cwd-local config by default. Set `EGGCALC_LOAD_CONFIG=1` to enable lazy config loading, or call `load_user_config()` explicitly.
 
