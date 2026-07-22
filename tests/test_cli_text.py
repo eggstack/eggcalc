@@ -83,6 +83,10 @@ class TestCLICount:
         assert code == 0
         assert "11" in stdout  # total characters
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows strips trailing whitespace from command-line arguments",
+    )
     def test_count_space_char(self):
         """Count space character."""
         code, stdout, stderr = run_calc(["count", "hello world", " "])
@@ -95,6 +99,10 @@ class TestCLICount:
         assert code == 1
         assert "Usage" in stderr
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows strips trailing whitespace from command-line arguments",
+    )
     def test_count_target_with_spaces_preserved(self):
         """Counting a single space inside multi-word text should work."""
         code, stdout, stderr = run_calc(["--json", "count", "hello world", " "])
