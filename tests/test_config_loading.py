@@ -224,9 +224,7 @@ class TestMCPHardening:
             timeout=10,
         )
         assert result.returncode == 0, f"stderr: {result.stderr}"
-        assert result.stdout.strip() == "", (
-            f"Import added env vars: {result.stdout.strip()}"
-        )
+        assert result.stdout.strip() == "", f"Import added env vars: {result.stdout.strip()}"
 
     def test_server_hard_sets_no_config_in_main(self):
         """mcp/server.py mcp_main() hard-sets EGGCALC_NO_CONFIG=1."""
