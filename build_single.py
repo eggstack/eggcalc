@@ -83,14 +83,17 @@ import os
 def get_version() -> str:
     """Get version from __init__.py"""
     init_path = os.path.join(EGGCALC_DIR, "__init__.py")
-    with open(init_path) as f:
+    with open(init_path, encoding="utf-8") as f:
         for line in f:
             if line.startswith("__version__"):
                 import re as _re
+
                 m = _re.match(r'__version__\s*=\s*["\']([^"\']+)["\']', line)
                 if m:
                     return m.group(1)
-                raise SystemExit(f"ERROR: Malformed __version__ line in {init_path}: {line.strip()!r}")
+                raise SystemExit(
+                    f"ERROR: Malformed __version__ line in {init_path}: {line.strip()!r}"
+                )
     raise SystemExit(f"ERROR: __version__ not found in {init_path}")
 
 
@@ -104,7 +107,7 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     """
     module_path = os.path.join(EGGCALC_DIR, f"{module_name}.py")
 
-    with open(module_path) as f:
+    with open(module_path, encoding="utf-8") as f:
         lines = f.readlines()
 
     # Find where code starts (after docstring)
@@ -147,9 +150,11 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
             if "/" in mod:
                 pkg, name = mod.split("/")
                 # Match "from .<pkg>.<name> import" or "from ..exact.<name> import"
-                if (f"from .{pkg}.{name} import" in stripped or
-                    f"from .{name} import" in stripped or
-                    f"from ..exact.{name} import" in stripped):
+                if (
+                    f"from .{pkg}.{name} import" in stripped
+                    or f"from .{name} import" in stripped
+                    or f"from ..exact.{name} import" in stripped
+                ):
                     return True
             else:
                 if f"from .{mod} import" in stripped:
@@ -170,7 +175,7 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
 
     def is_valid_single_line_import(stripped: str, line: str) -> bool:
         """Check if this is a valid single-line import to collect.
-        
+
         Must be a top-level import (not indented inside a function/class).
         """
         # Must start with "import " or "from "
@@ -202,23 +207,30 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
         # Need to check for "import (" without ")" on same line = multi-line import start
         # Strip all top-level multi-line imports; also strip local multi-line imports
         # except those from inlined exact modules (primitives, synthesis, etc.)
-        if (stripped.startswith("import ") or stripped.startswith("from ")) and "(" in stripped and ")" not in stripped:
+        if (
+            (stripped.startswith("import ") or stripped.startswith("from "))
+            and "(" in stripped
+            and ")" not in stripped
+        ):
             # Check if this is a local import from an inlined exact module
             # Patterns: "from .<module> import" or "from ..exact.<module> import"
             is_inlined_module = False
             for m in MODULES_EXACT:
                 mod_name = m.split('/')[-1]
-                if (stripped.startswith(f"from .{mod_name} import") or
-                    stripped.startswith(f"from ..exact.{mod_name} import")):
+                if stripped.startswith(f"from .{mod_name} import") or stripped.startswith(
+                    f"from ..exact.{mod_name} import"
+                ):
                     is_inlined_module = True
                     break
             if not (line and line[0] in " \t"):
                 # Top-level multi-line import
                 # Check if it's from ..exact (with or without submodule) —
                 # if so, extract aliases as globals
-                if (stripped.startswith("from ..exact ") or
-                    stripped.startswith("from .exact ") or
-                    stripped.startswith("from ..exact.")):
+                if (
+                    stripped.startswith("from ..exact ")
+                    or stripped.startswith("from .exact ")
+                    or stripped.startswith("from ..exact.")
+                ):
                     # Collect all names from this multi-line import block
                     _exact_names = []
                     _first_line = stripped.split("import ", 1)[1] if "import " in stripped else ""
@@ -306,7 +318,9 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
 
         # Skip bare import names and closing paren from ..exact imports
         _check_name = stripped.rstrip(",").rstrip(")").strip()
-        if _skip_exact_names and (_check_name in _skip_exact_names or stripped.strip() in _skip_exact_names):
+        if _skip_exact_names and (
+            _check_name in _skip_exact_names or stripped.strip() in _skip_exact_names
+        ):
             _skip_exact_names.discard(_check_name)
             _skip_exact_names.discard(stripped.strip())
             continue
@@ -324,7 +338,9 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     code = code.replace("units._rebuild_conversions()", "_rebuild_conversions()")
 
     # Normalize references to modules now inlined
-    code = code.replace("from eggcalc import __version__", "# __version__ is defined at module level")
+    code = code.replace(
+        "from eggcalc import __version__", "# __version__ is defined at module level"
+    )
 
     # Rename normalize.main() to normalize_main() to avoid conflict with MCP main()
     if '"""Main entry point for CLI."""' in code:
@@ -378,7 +394,10 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     code = code.replace("from ..exact import", "from exact import")
 
     # MCP imports from eggcalc
-    code = code.replace("from .. import EvaluationError, evaluate_raw", "from evaluator import EvaluationError, evaluate_raw")
+    code = code.replace(
+        "from .. import EvaluationError, evaluate_raw",
+        "from evaluator import EvaluationError, evaluate_raw",
+    )
     code = code.replace("from ..exact import", "from exact import")
 
     # MCP server: evaluator module reference
@@ -422,124 +441,41 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     )
 
     # Synthesis imports from exact submodules
+    code = code.replace("from .primitives import (", "# primitives imports handled inline")
+    code = code.replace("from .unicode_tools import (", "# unicode_tools imports handled inline")
+    code = code.replace("from .diff import (", "# diff imports handled inline")
+    code = code.replace("from .validate import (", "# validate imports handled inline")
+    code = code.replace("from .measure import (", "# measure imports handled inline")
+    code = code.replace("from .synthesis import (", "# synthesis imports handled inline")
+    code = code.replace("from .config import (", "# config imports handled inline")
+    code = code.replace("from .shell import (", "# shell imports handled inline")
+    code = code.replace("from .path_tools import (", "# path_tools imports handled inline")
+    code = code.replace("from .markdown import (", "# markdown imports handled inline")
+    code = code.replace("from .patch import (", "# patch imports handled inline")
+    code = code.replace("from .transform import (", "# transform imports handled inline")
+    code = code.replace("from .position import (", "# position imports handled inline")
+    code = code.replace("from .identifier import (", "# identifier imports handled inline")
     code = code.replace(
-        "from .primitives import (",
-        "# primitives imports handled inline"
+        "from .identifier_inspect import (", "# identifier_inspect imports handled inline"
     )
-    code = code.replace(
-        "from .unicode_tools import (",
-        "# unicode_tools imports handled inline"
-    )
-    code = code.replace(
-        "from .diff import (",
-        "# diff imports handled inline"
-    )
-    code = code.replace(
-        "from .validate import (",
-        "# validate imports handled inline"
-    )
-    code = code.replace(
-        "from .measure import (",
-        "# measure imports handled inline"
-    )
-    code = code.replace(
-        "from .synthesis import (",
-        "# synthesis imports handled inline"
-    )
-    code = code.replace(
-        "from .config import (",
-        "# config imports handled inline"
-    )
-    code = code.replace(
-        "from .shell import (",
-        "# shell imports handled inline"
-    )
-    code = code.replace(
-        "from .path_tools import (",
-        "# path_tools imports handled inline"
-    )
-    code = code.replace(
-        "from .markdown import (",
-        "# markdown imports handled inline"
-    )
-    code = code.replace(
-        "from .patch import (",
-        "# patch imports handled inline"
-    )
-    code = code.replace(
-        "from .transform import (",
-        "# transform imports handled inline"
-    )
-    code = code.replace(
-        "from .position import (",
-        "# position imports handled inline"
-    )
-    code = code.replace(
-        "from .identifier import (",
-        "# identifier imports handled inline"
-    )
-    code = code.replace(
-        "from .identifier_inspect import (",
-        "# identifier_inspect imports handled inline"
-    )
-    code = code.replace(
-        "from .glob import (",
-        "# glob imports handled inline"
-    )
-    code = code.replace(
-        "from .unicode_policy import (",
-        "# unicode_policy imports handled inline"
-    )
+    code = code.replace("from .glob import (", "# glob imports handled inline")
+    code = code.replace("from .unicode_policy import (", "# unicode_policy imports handled inline")
 
     # MCP imports from ..exact.<module> (indented inside functions)
+    code = code.replace("from ..exact.config import (", "# config imports handled inline")
+    code = code.replace("from ..exact.identifier import (", "# identifier imports handled inline")
+    code = code.replace("from ..exact.markdown import (", "# markdown imports handled inline")
+    code = code.replace("from ..exact.path_tools import (", "# path_tools imports handled inline")
+    code = code.replace("from ..exact.primitives import (", "# primitives imports handled inline")
+    code = code.replace("from ..exact.shell import (", "# shell imports handled inline")
+    code = code.replace("from ..exact.synthesis import (", "# synthesis imports handled inline")
+    code = code.replace("from ..exact.transform import (", "# transform imports handled inline")
     code = code.replace(
-        "from ..exact.config import (",
-        "# config imports handled inline"
+        "from ..exact.unicode_policy import (", "# unicode_policy imports handled inline"
     )
-    code = code.replace(
-        "from ..exact.identifier import (",
-        "# identifier imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.markdown import (",
-        "# markdown imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.path_tools import (",
-        "# path_tools imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.primitives import (",
-        "# primitives imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.shell import (",
-        "# shell imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.synthesis import (",
-        "# synthesis imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.transform import (",
-        "# transform imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.unicode_policy import (",
-        "# unicode_policy imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.cargo import (",
-        "# cargo imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.version import (",
-        "# version imports handled inline"
-    )
-    code = code.replace(
-        "from ..exact.validate import (",
-        "# validate imports handled inline"
-    )
+    code = code.replace("from ..exact.cargo import (", "# cargo imports handled inline")
+    code = code.replace("from ..exact.version import (", "# version imports handled inline")
+    code = code.replace("from ..exact.validate import (", "# validate imports handled inline")
     # Use regex to replace entire multi-line import blocks for patch module
     # (simple str.replace only replaces the header, leaving orphaned continuation lines)
     code = re.sub(
@@ -796,7 +732,7 @@ if __name__ == "__main__":
                 mod_name = stripped.split()[1].lstrip(".")
                 if mod_name in EXACT_MODULE_NAMES:
                     indent = line[: len(line) - len(line.lstrip())]
-                    after_from = stripped[len("from "):]
+                    after_from = stripped[len("from ") :]
                     mod_and_import = after_from.split(" import ", 1)
                     import_part = mod_and_import[1] if len(mod_and_import) > 1 else ""
                     import_part = import_part.rstrip(",").rstrip(")")
@@ -850,7 +786,7 @@ if __name__ == "__main__":
 
     final_content = _replace_local_imports(final_content)
 
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(final_content)
 
     os.chmod(output_path, os.stat(output_path).st_mode | 0o111)

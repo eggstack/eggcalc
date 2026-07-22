@@ -69,7 +69,7 @@ class TestImportDoesNotLoadConfig:
     def test_init_no_load_user_config_call(self):
         """__init__.py must not contain a bare load_user_config() call at module level."""
         init_source = importlib.util.find_spec("eggcalc").origin
-        with open(init_source) as f:
+        with open(init_source, encoding="utf-8") as f:
             lines = f.readlines()
 
         in_def_or_class = False
@@ -231,7 +231,7 @@ class TestMCPHardening:
         server_source_path = os.path.join(
             os.path.dirname(__file__), "..", "eggcalc", "mcp", "server.py"
         )
-        with open(server_source_path) as f:
+        with open(server_source_path, encoding="utf-8") as f:
             content = f.read()
 
         assert 'os.environ["EGGCALC_NO_CONFIG"] = "1"' in content

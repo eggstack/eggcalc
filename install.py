@@ -49,11 +49,12 @@ def create_executable(source_path: str, install_dir: str) -> str:
     os.makedirs(install_dir, exist_ok=True)
     dest_path = os.path.join(install_dir, "calc")
 
-    with open(source_path) as f:
+    with open(source_path, encoding="utf-8") as f:
         content = f.read()
 
     # Write to a temp file first, then rename atomically
     import tempfile
+
     fd, tmp_path = tempfile.mkstemp(dir=install_dir, prefix=".calc_tmp_")
     try:
         with os.fdopen(fd, "w") as f:
@@ -79,9 +80,7 @@ def _validate_shell_path(path: str) -> None:
     """Raise ValueError if path contains characters unsafe for shell config interpolation."""
     bad = _SHELL_UNSAFE_CHARS & set(path)
     if bad:
-        raise ValueError(
-            f"Path contains shell-unsafe characters: {''.join(sorted(bad))!r}"
-        )
+        raise ValueError(f"Path contains shell-unsafe characters: {''.join(sorted(bad))!r}")
 
 
 def add_to_path(install_dir: str) -> bool:
@@ -102,7 +101,7 @@ def add_to_path(install_dir: str) -> bool:
         target_file = zshrc if os.path.exists(zshrc) else shell_profile
 
         if os.path.exists(target_file):
-            with open(target_file) as f:
+            with open(target_file, encoding="utf-8") as f:
                 content = f.read()
 
             export_line = f'export PATH="{install_dir}:$PATH"'
@@ -111,13 +110,15 @@ def add_to_path(install_dir: str) -> bool:
                 print(f"{install_dir} is already in your PATH configuration.")
                 return True
 
-            with open(target_file, "a") as f:
+            with open(target_file, "a", encoding="utf-8") as f:
                 f.write(f"\n# Added by eggcalc install\n{export_line}\n")
 
             print(f"Added {install_dir} to PATH in {target_file}")
             return True
         else:
-            print("No shell config found. Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):")
+            print(
+                "No shell config found. Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
+            )
             print(f'  export PATH="{install_dir}:$PATH"')
             return False
 
@@ -137,7 +138,7 @@ def remove_from_path(install_dir: str) -> bool:
         print("No shell config found.")
         return False
 
-    with open(target_file) as f:
+    with open(target_file, encoding="utf-8") as f:
         content = f.read()
 
     export_line = f'export PATH="{install_dir}:$PATH"'
@@ -182,7 +183,7 @@ def remove_from_path(install_dir: str) -> bool:
     while result_lines and result_lines[-1].strip() == "":
         result_lines.pop()
 
-    with open(target_file, "w") as f:
+    with open(target_file, "w", encoding="utf-8") as f:
         f.write('\n'.join(result_lines))
 
     if found_export:
@@ -192,9 +193,7 @@ def remove_from_path(install_dir: str) -> bool:
     return True
 
 
-def install_calc(
-    install_dir: str, no_path: bool = False, spawn_shell: bool = False
-) -> bool:
+def install_calc(install_dir: str, no_path: bool = False, spawn_shell: bool = False) -> bool:
     """Install calc to the specified directory. Returns True if successful."""
     if is_installed(install_dir):
         print("calc is already installed.")
@@ -217,11 +216,7 @@ def install_calc(
         print("calc is ready to use!")
         if spawn_shell:
             new_path = f"{install_dir}{os.pathsep}{os.environ.get('PATH', '')}"
-            shell_bin = (
-                "zsh"
-                if os.path.exists(os.path.expanduser("~/.zshrc"))
-                else "bash"
-            )
+            shell_bin = "zsh" if os.path.exists(os.path.expanduser("~/.zshrc")) else "bash"
             print("\nSpawning shell with calc available...")
             subprocess.run(
                 [shell_bin, "-i"],
@@ -247,7 +242,7 @@ def _is_pip_entry_point(path: str) -> bool:
     if not path:
         return False
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             head = f.read(512)
     except OSError:
         return False
@@ -282,10 +277,11 @@ def update_calc(install_dir: str) -> bool:
 
     calc_path = get_calc_path(install_dir)
 
-    with open(single_file) as f:
+    with open(single_file, encoding="utf-8") as f:
         new_content = f.read()
 
     import tempfile
+
     fd, tmp_path = tempfile.mkstemp(dir=install_dir, prefix=".calc_tmp_")
     try:
         with os.fdopen(fd, "w") as f:
@@ -325,6 +321,7 @@ def uninstall_calc(install_dir: str, force: bool = False) -> bool:
         print(f"Removed {calc_path}")
     # Clean up any leftover temp files
     import glob as _glob
+
     for tmp in _glob.glob(os.path.join(install_dir, ".calc_tmp_*")):
         try:
             os.remove(tmp)
