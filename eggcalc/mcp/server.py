@@ -488,15 +488,15 @@ class McpServerConfig:
 
     profile: str = "full"
     schema_detail: str = "full"
-    max_request_bytes: int = 1_000_000
-    max_output_bytes: int = 1_000_000
-    max_requests_per_second: float = 10.0
-    max_request_id_length: int = 1024
-    max_tool_timeout_seconds: int = 30
-    max_cancelled_requests: int = 10_000
-    max_tool_workers: int = 16
+    max_request_bytes: int = MAX_REQUEST_BYTES
+    max_output_bytes: int = MAX_OUTPUT_BYTES
+    max_requests_per_second: float = MAX_REQUESTS_PER_SECOND
+    max_request_id_length: int = MAX_REQUEST_ID_LENGTH
+    max_tool_timeout_seconds: int = MAX_TOOL_TIMEOUT_SECONDS
+    max_cancelled_requests: int = MAX_CANCELLED_REQUESTS
+    max_tool_workers: int = _MAX_TOOL_WORKERS
     max_tool_queue_size: int = 32
-    supported_protocol_versions: tuple[str, ...] = ("2024-11-05", "2025-11-25")
+    supported_protocol_versions: tuple[str, ...] = SUPPORTED_PROTOCOL_VERSIONS
     allow_random: bool = False
     allow_side_effects: bool = False
 
@@ -545,21 +545,23 @@ class McpServerConfig:
             profile=os.environ.get("EGGCALC_MCP_PROFILE", "full"),
             schema_detail=os.environ.get("EGGCALC_MCP_SCHEMA_DETAIL", "full"),
             max_request_bytes=_parse_env_int(
-                "EGGCALC_MCP_MAX_REQUEST_BYTES", 1_000_000, 1_000, 100_000_000
+                "EGGCALC_MCP_MAX_REQUEST_BYTES", MAX_REQUEST_BYTES, 1_000, 100_000_000
             ),
             max_output_bytes=_parse_env_int(
-                "EGGCALC_MCP_MAX_OUTPUT_BYTES", 1_000_000, 1_000, 100_000_000
+                "EGGCALC_MCP_MAX_OUTPUT_BYTES", MAX_OUTPUT_BYTES, 1, 100_000_000
             ),
             max_requests_per_second=_parse_env_float(
-                "EGGCALC_MCP_MAX_REQUESTS_PER_SECOND", 10, 0.1, 1000
+                "EGGCALC_MCP_MAX_REQUESTS_PER_SECOND", MAX_REQUESTS_PER_SECOND, 0.1, 1000
             ),
             max_tool_timeout_seconds=_parse_env_int(
-                "EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS", 30, 1, 300
+                "EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS", MAX_TOOL_TIMEOUT_SECONDS, 1, 300
             ),
             max_cancelled_requests=_parse_env_int(
-                "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", 10_000, 100, 1_000_000
+                "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", MAX_CANCELLED_REQUESTS, 100, 1_000_000
             ),
-            max_tool_workers=_parse_env_int("EGGCALC_MCP_MAX_TOOL_WORKERS", 16, 1, 128),
+            max_tool_workers=_parse_env_int(
+                "EGGCALC_MCP_MAX_TOOL_WORKERS", _MAX_TOOL_WORKERS, 1, 128
+            ),
             max_tool_queue_size=_parse_env_int("EGGCALC_MCP_MAX_TOOL_QUEUE_SIZE", 32, 1, 1000),
         )
 

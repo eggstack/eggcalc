@@ -226,3 +226,56 @@ class TestReverseImportOrder:
         """)
         result = _run_import_check(code)
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+
+class TestCommandRegistry:
+    """Verify the declarative command registry is well-formed."""
+
+    def test_no_duplicate_names(self):
+        """Command names are unique across the registry."""
+        code = textwrap.dedent("""\
+            from eggcalc.cli import COMMANDS
+            names = [c["name"] for c in COMMANDS]
+            assert len(names) == len(set(names)), f"Duplicate names: {[n for n in names if names.count(n) > 1]}"
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_no_alias_collisions(self):
+        """Command aliases don't collide with other command names."""
+        code = textwrap.dedent("""\
+            from eggcalc.cli import COMMANDS
+            all_names = set()
+            for c in COMMANDS:
+                assert c["name"] not in all_names, f"Duplicate: {c['name']}"
+                all_names.add(c["name"])
+                for alias in c.get("aliases", ()):
+                    assert alias not in all_names, f"Alias collision: {alias}"
+                    all_names.add(alias)
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_all_handlers_resolvable(self):
+        """Every handler name in the registry maps to a callable."""
+        code = textwrap.dedent("""\
+            from eggcalc.cli import COMMANDS, _get_handler
+            for c in COMMANDS:
+                h = c["handler"]
+                handler = _get_handler(h)
+                assert callable(handler), f"Handler {h!r} not callable"
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_all_commands_have_required_fields(self):
+        """Every command spec has name, description, usage, min_args, handler."""
+        code = textwrap.dedent("""\
+            from eggcalc.cli import COMMANDS
+            required = ("name", "description", "usage", "min_args", "handler")
+            for c in COMMANDS:
+                for field in required:
+                    assert field in c, f"Command {c.get('name', '?')} missing {field}"
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

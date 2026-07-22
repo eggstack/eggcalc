@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from typing import Any
+from typing import Any, TypedDict
 
 from .evaluator import EvaluationError, evaluate
 from .exact import (
@@ -40,6 +40,140 @@ __all__ = [
 ]
 
 _DELIM = "|||"
+
+
+# ---------------------------------------------------------------------------
+# Declarative command registry (C2)
+# ---------------------------------------------------------------------------
+
+
+class CommandSpec(TypedDict, total=False):
+    """Immutable metadata for a CLI text command."""
+
+    name: str
+    aliases: tuple[str, ...]
+    description: str
+    usage: str
+    min_args: int
+    category: str
+    json_output: bool
+    handler: str
+
+
+COMMANDS: tuple[CommandSpec, ...] = (
+    CommandSpec(
+        name="inspect",
+        aliases=(),
+        description="Detect hidden characters and confusables in text",
+        usage="calc inspect <text>",
+        min_args=2,
+        category="text",
+        json_output=True,
+        handler="inspect_text",
+    ),
+    CommandSpec(
+        name="count",
+        aliases=(),
+        description="Count characters or show frequency table",
+        usage="calc count <text> [char]",
+        min_args=2,
+        category="text",
+        json_output=True,
+        handler="count_chars",
+    ),
+    CommandSpec(
+        name="regex",
+        aliases=(),
+        description="Test a regex pattern against text",
+        usage="calc regex <pattern> <text>",
+        min_args=3,
+        category="validation",
+        json_output=True,
+        handler="regex_test",
+    ),
+    CommandSpec(
+        name="replace-check",
+        aliases=(),
+        description="Preview text replacement results",
+        usage=f"calc replace-check <old> {_DELIM} <new> {_DELIM} <text>",
+        min_args=2,
+        category="text",
+        json_output=True,
+        handler="text_replace_check",
+    ),
+    CommandSpec(
+        name="lines",
+        aliases=(),
+        description="Extract a line range from text",
+        usage="calc lines <start[-end]> <text>",
+        min_args=3,
+        category="text",
+        json_output=True,
+        handler="line_range_extract",
+    ),
+    CommandSpec(
+        name="patch-check",
+        aliases=(),
+        description="Preview patch application results",
+        usage=f"calc patch-check <original> {_DELIM} <patch>",
+        min_args=2,
+        category="patch",
+        json_output=True,
+        handler="patch_apply_check",
+    ),
+    CommandSpec(
+        name="shell-split",
+        aliases=(),
+        description="Split a shell command into argv tokens",
+        usage="calc shell-split <command>",
+        min_args=2,
+        category="shell",
+        json_output=True,
+        handler="shell_split",
+    ),
+    CommandSpec(
+        name="md-structure",
+        aliases=(),
+        description="Analyze markdown structure (headings, fences, links)",
+        usage="calc md-structure <text>",
+        min_args=2,
+        category="markdown",
+        json_output=True,
+        handler="markdown_structure",
+    ),
+    CommandSpec(
+        name="dotenv-check",
+        aliases=(),
+        description="Validate .env file format",
+        usage="calc dotenv-check <text>",
+        min_args=2,
+        category="validation",
+        json_output=True,
+        handler="dotenv_validate",
+    ),
+)
+
+_COMMAND_NAME_TO_SPEC: dict[str, CommandSpec] = {}
+for _spec in COMMANDS:
+    _COMMAND_NAME_TO_SPEC[_spec["name"]] = _spec
+    for _alias in _spec.get("aliases", ()):
+        _COMMAND_NAME_TO_SPEC[_alias] = _spec
+
+
+def _get_handler(name: str) -> Any:
+    """Look up a handler function by name, supporting both package and single-file modes."""
+    _HANDLER_MAP: dict[str, Any] = {
+        "inspect_text": inspect_text,
+        "count_chars": count_chars,
+        "regex_test": regex_test,
+        "text_replace_check": text_replace_check,
+        "line_range_extract": line_range_extract,
+        "patch_apply_check": patch_apply_check,
+        "shell_split": shell_split,
+        "markdown_structure": markdown_structure,
+        "dotenv_validate": dotenv_validate,
+    }
+    return _HANDLER_MAP[name]
 
 
 def run_cli(
@@ -259,9 +393,9 @@ def _cli_text_command(
 ) -> int:
     """Handle text commands before math evaluation.
 
-    If ``argv`` is provided, it is used directly as the command + arguments
-    so that quoted arguments from the original shell argv are preserved.
-    Otherwise, ``expression`` is whitespace-split.
+    Dispatches through the declarative :data:`COMMANDS` registry.  If ``argv``
+    is provided it is used directly (preserving quoted shell arguments);
+    otherwise ``expression`` is whitespace-split.
 
     Returns:
         0 if command was handled, 1 if expression should continue to math eval
@@ -275,31 +409,35 @@ def _cli_text_command(
         return 1
 
     cmd = parts[0].lower()
+    spec = _COMMAND_NAME_TO_SPEC.get(cmd)
+    if spec is None:
+        return 1
+
+    if len(parts) < spec.get("min_args", 2):
+        print(f"Usage: {spec['usage']}", file=sys.stderr)
+        return 1
+
+    handler_name = spec["handler"]
+    handler = _get_handler(handler_name)
 
     if cmd == "inspect":
-        if len(parts) < 2:
-            print("Usage: calc inspect <text>", file=sys.stderr)
-            return 1
         text = " ".join(parts[1:])
         try:
-            result: Any = inspect_text(text, include_codepoints=False, include_confusables=True)
+            result: Any = handler(text, include_codepoints=False, include_confusables=True)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         if result["warnings"]:
             for w in result["warnings"]:
                 kind = w["kind"].upper()
                 print(f"\u2717 {kind}: {w['message']}")
         else:
             print("\u2713 No hidden characters")
-
         if result["confusables"]:
             print(f"\nConfusables found: {len(result['confusables'])}")
             for c in result["confusables"][:5]:
@@ -307,17 +445,12 @@ def _cli_text_command(
         return 0
 
     if cmd == "count":
-        if len(parts) < 2:
-            print("Usage: calc count <text> [char]", file=sys.stderr)
-            return 1
         text = " ".join(parts[1:])
-
-        # Check if last part is a single char to count
         if len(parts) >= 3 and len(parts[-1]) == 1:
             char = parts[-1]
             text = " ".join(parts[1:-1])
             try:
-                result = count_chars(text, target=char)
+                result = handler(text, target=char)
             except ValueError as e:
                 print(f"Error: {e}", file=sys.stderr)
                 return 1
@@ -328,11 +461,9 @@ def _cli_text_command(
                 return 0
             print(f"'{char}' appears {result['count']} time(s) in \"{text}\"")
             return 0
-
-        # Default: show frequency table for multi-word, simple count for single
         try:
             if " " in text:
-                result = count_chars(text)
+                result = handler(text)
                 if json_output:
                     import json
 
@@ -349,7 +480,7 @@ def _cli_text_command(
                         print(f"  ... and {len(result) - 10} more unique chars")
                 return 0
             else:
-                result = count_chars(text)
+                result = handler(text)
                 if json_output:
                     import json
 
@@ -362,27 +493,21 @@ def _cli_text_command(
         return 0
 
     if cmd == "regex":
-        if len(parts) < 3:
-            print("Usage: calc regex <pattern> <text>", file=sys.stderr)
-            return 1
         pattern = parts[1]
         text = " ".join(parts[2:])
         try:
-            result = regex_test(pattern, [text])
+            result = handler(pattern, [text])
         except re.error as e:
             print(f"Error: Invalid regex pattern: {e}", file=sys.stderr)
             return 1
-
         if not result["valid_pattern"]:
             print(f"\u2717 Invalid regex pattern: {pattern}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         if result["results"]:
             r = result["results"][0]
             if r["matches"]:
@@ -400,31 +525,25 @@ def _cli_text_command(
     if cmd == "replace-check":
         raw = " ".join(parts[1:]).strip()
         if _DELIM not in raw:
-            print(
-                f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr
-            )
+            print(f"Usage: {spec['usage']}", file=sys.stderr)
             return 1
         segments = raw.split(_DELIM, 2)
         if len(segments) < 3:
-            print(
-                f"Usage: calc replace-check <old> {_DELIM} <new> {_DELIM} <text>", file=sys.stderr
-            )
+            print(f"Usage: {spec['usage']}", file=sys.stderr)
             return 1
         old = segments[0].strip()
         new = segments[1].strip()
         text = segments[2].strip()
         try:
-            result = text_replace_check(text, old, new, return_preview=True)
+            result = handler(text, old, new, return_preview=True)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         count = result["match_count"]
         if count == 0:
             print("\u2717 No match for replacement.")
@@ -437,14 +556,12 @@ def _cli_text_command(
         return 0
 
     if cmd == "lines":
-        # Split into at most 3 parts to preserve text content (including newlines)
         split_parts = expression.strip().split(None, 2)
         if len(split_parts) < 3:
-            print("Usage: calc lines <start[-end]> <text>", file=sys.stderr)
+            print(f"Usage: {spec['usage']}", file=sys.stderr)
             return 1
         range_str = split_parts[1]
         text = split_parts[2]
-        # Parse range: "1-5" or just "3" (single line)
         if "-" in range_str:
             try:
                 start_str, end_str = range_str.split("-", 1)
@@ -461,17 +578,15 @@ def _cli_text_command(
                 print(f"Error: Invalid line number '{range_str}'", file=sys.stderr)
                 return 1
         try:
-            result = line_range_extract(text, start_line, end_line, include_line_numbers=True)
+            result = handler(text, start_line, end_line, include_line_numbers=True)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         if not result["valid_range"]:
             for f in result["findings"]:
                 print(f"  {f['kind']}: {f['message']}")
@@ -485,26 +600,24 @@ def _cli_text_command(
     if cmd == "patch-check":
         raw = " ".join(parts[1:]).strip()
         if _DELIM not in raw:
-            print(f"Usage: calc patch-check <original> {_DELIM} <patch>", file=sys.stderr)
+            print(f"Usage: {spec['usage']}", file=sys.stderr)
             return 1
         segments = raw.split(_DELIM, 1)
         if len(segments) < 2:
-            print(f"Usage: calc patch-check <original> {_DELIM} <patch>", file=sys.stderr)
+            print(f"Usage: {spec['usage']}", file=sys.stderr)
             return 1
         original = segments[0].strip()
         patch_text = segments[1].strip()
         try:
-            result = patch_apply_check(original, patch_text)
+            result = handler(original, patch_text)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         if not result["patch_parse_ok"]:
             print("\u2717 Failed to parse patch.")
             for f in result["findings"]:
@@ -522,22 +635,17 @@ def _cli_text_command(
         return 0
 
     if cmd == "shell-split":
-        if len(parts) < 2:
-            print("Usage: calc shell-split <command>", file=sys.stderr)
-            return 1
         command = " ".join(parts[1:])
         try:
-            result = shell_split(command)
+            result = handler(command)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         if not result["parse_ok"]:
             print("\u2717 Parse failed.")
             for f in result["findings"]:
@@ -554,24 +662,21 @@ def _cli_text_command(
         return 0
 
     if cmd == "md-structure":
-        # Split into at most 2 parts to preserve text content (including newlines)
         split_parts = expression.strip().split(None, 1)
         if len(split_parts) < 2:
-            print("Usage: calc md-structure <text>", file=sys.stderr)
+            print(f"Usage: {spec['usage']}", file=sys.stderr)
             return 1
         text = split_parts[1]
         try:
-            result = markdown_structure(text)
+            result = handler(text)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         headings = result["headings"]
         fences = result["code_fences"]
         links = result["links"]
@@ -600,22 +705,17 @@ def _cli_text_command(
         return 0
 
     if cmd == "dotenv-check":
-        if len(parts) < 2:
-            print("Usage: calc dotenv-check <text>", file=sys.stderr)
-            return 1
         text = " ".join(parts[1:])
         try:
-            result = dotenv_validate(text)
+            result = handler(text)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
-
         if json_output:
             import json
 
             print(json.dumps(result))
             return 0
-
         entries = result["entries"]
         if result["parse_ok"] and not result["invalid_lines"]:
             print(f"\u2713 Valid .env: {len(entries)} entry/entries.")
@@ -625,7 +725,7 @@ def _cli_text_command(
             print(f"  {f}")
         return 0
 
-    return 1  # Not a text command, continue to math eval
+    return 1
 
 
 def maybe_load_cli_config() -> None:

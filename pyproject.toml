@@ -46,7 +46,7 @@ docs = [
 ]
 
 [project.scripts]
-calc = "eggcalc.normalize:main"
+calc = "eggcalc.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/eggstack/eggcalc"

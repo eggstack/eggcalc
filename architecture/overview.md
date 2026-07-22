@@ -278,6 +278,10 @@ mcp/
 
 | Structure | Module | Purpose |
 |-----------|--------|---------|
+| `Dimension` | units.py | Immutable structural dimension (8 SI base exponents + angle flag) |
+| `UnitDefinition` | units.py | Immutable unit definition (canonical, dimension, scale, offset, aliases) |
+| `UnitRegistry` | units.py | Authoritative registry of all units with alias/canonical/dimension lookups |
+| `_CATEGORY_DIMENSIONS` | units.py | Maps UNIT_BASE category keys to Dimension instances |
 | `NUMBER_WORDS` | normalize.py | Maps number values to word variants (`"one"` → `"1"`) |
 | `OPERATOR_CONVERSIONS` | normalize.py | Maps operator words to symbols (`"plus"` → `"+"`) |
 | `FUNCTION_MAPPINGS` | normalize.py | Maps function name aliases (`"square root"` → `"sqrt"`) |
@@ -292,6 +296,8 @@ mcp/
 | `Memory` | evaluator.py | Thread-safe calculator memory registers (M, M+, MR, MC) |
 | `Evaluator` | evaluator.py | `ast.NodeVisitor` for safe expression evaluation |
 | `EggCalcApp` | evaluator.py | Thread-safe wrapper with LRU cache and async support |
+| `CommandSpec` | cli.py | TypedDict for declarative CLI text command metadata |
+| `COMMANDS` | cli.py | Tuple of 9 CommandSpec entries (inspect, count, regex, etc.) |
 | `TOOL_SCHEMAS` | mcp/schemas.py | MCP tool definitions with JSON schemas (77 tools) |
 | `TOOL_PROFILES` | mcp/schemas.py | 11 tool profiles (full, default, codegg_*, human_math) |
 

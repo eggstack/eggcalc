@@ -43,7 +43,7 @@ __all__ = [
 
 MAX_INPUT_LENGTH = 10000
 MAX_NORMALIZED_LENGTH = 20000
-MAX_NESTING_DEPTH = 100
+from .evaluator import MAX_NESTING_DEPTH  # noqa: E402 — authoritative source
 
 # Decimal Python numeric literal subset used after unit preprocessing. It
 # intentionally excludes non-decimal prefixes because 0x/0b/0o literals are

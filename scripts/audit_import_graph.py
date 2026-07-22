@@ -67,9 +67,7 @@ def _run_subprocess(code: str, timeout: float = TIMEOUT) -> str:
         env=env,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"subprocess failed (rc={result.returncode}): {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"subprocess failed (rc={result.returncode}): {result.stderr.strip()}")
     return result.stdout.strip()
 
 
@@ -112,8 +110,7 @@ def _cli_import_modules(args: list[str]) -> list[str]:
         if line.startswith("["):
             return json.loads(line)
     raise RuntimeError(
-        f"No JSON array found in CLI output (rc={result.returncode}): "
-        f"{result.stdout[:200]!r}"
+        f"No JSON array found in CLI output (rc={result.returncode}): " f"{result.stdout[:200]!r}"
     )
 
 
@@ -136,9 +133,13 @@ def audit() -> dict[str, Any]:
     timed_modules = timed_samples[-1]["modules"] if timed_samples else []
 
     all_modules = sorted(
-        set(import_eggcalc) | set(from_evaluate) | set(import_normalize)
-        | set(cli_help_modules) | set(cli_expr_modules)
-        | set(cli_inspect_modules) | set(timed_modules)
+        set(import_eggcalc)
+        | set(from_evaluate)
+        | set(import_normalize)
+        | set(cli_help_modules)
+        | set(cli_expr_modules)
+        | set(cli_inspect_modules)
+        | set(timed_modules)
     )
 
     return {

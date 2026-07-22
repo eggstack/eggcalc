@@ -800,10 +800,66 @@ if __name__ == "__main__":
     return output_path
 
 
+def validate_build_manifest() -> list[str]:
+    """Validate the build manifest for correctness.
+
+    Checks:
+    - No duplicate modules across MODULES_CALC, MODULES_EXACT, MODULES_MCP
+    - Every declared module file exists on disk
+    - Import dependency order is valid (units before evaluator before normalize)
+
+    Returns a list of error strings (empty if valid).
+    """
+    errors: list[str] = []
+
+    all_modules = MODULES_CALC + MODULES_EXACT + MODULES_MCP
+    seen: set[str] = set()
+    for mod in all_modules:
+        if mod in seen:
+            errors.append(f"Duplicate module in build manifest: {mod!r}")
+        seen.add(mod)
+
+    for mod in all_modules:
+        path = os.path.join(EGGCALC_DIR, mod.replace("/", os.sep) + ".py")
+        if not os.path.exists(path):
+            errors.append(f"Module file not found: {path}")
+
+    # Verify required ordering constraints
+    calc_indices = {m: i for i, m in enumerate(MODULES_CALC)}
+    required_order = [
+        ("units", "evaluator"),
+        ("evaluator", "normalize"),
+        ("normalize", "cli"),
+        ("evaluator", "cli"),
+    ]
+    for before, after in required_order:
+        if before in calc_indices and after in calc_indices:
+            if calc_indices[before] >= calc_indices[after]:
+                errors.append(
+                    f"Order violation: {before!r} must come before {after!r} " f"in MODULES_CALC"
+                )
+
+    return errors
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build single-file eggcalc")
     parser.add_argument("-o", "--output", help="Output file path")
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate build manifest without building",
+    )
     args = parser.parse_args()
+
+    if args.validate:
+        errors = validate_build_manifest()
+        if errors:
+            for e in errors:
+                print(f"ERROR: {e}")
+            raise SystemExit(1)
+        print("Build manifest valid.")
+        return
 
     build_single_file(args.output)
 

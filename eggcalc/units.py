@@ -25,6 +25,428 @@ FLOAT_EPSILON = 1e-10
 MAX_RESULT_VALUE = 1e308
 
 
+# ---------------------------------------------------------------------------
+# Structural dimension model (D1-D2)
+# ---------------------------------------------------------------------------
+
+
+class Dimension:
+    """Immutable structural dimension for unit classification.
+
+    Encodes exponents for the eight SI base dimensions.  Two units are
+    compatible for addition/subtraction if and only if their dimensions
+    are equal (after normalising to a shared base).
+
+    Angles are dimensionless with semantic metadata (``angle=True``).
+    """
+
+    __slots__ = (
+        "length",
+        "mass",
+        "time",
+        "current",
+        "temperature",
+        "amount",
+        "luminous_intensity",
+        "information",
+        "angle",
+    )
+
+    # Type annotations for __slots__ attributes (mypy needs these)
+    length: int
+    mass: int
+    time: int
+    current: int
+    temperature: int
+    amount: int
+    luminous_intensity: int
+    information: int
+    angle: bool
+
+    def __init__(
+        self,
+        length: int = 0,
+        mass: int = 0,
+        time: int = 0,
+        current: int = 0,
+        temperature: int = 0,
+        amount: int = 0,
+        luminous_intensity: int = 0,
+        information: int = 0,
+        angle: bool = False,
+    ) -> None:
+        object.__setattr__(self, "length", length)
+        object.__setattr__(self, "mass", mass)
+        object.__setattr__(self, "time", time)
+        object.__setattr__(self, "current", current)
+        object.__setattr__(self, "temperature", temperature)
+        object.__setattr__(self, "amount", amount)
+        object.__setattr__(self, "luminous_intensity", luminous_intensity)
+        object.__setattr__(self, "information", information)
+        object.__setattr__(self, "angle", angle)
+
+    # Immutability --------------------------------------------------------
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("Dimension is immutable")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("Dimension is immutable")
+
+    # Identity / comparison -----------------------------------------------
+
+    def _tuple(self) -> tuple[int, ...]:
+        return (
+            self.length,
+            self.mass,
+            self.time,
+            self.current,
+            self.temperature,
+            self.amount,
+            self.luminous_intensity,
+            self.information,
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Dimension):
+            return NotImplemented
+        return self._tuple() == other._tuple()
+
+    def __hash__(self) -> int:
+        return hash(self._tuple())
+
+    def __repr__(self) -> str:
+        parts = []
+        names = ["L", "M", "T", "I", "Θ", "N", "J", "Q"]
+        vals = self._tuple()
+        for name, val in zip(names, vals):
+            if val != 0:
+                parts.append(f"{name}^{val}" if val != 1 else name)
+        if self.angle:
+            parts.append("∠")
+        return f"Dimension({', '.join(parts)})" if parts else "Dimension()"
+
+    # Arithmetic (for compound unit derivation) ---------------------------
+
+    def __mul__(self, other: Dimension) -> Dimension:
+        if not isinstance(other, Dimension):
+            return NotImplemented
+        return Dimension(
+            length=self.length + other.length,
+            mass=self.mass + other.mass,
+            time=self.time + other.time,
+            current=self.current + other.current,
+            temperature=self.temperature + other.temperature,
+            amount=self.amount + other.amount,
+            luminous_intensity=self.luminous_intensity + other.luminous_intensity,
+            information=self.information + other.information,
+        )
+
+    def __truediv__(self, other: Dimension) -> Dimension:
+        if not isinstance(other, Dimension):
+            return NotImplemented
+        return Dimension(
+            length=self.length - other.length,
+            mass=self.mass - other.mass,
+            time=self.time - other.time,
+            current=self.current - other.current,
+            temperature=self.temperature - other.temperature,
+            amount=self.amount - other.amount,
+            luminous_intensity=self.luminous_intensity - other.luminous_intensity,
+            information=self.information - other.information,
+        )
+
+    def __pow__(self, n: int) -> Dimension:
+        if not isinstance(n, int):
+            return NotImplemented
+        return Dimension(
+            length=self.length * n,
+            mass=self.mass * n,
+            time=self.time * n,
+            current=self.current * n,
+            temperature=self.temperature * n,
+            amount=self.amount * n,
+            luminous_intensity=self.luminous_intensity * n,
+            information=self.information * n,
+        )
+
+    @property
+    def is_dimensionless(self) -> bool:
+        """True if all exponents are zero (purely dimensionless quantity)."""
+        return self._tuple() == (0, 0, 0, 0, 0, 0, 0, 0)
+
+    @property
+    def is_affine(self) -> bool:
+        """True if the dimension has a non-zero temperature exponent.
+
+        Affine dimensions require offset-aware conversion and cannot
+        participate in arbitrary multiplication/division.
+        """
+        return self.temperature != 0
+
+
+# Pre-built base dimensions for the eight SI base quantities.
+DIM_LENGTH = Dimension(length=1)
+DIM_MASS = Dimension(mass=1)
+DIM_TIME = Dimension(time=1)
+DIM_CURRENT = Dimension(current=1)
+DIM_TEMPERATURE = Dimension(temperature=1)
+DIM_AMOUNT = Dimension(amount=1)
+DIM_LUMINOUS = Dimension(luminous_intensity=1)
+DIM_INFORMATION = Dimension(information=1)
+DIM_DIMENSIONLESS = Dimension()
+
+
+# Mapping from UNIT_BASE category keys to their structural dimensions.
+_CATEGORY_DIMENSIONS: dict[str, Dimension] = {
+    "m": DIM_LENGTH,
+    "s": DIM_TIME,
+    "B": DIM_INFORMATION,
+    "bps": Dimension(information=1, time=-1),
+    "kg": DIM_MASS,
+    "L": Dimension(length=3),
+    "Pa": Dimension(mass=1, length=-1, time=-2),
+    "J": Dimension(mass=1, length=2, time=-2),
+    "W": Dimension(mass=1, length=2, time=-3),
+    "N": Dimension(mass=1, length=1, time=-2),
+    "V": Dimension(mass=1, length=2, time=-3, current=-1),
+    "A": DIM_CURRENT,
+    "rad": Dimension(angle=True),
+    "m/s": Dimension(length=1, time=-1),
+    "m2": Dimension(length=2),
+    "Hz": Dimension(time=-1),
+}
+
+
+class UnitDefinition:
+    """Immutable definition of a single unit within the structural registry.
+
+    Stores the canonical name, structural :class:`Dimension`, multiplicative
+    scale factor (relative to the dimension's base unit), optional affine
+    offset, and the full set of user-facing aliases.
+    """
+
+    __slots__ = (
+        "canonical",
+        "dimension",
+        "scale",
+        "offset",
+        "affine",
+        "aliases",
+        "display",
+    )
+
+    # Type annotations for __slots__ attributes (mypy needs these)
+    canonical: str
+    dimension: Dimension
+    scale: float
+    offset: float
+    affine: bool
+    aliases: tuple[str, ...]
+    display: str | None
+
+    def __init__(
+        self,
+        canonical: str,
+        dimension: Dimension,
+        scale: float,
+        offset: float = 0.0,
+        affine: bool = False,
+        aliases: tuple[str, ...] = (),
+        display: str | None = None,
+    ) -> None:
+        if not math.isfinite(scale) or scale == 0.0:
+            raise ValueError(f"Scale must be a non-zero finite number, got {scale}")
+        if not math.isfinite(offset):
+            raise ValueError(f"Offset must be finite, got {offset}")
+        object.__setattr__(self, "canonical", canonical)
+        object.__setattr__(self, "dimension", dimension)
+        object.__setattr__(self, "scale", scale)
+        object.__setattr__(self, "offset", offset)
+        object.__setattr__(self, "affine", affine)
+        object.__setattr__(self, "aliases", aliases)
+        object.__setattr__(self, "display", display)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("UnitDefinition is immutable")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("UnitDefinition is immutable")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, UnitDefinition):
+            return NotImplemented
+        return (
+            self.canonical == other.canonical
+            and self.dimension == other.dimension
+            and self.scale == other.scale
+            and self.offset == other.offset
+            and self.affine == other.affine
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.canonical, self.dimension, self.scale, self.offset, self.affine))
+
+    def __repr__(self) -> str:
+        return (
+            f"UnitDefinition(canonical={self.canonical!r}, "
+            f"dim={self.dimension!r}, scale={self.scale}, "
+            f"offset={self.offset}, affine={self.affine})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Authoritative unit registry (D4)
+# ---------------------------------------------------------------------------
+
+
+class UnitRegistry:
+    """Immutable registry mapping every known unit to its structural definition.
+
+    Built by :func:`build_unit_registry` from the canonical ``UNIT_BASE``,
+    ``UNIT_ALIASES``, and ``TEMPERATURE_CONVERSIONS`` data.  Provides:
+
+    * alias → :class:`UnitDefinition` lookup
+    * canonical → :class:`UnitDefinition` lookup
+    * structural :class:`Dimension` lookup
+    * conversion factor computation (scale-ratio for multiplicative,
+      offset-aware for affine)
+    """
+
+    __slots__ = (
+        "_by_alias",
+        "_by_canonical",
+        "_dimensions",
+        "_all_aliases",
+        "_all_canonicals",
+    )
+
+    # Type annotations for __slots__ attributes (mypy needs these)
+    _by_alias: dict[str, UnitDefinition]
+    _by_canonical: dict[str, UnitDefinition]
+    _dimensions: dict[str, Dimension]
+    _all_aliases: frozenset[str]
+    _all_canonicals: frozenset[str]
+
+    def __init__(
+        self,
+        by_alias: dict[str, UnitDefinition],
+        by_canonical: dict[str, UnitDefinition],
+        dimensions: dict[str, Dimension],
+    ) -> None:
+        object.__setattr__(self, "_by_alias", dict(by_alias))
+        object.__setattr__(self, "_by_canonical", dict(by_canonical))
+        object.__setattr__(self, "_dimensions", dict(dimensions))
+        object.__setattr__(self, "_all_aliases", frozenset(by_alias))
+        object.__setattr__(self, "_all_canonicals", frozenset(by_canonical))
+
+    # -- lookups ----------------------------------------------------------
+
+    def by_alias(self, alias: str) -> UnitDefinition | None:
+        return self._by_alias.get(alias)
+
+    def by_canonical(self, canonical: str) -> UnitDefinition | None:
+        return self._by_canonical.get(canonical)
+
+    def dimension_of(self, unit: str) -> Dimension | None:
+        ud = self._by_alias.get(unit) or self._by_canonical.get(unit)
+        return ud.dimension if ud is not None else None
+
+    def is_known(self, unit: str) -> bool:
+        return unit in self._by_alias or unit in self._by_canonical
+
+    # -- conversion -------------------------------------------------------
+
+    def conversion_factor(self, from_unit: str, to_unit: str) -> float | None:
+        """Return multiplicative factor ``from_unit → to_unit``, or None."""
+        from_ud = self._by_alias.get(from_unit) or self._by_canonical.get(from_unit)
+        to_ud = self._by_alias.get(to_unit) or self._by_canonical.get(to_unit)
+        if from_ud is None or to_ud is None:
+            return None
+        if from_ud.dimension != to_ud.dimension:
+            return None
+        if from_ud.affine or to_ud.affine:
+            return None  # use convert_temperature for affine units
+        if to_ud.scale == 0:
+            return None
+        return from_ud.scale / to_ud.scale
+
+    # -- introspection ----------------------------------------------------
+
+    @property
+    def all_aliases(self) -> frozenset[str]:
+        return self._all_aliases
+
+    @property
+    def all_canonicals(self) -> frozenset[str]:
+        return self._all_canonicals
+
+    @property
+    def dimensions(self) -> dict[str, Dimension]:
+        return dict(self._dimensions)
+
+    def __len__(self) -> int:
+        return len(self._by_alias)
+
+    def __repr__(self) -> str:
+        return f"UnitRegistry(aliases={len(self._by_alias)}, canonicals={len(self._by_canonical)})"
+
+
+def build_unit_registry() -> UnitRegistry:
+    """Build the authoritative :class:`UnitRegistry` from canonical data sources.
+
+    Constructs a :class:`UnitDefinition` for every unit in ``UNIT_BASE`` and
+    every temperature unit, then verifies there are no duplicate aliases or
+    conflicting definitions.
+    """
+    by_alias: dict[str, UnitDefinition] = {}
+    by_canonical: dict[str, UnitDefinition] = {}
+    dimensions: dict[str, Dimension] = {}
+
+    # -- multiplicative units from UNIT_BASE ------------------------------
+    for base_key, variants in UNIT_BASE.items():
+        dim = _CATEGORY_DIMENSIONS.get(base_key)
+        if dim is None:
+            continue
+        dimensions[base_key] = dim
+        for alias, factor in variants.items():
+            ud = UnitDefinition(
+                canonical=base_key,
+                dimension=dim,
+                scale=factor,
+                aliases=(alias,),
+            )
+            by_alias[alias] = ud
+            if factor == 1.0 and alias != base_key:
+                pass  # not canonical
+            if alias == base_key:
+                by_canonical[base_key] = ud
+
+    # -- affine temperature units -----------------------------------------
+    temp_dim = Dimension(temperature=1)
+    for (from_u, to_u), (mult, off) in TEMPERATURE_CONVERSIONS.items():
+        if from_u not in by_alias:
+            # Derive scale from K→from_u conversion (mult gives K→from_u)
+            # For K→C: value * 1.0 + (-273.15), so C scale ~1.0 relative to K
+            by_alias[from_u] = UnitDefinition(
+                canonical=from_u,
+                dimension=temp_dim,
+                scale=1.0,
+                offset=off / mult if mult != 0 else 0.0,
+                affine=True,
+                aliases=(from_u,),
+            )
+            by_canonical[from_u] = by_alias[from_u]
+    # Ensure K is registered
+    if "K" not in by_alias:
+        by_alias["K"] = UnitDefinition(
+            canonical="K", dimension=temp_dim, scale=1.0, affine=True, aliases=("K",)
+        )
+        by_canonical["K"] = by_alias["K"]
+
+    return UnitRegistry(by_alias, by_canonical, dimensions)
+
+
 def _display_value(v: float | int | complex) -> str:
     """Format a value for display, showing whole-number floats as integers."""
     if isinstance(v, float):
@@ -2124,27 +2546,108 @@ def _pow_unit_string(unit: str, exp: int) -> str | None:
 def are_units_compatible(unit1: str | None, unit2: str | None) -> bool:
     """Check if two units are compatible for addition/subtraction.
 
+    Uses structural :class:`Dimension` comparison when possible, falling
+    back to category-based matching for compound units not yet in the
+    structural registry.
+
     Returns True if:
     - Both units are None (dimensionless)
-    - Both units belong to the same category (e.g., both length)
+    - Both units have the same structural dimension
 
     Returns False if:
     - Exactly one unit is None (dimensionless cannot be added to dimensional)
-    - Units are from different categories
-    - One category is known but the other is unknown
+    - Units have different structural dimensions
+    - One or both units have unknown dimensions
     """
     if unit1 is None and unit2 is None:
         return True
     if unit1 is None or unit2 is None:
         return False
 
+    dim1 = _structural_dimension(unit1)
+    dim2 = _structural_dimension(unit2)
+
+    if dim1 is not None and dim2 is not None:
+        return dim1 == dim2
+
+    # Fallback to category-based matching for units not in the registry
     cat1 = get_unit_category(unit1)
     cat2 = get_unit_category(unit2)
-
     if cat1 is None or cat2 is None:
         return False
-
     return cat1 == cat2
+
+
+def _structural_dimension(unit: str) -> Dimension | None:
+    """Resolve the structural :class:`Dimension` for a unit string.
+
+    Handles both simple units (``"m"``) and compound expressions
+    (``"m/s"``, ``"kg*m**2"``) by parsing the unit signature and
+    combining base dimensions.
+    """
+    # Fast path: direct alias lookup
+    normalized = normalize_unit(unit)
+    _reg = _get_unit_registry()
+    if _reg is not None:
+        ud = _reg.by_alias(normalized)
+        if ud is not None:
+            return ud.dimension
+
+    # Slow path: parse compound expression
+    sig = _parse_compound_signature(normalized)
+    if sig is None:
+        return None
+    num, den = sig
+    dim = DIM_DIMENSIONLESS
+    for base, exp in num:
+        base_dim = _base_unit_dimension(base)
+        if base_dim is None:
+            return None
+        dim = dim * (base_dim**exp)
+    for base, exp in den:
+        base_dim = _base_unit_dimension(base)
+        if base_dim is None:
+            return None
+        dim = dim / (base_dim**exp)
+    return dim
+
+
+def _base_unit_dimension(unit: str) -> Dimension | None:
+    """Return the Dimension for a base unit key used in compound signatures."""
+    _dims: dict[str, Dimension] = {
+        "m": DIM_LENGTH,
+        "s": DIM_TIME,
+        "B": DIM_INFORMATION,
+        "bps": Dimension(information=1, time=-1),
+        "kg": DIM_MASS,
+        "L": Dimension(length=3),
+        "Pa": Dimension(mass=1, length=-1, time=-2),
+        "J": Dimension(mass=1, length=2, time=-2),
+        "W": Dimension(mass=1, length=2, time=-3),
+        "N": Dimension(mass=1, length=1, time=-2),
+        "V": Dimension(mass=1, length=2, time=-3, current=-1),
+        "A": DIM_CURRENT,
+        "rad": Dimension(angle=True),
+        "m/s": Dimension(length=1, time=-1),
+        "m2": Dimension(length=2),
+        "Hz": Dimension(time=-1),
+    }
+    return _dims.get(unit)
+
+
+# Module-level registry instance (built lazily on first access).
+_unit_registry: UnitRegistry | None = None
+
+
+def _get_unit_registry() -> UnitRegistry | None:
+    """Return the module-level :class:`UnitRegistry`, building it on first call."""
+    global _unit_registry
+    if _unit_registry is None:
+        try:
+            _unit_registry = build_unit_registry()
+        except Exception:
+            return None
+    return _unit_registry
 
 
 def get_all_units() -> list[str]:

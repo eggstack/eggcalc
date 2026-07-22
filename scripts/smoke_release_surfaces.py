@@ -204,9 +204,9 @@ def _mcp_session(python: str, args: list[str], timeout: float = 15.0) -> dict:
         id=1,
     )
     # Notification (no id) — must follow initialize before tool requests
-    initialized_notification = json.dumps(
-        {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}
-    ) + "\n"
+    initialized_notification = (
+        json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}) + "\n"
+    )
     tools_msg = _make_msg("tools/list", {"_meta": {"schemaDetail": "compact"}}, id=2)
     call_msg = _make_msg(
         "tools/call",
