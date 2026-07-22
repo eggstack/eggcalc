@@ -20,7 +20,7 @@ def _run_cli(*args: str, stdin: str | None = None) -> subprocess.CompletedProces
     return subprocess.run(
         cmd,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         input=stdin,
         timeout=10,
         env=env,

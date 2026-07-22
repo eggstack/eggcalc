@@ -83,11 +83,13 @@ class TestBuildSingleFile:
 
     def test_build_file_parses(self, single_file_path):
         """Built file should parse as valid Python."""
+        # Use forward slashes to avoid backslash-escape issues on Windows
+        path_str = str(single_file_path).replace("\\", "/")
         result = subprocess.run(
             [
                 sys.executable,
                 "-c",
-                f"import ast; ast.parse(open('{single_file_path}', encoding='utf-8').read())",
+                f"import ast; ast.parse(open('{path_str}', encoding='utf-8').read())",
             ],
             capture_output=True,
             text=True,

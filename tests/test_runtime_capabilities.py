@@ -267,18 +267,19 @@ class TestPackageSingleFileParity:
         from eggcalc.mcp.server import TOOL_HANDLERS
 
         package_tools = sorted(TOOL_HANDLERS.keys())
+        parent_path = str(single_file.parent).replace("\\", "/")
 
         result = subprocess.run(
             [
                 sys.executable,
                 "-c",
-                f"import sys; sys.path.insert(0, '{single_file.parent}'); "
+                f"import sys; sys.path.insert(0, '{parent_path}'); "
                 "ns = {}; exec(open(sys.argv[1], encoding='utf-8').read(), ns); "
                 "print('\\n'.join(sorted(ns['TOOL_HANDLERS'].keys())))",
-                str(single_file),
+                str(single_file).replace("\\", "/"),
             ],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             timeout=30,
         )
         assert result.returncode == 0, f"Failed to load single-file: {result.stderr}"
@@ -300,18 +301,19 @@ class TestPackageSingleFileParity:
         from eggcalc.mcp.schemas import TOOL_SCHEMAS
 
         package_schemas = sorted(TOOL_SCHEMAS.keys())
+        parent_path = str(single_file.parent).replace("\\", "/")
 
         result = subprocess.run(
             [
                 sys.executable,
                 "-c",
-                f"import sys; sys.path.insert(0, '{single_file.parent}'); "
+                f"import sys; sys.path.insert(0, '{parent_path}'); "
                 "ns = {}; exec(open(sys.argv[1], encoding='utf-8').read(), ns); "
                 "print('\\n'.join(sorted(ns['TOOL_SCHEMAS'].keys())))",
-                str(single_file),
+                str(single_file).replace("\\", "/"),
             ],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             timeout=30,
         )
         assert result.returncode == 0, f"Failed to load single-file: {result.stderr}"

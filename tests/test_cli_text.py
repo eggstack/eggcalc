@@ -18,7 +18,7 @@ def run_calc(args: list[str]) -> tuple[int, str, str]:
     result = subprocess.run(
         [sys.executable, "-m", "eggcalc"] + args,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         env=env,
     )
     return result.returncode, result.stdout, result.stderr
