@@ -6,7 +6,8 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from eggcalc.normalize import _run_repl, run
+from eggcalc.cli import _run_repl
+from eggcalc.cli import run_cli as _run_cli_for_wrap
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -133,16 +134,16 @@ class TestReplEdgeCases:
                 return "10 + 2"
             raise EOFError()
 
-        original_run = run
+        from eggcalc.cli import run_cli as _orig_run_cli
 
-        def mock_run(expression, operators, patterns, output_format="plain", show_expression=True):
+        def mock_run_cli(expression, output_format="plain", show_expression=True):
             if expression == "10 + 2":
                 raise KeyboardInterrupt()
-            return original_run(expression, operators, patterns, output_format, show_expression)
+            return _orig_run_cli(expression, output_format, show_expression)
 
         with (
             patch("builtins.input", side_effect=mock_input),
-            patch("eggcalc.normalize.run", side_effect=mock_run),
+            patch("eggcalc.cli.run_cli", side_effect=mock_run_cli),
         ):
             exit_code = _run_repl()
         assert exit_code == 0
@@ -192,28 +193,30 @@ class TestReplEdgeCases:
         assert exit_code == 0
 
     def test_repl_show_expression_true(self, capsys):
-        """REPL passes show_expression=True to run()."""
+        """REPL passes show_expression=True to run_cli()."""
         with (
             patch("builtins.input", side_effect=["5 + 3", EOFError]),
-            patch("eggcalc.normalize.run", wraps=run) as mock_run,
+            patch("eggcalc.cli.run_cli", wraps=_run_cli_for_wrap) as mock_run,
         ):
             exit_code = _run_repl(show_expression=True)
         assert exit_code == 0
         mock_run.assert_called_once()
-        args = mock_run.call_args
-        assert args[0][4] is True  # show_expression positional arg
+        args, kwargs = mock_run.call_args
+        show_expr = kwargs.get("show_expression", args[2] if len(args) > 2 else None)
+        assert show_expr is True
 
     def test_repl_show_expression_false(self, capsys):
-        """REPL passes show_expression=False to run()."""
+        """REPL passes show_expression=False to run_cli()."""
         with (
             patch("builtins.input", side_effect=["5 + 3", EOFError]),
-            patch("eggcalc.normalize.run", wraps=run) as mock_run,
+            patch("eggcalc.cli.run_cli", wraps=_run_cli_for_wrap) as mock_run,
         ):
             exit_code = _run_repl(show_expression=False)
         assert exit_code == 0
         mock_run.assert_called_once()
-        args = mock_run.call_args
-        assert args[0][4] is False  # show_expression positional arg
+        args, kwargs = mock_run.call_args
+        show_expr = kwargs.get("show_expression", args[2] if len(args) > 2 else None)
+        assert show_expr is False
 
 
 # ---------------------------------------------------------------------------

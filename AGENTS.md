@@ -28,6 +28,8 @@ The public API wraps these differently:
 - `evaluate_raw()` / `evaluate_cached()` / `evaluate_async()` → full pipeline (NL/units → normalize → evaluate)
 - `evaluate()` → direct AST evaluation (accepts valid Python math syntax with or without spaces, but rejects natural language and unit suffixes)
 
+Note: `main()` and `print_help()` are lazy re-exports via PEP 562 from `cli.py` — they are not imported at `import eggcalc` time.
+
 ### Caret (`^`) semantics
 
 The two paths interpret `^` differently:
@@ -98,10 +100,11 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 
 | Module | Role |
 |--------|------|
-| `eggcalc/normalize.py` | NL tokenization, number words, expression normalization, CLI main |
+| `eggcalc/normalize.py` | NL tokenization, expression normalization (no CLI dispatch) |
 | `eggcalc/evaluator.py` | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
 | `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class |
-| `eggcalc/__main__.py` | Module entry, delegates to `normalize.main()` |
+| `eggcalc/cli.py` | CLI dispatch: argparse, REPL, text commands, help, main entry point |
+| `eggcalc/__main__.py` | Module entry, delegates to `cli.main()` |
 | `eggcalc/exact/` | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
 | `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor |
 | `build_single.py` | Assembles everything into `eggcalc.py` |
@@ -201,7 +204,7 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 
 | Path | Entry Point | When |
 |------|-------------|------|
-| CLI | `maybe_load_cli_config()` in normalize.py | Once at CLI startup (`main()`) |
+| CLI | `maybe_load_cli_config()` in cli.py | Once at CLI startup (`main()`) |
 | API (opt-in) | `_ensure_config_loaded()` in evaluator.py | Only when `EGGCALC_LOAD_CONFIG=1` is set |
 | MCP server | Handled by `McpServerConfig.from_environment()` and `main()` | `EGGCALC_NO_CONFIG=1` set in `main()` setup |
 
@@ -224,3 +227,4 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 9. **MCP handshake before tools** — `main()` creates an UNINITIALIZED session. Clients must send `initialize` then `notifications/initialized` before `tools/list` or `tools/call`. Tool requests before init return `-32600`.
 10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`). Use `McpServer` + `McpSession` for new code.
 11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.
+12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Only `normalize`, `evaluator`, and `units` are loaded eagerly.

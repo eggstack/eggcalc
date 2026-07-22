@@ -21,6 +21,7 @@ MODULES_CALC = [
     "units",
     "evaluator",
     "normalize",
+    "cli",
     "capabilities",
 ]
 

@@ -59,10 +59,8 @@ from .normalize import (
     MAX_NESTING_DEPTH,
     NORMALIZE,
     PATTERNS,
-    main,
     normalize_expression,
     normalize_text,
-    print_help,
     run,
 )
 from .units import (
@@ -139,3 +137,18 @@ __all__ = [
     "listvars",
     "clearvars",
 ]
+
+# Lazy CLI exports — loaded on demand to avoid pulling in argparse, exact, and MCP
+_LAZY_NAMES = frozenset({"main", "print_help"})
+
+
+def __getattr__(name: str) -> object:
+    if name in _LAZY_NAMES:
+        from . import cli as _cli
+
+        return getattr(_cli, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return list(globals()) + list(_LAZY_NAMES)

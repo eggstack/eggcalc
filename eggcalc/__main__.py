@@ -14,6 +14,6 @@ if __name__ == "__main__":
     if eggcalc_dir not in sys.path:
         sys.path.insert(0, eggcalc_dir)
 
-    from eggcalc.normalize import main
+    from eggcalc.cli import main
 
     sys.exit(main())

@@ -30,20 +30,25 @@ eggcalc is a dual-purpose tool:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Entry Points                                │
-│   CLI (__main__.py → normalize.main())  |  MCP Server (server) │
+│   CLI (__main__.py → cli.main())  |  MCP Server (server)       │
 └────────────────────────────────────┬────────────────────────────┘
                                      │
                     ┌────────────────┴────────────────┐
                     │                                 │
           ┌─────────▼─────────┐              ┌────────▼────────┐
-          │   normalize.py   │              │   mcp/tools.py  │
-          │  (NL → Python)   │              │  (Tool Router)  │
+          │     cli.py        │              │   mcp/tools.py  │
+          │  (CLI dispatch)   │              │  (Tool Router)  │
           └─────────┬─────────┘              └────────┬────────┘
                     │                                 │
           ┌─────────▼─────────┐              ┌────────▼────────┐
-          │   evaluator.py   │              │   exact/ pkg    │
-          │    (AST Eval)    │              │  (Text Ops)     │
+          │   normalize.py   │              │   exact/ pkg    │
+          │  (NL → Python)   │              │  (Text Ops)     │
           └─────────┬─────────┘              └─────────────────┘
+                    │
+          ┌─────────▼─────────┐
+          │   evaluator.py   │
+          │    (AST Eval)    │
+          └─────────┬─────────┘
                     │
           ┌─────────▼─────────┐
           │     units.py      │
@@ -57,11 +62,12 @@ eggcalc is a dual-purpose tool:
 
 | Module | Role | Key Exports |
 |--------|------|-------------|
-| [`normalize.py`](normalize.md) | NL tokenization, number words, expression normalization, CLI main | `run()`, `normalize_text()`, `normalize_expression()`, `main()` |
+| [`cli.py`](cli.md) | CLI dispatch: argparse, REPL, text commands, help, main entry point | `main()`, `print_help()` |
+| [`normalize.py`](normalize.md) | Pure normalization: NL tokenization, number words, expression normalization | `run()`, `normalize_text()`, `normalize_expression()` |
 | [`evaluator.py`](evaluator.md) | AST parsing, math evaluation, `EggCalcApp` | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()` |
 | [`units.py`](units.md) | Unit definitions, conversions, `UnitValue` class | `UnitValue`, `get_conversion_factor()`, `is_unit()`, `convert_temperature()` |
-| `__main__.py` | Module entry point | Delegates to `normalize.main()` |
-| `__init__.py` | Public API surface | Re-exports all key symbols from submodules |
+| `__main__.py` | Module entry point | Delegates to `cli.main()` |
+| `__init__.py` | Public API surface | Re-exports all key symbols; lazy re-exports `main`/`print_help` from `cli` via PEP 562 |
 | [`exact/`](exact.md) | Text analysis: Unicode, confusables, diffs, validation, shell parsing | `inspect_text()`, `count_chars()`, `shell_split()`, `markdown_structure()` |
 | [`mcp/`](mcp.md) | MCP server: schemas, tools, server | `mcp_main()`, `handle_request()`, `TOOL_SCHEMAS` |
 | `build_single.py` | Assembles all modules into one file | Produces `eggcalc.py` (~394KB) |
@@ -206,7 +212,7 @@ Output: JSON result
 
 | Entry Point | How | Description |
 |-------------|-----|-------------|
-| CLI (package) | `python -m eggcalc "expr"` | `normalize.main()` → NL pipeline → evaluate |
+| CLI (package) | `python -m eggcalc "expr"` | `cli.main()` → NL pipeline → evaluate |
 | CLI (pip) | `calc "expr"` | Same (via pyproject.toml scripts) |
 | CLI (single-file) | `python3 eggcalc.py "expr"` | Assembled single file |
 | API (direct) | `evaluate("5+3")` | Direct AST evaluation |
@@ -223,12 +229,21 @@ Output: JSON result
 
 ```
 __main__.py
-    └── normalize.main()
+    └── cli.main()
 
-normalize.py
+__init__.py
+    ├── evaluator, normalize, units, capabilities
+    └── lazy: cli.main, cli.print_help (PEP 562 __getattr__)
+
+cli.py  (CLI dispatch — argparse, REPL, text commands)
+    ├── evaluator
+    ├── normalize
+    ├── exact/
+    └── units
+
+normalize.py  (pure normalization — no CLI, no exact/)
     ├── evaluator.evaluate()
-    ├── units.UnitValue, UNIT_ALIASES, is_unit, UNIT_CATEGORIES
-    └── exact/ (inspect_text, count_chars, regex_test, shell_split, etc.)
+    └── units.UnitValue, UNIT_ALIASES, is_unit, UNIT_CATEGORIES
 
 evaluator.py
     └── units (UnitValue, UNIT_ALIASES, convert_temperature, etc.)
@@ -254,6 +269,8 @@ mcp/
     ├── tools.py → exact/, evaluator
     └── server.py → tools, schemas
 ```
+
+**Lazy CLI re-exports.** Both `normalize.py` and `__init__.py` re-export `main` and `print_help` from `cli` using PEP 562 `__getattr__`. This preserves backward compatibility (`from eggcalc import main`) while keeping the dependency graph acyclic — `cli.py` imports `normalize`, so `normalize` cannot eagerly import `cli`.
 
 ---
 
@@ -288,7 +305,7 @@ Assembles all modules into a single `eggcalc.py` file (~394KB) for portability.
 
 | Module Group | Modules |
 |-------------|---------|
-| `MODULES_CALC` | units, evaluator, normalize |
+| `MODULES_CALC` | units, evaluator, normalize, cli |
 | `MODULES_EXACT` | 25 exact/ submodules |
 | `MODULES_MCP` | schemas, tools, server |
 
@@ -326,7 +343,7 @@ Each component has a dedicated architecture document. Use this index to navigate
 
 | Component | Document | What It Covers |
 |-----------|----------|----------------|
-| normalize.py | [normalize.md](normalize.md) | NL tokenization pipeline, number words, unit parsing, CLI main |
+| normalize.py | [normalize.md](normalize.md) | Pure normalization: NL tokenization, number words, unit parsing (no CLI) |
 | evaluator.py | [evaluator.md](evaluator.md) | AST parsing, math functions, constants, EggCalcApp, memory, variables |
 | units.py | [units.md](units.md) | Unit definitions, conversions, UnitValue class, temperature offset math |
 | CLI | [cli.md](cli.md) | Entry points, argument parsing, REPL, text subcommands |
