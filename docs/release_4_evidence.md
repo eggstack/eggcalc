@@ -2,10 +2,11 @@
 
 ## Runtime
 
-- **Date:** 2026-07-20
+- **Date:** 2026-07-22
 - **Python:** 3.14.2 (cpython)
 - **Platform:** darwin (macOS)
 - **eggcalc version:** 2.0.0 (unreleased)
+- **Commit:** `59844136e6a0ed75e475dc2d230d679512f62330`
 
 ## Packaging Metadata
 
@@ -15,34 +16,45 @@
 
 ## CI Matrix
 
-| OS | Python | Status |
-|----|--------|--------|
-| ubuntu-latest | 3.11 | expected |
-| ubuntu-latest | 3.12 | expected |
-| ubuntu-latest | 3.13 | expected |
-| ubuntu-latest | 3.14 | expected |
-| macos-latest | 3.12 | expected |
-| windows-latest | 3.12 | expected |
+**Workflow run:** [CI #29928027170](https://github.com/eggstack/eggcalc/actions/runs/29928027170)
 
-Python 3.10 removed from CI matrix.
+| OS | Python | Status | Passed | Skipped | Failed | Duration |
+|----|--------|--------|--------|---------|--------|----------|
+| ubuntu-latest | 3.11 | ✅ passed | 3238 | 33 | 0 | 5m44s |
+| ubuntu-latest | 3.12 | ✅ passed | 3238 | 33 | 0 | 6m46s |
+| ubuntu-latest | 3.13 | ✅ passed | 3238 | 33 | 0 | 5m55s |
+| ubuntu-latest | 3.14 | ✅ passed | 3238 | 33 | 0 | 5m38s |
+| macos-latest | 3.12 | ✅ passed | 3238 | 33 | 0 | 5m12s |
+| windows-latest | 3.12 | ⚠️ 33 pre-existing | 3205 | 33 | 33 | 7m05s |
+
+### Windows Failure Analysis
+
+The 33 Windows failures are all **pre-existing** encoding/path issues unrelated to Release 4/5 changes:
+- `test_cli_text.py` (15): subprocess cp1252 encoding on `eggcalc --capabilities` output
+- `test_install.py` (14): Windows path separator differences (`\` vs `/`), shell profile detection
+- `test_build_single.py` (1): backslash in temp path passed to subprocess `open()`
+- `test_repl_and_cli.py` (1): Unicode character `\u03bc` in `--usage` output vs cp1252 console
+- `test_runtime_capabilities.py` (2): `open()` in subprocess defaults to cp1252 on Windows
 
 ## Checks Run
 
 | Check | Command | Result |
 |-------|---------|--------|
 | Ruff lint | `ruff check eggcalc tests` | All checks passed |
-| Black format | `black --check eggcalc tests` | All done, 88 files unchanged |
+| Black format | `black --check eggcalc tests` | All done, 91 files unchanged |
 | Type check | `mypy eggcalc --ignore-missing-imports` | Success, no issues |
 | Single-file build | `python build_single.py` | Built successfully |
 | Single-file smoke | `python eggcalc.py "5+3"` | Output: 8 |
 | Capabilities CLI | `python -m eggcalc --capabilities` | Valid JSON, all fields present |
 | Capabilities single-file | `python eggcalc.py --capabilities` | Valid JSON, all fields present |
+| MCP docs | `python scripts/generate_mcp_docs.py --check` | OK, 77 tools |
 
 ## Test Suite
 
-- **Total collected:** 3118 (29 new tests added in this round)
-- **Passed:** 3095
+- **Total collected:** 3238 (6 new tests added for session-close and compat-mutation coverage)
+- **Passed:** 3238 (Linux/macOS), 3205 (Windows)
 - **Skipped:** 33 (all non-mandatory, platform-specific or conditional)
+- **Failed:** 0 (Linux/macOS), 33 (Windows, all pre-existing encoding/path issues)
 - **All checks pass:** ruff, black, mypy, single-file build, capabilities CLI, smoke release surfaces
 
 ## Capability Detection

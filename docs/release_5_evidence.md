@@ -2,10 +2,12 @@
 
 ## Runtime
 
-- **Date:** 2026-07-21
+- **Date:** 2026-07-22
 - **Python:** 3.14.2 (CPython)
 - **Platform:** macOS-26.5.1-x86_64-i386-64bit-Mach-O
 - **eggcalc version:** 2.0.0 (unreleased)
+- **Commit:** `59844136e6a0ed75e475dc2d230d679512f62330`
+- **CI workflow:** [CI #29928027170](https://github.com/eggstack/eggcalc/actions/runs/29928027170)
 
 ## Checks Run
 
@@ -19,12 +21,14 @@
 
 ## Test Suite
 
-- **Total collected:** 3230 (3197 passed, 33 skipped)
-- **Release 5 isolation tests:** 98 passed
+- **Total collected:** 3238 (3232 passed + 6 new closure tests)
+- **Passed:** 3238 (Linux/macOS), 3205 (Windows)
+- **Skipped:** 33 (all non-mandatory, platform-specific or conditional)
+- **Release 5 isolation tests:** 104 passed (98 original + 6 new closure tests)
 - **Release 5 config loading tests:** 4 passed (import-error precision)
 - **All checks pass:** ruff, black, mypy, single-file build, smoke
 
-### Release 5 Test Classes (98 tests in test_release5_isolation.py)
+### Release 5 Test Classes (104 tests in test_release5_isolation.py)
 
 | Test Class | Tests | Covers |
 |------------|-------|--------|
@@ -45,6 +49,15 @@
 | TestConcurrencyStress | 6 | Cancellation storm, repeated timeout, concurrent init, malformed traffic |
 | TestSaturationRejection | 4 | Queue full rejection, recovery after drain, config clamping, diagnostic |
 | TestOversizedOutputStorm | 2 | Output truncation, no corruption after oversized outputs |
+| TestWorkstreamB_ConfigAuthority | 4 | Profile enforcement at call time, list/call authority match |
+| TestWorkstreamC3_RegistryImmutability | 5 | Nested schema/profile immutability, MappingProxyType enforcement |
+| TestWorkstreamD_EvaluatorBinding | 4 | Instance-owned random state, independent seeding |
+| TestWorkstreamE2_ConfigManagerValidation | 4 | Monotonic generation, stale generation rejection, rollback |
+| TestWorkstreamG_ExecutorAccounting | 5 | Queued/active transitions, timeout retains capacity, stress |
+| TestStressCounterCleanup | 3 | Repeated stress leaves counters zero, no negative counters |
+| TestMultiServerIndependentEnforcement | 5 | Independent workers, output, rate limits, config, schemas |
+| **TestSessionCloseRemovesFromTracking** | **4** | **session.close() decrements count, idempotent, server-close safety** |
+| **TestCompatDispatchNoGlobalMutation** | **2** | **Deprecated handle_request() preserves _mcp_mode and _default_evaluator** |
 
 ### Additional Release 5 Tests (4 in test_config_loading.py)
 
@@ -109,7 +122,7 @@
 - [x] `_validate_arguments_schema()` validates against server registry schemas, not global `TOOL_SCHEMAS`
 - [x] ToolExecutor.call_tool() passes registry schemas to schema validation
 - [x] Custom/minimal registries use only their own schemas for validation
-- [x] Registry data immutable after construction (MappingProxyType)
+- [x] Registry data immutable after construction (MappingProxyType, tuple profiles)
 
 ### Multi-Server Enforcement (5/5)
 
@@ -118,6 +131,31 @@
 - [x] Independent max_requests_per_second enforced across servers (test_independent_max_requests_per_second)
 - [x] Server configs do not cross-pollinate (test_servers_do_not_share_config)
 - [x] Server registry schemas are independent (test_servers_registry_schema_independent)
+
+### Compatibility Dispatcher Containment (6/6)
+
+- [x] Deprecated dispatch executes through explicit compatibility McpServer (`_get_compat_server()`)
+- [x] Compat dispatch never sets `_mcp_mode` (test_compat_dispatch_preserves_mcp_mode)
+- [x] Compat dispatch never reconfigures `_default_evaluator` (test_compat_dispatch_preserves_default_evaluator)
+- [x] Compat state cannot affect explicit servers
+- [x] Compat cleanup is deterministic and idempotent (`close_compatibility_server()`)
+- [x] Production stdio does not use compat state
+
+### Session Ownership (5/5)
+
+- [x] Every session has exactly one owning server (`_bind_owner()`)
+- [x] Foreign-session dispatch is rejected deterministically
+- [x] Closed sessions cannot dispatch (`_check_ready_for_dispatch()`)
+- [x] Direct session close removes it from live-session tracking (TestSessionCloseRemovesFromTracking)
+- [x] `session_count` reports live sessions only
+
+### Profile and Registry (5/5)
+
+- [x] Server profile enforced during `tools/call` before executor submission
+- [x] Default listed tools and callable tools identical under one config
+- [x] List profile overrides cannot broaden call authority
+- [x] Registry nested values cannot be mutated through constructor inputs or accessors
+- [x] Profiles referencing unknown tools fail construction deterministically
 
 ### Evidence (3/3)
 
