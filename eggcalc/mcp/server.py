@@ -1145,6 +1145,7 @@ class McpSession:
         self.request_id: str | None = None
         # Owner server binding — set once by the owning McpServer.
         self._owner_id: int | None = None
+        self._owner_remove_callback: Any = None
         self._closed = False
         # Session-scoped cancellation records. Each session owns its own
         # set + deque + lock so sessions are isolated from each other.
@@ -1253,15 +1254,13 @@ class McpSession:
             return
         self._closed = True
         self.state = McpSessionState.CLOSED
-        # Remove from owner's live session set (if still bound)
-        if self._owner_id is not None:
-            # We cannot import McpServer at class level, so use a module lookup.
-            # The owner reference is kept via the module-level _compat_server
-            # and any explicit servers — but since we store owner by id(), we
-            # cannot directly access it here. Instead, we rely on the server's
-            # close() method iterating sessions. For direct close() calls, we
-            # just mark closed; the server's next diagnostic/close will clean up.
-            pass
+        # Remove from owner's live session set via the registered callback.
+        if self._owner_remove_callback is not None:
+            try:
+                self._owner_remove_callback(self)
+            except Exception:
+                pass  # Best-effort cleanup; server may already be closed.
+        self._owner_remove_callback = None
 
     def _bind_owner(self, server: McpServer) -> None:
         """Bind this session to exactly one owning server. Called once by create_session."""
@@ -1436,6 +1435,7 @@ class McpServer:
         """Create a new session owned by this server."""
         session = McpSession(initial_state=initial_state)
         session._bind_owner(self)
+        session._owner_remove_callback = self._remove_session
         with self._sessions_lock:
             self._sessions.add(session)
         return session
@@ -1477,10 +1477,14 @@ class McpServer:
                 return
             self._closed = True
         self._executor.close()
+        # Snapshot and clear sessions under the lock, then close each one.
+        # session.close() may call back into _remove_session, so we must not
+        # hold _sessions_lock during those calls.
         with self._sessions_lock:
-            for session in self._sessions:
-                session.close()
+            sessions_to_close = list(self._sessions)
             self._sessions.clear()
+        for session in sessions_to_close:
+            session.close()
 
     def diagnostic(self) -> dict[str, Any]:
         """Return deterministic diagnostic information."""

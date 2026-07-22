@@ -39,6 +39,7 @@ from eggcalc.mcp.server import (
     McpSessionState,
     ToolExecutor,
     ToolRegistry,
+    close_compatibility_server,
     handle_request,
 )
 
@@ -1907,3 +1908,126 @@ class TestMultiServerIndependentEnforcement:
         assert "error" in r2_bad
         exec1.close()
         exec2.close()
+
+
+# ---------------------------------------------------------------------------
+# Workstream G: Session close removes from live tracking
+# ---------------------------------------------------------------------------
+
+
+class TestSessionCloseRemovesFromTracking:
+    """Direct session.close() proactively removes from server live tracking."""
+
+    def test_session_close_decrements_session_count(self):
+        """Closing a session directly should decrement server.diagnostic()['session_count']."""
+        server = McpServer()
+        s1 = server.create_session()
+        s2 = server.create_session()
+        assert server.diagnostic()["session_count"] == 2
+        s1.close()
+        assert server.diagnostic()["session_count"] == 1
+        s2.close()
+        assert server.diagnostic()["session_count"] == 0
+        server.close()
+
+    def test_session_close_idempotent(self):
+        """Closing an already-closed session does not double-remove."""
+        server = McpServer()
+        s1 = server.create_session()
+        assert server.diagnostic()["session_count"] == 1
+        s1.close()
+        assert server.diagnostic()["session_count"] == 0
+        s1.close()  # second close — should be a no-op, not error
+        assert server.diagnostic()["session_count"] == 0
+        server.close()
+
+    def test_direct_close_then_server_close_no_error(self):
+        """Closing a session directly, then closing the server, does not error."""
+        server = McpServer()
+        s1 = server.create_session()
+        s2 = server.create_session()
+        s1.close()
+        assert server.diagnostic()["session_count"] == 1
+        server.close()  # should not raise
+        assert server.diagnostic()["session_count"] == 0
+
+    def test_closed_session_rejects_dispatch(self):
+        """A directly-closed session must reject further dispatch."""
+        server = McpServer()
+        session = server.create_session()
+        # Complete handshake
+        handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0.1"},
+                },
+            },
+            session=session,
+        )
+        handle_request(
+            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+            session=session,
+        )
+        session.close()
+        result = _session_request(session, "ping")
+        assert result is not None
+        assert "error" in result
+        server.close()
+
+
+# ---------------------------------------------------------------------------
+# Workstream A: Compatibility dispatch does not mutate globals
+# ---------------------------------------------------------------------------
+
+
+class TestCompatDispatchNoGlobalMutation:
+    """Deprecated handle_request() must not mutate _mcp_mode or _default_evaluator."""
+
+    def test_compat_dispatch_preserves_mcp_mode(self):
+        """Calling deprecated handle_request() must not set _mcp_mode."""
+        from eggcalc import evaluator as eval_mod
+
+        old_mode = eval_mod._mcp_mode
+        session = McpSession()
+        handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0.1"},
+                },
+            },
+            session=session,
+        )
+        assert eval_mod._mcp_mode == old_mode
+        close_compatibility_server()
+
+    def test_compat_dispatch_preserves_default_evaluator(self):
+        """Calling deprecated handle_request() must not reconfigure _default_evaluator."""
+        from eggcalc import evaluator as eval_mod
+
+        old_eval = eval_mod.get_default_evaluator()
+        session = McpSession()
+        handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0.1"},
+                },
+            },
+            session=session,
+        )
+        assert eval_mod.get_default_evaluator() is old_eval
+        close_compatibility_server()
