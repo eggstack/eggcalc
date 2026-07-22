@@ -273,7 +273,7 @@ class TestPackageSingleFileParity:
                 sys.executable,
                 "-c",
                 f"import sys; sys.path.insert(0, '{single_file.parent}'); "
-                "ns = {}; exec(open(sys.argv[1]).read(), ns); "
+                "ns = {}; exec(open(sys.argv[1], encoding='utf-8').read(), ns); "
                 "print('\\n'.join(sorted(ns['TOOL_HANDLERS'].keys())))",
                 str(single_file),
             ],
@@ -306,7 +306,7 @@ class TestPackageSingleFileParity:
                 sys.executable,
                 "-c",
                 f"import sys; sys.path.insert(0, '{single_file.parent}'); "
-                "ns = {}; exec(open(sys.argv[1]).read(), ns); "
+                "ns = {}; exec(open(sys.argv[1], encoding='utf-8').read(), ns); "
                 "print('\\n'.join(sorted(ns['TOOL_SCHEMAS'].keys())))",
                 str(single_file),
             ],

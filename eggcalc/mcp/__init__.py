@@ -11,6 +11,7 @@ from .schemas import TOOL_SCHEMAS
 from .server import (
     LATEST_SUPPORTED_PROTOCOL_VERSION,
     SUPPORTED_PROTOCOL_VERSIONS,
+    ConfigError,
     ConfigManager,
     ConfigSnapshot,
     McpServer,
@@ -22,6 +23,7 @@ from .server import (
     close_compatibility_server,
     handle_request,
     main,
+    parse_config_snapshot,
 )
 
 __all__ = [
@@ -40,4 +42,6 @@ __all__ = [
     "ToolExecutor",
     "ConfigSnapshot",
     "ConfigManager",
+    "ConfigError",
+    "parse_config_snapshot",
 ]

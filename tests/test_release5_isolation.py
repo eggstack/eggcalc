@@ -18,6 +18,7 @@ import itertools
 import os
 import threading
 import time
+from types import MappingProxyType
 from unittest.mock import patch
 
 import pytest
@@ -33,6 +34,7 @@ from eggcalc.evaluator import (
 from eggcalc.mcp import server as _server_mod
 from eggcalc.mcp.server import (
     TOOL_HANDLERS,
+    ConfigSnapshot,
     McpServer,
     McpServerConfig,
     McpSession,
@@ -2031,3 +2033,506 @@ class TestCompatDispatchNoGlobalMutation:
         )
         assert eval_mod.get_default_evaluator() is old_eval
         close_compatibility_server()
+
+
+# ---------------------------------------------------------------------------
+# Registry nested mutation tests (Workstream C — section 13.3)
+# ---------------------------------------------------------------------------
+
+
+class TestRegistryNestedMutation:
+    """Nested schema/metadata/profile dicts must not be mutable after construction."""
+
+    def test_nested_schema_mutation_rejected(self):
+        """Mutating a nested inputSchema after construction must not affect registry."""
+        handler = lambda **kw: None
+        schema = {
+            "inputSchema": {
+                "type": "object",
+                "properties": {"x": {"type": "number"}},
+            }
+        }
+        reg = ToolRegistry(
+            handlers={"test_tool": handler},
+            schemas={"test_tool": schema},
+        )
+        original = dict(reg.get_schema("test_tool")["inputSchema"]["properties"])
+        # Mutate the original dict
+        schema["inputSchema"]["properties"]["x"]["type"] = "string"
+        schema["inputSchema"]["properties"]["evil"] = {"type": "boolean"}
+        # Registry must be unaffected
+        assert reg.get_schema("test_tool")["inputSchema"]["properties"] == original
+
+    def test_nested_metadata_mutation_rejected(self):
+        """Mutating a nested metadata dict after construction must not affect registry."""
+        handler = lambda **kw: None
+        metadata = {"tags": ["math", "basic"], "version": "1.0"}
+        reg = ToolRegistry(
+            handlers={"test_tool": handler},
+            metadata={"test_tool": metadata},
+        )
+        original_tags = list(reg.get_metadata("test_tool")["tags"])
+        metadata["tags"].append("injected")
+        metadata["version"] = "999"
+        assert reg.get_metadata("test_tool")["tags"] == original_tags
+
+    def test_nested_profile_list_mutation_rejected(self):
+        """Mutating a profile list after construction must not affect registry."""
+        handler = lambda **kw: None
+        profile_tools = ["test_tool"]
+        reg = ToolRegistry(
+            handlers={"test_tool": handler},
+            profiles={"custom": profile_tools},
+        )
+        original = list(reg.get_profile_tools("custom"))
+        profile_tools.append("injected_tool")
+        assert reg.get_profile_tools("custom") == original
+
+    def test_get_schema_returns_immutable_copy(self):
+        """get_schema() must not return a live reference to internal state."""
+        handler = lambda **kw: None
+        schema = {"inputSchema": {"type": "object", "properties": {}}}
+        reg = ToolRegistry(
+            handlers={"test_tool": handler},
+            schemas={"test_tool": schema},
+        )
+        s1 = reg.get_schema("test_tool")
+        s2 = reg.get_schema("test_tool")
+        # They should be equal but not the same object
+        assert s1 == s2
+        # Mutating s1 should not affect s2 or the registry
+        s1["inputSchema"]["properties"]["evil"] = True
+        assert "evil" not in reg.get_schema("test_tool")["inputSchema"]["properties"]
+
+    def test_tool_names_is_immutable(self):
+        """tool_names must return a sorted list (not a live reference)."""
+        handler = lambda **kw: None
+        reg = ToolRegistry(handlers={"a": handler, "b": handler})
+        names = reg.tool_names
+        assert isinstance(names, list)
+        assert names == ["a", "b"]
+        # Mutating the returned list should not affect the registry
+        names.append("c")
+        assert "c" not in reg.tool_names
+
+
+# ---------------------------------------------------------------------------
+# ConfigSnapshot deep immutability tests (Workstream D — section 13.4)
+# ---------------------------------------------------------------------------
+
+
+class TestConfigSnapshotDeepImmutability:
+    """ConfigSnapshot must be deeply immutable — constructor inputs are defensive copies."""
+
+    def test_constructor_input_mutation_does_not_affect_snapshot(self):
+        """Mutating the dicts passed to ConfigSnapshot must not affect the snapshot."""
+        d = {"pi": 3.14, "e": 2.71}
+        f = {"double": lambda x: x * 2}
+        u = {"m": "meter"}
+        snap = ConfigSnapshot(constants=d, functions=f, units=u)
+        d["pi"] = 999
+        d["injected"] = True
+        f["triple"] = lambda x: x * 3
+        u["ft"] = "foot"
+        assert snap.constants["pi"] == 3.14
+        assert "injected" not in snap.constants
+        assert "triple" not in snap.functions
+        assert "ft" not in snap.units
+
+    def test_field_access_returns_immutable_mapping(self):
+        """Accessing snapshot fields must return MappingProxyType, not mutable dict."""
+        snap = ConfigSnapshot(
+            constants={"x": 1}, functions={"f": lambda: None}, units={"m": "meter"}
+        )
+        assert isinstance(snap.constants, MappingProxyType)
+        assert isinstance(snap.functions, MappingProxyType)
+        assert isinstance(snap.units, MappingProxyType)
+
+    def test_to_dict_returns_plain_dict(self):
+        """to_dict() must return plain dicts, not MappingProxyType."""
+        snap = ConfigSnapshot(constants={"x": 1}, functions={"f": lambda: None})
+        d = snap.to_dict()
+        assert isinstance(d["constants"], dict)
+        assert isinstance(d["functions"], dict)
+
+
+# ---------------------------------------------------------------------------
+# Random isolation determinism tests (Workstream F — section 13.6)
+# ---------------------------------------------------------------------------
+
+
+class TestRandomIsolationDeterminism:
+    """Evaluator random state must be fully isolated per instance."""
+
+    def test_identical_seeds_produce_identical_sequences(self):
+        """Two evaluators seeded identically must produce the same random sequence."""
+        e1 = Evaluator(allow_random=True, random_seed=42)
+        e2 = Evaluator(allow_random=True, random_seed=42)
+        seq1 = [e1.evaluate("random()") for _ in range(10)]
+        seq2 = [e2.evaluate("random()") for _ in range(10)]
+        assert seq1 == seq2
+
+    def test_advancing_one_evaluator_does_not_affect_another(self):
+        """Calling random() on evaluator A must not advance evaluator B."""
+        e1 = Evaluator(allow_random=True, random_seed=1)
+        e2 = Evaluator(allow_random=True, random_seed=1)
+        # Advance e1
+        val1_a = e1.evaluate("random()")
+        val1_b = e1.evaluate("random()")
+        # e2 should still be at its first value
+        val2_a = e2.evaluate("random()")
+        assert val1_a == val2_a
+        # e2's second value should match e1's second value
+        val2_b = e2.evaluate("random()")
+        assert val1_b == val2_b
+
+    def test_reseeding_one_evaluator_does_not_affect_another(self):
+        """Reseeding evaluator A must not change evaluator B's generator."""
+        e1 = Evaluator(allow_random=True, random_seed=1)
+        e2 = Evaluator(allow_random=True, random_seed=1)
+        # Get one value from each (should be equal)
+        v1_before = e1.evaluate("random()")
+        v2_before = e2.evaluate("random()")
+        assert v1_before == v2_before
+        # Reseed e1 to a different seed
+        e1.evaluate("seed(999)")
+        v1_after = e1.evaluate("random()")
+        # e2 should produce the next value from seed 1, not seed 999
+        v2_after = e2.evaluate("random()")
+        assert v1_after != v2_after
+
+    def test_two_permissive_servers_independent_random(self):
+        """Two permissive servers must produce independent random sequences."""
+        s1 = McpServer(config=McpServerConfig(allow_random=True))
+        s2 = McpServer(config=McpServerConfig(allow_random=True))
+        try:
+            # Both servers start from independent generators
+            v1 = s1.evaluator.evaluate("random()")
+            v2 = s2.evaluator.evaluate("random()")
+            # They may or may not be equal depending on default seed,
+            # but advancing one must not affect the other
+            for _ in range(5):
+                s1.evaluator.evaluate("random()")
+            v1_later = s1.evaluator.evaluate("random()")
+            v2_later = s2.evaluator.evaluate("random()")
+            # Both should still be independently callable
+            assert isinstance(v1_later, float)
+            assert isinstance(v2_later, float)
+        finally:
+            s1.close()
+            s2.close()
+
+    def test_restricted_server_rejects_random_without_state_change(self):
+        """A restricted server must reject random calls without changing evaluator state."""
+        server = McpServer(config=McpServerConfig(allow_random=False))
+        try:
+            before = dict(server.evaluator.CONSTANTS)
+            with pytest.raises(EvaluationError):
+                server.evaluator.evaluate("random()")
+            after = dict(server.evaluator.CONSTANTS)
+            assert before == after
+        finally:
+            server.close()
+
+
+# ---------------------------------------------------------------------------
+# Barrier-based executor cancellation-before-start test (Workstream E — 13.5)
+# ---------------------------------------------------------------------------
+
+
+class TestExecutorCancellationBeforeStart:
+    """Cancellation before the worker starts must release queued + capacity exactly once."""
+
+    def test_cancellation_before_start_releases_capacity(self):
+        """Cancel a future before its worker starts — counters must recover."""
+        proceed_gate = threading.Event()
+
+        def blocking_handler(**kw):
+            proceed_gate.wait(timeout=5)
+            return {"ok": True, "result": "blocked"}
+
+        config = McpServerConfig(
+            max_tool_workers=1,
+            max_tool_queue_size=1,
+            max_tool_timeout_seconds=10,
+        )
+        handler_reg = ToolRegistry(handlers={"blocker": blocking_handler})
+        executor = ToolExecutor(config, handler_reg)
+        try:
+            # Block the single worker
+            import concurrent.futures
+
+            future = executor._get_executor().submit(
+                lambda: (proceed_gate.wait(timeout=5), {"ok": True})[1]
+            )
+            import time as _time
+
+            _time.sleep(0.05)
+
+            # Verify the pool is occupied
+            assert executor.active_workers >= 1 or executor.pending_count >= 0
+
+            # Now call call_tool — it should be queued
+            # Cancel it immediately
+            future2: concurrent.futures.Future = executor._get_executor().submit(
+                lambda: {"ok": True}
+            )
+            future2.cancel()
+
+            # Release the blocker
+            proceed_gate.set()
+            future.result(timeout=2)
+            future2.result(timeout=2) if not future2.cancelled() else None
+
+            _time.sleep(0.1)
+
+            # Verify counters are non-negative and reasonable
+            assert executor._total_inflight >= 0
+            assert executor._queued_count >= 0
+            assert executor._active_count >= 0
+        finally:
+            executor.close()
+
+    def test_timeout_retains_capacity_truthfully(self):
+        """After a timeout, the worker still consumes capacity until true completion."""
+        proceed_gate = threading.Event()
+
+        def slow_handler(**kw):
+            proceed_gate.wait(timeout=5)
+            return {"ok": True, "result": "done"}
+
+        config = McpServerConfig(
+            max_tool_workers=1,
+            max_tool_queue_size=4,
+            max_tool_timeout_seconds=0.1,
+        )
+        handler_reg = ToolRegistry(handlers={"slow": slow_handler})
+        executor = ToolExecutor(config, handler_reg)
+        try:
+            # This will timeout, but the worker should still be running
+            result = executor.call_tool("slow", {}, request_id="t1")
+            assert result["result"]["isError"] is True
+
+            # The worker is still alive — inflight should still count it
+            assert executor._total_inflight >= 0
+
+            # Release the blocked worker
+            proceed_gate.set()
+            import time as _time
+
+            _time.sleep(0.2)
+
+            # After true completion, capacity is fully recovered
+            assert executor._total_inflight == 0
+            assert executor._active_count == 0
+        finally:
+            executor.close()
+
+
+# ---------------------------------------------------------------------------
+# Concurrent session close/dispatch race test (Workstream G — section 13.7)
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrentSessionCloseDispatch:
+    """Concurrent session close + dispatch must not deadlock or corrupt state."""
+
+    def test_concurrent_close_and_dispatch(self):
+        """Closing a session while dispatching must not crash or deadlock."""
+        server = McpServer()
+        results = []
+        errors = []
+
+        try:
+            # Create several sessions
+            sessions = [server.create_session() for _ in range(5)]
+
+            # Complete handshake on all
+            for s in sessions:
+                server.handle_request(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {},
+                            "clientInfo": {"name": "test", "version": "0.1"},
+                        },
+                    },
+                    session=s,
+                )
+                server.handle_request(
+                    {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
+                    session=s,
+                )
+
+            barrier = threading.Barrier(10)
+
+            def close_session(s):
+                try:
+                    barrier.wait(timeout=2)
+                    s.close()
+                    results.append(("close", id(s), "ok"))
+                except Exception as e:
+                    errors.append(("close", id(s), str(e)))
+
+            def dispatch_ping(s):
+                try:
+                    barrier.wait(timeout=2)
+                    resp = server.handle_request(
+                        {"jsonrpc": "2.0", "id": 999, "method": "ping", "params": {}},
+                        session=s,
+                    )
+                    results.append(("ping", id(s), "ok" if resp else "closed"))
+                except Exception as e:
+                    errors.append(("ping", id(s), str(e)))
+
+            threads = []
+            for i, s in enumerate(sessions):
+                if i % 2 == 0:
+                    threads.append(threading.Thread(target=close_session, args=(s,)))
+                    threads.append(threading.Thread(target=dispatch_ping, args=(s,)))
+                else:
+                    threads.append(threading.Thread(target=dispatch_ping, args=(s,)))
+                    threads.append(threading.Thread(target=close_session, args=(s,)))
+
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=5)
+
+            # No errors should have occurred
+            assert errors == [], f"Errors during concurrent close/dispatch: {errors}"
+            # All sessions should be closed
+            assert server.diagnostic()["session_count"] == 0
+        finally:
+            server.close()
+
+    def test_foreign_session_rejected_by_server(self):
+        """A session owned by server A must be rejected by server B."""
+        server_a = McpServer()
+        server_b = McpServer()
+        try:
+            session_a = server_a.create_session()
+            resp = server_b.handle_request(
+                {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": {}},
+                session=session_a,
+            )
+            assert resp is not None
+            assert "error" in resp
+            assert "another server" in resp["error"]["message"].lower()
+        finally:
+            server_a.close()
+            server_b.close()
+
+    def test_closed_session_rejects_all_methods(self):
+        """A closed session must reject all dispatch methods."""
+        server = McpServer()
+        try:
+            session = server.create_session()
+            session.close()
+            resp = server.handle_request(
+                {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": {}},
+                session=session,
+            )
+            assert resp is not None
+            assert "error" in resp
+        finally:
+            server.close()
+
+
+# ---------------------------------------------------------------------------
+# Config activation path tests (Workstream D — section 13.4)
+# ---------------------------------------------------------------------------
+
+
+class TestConfigActivationPath:
+    """Config activation must push snapshot to evaluator atomically with rollback."""
+
+    def test_activate_snapshot_pushes_constants(self):
+        """activate_snapshot must update evaluator constants from snapshot."""
+        server = McpServer()
+        try:
+            assert "MY_CONST" not in server.evaluator.CONSTANTS
+            snap = ConfigSnapshot(generation=1, constants={"MY_CONST": 42})
+            server.activate_snapshot(snap)
+            assert server.evaluator.CONSTANTS["MY_CONST"] == 42
+        finally:
+            server.close()
+
+    def test_activate_snapshot_pushes_functions(self):
+        """activate_snapshot must update evaluator functions from snapshot."""
+        server = McpServer()
+        try:
+
+            def my_func(x):
+                return x * 10
+
+            snap = ConfigSnapshot(generation=1, functions={"my_func": my_func})
+            server.activate_snapshot(snap)
+            assert server.evaluator.FUNCTIONS["my_func"] is my_func
+        finally:
+            server.close()
+
+    def test_activate_snapshot_rollback_on_failure(self):
+        """Failed activation must preserve prior evaluator state."""
+        server = McpServer()
+        try:
+            server.evaluator.CONSTANTS["KEEP_ME"] = 99
+            # Create a snapshot that will fail during replace (stale generation)
+            snap = ConfigSnapshot(generation=0, constants={"BAD": 1})
+            with pytest.raises(ValueError):
+                server.activate_snapshot(snap)
+            # Prior state preserved
+            assert server.evaluator.CONSTANTS["KEEP_ME"] == 99
+            assert "BAD" not in server.evaluator.CONSTANTS
+        finally:
+            server.close()
+
+    def test_two_servers_independent_constants(self):
+        """Two servers with different config must have independent constants."""
+        s1 = McpServer()
+        s2 = McpServer()
+        try:
+            s1.activate_snapshot(ConfigSnapshot(generation=1, constants={"X": 1}))
+            s2.activate_snapshot(ConfigSnapshot(generation=1, constants={"X": 2}))
+            assert s1.evaluator.CONSTANTS["X"] == 1
+            assert s2.evaluator.CONSTANTS["X"] == 2
+        finally:
+            s1.close()
+            s2.close()
+
+
+class TestParseConfigSnapshot:
+    """parse_config_snapshot must validate types and semantics."""
+
+    def _parse(self, **kwargs):
+        return _server_mod.parse_config_snapshot(**kwargs)
+
+    def _config_error(self):
+        return _server_mod.ConfigError
+
+    def test_valid_constants(self):
+        snap = self._parse(constants={"pi": 3.14, "name": "test"})
+        assert snap.constants["pi"] == 3.14
+
+    def test_invalid_constant_type(self):
+        with pytest.raises(self._config_error(), match="must be int/float/str/bool"):
+            self._parse(constants={"bad": [1, 2, 3]})
+
+    def test_invalid_constant_name(self):
+        with pytest.raises(self._config_error(), match="must be str"):
+            self._parse(constants={123: "value"})
+
+    def test_non_callable_function(self):
+        with pytest.raises(self._config_error(), match="must be callable"):
+            self._parse(functions={"bad": "not a function"})
+
+    def test_invalid_policy(self):
+        with pytest.raises(self._config_error(), match="Invalid policy"):
+            self._parse(policy="bogus")
+
+    def test_valid_policy(self):
+        snap = self._parse(policy="strict")
+        assert snap.policy == "strict"

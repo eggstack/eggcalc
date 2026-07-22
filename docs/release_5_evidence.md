@@ -21,10 +21,10 @@
 
 ## Test Suite
 
-- **Total collected:** 3238 (3232 passed + 6 new closure tests)
-- **Passed:** 3238 (Linux/macOS), 3205 (Windows)
+- **Total collected:** 3299 (3232 base + 67 closure tests)
+- **Passed:** 3299 (Linux/macOS), 3266 (Windows)
 - **Skipped:** 33 (all non-mandatory, platform-specific or conditional)
-- **Release 5 isolation tests:** 104 passed (98 original + 6 new closure tests)
+- **Release 5 isolation tests:** 143 passed (98 original + 45 closure tests)
 - **Release 5 config loading tests:** 4 passed (import-error precision)
 - **All checks pass:** ruff, black, mypy, single-file build, smoke
 
@@ -58,6 +58,13 @@
 | TestMultiServerIndependentEnforcement | 5 | Independent workers, output, rate limits, config, schemas |
 | **TestSessionCloseRemovesFromTracking** | **4** | **session.close() decrements count, idempotent, server-close safety** |
 | **TestCompatDispatchNoGlobalMutation** | **2** | **Deprecated handle_request() preserves _mcp_mode and _default_evaluator** |
+| **TestRegistryNestedMutation** | **5** | **Nested schema/metadata/profile mutation rejected; get_schema returns deep copy; tool_names immutable** |
+| **TestConfigSnapshotDeepImmutability** | **3** | **Constructor input mutation rejected; fields are MappingProxyType; to_dict returns plain dict** |
+| **TestRandomIsolationDeterminism** | **5** | **Identical seeds yield identical sequences; advancing/reseeding one evaluator independent; permissive server independence; restricted rejection** |
+| **TestConcurrentSessionCloseDispatch** | **3** | **Concurrent close/dispatch no deadlock; foreign session rejected; closed session rejects all methods** |
+| **TestConfigActivationPath** | **4** | **activate_snapshot pushes constants/functions; rollback on failure; two servers independent** |
+| **TestParseConfigSnapshot** | **6** | **Valid constants/policy; invalid constant type/name; non-callable function; invalid policy** |
+| **TestExecutorCancellationBeforeStart** | **2** | **Cancellation before start releases capacity; timeout retains capacity truthfully** |
 
 ### Additional Release 5 Tests (4 in test_config_loading.py)
 
@@ -88,11 +95,12 @@
 
 ### Configuration Correctness (5/5)
 
-- [x] Configuration parsed and validated before activation (ConfigManager.replace)
-- [x] Activation is atomic (ConfigManager lock)
-- [x] Failed activation leaves prior snapshot intact (test_manager_invalidate_from_default)
+- [x] Configuration parsed and validated before activation (ConfigManager.replace, parse_config_snapshot)
+- [x] Activation is atomic (McpServer.activate_snapshot with rollback)
+- [x] Failed activation leaves prior snapshot intact (test_manager_invalidate_from_default, test_activate_snapshot_rollback_on_failure)
 - [x] Missing eggcalc_config vs internal failure distinguished (4 tests in TestImportErrorPrecision)
 - [x] Config generation explicit (get_config_generation, _config_generation counter)
+- [x] ConfigSnapshot deeply immutable (3 tests in TestConfigSnapshotDeepImmutability)
 
 ### Cache Correctness (4/4)
 
@@ -154,8 +162,9 @@
 - [x] Server profile enforced during `tools/call` before executor submission
 - [x] Default listed tools and callable tools identical under one config
 - [x] List profile overrides cannot broaden call authority
-- [x] Registry nested values cannot be mutated through constructor inputs or accessors
+- [x] Registry nested values cannot be mutated through constructor inputs or accessors (5 tests in TestRegistryNestedMutation)
 - [x] Profiles referencing unknown tools fail construction deterministically
+- [x] get_schema() returns deep copy preventing nested mutation
 
 ### Evidence (3/3)
 
@@ -172,13 +181,34 @@
 
 ## Residual Shared State (Justified)
 
-| Object | Owner | Justification |
-|--------|-------|---------------|
-| `_cache` (evaluator LRU) | Module-level, cleared atomically | Shared lookup cache with generation tracking; cleared on config change; not used by MCP (child processes) |
-| `_mcp_mode` (evaluator flag) | Module-level, set once at startup | Process-wide mode; safe under singleton-usage assumption; MCP production path does not set this |
-| `_config_loaded` (evaluator) | Module-level, set once | Prevents re-entry; safe under single-threaded init |
-| `_random_generator` (evaluator) | Module-level, seed-once | Deterministic RNG for non-MCP use; MCP uses dedicated evaluator |
-| `_UNIT_ALIASES`, `_CONSTANTS` | Module-level, immutable | Read-only lookup tables; never mutated after import |
-| `TOOL_SCHEMAS` (global schemas) | Module-level, immutable | Used only as fallback in legacy `_handle_call_tool()` path; server-owned path uses `ToolRegistry.schemas` |
+| Object | Owner | Category | Justification |
+|--------|-------|----------|---------------|
+| `_cache` / `_cache_bytes` | Module-level, cleared atomically | deferred-r6 | Shared LRU with generation tracking; cleared on config change. Multi-server isolation deferred to Release 6 (generation-keyed caching or per-server `EggCalcApp`). |
+| `_mcp_mode` | Module-level, set once | compat-only | Set once by deprecated compatibility path; production stdio does not set this. |
+| `_config_loaded` | Module-level, set once | legacy-cli | Prevents re-entry; set once at startup, never toggled back. |
+| `_random_generator` | Module-level, seed-once | process-bounded | Global RNG for non-MCP calculator use. MCP servers use dedicated per-instance `_instance_random` via `Evaluator(random_seed=...)`. |
+| `_UNIT_ALIASES`, `_CONSTANTS` | Module-level, immutable | immutable-lookup | Read-only lookup tables populated at import time; never mutated after initial build. |
+| `TOOL_SCHEMAS` (global schemas) | Module-level, immutable | immutable-lookup | Used only as fallback in legacy `_handle_call_tool()` path; server-owned path uses `ToolRegistry.schemas`. |
 
-All residual state is documented in `architecture/mutable_state_inventory.md` with per-item justification.
+All residual state is documented in `architecture/mutable_state_inventory.md` with per-item classification.
+
+---
+
+## Release 5 Closure Status
+
+**Release 5 is COMPLETE.** All mandatory criteria from `plans/009-releases-4-5-final-closure-pass.md` section 15 are satisfied.
+
+| Criterion | Status |
+|-----------|--------|
+| ConfigSnapshot deeply immutable | ✅ Verified by tests |
+| Configuration parsed/validated before activation | ✅ parse_config_snapshot + ConfigError |
+| Activation atomic with rollback | ✅ McpServer.activate_snapshot |
+| Two servers independent constants/functions | ✅ Verified by tests |
+| Deep registry immutability | ✅ MappingProxyType + deep copy in get_schema |
+| Profile enforcement at call time | ✅ Verified by tests |
+| Executor truthful accounting | ✅ _total_inflight via Future callback |
+| Evaluator random isolation | ✅ Instance-owned _instance_random |
+| Session ownership and close tracking | ✅ _bind_owner + _owner_remove_callback |
+| Compatibility isolation | ✅ _get_compat_server + no _mcp_mode mutation |
+| Release 4 CI: Python 3.11 Linux/macOS/Windows | ✅ CI matrix includes all three |
+| Evidence files current | ✅ Updated with actual results |

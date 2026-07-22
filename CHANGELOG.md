@@ -27,7 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Request ID length validation in `McpServer.handle_request()` using `server.config.max_request_id_length`
 - `_handle_initialize()` uses `server.config.supported_protocol_versions` when server is available
 - `McpSession.close()` method for explicit session lifecycle management
-- 23 new tests covering Workstreams B, C3, D, E2, G, H (config authority, registry immutability, evaluator binding, config validation, executor accounting, session lifecycle)
+- `McpSession.close()` now removes session from server's live tracking via `_owner_remove_callback`
+- `ConfigError` exception for configuration parsing/validation failures
+- `parse_config_snapshot()` for validated config construction with type/semantics checks
+- `McpServer.activate_snapshot()` for atomic config activation with evaluator push and rollback
+- `ToolRegistry.get_schema()` returns deep copy to prevent nested mutation
+- 27 new tests covering registry nested mutation, config deep immutability, random isolation determinism, executor cancellation, concurrent session close/dispatch, config activation path, and config parsing
 
 ## [1.2.0] - 2026-07-16
 

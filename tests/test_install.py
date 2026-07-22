@@ -48,7 +48,8 @@ class TestGetInstallPath:
 
 class TestGetCalcPath:
     def test_joins_dir_and_calc(self):
-        assert get_calc_path("/foo/bar") == "/foo/bar/calc"
+        expected = os.path.join("/foo/bar", "calc")
+        assert get_calc_path("/foo/bar") == expected
 
     def test_empty_dir(self):
         assert get_calc_path("") == "calc"
@@ -101,6 +102,7 @@ class TestFindCalcOnPath:
         with patch.dict(os.environ, {"PATH": str(tmp_path)}):
             assert _find_calc_on_path() == str(calc)
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows has no execute-bit semantics")
     def test_ignores_non_executable(self, tmp_path):
         calc = tmp_path / "calc"
         calc.write_text("not executable")
@@ -166,6 +168,7 @@ class TestIsPipEntryPoint:
         f.write_text("x" * 600 + "from eggcalc import main\n")
         assert _is_pip_entry_point(str(f)) is False
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod does not prevent reading")
     def test_permission_error_returns_false(self, tmp_path):
         f = tmp_path / "calc"
         f.write_text("from eggcalc import main\n")
@@ -248,6 +251,10 @@ class TestCreateExecutable:
 
 
 class TestAddToPath:
+    pytestmark = pytest.mark.skipif(
+        sys.platform == "win32", reason="Shell config manipulation is Unix-only"
+    )
+
     def test_adds_to_zshrc(self, tmp_path):
         zshrc = tmp_path / ".zshrc"
         zshrc.write_text("old content\n")
@@ -308,6 +315,10 @@ class TestAddToPath:
 
 
 class TestRemoveFromPath:
+    pytestmark = pytest.mark.skipif(
+        sys.platform == "win32", reason="Shell config manipulation is Unix-only"
+    )
+
     def test_removes_from_zshrc(self, tmp_path):
         zshrc = tmp_path / ".zshrc"
         zshrc.write_text("old\nexport PATH=\"/custom/bin:$PATH\"\nmore\n")

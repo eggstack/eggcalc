@@ -655,9 +655,10 @@ class ToolRegistry:
         schema = self._schemas.get(name)
         if schema is None:
             return None
-        # Return a shallow copy of the top-level dict; nested values are
-        # already immutable MappingProxyType from construction.
-        return dict(schema)
+        # Return a deep copy so callers cannot mutate internal state
+        # through nested dicts (e.g. inputSchema.properties).
+        result: dict[str, Any] = _deep_copy(dict(schema))
+        return result
 
     def get_metadata(self, name: str) -> dict[str, Any]:
         meta = self._metadata.get(name)
@@ -1045,6 +1046,61 @@ class ConfigSnapshot:
             "units": dict(self.units),
             "policy": self.policy,
         }
+
+
+class ConfigError(Exception):
+    """Raised when configuration parsing or validation fails."""
+
+
+def parse_config_snapshot(
+    *,
+    constants: dict[str, Any] | None = None,
+    functions: dict[str, Any] | None = None,
+    units: dict[str, Any] | None = None,
+    policy: str | None = None,
+) -> ConfigSnapshot:
+    """Parse raw configuration values into a validated ConfigSnapshot.
+
+    Validates types and semantics before constructing the snapshot.
+    Raises ConfigError on invalid input.
+    """
+    parsed_constants: dict[str, Any] = {}
+    if constants is not None:
+        for name, value in constants.items():
+            if not isinstance(name, str):
+                raise ConfigError(f"Constant name must be str, got {type(name).__name__}")
+            if not isinstance(value, (int, float, str, bool)):
+                raise ConfigError(
+                    f"Constant '{name}' must be int/float/str/bool, " f"got {type(value).__name__}"
+                )
+            parsed_constants[name] = value
+
+    parsed_functions: dict[str, Any] = {}
+    if functions is not None:
+        for name, value in functions.items():
+            if not isinstance(name, str):
+                raise ConfigError(f"Function name must be str, got {type(name).__name__}")
+            if not callable(value):
+                raise ConfigError(f"Function '{name}' must be callable")
+            parsed_functions[name] = value
+
+    parsed_units: dict[str, Any] = {}
+    if units is not None:
+        for name, value in units.items():
+            if not isinstance(name, str):
+                raise ConfigError(f"Unit name must be str, got {type(name).__name__}")
+            parsed_units[name] = value
+
+    valid_policies = ("default", "strict", "permissive")
+    if policy is not None and policy not in valid_policies:
+        raise ConfigError(f"Invalid policy '{policy}'; must be one of {valid_policies}")
+
+    return ConfigSnapshot(
+        constants=parsed_constants,
+        functions=parsed_functions,
+        units=parsed_units,
+        policy=policy or "default",
+    )
 
 
 class ConfigManager:
@@ -1485,6 +1541,28 @@ class McpServer:
             self._sessions.clear()
         for session in sessions_to_close:
             session.close()
+
+    def activate_snapshot(self, snapshot: ConfigSnapshot) -> None:
+        """Atomically activate a configuration snapshot.
+
+        Pushes constants, functions, and units from the snapshot into the
+        server's evaluator.  On failure the prior evaluator state is preserved.
+        """
+        prev_constants = dict(self._evaluator.CONSTANTS)
+        prev_functions = dict(self._evaluator.FUNCTIONS)
+        try:
+            for name, value in snapshot.constants.items():
+                self._evaluator.CONSTANTS[name] = value
+            for name, value in snapshot.functions.items():
+                if callable(value):
+                    self._evaluator.FUNCTIONS[name] = value
+            self._config_manager.replace(snapshot)
+        except Exception:
+            self._evaluator.CONSTANTS.clear()
+            self._evaluator.CONSTANTS.update(prev_constants)
+            self._evaluator.FUNCTIONS.clear()
+            self._evaluator.FUNCTIONS.update(prev_functions)
+            raise
 
     def diagnostic(self) -> dict[str, Any]:
         """Return deterministic diagnostic information."""

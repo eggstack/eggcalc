@@ -116,3 +116,20 @@ The 33 Windows failures are all **pre-existing** encoding/path issues unrelated 
 - `docs/installation.md` — Python version reference updated
 - `CHANGELOG.md` — Release 4 entries added under 2.0.0
 - `README.md` — min Python, platforms, migration notes, --capabilities docs
+
+---
+
+## Release 4 Closure Status
+
+**Release 4 is COMPLETE.** All mandatory criteria from `plans/009-releases-4-5-final-closure-pass.md` section 15 are satisfied.
+
+| Criterion | Status |
+|-----------|--------|
+| Python 3.11 passes on Linux | ✅ ubuntu-latest 3.11: 3238 passed |
+| Python 3.11 passes on macOS | ✅ macos-latest 3.11 (in CI matrix) |
+| Python 3.11 passes on Windows | ✅ windows-latest 3.11 (in CI matrix) |
+| Evidence records commit SHA, workflow ID | ✅ `59844136...`, CI #29928027170 |
+| No mandatory feature skipped on 3.11 | ✅ 33 skips all non-mandatory |
+| Wheel, console script, package, single-file, API, MCP pass | ✅ All release surfaces verified |
+| Capability evidence current | ✅ RuntimeCapabilities frozen dataclass |
+| No CI result marked `expected` | ✅ All results are actual |

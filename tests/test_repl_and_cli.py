@@ -1,6 +1,7 @@
 """Tests for REPL mode and CLI flags."""
 
 import json
+import os
 import subprocess
 import sys
 from unittest.mock import patch
@@ -15,12 +16,14 @@ from eggcalc.normalize import _run_repl, run
 def _run_cli(*args: str, stdin: str | None = None) -> subprocess.CompletedProcess:
     """Run eggcalc as a subprocess and return the result."""
     cmd = [sys.executable, "-m", "eggcalc", *args]
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     return subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         input=stdin,
         timeout=10,
+        env=env,
     )
 
 

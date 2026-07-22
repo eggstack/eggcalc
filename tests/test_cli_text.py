@@ -5,6 +5,7 @@ the commands work correctly from the command line.
 """
 
 import json
+import os
 import subprocess
 import sys
 
@@ -13,10 +14,12 @@ import pytest
 
 def run_calc(args: list[str]) -> tuple[int, str, str]:
     """Run calc command and return (returncode, stdout, stderr)."""
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     result = subprocess.run(
         [sys.executable, "-m", "eggcalc"] + args,
         capture_output=True,
         text=True,
+        env=env,
     )
     return result.returncode, result.stdout, result.stderr
 
