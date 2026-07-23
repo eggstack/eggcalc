@@ -3319,7 +3319,7 @@ def identifier_inspect_mcp(
         )
 
     try:
-        result = _identifier_inspect(
+        result = _identifier_inspect(  # type: ignore[operator]
             identifiers, language, normalization, casefold, check_confusables
         )
 
