@@ -127,17 +127,84 @@ class TestNormalizeBoundaries:
 class TestCLIBoundaries:
     """Verify that CLI module loads correctly and has expected boundaries."""
 
-    def test_cli_loads_exact_on_import(self):
-        """eggcalc.cli imports exact tools at module level (needed for text commands)."""
+    def test_cli_does_not_load_exact_on_import(self):
+        """eggcalc.cli must NOT load exact tool modules at import time."""
         code = textwrap.dedent("""\
             import sys
             import eggcalc.cli
-            # cli imports exact tools at the top level for text commands
             exact_impls = [
                 m for m in sys.modules
                 if m.startswith("eggcalc.exact.") and m != "eggcalc.exact"
             ]
-            assert exact_impls, "CLI should load exact tools at import time"
+            assert not exact_impls, f"CLI loaded exact modules at import time: {exact_impls}"
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_cli_help_loads_no_exact_modules(self):
+        """Invoking CLI help (--help) must not load any exact modules."""
+        code = textwrap.dedent("""\
+            import sys
+            from eggcalc.cli import main
+            sys.argv = ["calc", "--help"]
+            main()
+            exact_impls = [
+                m for m in sys.modules
+                if m.startswith("eggcalc.exact.") and m != "eggcalc.exact"
+            ]
+            assert not exact_impls, f"CLI help loaded exact modules: {exact_impls}"
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_calculator_only_loads_no_exact_modules(self):
+        """A calculator-only invocation must not load any exact modules."""
+        code = textwrap.dedent("""\
+            import sys
+            from eggcalc.cli import main
+            sys.argv = ["calc", "5+3"]
+            main()
+            exact_impls = [
+                m for m in sys.modules
+                if m.startswith("eggcalc.exact.") and m != "eggcalc.exact"
+            ]
+            assert not exact_impls, f"Calculator invocation loaded exact modules: {exact_impls}"
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_text_command_loads_its_defining_module(self):
+        """Invoking a text command loads only its defining exact module."""
+        code = textwrap.dedent("""\
+            import sys
+            from eggcalc.cli import main
+            sys.argv = ["calc", "inspect", "hello"]
+            main()
+            assert "eggcalc.exact.synthesis" in sys.modules, (
+                f"inspect should load eggcalc.exact.synthesis. Modules: "
+                f"{[m for m in sys.modules if 'eggcalc.exact' in m]}"
+            )
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_text_command_does_not_load_unrelated_modules(self):
+        """Invoking inspect must not load patch, shell, markdown, or config modules."""
+        code = textwrap.dedent("""\
+            import sys
+            from eggcalc.cli import main
+            sys.argv = ["calc", "inspect", "hello"]
+            main()
+            unrelated = [
+                m for m in sys.modules
+                if m in (
+                    "eggcalc.exact.patch",
+                    "eggcalc.exact.shell",
+                    "eggcalc.exact.markdown",
+                    "eggcalc.exact.config",
+                )
+            ]
+            assert not unrelated, f"inspect loaded unrelated modules: {unrelated}"
         """)
         result = _run_import_check(code)
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

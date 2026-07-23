@@ -28,7 +28,7 @@ The public API wraps these differently:
 - `evaluate_raw()` / `evaluate_cached()` / `evaluate_async()` → full pipeline (NL/units → normalize → evaluate)
 - `evaluate()` → direct AST evaluation (accepts valid Python math syntax with or without spaces, but rejects natural language and unit suffixes)
 
-Note: `main()` and `print_help()` are lazy re-exports via PEP 562 from `cli.py` — they are not imported at `import eggcalc` time.
+Note: `main()` and `print_help()` are lazy re-exports via PEP 562 from `cli.py` — they are not imported at `import eggcalc` time. `import eggcalc.cli` now loads zero `eggcalc.exact.*` implementation modules.
 
 ### Caret (`^`) semantics
 
@@ -103,7 +103,7 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 | `eggcalc/normalize.py` | NL tokenization, expression normalization (no CLI dispatch) |
 | `eggcalc/evaluator.py` | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
 | `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class |
-| `eggcalc/cli.py` | CLI dispatch: argparse, REPL, text commands, help, main entry point |
+| `eggcalc/cli.py` | CLI dispatch: argparse, REPL, text commands, help, main entry point. Text commands use lazy `importlib` loading of exact modules. |
 | `eggcalc/__main__.py` | Module entry, delegates to `cli.main()` |
 | `eggcalc/exact/` | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
 | `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor |
@@ -218,7 +218,7 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 
 1. **Wrong test API** — `evaluate("five plus three")` fails. Use `run()` or CLI for NL.
 2. **Wrong python** — `.venv/bin/python` needed for pytest (system python lacks deps).
-3. **Importing from wrong path** — `from eggcalc import ...` works; `from eggcalc.normalize import run` also works. But `evaluate()` from normalize won't handle NL.
+3. **Importing from wrong path** — `from eggcalc import ...` works; `from eggcalc.normalize import run` also works. But `evaluate()` from normalize won't handle NL. `import eggcalc.cli` no longer loads `eggcalc.exact.*` implementation modules — exact command handlers are loaded lazily via `importlib.import_module()` only when dispatched.
 4. **build_single.py breakage** — adding imports outside the allowed set or code that can't be concatenated will break the build.
 5. **confusables.py editing** — it's generated data; edit `scripts/generate_confusables.py` instead.
 6. **`normalize_main` alias** — created by `build_single.py` during assembly, does not exist in source `normalize.py`. Don't reference it in tests.
@@ -228,3 +228,4 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`). Use `McpServer` + `McpSession` for new code.
 11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.
 12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Only `normalize`, `evaluator`, and `units` are loaded eagerly.
+13. **`Dimension(angle=True)` is not dimensionless** — Angle is a structural axis, not a compatibility alias for dimensionless. `rad + 1` is rejected.

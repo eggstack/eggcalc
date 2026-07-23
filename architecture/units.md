@@ -371,6 +371,8 @@ are_units_compatible(None, None)    # → True (both dimensionless)
 are_units_compatible("m", None)     # → False (dimensional vs dimensionless)
 ```
 
+**Note:** `are_units_compatible()` compares units by their `Dimension` objects directly. It no longer falls back to category-string matching, which was imprecise for compound and structural dimensions like angle.
+
 ### `get_unit_category(unit: str) -> str | None`
 
 Returns the category for a unit. Looks up the normalized form in `UNIT_CATEGORIES`, then falls back to `_derived_category` for compound expressions.
@@ -488,6 +490,27 @@ Returns all equivalent short-compound forms of a unit (short, `**`, `^` variants
 ### `_rebuild_conversions() -> None`
 
 Thread-safe rebuild of `UNIT_CONVERSIONS` after custom units are added. Acquires `_UNITS_LOCK` for the swap.
+
+## Dimension Semantics
+
+### Dimension Equality and Hashing
+
+`Dimension` equality and hashing now include the `angle` field. Two `Dimension` instances are equal only if all their fields (including `angle`) match. This ensures that angle dimensions are treated as a distinct structural axis, not conflated with dimensionless or other categories.
+
+```python
+Dimension() == Dimension(angle=True)  # → False
+hash(Dimension()) != hash(Dimension(angle=True))
+```
+
+### Angle Propagation
+
+Angle propagates via XOR in multiplication and division. When multiplying or dividing two units, the `angle` flag of the result is the XOR of the operands' `angle` flags:
+
+- `rad * rad` → angle XOR angle = not angle (dimensionless-like)
+- `rad * m` → angle XOR not angle = angle
+- `m * m` → not angle XOR not angle = not angle
+
+This models the physical intuition that angle is a ratio (length/length) and cancels when like dimensions multiply.
 
 ## Module Dependencies
 

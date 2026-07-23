@@ -56,6 +56,7 @@ The 33 Windows failures are all **pre-existing** encoding/path issues unrelated 
 - **Skipped:** 33 (all non-mandatory, platform-specific or conditional)
 - **Failed:** 0 (Linux/macOS), 33 (Windows, all pre-existing encoding/path issues)
 - **All checks pass:** ruff, black, mypy, single-file build, capabilities CLI, smoke release surfaces
+- **Note:** Total test count updated to 3363 by the corrective closure pass; counts above reflect the original Release 4 snapshot.
 
 ## Capability Detection
 

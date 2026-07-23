@@ -7,294 +7,247 @@ perform semantic interpretation or call LLMs.
 
 from __future__ import annotations
 
-# Re-export cargo
-from .cargo import (
-    CargoDependencyForm,
-    CargoDepSection,
-    CargoInspectResult,
-    CargoPackageInfo,
-    CargoWorkspaceInfo,
-    cargo_toml_inspect,
-)
+from typing import Any
 
-# Re-export config
-from .config import (
-    DotenvEntry,
-    DotenvValidateResult,
-    IniKeyValueLine,
-    IniSectionLine,
-    IniValidateResult,
-    dotenv_validate,
-    ini_validate,
-)
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    # Cargo
+    "CargoDependencyForm": (".cargo", "CargoDependencyForm"),
+    "CargoDepSection": (".cargo", "CargoDepSection"),
+    "CargoInspectResult": (".cargo", "CargoInspectResult"),
+    "CargoPackageInfo": (".cargo", "CargoPackageInfo"),
+    "CargoWorkspaceInfo": (".cargo", "CargoWorkspaceInfo"),
+    "cargo_toml_inspect": (".cargo", "cargo_toml_inspect"),
+    # Config
+    "DotenvEntry": (".config", "DotenvEntry"),
+    "DotenvValidateResult": (".config", "DotenvValidateResult"),
+    "IniKeyValueLine": (".config", "IniKeyValueLine"),
+    "IniSectionLine": (".config", "IniSectionLine"),
+    "IniValidateResult": (".config", "IniValidateResult"),
+    "dotenv_validate": (".config", "dotenv_validate"),
+    "ini_validate": (".config", "ini_validate"),
+    # Diff
+    "CommonPrefixSuffix": (".diff", "CommonPrefixSuffix"),
+    "DiffSpan": (".diff", "DiffSpan"),
+    "FirstDiff": (".diff", "FirstDiff"),
+    "common_prefix_suffix": (".diff", "common_prefix_suffix"),
+    "diff_spans": (".diff", "diff_spans"),
+    "first_diff": (".diff", "first_diff"),
+    "levenshtein_distance": (".diff", "levenshtein_distance"),
+    "longest_common_subsequence": (".diff", "longest_common_subsequence"),
+    # Diff analysis
+    "ConflictMarkerLocation": (".diff_analysis", "ConflictMarkerLocation"),
+    "DiffFileHeaderEntry": (".diff_analysis", "DiffFileHeaderEntry"),
+    "DiffFileHeadersResult": (".diff_analysis", "DiffFileHeadersResult"),
+    "DiffHunkRangesFile": (".diff_analysis", "DiffHunkRangesFile"),
+    "DiffHunkRangesResult": (".diff_analysis", "DiffHunkRangesResult"),
+    "DiffTouchedPathsResult": (".diff_analysis", "DiffTouchedPathsResult"),
+    "HunkDetail": (".diff_analysis", "HunkDetail"),
+    "ModeChange": (".diff_analysis", "ModeChange"),
+    "PatchConflictMarkersResult": (".diff_analysis", "PatchConflictMarkersResult"),
+    "UnifiedDiffValidateResult": (".diff_analysis", "UnifiedDiffValidateResult"),
+    "diff_file_headers": (".diff_analysis", "diff_file_headers"),
+    "diff_hunk_ranges": (".diff_analysis", "diff_hunk_ranges"),
+    "diff_touched_paths": (".diff_analysis", "diff_touched_paths"),
+    "patch_conflict_markers_inspect": (".diff_analysis", "patch_conflict_markers_inspect"),
+    "unified_diff_validate": (".diff_analysis", "unified_diff_validate"),
+    # Glob
+    "GlobMatchResult": (".glob", "GlobMatchResult"),
+    "glob_match": (".glob", "glob_match"),
+    # Identifier
+    "IdentifierAnalyzeResult": (".identifier", "IdentifierAnalyzeResult"),
+    "identifier_analyze": (".identifier", "identifier_analyze"),
+    # Identifier inspect
+    "CollisionInfo": (".identifier_inspect", "CollisionInfo"),
+    "IdentifierInfo": (".identifier_inspect", "IdentifierInfo"),
+    "IdentifierInspectResult": (".identifier_inspect", "IdentifierInspectResult"),
+    "IdentifierTableInspectResult": (".identifier_inspect", "IdentifierTableInspectResult"),
+    "MixedStyleGroup": (".identifier_inspect", "MixedStyleGroup"),
+    "ReservedKeywordHit": (".identifier_inspect", "ReservedKeywordHit"),
+    "TableCollisionInfo": (".identifier_inspect", "TableCollisionInfo"),
+    "TableIdentifierEntry": (".identifier_inspect", "TableIdentifierEntry"),
+    "identifier_inspect": (".identifier_inspect", "identifier_inspect"),
+    "identifier_table_inspect": (".identifier_inspect", "identifier_table_inspect"),
+    # Inspect prompt
+    "PromptInspectionFinding": (".inspect_prompt", "PromptInspectionFinding"),
+    "PromptInspectionResult": (".inspect_prompt", "PromptInspectionResult"),
+    "prompt_input_inspect": (".inspect_prompt", "prompt_input_inspect"),
+    # LLM hygiene
+    "JsonFixHint": (".llm_hygiene", "JsonFixHint"),
+    "LlmJsonCheckResult": (".llm_hygiene", "LlmJsonCheckResult"),
+    "llm_json_output_check": (".llm_hygiene", "llm_json_output_check"),
+    # Markdown
+    "CodeFenceBlock": (".markdown", "CodeFenceBlock"),
+    "CodeFenceExtractResult": (".markdown", "CodeFenceExtractResult"),
+    "DuplicateAnchor": (".markdown", "DuplicateAnchor"),
+    "MalformedLink": (".markdown", "MalformedLink"),
+    "MarkdownCodeFence": (".markdown", "MarkdownCodeFence"),
+    "MarkdownFrontmatter": (".markdown", "MarkdownFrontmatter"),
+    "MarkdownHeading": (".markdown", "MarkdownHeading"),
+    "MarkdownLink": (".markdown", "MarkdownLink"),
+    "MarkdownLinkCheckResult": (".markdown", "MarkdownLinkCheckResult"),
+    "MarkdownStructureResult": (".markdown", "MarkdownStructureResult"),
+    "UnresolvedRelative": (".markdown", "UnresolvedRelative"),
+    "code_fence_extract": (".markdown", "code_fence_extract"),
+    "markdown_link_check_lexical": (".markdown", "markdown_link_check_lexical"),
+    "markdown_structure": (".markdown", "markdown_structure"),
+    # Measure
+    "CharCategoryMetrics": (".measure", "CharCategoryMetrics"),
+    "LineMetrics": (".measure", "LineMetrics"),
+    "WordMetrics": (".measure", "WordMetrics"),
+    "char_category_metrics": (".measure", "char_category_metrics"),
+    "line_metrics": (".measure", "line_metrics"),
+    "word_metrics": (".measure", "word_metrics"),
+    # Patch
+    "FailedHunk": (".patch", "FailedHunk"),
+    "PatchApplyCheckResult": (".patch", "PatchApplyCheckResult"),
+    "PatchFile": (".patch", "PatchFile"),
+    "PatchHunk": (".patch", "PatchHunk"),
+    "PatchParseResult": (".patch", "PatchParseResult"),
+    "PatchSummaryResult": (".patch", "PatchSummaryResult"),
+    "patch_apply_check": (".patch", "patch_apply_check"),
+    "patch_summary": (".patch", "patch_summary"),
+    # Path
+    "PathAnalyzeResult": (".path_tools", "PathAnalyzeResult"),
+    "PathCompareResult": (".path_tools", "PathCompareResult"),
+    "PathNormalizeResult": (".path_tools", "PathNormalizeResult"),
+    "PathScopeCheckResult": (".path_tools", "PathScopeCheckResult"),
+    "path_analyze": (".path_tools", "path_analyze"),
+    "path_compare": (".path_tools", "path_compare"),
+    "path_normalize": (".path_tools", "path_normalize"),
+    "path_scope_check": (".path_tools", "path_scope_check"),
+    # Position
+    "TextPositionResult": (".position", "TextPositionResult"),
+    "text_position": (".position", "text_position"),
+    # Primitives
+    "CodepointInfo": (".primitives", "CodepointInfo"),
+    "InvisibleCharInfo": (".primitives", "InvisibleCharInfo"),
+    "MeasureBasic": (".primitives", "MeasureBasic"),
+    "casefold_text": (".primitives", "casefold_text"),
+    "codepoints": (".primitives", "codepoints"),
+    "count_graphemes": (".primitives", "count_graphemes"),
+    "find_invisibles": (".primitives", "find_invisibles"),
+    "measure_basic": (".primitives", "measure_basic"),
+    "normalize_unicode": (".primitives", "normalize_unicode"),
+    "normalized_equal": (".primitives", "normalized_equal"),
+    "raw_equal": (".primitives", "raw_equal"),
+    "truncate_to_grapheme": (".primitives", "truncate_to_grapheme"),
+    "utf8_bytes": (".primitives", "utf8_bytes"),
+    "visible_repr": (".primitives", "visible_repr"),
+    # Repo audit
+    "RepoInventoryResult": (".repo_audit", "RepoInventoryResult"),
+    "repo_file_inventory": (".repo_audit", "repo_file_inventory"),
+    # Shell
+    "ArgvCompareResult": (".shell", "ArgvCompareResult"),
+    "ShellFeatures": (".shell", "ShellFeatures"),
+    "ShellQuoteJoinResult": (".shell", "ShellQuoteJoinResult"),
+    "ShellSplitResult": (".shell", "ShellSplitResult"),
+    "argv_compare": (".shell", "argv_compare"),
+    "shell_quote_join": (".shell", "shell_quote_join"),
+    "shell_split": (".shell", "shell_split"),
+    # Synthesis
+    "CountCharsResult": (".synthesis", "CountCharsResult"),
+    "ExplainDiffResult": (".synthesis", "ExplainDiffResult"),
+    "InspectTextResult": (".synthesis", "InspectTextResult"),
+    "LineRangeCompareResult": (".synthesis", "LineRangeCompareResult"),
+    "LineRangeExtractResult": (".synthesis", "LineRangeExtractResult"),
+    "MeasureTextResult": (".synthesis", "MeasureTextResult"),
+    "TextEqualResult": (".synthesis", "TextEqualResult"),
+    "TextReplaceCheckResult": (".synthesis", "TextReplaceCheckResult"),
+    "TextWindowResult": (".synthesis", "TextWindowResult"),
+    "count_chars": (".synthesis", "count_chars"),
+    "explain_diff": (".synthesis", "explain_diff"),
+    "inspect_text": (".synthesis", "inspect_text"),
+    "line_range_compare": (".synthesis", "line_range_compare"),
+    "line_range_extract": (".synthesis", "line_range_extract"),
+    "list_compare": (".synthesis", "list_compare"),
+    "measure_text": (".synthesis", "measure_text"),
+    "text_equal": (".synthesis", "text_equal"),
+    "text_replace_check": (".synthesis", "text_replace_check"),
+    "text_window": (".synthesis", "text_window"),
+    # Transform
+    "EscapeTextResult": (".transform", "EscapeTextResult"),
+    "RemovedChar": (".transform", "RemovedChar"),
+    "TextFingerprintResult": (".transform", "TextFingerprintResult"),
+    "TextTransformResult": (".transform", "TextTransformResult"),
+    "UnescapeTextResult": (".transform", "UnescapeTextResult"),
+    "escape_text": (".transform", "escape_text"),
+    "text_fingerprint": (".transform", "text_fingerprint"),
+    "text_hash": (".transform", "text_hash"),
+    "text_transform": (".transform", "text_transform"),
+    "unescape_text": (".transform", "unescape_text"),
+    # Unicode policy
+    "CanonicalizeResult": (".unicode_policy", "CanonicalizeResult"),
+    "CanonicalizeResultWithMapping": (".unicode_policy", "CanonicalizeResultWithMapping"),
+    "PolicyFinding": (".unicode_policy", "PolicyFinding"),
+    "UnicodePolicyCheckResult": (".unicode_policy", "UnicodePolicyCheckResult"),
+    "canonicalize_text": (".unicode_policy", "canonicalize_text"),
+    "unicode_policy_check": (".unicode_policy", "unicode_policy_check"),
+    # Unicode tools
+    "ConfusableInfo": (".unicode_tools", "ConfusableInfo"),
+    "MixedScriptsResult": (".unicode_tools", "MixedScriptsResult"),
+    "ScriptInfo": (".unicode_tools", "ScriptInfo"),
+    "confusables_count": (".unicode_tools", "confusables_count"),
+    "detect_confusables": (".unicode_tools", "detect_confusables"),
+    "detect_mixed_scripts": (".unicode_tools", "detect_mixed_scripts"),
+    "reverse_confusables": (".unicode_tools", "reverse_confusables"),
+    "unicode_script": (".unicode_tools", "unicode_script"),
+    "unicode_scripts": (".unicode_tools", "unicode_scripts"),
+    # Validate
+    "CheckBracketsResult": (".validate", "CheckBracketsResult"),
+    "JsonCompareDiff": (".validate", "JsonCompareDiff"),
+    "JsonCompareResult": (".validate", "JsonCompareResult"),
+    "JsonExtractResult": (".validate", "JsonExtractResult"),
+    "JsonShapeKey": (".validate", "JsonShapeKey"),
+    "JsonShapeResult": (".validate", "JsonShapeResult"),
+    "RegexFindIterMatch": (".validate", "RegexFindIterMatch"),
+    "RegexFindIterResult": (".validate", "RegexFindIterResult"),
+    "RegexSafetyFinding": (".validate", "RegexSafetyFinding"),
+    "RegexSafetyResult": (".validate", "RegexSafetyResult"),
+    "RegexTestResult": (".validate", "RegexTestResult"),
+    "TomlShapeResult": (".validate", "TomlShapeResult"),
+    "ValidateJsonResult": (".validate", "ValidateJsonResult"),
+    "ValidateSchemaLightResult": (".validate", "ValidateSchemaLightResult"),
+    "ValidateTomlResult": (".validate", "ValidateTomlResult"),
+    "VersionCompareResult": (".validate", "VersionCompareResult"),
+    "check_brackets": (".validate", "check_brackets"),
+    "json_compare": (".validate", "json_compare"),
+    "json_extract": (".validate", "json_extract"),
+    "json_shape": (".validate", "json_shape"),
+    "list_dedupe": (".validate", "list_dedupe"),
+    "list_sort": (".validate", "list_sort"),
+    "regex_finditer": (".validate", "regex_finditer"),
+    "regex_safety_check": (".validate", "regex_safety_check"),
+    "regex_test": (".validate", "regex_test"),
+    "toml_shape": (".validate", "toml_shape"),
+    "validate_json": (".validate", "validate_json"),
+    "validate_schema_light": (".validate", "validate_schema_light"),
+    "validate_toml_text": (".validate", "validate_toml_text"),
+    "version_compare": (".validate", "version_compare"),
+    # Version
+    "ParsedConstraint": (".version", "ParsedConstraint"),
+    "ParsedConstraintComponent": (".version", "ParsedConstraintComponent"),
+    "ParsedVersion": (".version", "ParsedVersion"),
+    "VersionConstraintResult": (".version", "VersionConstraintResult"),
+    "check_version_constraint": (".version", "check_version_constraint"),
+    "parse_version": (".version", "parse_version"),
+}
 
-# Re-export diff
-from .diff import (
-    CommonPrefixSuffix,
-    DiffSpan,
-    FirstDiff,
-    common_prefix_suffix,
-    diff_spans,
-    first_diff,
-    levenshtein_distance,
-    longest_common_subsequence,
-)
 
-# Re-export diff_analysis
-from .diff_analysis import (
-    ConflictMarkerLocation,
-    DiffFileHeaderEntry,
-    DiffFileHeadersResult,
-    DiffHunkRangesFile,
-    DiffHunkRangesResult,
-    DiffTouchedPathsResult,
-    HunkDetail,
-    ModeChange,
-    PatchConflictMarkersResult,
-    UnifiedDiffValidateResult,
-    diff_file_headers,
-    diff_hunk_ranges,
-    diff_touched_paths,
-    patch_conflict_markers_inspect,
-    unified_diff_validate,
-)
+def __getattr__(name: str) -> Any:
+    if name in _LAZY_IMPORTS:
+        module_path, attr = _LAZY_IMPORTS[name]
+        import importlib
 
-# Re-export glob
-from .glob import (
-    GlobMatchResult,
-    glob_match,
-)
+        mod = importlib.import_module(module_path, __name__)
+        value = getattr(mod, attr)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-# Re-export identifier
-from .identifier import (
-    IdentifierAnalyzeResult,
-    identifier_analyze,
-)
 
-# Re-export identifier_inspect
-from .identifier_inspect import (
-    CollisionInfo,
-    IdentifierInfo,
-    IdentifierInspectResult,
-    IdentifierTableInspectResult,
-    MixedStyleGroup,
-    ReservedKeywordHit,
-    TableCollisionInfo,
-    TableIdentifierEntry,
-    identifier_inspect,
-    identifier_table_inspect,
-)
+def __dir__() -> list[str]:
+    return list(_LAZY_IMPORTS.keys())
 
-# Re-export inspect_prompt
-from .inspect_prompt import (
-    PromptInspectionFinding,
-    PromptInspectionResult,
-    prompt_input_inspect,
-)
-
-# Re-export llm_hygiene
-from .llm_hygiene import (
-    JsonFixHint,
-    LlmJsonCheckResult,
-    llm_json_output_check,
-)
-
-# Re-export markdown
-from .markdown import (
-    CodeFenceBlock,
-    CodeFenceExtractResult,
-    DuplicateAnchor,
-    MalformedLink,
-    MarkdownCodeFence,
-    MarkdownFrontmatter,
-    MarkdownHeading,
-    MarkdownLink,
-    MarkdownLinkCheckResult,
-    MarkdownStructureResult,
-    UnresolvedRelative,
-    code_fence_extract,
-    markdown_link_check_lexical,
-    markdown_structure,
-)
-
-# Re-export measure
-from .measure import (
-    CharCategoryMetrics,
-    LineMetrics,
-    WordMetrics,
-    char_category_metrics,
-    line_metrics,
-    word_metrics,
-)
-
-# Re-export patch
-from .patch import (
-    FailedHunk,
-    PatchApplyCheckResult,
-    PatchFile,
-    PatchHunk,
-    PatchParseResult,
-    PatchSummaryResult,
-    patch_apply_check,
-    patch_summary,
-)
-
-# Re-export path_tools
-from .path_tools import (
-    PathAnalyzeResult,
-    PathCompareResult,
-    PathNormalizeResult,
-    PathScopeCheckResult,
-    path_analyze,
-    path_compare,
-    path_normalize,
-    path_scope_check,
-)
-
-# Re-export position
-from .position import (
-    TextPositionResult,
-    text_position,
-)
-
-# Re-export primitives
-from .primitives import (
-    CodepointInfo,
-    InvisibleCharInfo,
-    MeasureBasic,
-    casefold_text,
-    codepoints,
-    count_graphemes,
-    find_invisibles,
-    measure_basic,
-    normalize_unicode,
-    normalized_equal,
-    raw_equal,
-    truncate_to_grapheme,
-    utf8_bytes,
-    visible_repr,
-)
-
-# Re-export repo_audit
-from .repo_audit import (
-    RepoInventoryResult,
-    repo_file_inventory,
-)
-
-# Re-export shell
-from .shell import (
-    ArgvCompareResult,
-    ShellFeatures,
-    ShellQuoteJoinResult,
-    ShellSplitResult,
-    argv_compare,
-    shell_quote_join,
-    shell_split,
-)
-
-# Re-export synthesis
-from .synthesis import (
-    CountCharsResult,
-    ExplainDiffResult,
-    InspectTextResult,
-    LineRangeCompareResult,
-    LineRangeExtractResult,
-    MeasureTextResult,
-    TextEqualResult,
-    TextReplaceCheckResult,
-    TextWindowResult,
-    count_chars,
-    explain_diff,
-    inspect_text,
-    line_range_compare,
-    line_range_extract,
-    list_compare,
-    measure_text,
-    text_equal,
-    text_replace_check,
-    text_window,
-)
-
-# Re-export transform
-from .transform import (
-    EscapeTextResult,
-    RemovedChar,
-    TextFingerprintResult,
-    TextTransformResult,
-    UnescapeTextResult,
-    escape_text,
-    text_fingerprint,
-    text_hash,
-    text_transform,
-    unescape_text,
-)
-
-# Re-export unicode_policy
-from .unicode_policy import (
-    CanonicalizeResult,
-    CanonicalizeResultWithMapping,
-    PolicyFinding,
-    UnicodePolicyCheckResult,
-    canonicalize_text,
-    unicode_policy_check,
-)
-
-# Re-export unicode_tools
-from .unicode_tools import (
-    ConfusableInfo,
-    MixedScriptsResult,
-    ScriptInfo,
-    confusables_count,
-    detect_confusables,
-    detect_mixed_scripts,
-    reverse_confusables,
-    unicode_script,
-    unicode_scripts,
-)
-
-# Re-export validate
-from .validate import (
-    CheckBracketsResult,
-    JsonCompareDiff,
-    JsonCompareResult,
-    JsonExtractResult,
-    JsonShapeKey,
-    JsonShapeResult,
-    RegexFindIterMatch,
-    RegexFindIterResult,
-    RegexSafetyFinding,
-    RegexSafetyResult,
-    RegexTestResult,
-    TomlShapeResult,
-    ValidateJsonResult,
-    ValidateSchemaLightResult,
-    ValidateTomlResult,
-    VersionCompareResult,
-    check_brackets,
-    json_compare,
-    json_extract,
-    json_shape,
-    list_dedupe,
-    list_sort,
-    regex_finditer,
-    regex_safety_check,
-    regex_test,
-    toml_shape,
-    validate_json,
-    validate_schema_light,
-    validate_toml_text,
-    version_compare,
-)
-
-# Re-export version
-from .version import (
-    ParsedConstraint,
-    ParsedConstraintComponent,
-    ParsedVersion,
-    VersionConstraintResult,
-    check_version_constraint,
-    parse_version,
-)
 
 __all__ = [
     # Config

@@ -150,3 +150,28 @@ All documented public API surfaces preserved:
 - `architecture/overview.md` — Updated module map, key data structures, entry points
 - `architecture/authority_inventory.md` — New: authoritative source inventory
 - `AGENTS.md` — Updated module map, lazy re-exports, command registry
+
+## Corrective Closure Pass
+
+The following changes were made in the corrective closure pass:
+
+### Lazy CLI Loading (Workstream B)
+- `import eggcalc.cli` no longer loads `eggcalc.exact.*` implementation modules
+- `CommandSpec` now includes `module` and `symbol` fields for lazy resolution
+- `_get_handler()` uses `importlib.import_module()` with a private cache
+- 5 new import boundary tests verify lazy loading behavior
+- Calculator-only and CLI help invocations load zero exact modules
+
+### Structural Dimension Semantics (Workstream C)
+- `Dimension` equality and hashing now include the `angle` field
+- `Dimension(angle=True) != Dimension()` (was previously equal)
+- Angle propagates via XOR in multiplication/division
+- `are_units_compatible()` no longer falls back to category-string matching
+- Unknown units are explicitly incompatible (no silent category coincidence)
+
+### Verification
+- 3363 tests pass (up from 3354)
+- All import boundary tests pass (24 tests)
+- Single-file generation and smoke tests pass
+- Ruff, black checks pass
+- Pre-existing mypy error in mcp/tools.py (not related to these changes)

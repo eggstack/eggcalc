@@ -27,6 +27,7 @@
 - **Release 5 isolation tests:** 143 passed (98 original + 45 closure tests)
 - **Release 5 config loading tests:** 4 passed (import-error precision)
 - **All checks pass:** ruff, black, mypy, single-file build, smoke
+- **Note:** Total test count updated to 3363 by the corrective closure pass; counts above reflect the original Release 5 snapshot.
 
 ### Release 5 Test Classes (104 tests in test_release5_isolation.py)
 

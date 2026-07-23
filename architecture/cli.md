@@ -60,6 +60,12 @@ The CLI includes built-in text inspection commands, dispatched by `_cli_text_com
 
 All text commands accept `--json` for machine-readable output.
 
+### Lazy Exact-Command Loading
+
+Text command handlers are loaded lazily to avoid importing the entire `eggcalc.exact` package at CLI startup. The `COMMANDS` registry includes `module` and `symbol` fields for each text command, specifying the handler's module path and function name.
+
+`_get_handler(command)` uses `importlib.import_module()` to load the handler module on first use, then resolves the function via `getattr()`. A `_handler_cache` dict caches resolved handlers so subsequent calls skip the import. The `globals().get()` fallback supports single-file mode where `build_single.py` concatenates all modules into one file and handlers are already in the global namespace.
+
 ### `calc inspect <text>`
 
 Check for hidden characters and confusables via `inspect_text()`:

@@ -105,6 +105,7 @@ class Dimension:
             self.amount,
             self.luminous_intensity,
             self.information,
+            int(self.angle),
         )
 
     def __eq__(self, other: object) -> bool:
@@ -140,6 +141,7 @@ class Dimension:
             amount=self.amount + other.amount,
             luminous_intensity=self.luminous_intensity + other.luminous_intensity,
             information=self.information + other.information,
+            angle=self.angle != other.angle,
         )
 
     def __truediv__(self, other: Dimension) -> Dimension:
@@ -154,6 +156,7 @@ class Dimension:
             amount=self.amount - other.amount,
             luminous_intensity=self.luminous_intensity - other.luminous_intensity,
             information=self.information - other.information,
+            angle=self.angle != other.angle,
         )
 
     def __pow__(self, n: int) -> Dimension:
@@ -168,12 +171,13 @@ class Dimension:
             amount=self.amount * n,
             luminous_intensity=self.luminous_intensity * n,
             information=self.information * n,
+            angle=self.angle if n % 2 != 0 else False,
         )
 
     @property
     def is_dimensionless(self) -> bool:
-        """True if all exponents are zero (purely dimensionless quantity)."""
-        return self._tuple() == (0, 0, 0, 0, 0, 0, 0, 0)
+        """True if all exponents are zero and not angle-tagged (purely dimensionless quantity)."""
+        return self._tuple() == (0, 0, 0, 0, 0, 0, 0, 0, 0)
 
     @property
     def is_affine(self) -> bool:
@@ -215,6 +219,30 @@ _CATEGORY_DIMENSIONS: dict[str, Dimension] = {
     "m/s": Dimension(length=1, time=-1),
     "m2": Dimension(length=2),
     "Hz": Dimension(time=-1),
+}
+
+# Reverse mapping from friendly category names (as stored in
+# UNIT_CATEGORIES) to structural Dimensions.  Used by
+# _structural_dimension to resolve dynamically-registered custom units
+# that aren't in the built-time registry.
+_CATEGORY_NAME_TO_DIMENSION: dict[str, Dimension] = {
+    "length": DIM_LENGTH,
+    "time": DIM_TIME,
+    "data": DIM_INFORMATION,
+    "data_rate": Dimension(information=1, time=-1),
+    "mass": DIM_MASS,
+    "volume": Dimension(length=3),
+    "pressure": Dimension(mass=1, length=-1, time=-2),
+    "energy": Dimension(mass=1, length=2, time=-2),
+    "power": Dimension(mass=1, length=2, time=-3),
+    "force": Dimension(mass=1, length=1, time=-2),
+    "voltage": Dimension(mass=1, length=2, time=-3, current=-1),
+    "current": DIM_CURRENT,
+    "angle": Dimension(angle=True),
+    "speed": Dimension(length=1, time=-1),
+    "area": Dimension(length=2),
+    "frequency": Dimension(time=-1),
+    "temperature": Dimension(temperature=1),
 }
 
 
@@ -2546,9 +2574,8 @@ def _pow_unit_string(unit: str, exp: int) -> str | None:
 def are_units_compatible(unit1: str | None, unit2: str | None) -> bool:
     """Check if two units are compatible for addition/subtraction.
 
-    Uses structural :class:`Dimension` comparison when possible, falling
-    back to category-based matching for compound units not yet in the
-    structural registry.
+    Uses structural :class:`Dimension` comparison. Unknown units are
+    treated as incompatible.
 
     Returns True if:
     - Both units are None (dimensionless)
@@ -2570,12 +2597,8 @@ def are_units_compatible(unit1: str | None, unit2: str | None) -> bool:
     if dim1 is not None and dim2 is not None:
         return dim1 == dim2
 
-    # Fallback to category-based matching for units not in the registry
-    cat1 = get_unit_category(unit1)
-    cat2 = get_unit_category(unit2)
-    if cat1 is None or cat2 is None:
-        return False
-    return cat1 == cat2
+    # Unknown units are incompatible (no category-string fallback)
+    return False
 
 
 def _structural_dimension(unit: str) -> Dimension | None:
@@ -2583,7 +2606,8 @@ def _structural_dimension(unit: str) -> Dimension | None:
 
     Handles both simple units (``"m"``) and compound expressions
     (``"m/s"``, ``"kg*m**2"``) by parsing the unit signature and
-    combining base dimensions.
+    combining base dimensions.  Also resolves dynamically-registered
+    custom units via their ``UNIT_CATEGORIES`` entry.
     """
     # Fast path: direct alias lookup
     normalized = normalize_unit(unit)
@@ -2595,21 +2619,32 @@ def _structural_dimension(unit: str) -> Dimension | None:
 
     # Slow path: parse compound expression
     sig = _parse_compound_signature(normalized)
-    if sig is None:
-        return None
-    num, den = sig
-    dim = DIM_DIMENSIONLESS
-    for base, exp in num:
-        base_dim = _base_unit_dimension(base)
-        if base_dim is None:
-            return None
-        dim = dim * (base_dim**exp)
-    for base, exp in den:
-        base_dim = _base_unit_dimension(base)
-        if base_dim is None:
-            return None
-        dim = dim / (base_dim**exp)
-    return dim
+    if sig is not None:
+        num, den = sig
+        dim = DIM_DIMENSIONLESS
+        ok = True
+        for base, exp in num:
+            base_dim = _base_unit_dimension(base)
+            if base_dim is None:
+                ok = False
+                break
+            dim = dim * (base_dim**exp)
+        if ok:
+            for base, exp in den:
+                base_dim = _base_unit_dimension(base)
+                if base_dim is None:
+                    ok = False
+                    break
+                dim = dim / (base_dim**exp)
+        if ok:
+            return dim
+
+    # Fallback: resolve dynamically-registered units via category mapping
+    cat = UNIT_CATEGORIES.get(normalized)
+    if cat is not None:
+        return _CATEGORY_NAME_TO_DIMENSION.get(cat)
+
+    return None
 
 
 def _base_unit_dimension(unit: str) -> Dimension | None:

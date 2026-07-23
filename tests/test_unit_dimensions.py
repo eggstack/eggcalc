@@ -40,7 +40,7 @@ class TestDimensionType:
 
         d = Dimension()
         assert d.is_dimensionless
-        assert d._tuple() == (0, 0, 0, 0, 0, 0, 0, 0)
+        assert d._tuple() == (0, 0, 0, 0, 0, 0, 0, 0, 0)
 
     def test_base_dimensions(self):
         assert DIM_LENGTH.length == 1
@@ -57,6 +57,22 @@ class TestDimensionType:
         assert d1 == d2
         assert d1 != d3
         assert d1 != "not a dimension"
+
+    def test_angle_distinguishes_dimensions(self):
+        from eggcalc.units import Dimension
+
+        d_angle = Dimension(angle=True)
+        d_plain = Dimension()
+        assert d_angle != d_plain
+        assert hash(d_angle) != hash(d_plain)
+
+    def test_angle_equality(self):
+        from eggcalc.units import Dimension
+
+        d1 = Dimension(angle=True)
+        d2 = Dimension(angle=True)
+        assert d1 == d2
+        assert hash(d1) == hash(d2)
 
     def test_hash_consistency(self):
         from eggcalc.units import Dimension
@@ -81,15 +97,52 @@ class TestDimensionType:
         assert d.length == 1
         assert d.mass == 1
 
+    def test_mul_angle_propagation(self):
+        from eggcalc.units import Dimension
+
+        a = Dimension(angle=True)
+        b = Dimension()
+        # angle × dimensionless = angle (XOR: True != False = True)
+        assert (a * b).angle is True
+        # dimensionless × angle = angle (XOR: False != True = True)
+        assert (b * a).angle is True
+        # angle × angle = no angle (XOR: True != True = False)
+        assert (a * a).angle is False
+        # angle × length = angle (XOR: True != False = True)
+        assert (a * DIM_LENGTH).angle is True
+
     def test_truediv(self):
         d = DIM_LENGTH / DIM_TIME
         assert d.length == 1
         assert d.time == -1
 
+    def test_truediv_angle_propagation(self):
+        from eggcalc.units import Dimension
+
+        a = Dimension(angle=True)
+        b = Dimension()
+        # angle / dimensionless = angle
+        assert (a / b).angle is True
+        # angle / angle = no angle (XOR cancels)
+        assert (a / a).angle is False
+
     def test_pow(self):
         d = DIM_LENGTH**3
         assert d.length == 3
         assert d.mass == 0
+
+    def test_pow_angle_propagation(self):
+        from eggcalc.units import Dimension
+
+        a = Dimension(angle=True)
+        # angle^1 = angle
+        assert (a**1).angle is True
+        # angle^2 = no angle (even exponent)
+        assert (a**2).angle is False
+        # angle^3 = angle (odd exponent)
+        assert (a**3).angle is True
+        # angle^0 = no angle
+        assert (a**0).angle is False
 
     def test_is_affine(self):
         assert not DIM_LENGTH.is_affine

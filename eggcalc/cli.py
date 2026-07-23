@@ -19,17 +19,6 @@ import sys
 from typing import Any, TypedDict
 
 from .evaluator import EvaluationError, evaluate
-from .exact import (
-    count_chars,
-    dotenv_validate,
-    inspect_text,
-    line_range_extract,
-    markdown_structure,
-    patch_apply_check,
-    regex_test,
-    shell_split,
-    text_replace_check,
-)
 from .normalize import NORMALIZE, PATTERNS, error_message, normalize_expression
 from .units import UNIT_CATEGORIES
 
@@ -58,6 +47,8 @@ class CommandSpec(TypedDict, total=False):
     category: str
     json_output: bool
     handler: str
+    module: str
+    symbol: str
 
 
 COMMANDS: tuple[CommandSpec, ...] = (
@@ -70,6 +61,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="text",
         json_output=True,
         handler="inspect_text",
+        module="eggcalc.exact.synthesis",
+        symbol="inspect_text",
     ),
     CommandSpec(
         name="count",
@@ -80,6 +73,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="text",
         json_output=True,
         handler="count_chars",
+        module="eggcalc.exact.synthesis",
+        symbol="count_chars",
     ),
     CommandSpec(
         name="regex",
@@ -90,6 +85,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="validation",
         json_output=True,
         handler="regex_test",
+        module="eggcalc.exact.validate",
+        symbol="regex_test",
     ),
     CommandSpec(
         name="replace-check",
@@ -100,6 +97,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="text",
         json_output=True,
         handler="text_replace_check",
+        module="eggcalc.exact.synthesis",
+        symbol="text_replace_check",
     ),
     CommandSpec(
         name="lines",
@@ -110,6 +109,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="text",
         json_output=True,
         handler="line_range_extract",
+        module="eggcalc.exact.synthesis",
+        symbol="line_range_extract",
     ),
     CommandSpec(
         name="patch-check",
@@ -120,6 +121,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="patch",
         json_output=True,
         handler="patch_apply_check",
+        module="eggcalc.exact.patch",
+        symbol="patch_apply_check",
     ),
     CommandSpec(
         name="shell-split",
@@ -130,6 +133,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="shell",
         json_output=True,
         handler="shell_split",
+        module="eggcalc.exact.shell",
+        symbol="shell_split",
     ),
     CommandSpec(
         name="md-structure",
@@ -140,6 +145,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="markdown",
         json_output=True,
         handler="markdown_structure",
+        module="eggcalc.exact.markdown",
+        symbol="markdown_structure",
     ),
     CommandSpec(
         name="dotenv-check",
@@ -150,6 +157,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
         category="validation",
         json_output=True,
         handler="dotenv_validate",
+        module="eggcalc.exact.config",
+        symbol="dotenv_validate",
     ),
 )
 
@@ -160,20 +169,34 @@ for _spec in COMMANDS:
         _COMMAND_NAME_TO_SPEC[_alias] = _spec
 
 
+_handler_cache: dict[str, Any] = {}
+
+
 def _get_handler(name: str) -> Any:
-    """Look up a handler function by name, supporting both package and single-file modes."""
-    _HANDLER_MAP: dict[str, Any] = {
-        "inspect_text": inspect_text,
-        "count_chars": count_chars,
-        "regex_test": regex_test,
-        "text_replace_check": text_replace_check,
-        "line_range_extract": line_range_extract,
-        "patch_apply_check": patch_apply_check,
-        "shell_split": shell_split,
-        "markdown_structure": markdown_structure,
-        "dotenv_validate": dotenv_validate,
-    }
-    return _HANDLER_MAP[name]
+    """Look up a handler function lazily by name."""
+    if name in _handler_cache:
+        return _handler_cache[name]
+    for spec in COMMANDS:
+        if spec.get("handler") == name:
+            module_path = spec.get("module")
+            symbol = spec.get("symbol")
+            if module_path and symbol:
+                import importlib
+
+                mod = importlib.import_module(module_path)
+                handler = getattr(mod, symbol)
+                _handler_cache[name] = handler
+                return handler
+    handler = globals().get(name)
+    if handler is not None:
+        _handler_cache[name] = handler
+        return handler
+    raise KeyError(f"No handler found for {name!r}")
+
+
+def _reset_handler_cache() -> None:
+    """Reset the handler cache (for testing)."""
+    _handler_cache.clear()
 
 
 def run_cli(
