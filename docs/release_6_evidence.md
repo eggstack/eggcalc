@@ -4,7 +4,7 @@ Release 6 — Internal Architecture and Maintainability
 
 ## Commit
 
-- **SHA**: `TBD` (corrective closure pass — pending final CI)
+- **SHA**: `3825e7e` (corrective closure pass)
 - **Branch**: `main`
 - **Date**: 2026-07-23
 
