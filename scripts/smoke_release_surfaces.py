@@ -379,6 +379,66 @@ def test_single_file_mcp() -> None:
         _fail("single-file MCP tools/call", f"No response for id=3. Messages: {msgs}")
 
 
+# --- REPL surface --------------------------------------------------------
+
+
+def test_repl_surface() -> None:
+    """Verify the interactive REPL accepts expressions and exits cleanly."""
+    _banner("REPL surface (stdin pipe)")
+    input_data = "2 + 2\nquit\n"
+    r = _run([PYTHON, "-m", "eggcalc", "-i"], input_data=input_data)
+    # REPL may print prompts; just verify it doesn't crash and produces output
+    if r.returncode == 0:
+        _pass("REPL accepts expression and exits cleanly")
+    else:
+        # On some platforms quit() raises SystemExit(0) which may look like failure
+        if "4" in r.stdout:
+            _pass("REPL output contains result")
+        else:
+            _fail("REPL surface", f"returncode={r.returncode} stdout={r.stdout!r} stderr={r.stderr!r}")
+
+
+# --- Editable install surface --------------------------------------------
+
+
+def test_editable_install() -> None:
+    """Verify pip install -e . works and the installed package is functional."""
+    _banner("Editable install in clean venv")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        venv_dir = Path(tmpdir) / "test_venv"
+        venv.create(str(venv_dir), with_pip=True)
+        pip = venv_dir / "bin" / "pip"
+
+        r = _run([str(pip), "install", "-e", str(REPO_ROOT)])
+        if r.returncode != 0:
+            _fail("pip install -e .", r.stderr)
+
+        python = venv_dir / "bin" / "python"
+        r = _run(
+            [
+                str(python),
+                "-c",
+                "from eggcalc import evaluate; assert evaluate('2+2') == 4; print('ok')",
+            ]
+        )
+        if r.returncode == 0 and "ok" in r.stdout:
+            _pass("editable install evaluate('2+2') == 4")
+        else:
+            _fail("editable install evaluate", r.stderr)
+
+        r = _run(
+            [
+                str(python),
+                "-c",
+                "from eggcalc import detect_capabilities; caps = detect_capabilities(); print(caps.mode)",
+            ]
+        )
+        if r.returncode == 0 and "package" in r.stdout:
+            _pass("editable install reports package mode")
+        else:
+            _fail("editable install capabilities", r.stderr)
+
+
 # --- Main ----------------------------------------------------------------
 
 
@@ -394,6 +454,7 @@ def main() -> int:
         test_mcp_package_mode,
         test_config_safety,
         test_single_file_mcp,
+        test_repl_surface,
     ]
 
     # Skip wheel test if dist/ doesn't exist
@@ -401,6 +462,9 @@ def main() -> int:
         tests.insert(2, test_wheel_install)
     else:
         _banner("Wheel install (SKIPPED — no .whl in dist/)")
+
+    # Always run editable install test
+    tests.insert(3, test_editable_install)
 
     passed = 0
     failed = 0

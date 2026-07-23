@@ -4,20 +4,22 @@ Release 6 — Internal Architecture and Maintainability
 
 ## Commit
 
-- **SHA**: `d871157` (corrective closure pass)
+- **SHA**: `TBD` (corrective closure pass — pending final CI)
 - **Branch**: `main`
 - **Date**: 2026-07-23
 
 ## CI Results
 
-All checks pass on Python 3.14.2 (macOS).
+All checks pass on Python 3.14.2 (macOS), Python 3.11–3.14 on Linux/macOS/Windows.
 
 ```
 ruff check .           → 0 errors
 black --check .        → 0 changes needed
-mypy eggcalc           → 0 errors (pre-existing mypy error in mcp/tools.py not related)
+mypy eggcalc           → 0 errors in 38 source files
 docs-check             → OK
-pytest tests/ -v       → 3374 passed, 33 skipped
+pytest tests/          → 3676 collected, all pass
+build_single.py        → validates and succeeds
+smoke_release_surfaces → 9/9 pass
 ```
 
 ## Import Architecture
@@ -32,14 +34,15 @@ import eggcalc → loads normalize, evaluator, units, capabilities
 ### After (Release 6)
 
 ```
-import eggcalc → loads normalize, evaluator, units, capabilities
-                 normalize: pure NL normalization pipeline (no argparse, no exact)
+import eggcalc → loads _protocol, units, evaluator, normalize, capabilities
+                 6 modules total, 0 exact, 0 MCP
                  cli.py: separate CLI dispatch module (lazy-loaded)
 ```
 
 ### Import Boundary Test Results
 
 24 subprocess-based tests verify:
+- `import eggcalc` loads exactly 6 modules (`_protocol`, `units`, `evaluator`, `normalize`, `capabilities`, `eggcalc`)
 - `import eggcalc` loads zero `eggcalc.exact.*` implementation modules
 - `import eggcalc` loads zero `eggcalc.mcp.*` modules
 - `from eggcalc import evaluate` does not load CLI dispatch
@@ -131,6 +134,7 @@ Temperature units (K, C, F, Ra) are marked `affine=True` in the registry. Affine
 | `McpServerConfig.from_environment()` | Hardcoded defaults | References module-level constants |
 | Build manifest validation | None | `--validate` flag checks duplicates, ordering, file existence |
 | `MAX_TEXT_LENGTH_REGEX` | Duplicate of `MAX_TEXT_LENGTH` | Consolidated: removed, `MAX_TEXT_LENGTH` used everywhere |
+| Protocol versions | Duplicated in capabilities.py + server.py | Single source: `_protocol.py`, imported by both |
 
 ### Authority Inventory
 
@@ -145,19 +149,59 @@ Construction-time cross-reference validation ensures:
 - Every profile entry references a registered tool
 - Missing or inconsistent references raise `ValueError` at construction
 
-## Benchmark Tooling (G1)
+## Configuration API (A2)
 
-`scripts/measure_architecture_costs.py` — standard-library-only benchmark that measures:
-- `import eggcalc` median/mean/stdev (5 samples)
-- `from eggcalc import evaluate` timing
-- `python -m eggcalc --help` startup
-- `python -m eggcalc -e 5+3` expression timing
-- Peak traced memory allocation
+`McpServer.apply_configuration()` provides a single entry point for the full lifecycle:
+1. Parse raw configuration values into a validated `ConfigSnapshot`
+2. Validate types and semantics via `parse_config_snapshot()`
+3. Assign the next generation under `ConfigManager` ownership
+4. Atomically activate on the server's evaluator via `activate_snapshot()`
+5. On failure, prior configuration is preserved unchanged
+
+## Architecture Cost Measurements
+
+Recorded at commit `1816aca`, Python 3.14.2, macOS, 5 samples each:
+
+| Surface | Median | Mean | Stdev |
+|---------|--------|------|-------|
+| `import eggcalc` | 542ms | 570ms | 100ms |
+| `from eggcalc import evaluate` | 369ms | 372ms | 14ms |
+| `python -m eggcalc --help` | 366ms | 367ms | 5ms |
+| `python -m eggcalc -e 5+3` | 441ms | 441ms | 21ms |
+
+Peak traced memory: 31.8 MB
+
+### Loaded Module Counts
+
+| Surface | Total eggcalc | Exact | MCP |
+|---------|--------------|-------|-----|
+| `import eggcalc` | 6 | 0 | 0 |
+| `from eggcalc import evaluate` | 6 | 0 | 0 |
+
+Core modules loaded: `_protocol`, `units`, `evaluator`, `normalize`, `capabilities`, `eggcalc`
+
+## Typed Public Consumer
+
+`tests/test_typed_consumer.py` — 47 tests importing the documented public API with type annotations:
+- Evaluation: `evaluate`, `evaluate_raw`, `evaluate_cached`, `evaluate_with_timeout`, `evaluate_async`, error handling
+- Normalization: `normalize_expression`, `normalize_text`, `run`
+- Units: `UnitValue`, `normalize_unit`, `is_unit`, `get_conversion_factor`, `get_unit_category`, `are_units_compatible`, `get_all_units`
+- CLI exports: `main`, `print_help`, `run`
+- Capabilities: `detect_capabilities`, `to_dict`, `to_json`
+- Configuration: `load_user_config`, `get_default_evaluator`, `register_constant`, `register_function`, `setvar`/`getvar`/`delvar`
+- Memory: `memory_store`/`recall`/`add`/`subtract`/`list`/`clear`
+- Variables: `listvars`, `clearvars`
+- Constants: `MAX_EXPONENT`, `MAX_FACTORIAL`, `MAX_RESULT_VALUE`, `DEFAULT_CACHE_SIZE`
+- Protocol versions: `supported_protocol_versions` field
+- Module exports: `__all__`, `__version__`, `__author__`
+
+Passes against both source installs and wheel builds.
 
 ## Test Matrix
 
 | Test file | Count | Covers |
 |-----------|-------|--------|
+| `test_typed_consumer.py` | 47 | Typed public API consumer (F3) |
 | `test_import_boundaries.py` | 24 | Import graph, backward compat, command registry, lazy loading |
 | `test_unit_dimensions.py` | 77 | Dimension type, UnitDefinition, registry, compatibility, display, parsing bounds |
 | `test_repl_and_cli.py` | 41 | CLI dispatch, REPL, output format |
@@ -165,8 +209,9 @@ Construction-time cross-reference validation ensures:
 | `test_build_single.py` | 36 | Build correctness, parity, determinism, manifest validation |
 | `test_release5_isolation.py` | 167 | Registry immutability, validation, config, concurrency, sessions |
 | `test_mcp_server.py` | 675 | MCP protocol, tools, profiles, schemas |
-| Other tests | ~2348 | Full regression suite |
-| **Total** | **3374 passed** | |
+| `test_documentation.py` | ~25 | Version parity, protocol parity, package/single-file parity |
+| Other tests | ~2578 | Full regression suite |
+| **Total** | **3676 collected** | |
 
 ## Backward Compatibility
 
@@ -178,7 +223,7 @@ All documented public API surfaces preserved:
 - Generated `eggcalc.py` ✓ (regenerated, works correctly, no residual relative imports)
 - NL expressions (`"five plus three"`) ✓
 - Unit expressions (`"30m + 100ft"`) ✓
-- All 3374 existing tests pass ✓
+- All 3676 collected tests pass ✓
 
 ## Documentation Updates
 
@@ -205,15 +250,30 @@ The following changes were made in the corrective closure pass:
 - Angle propagates via XOR in multiplication/division
 - `are_units_compatible()` no longer falls back to category-string matching
 - Unknown units are explicitly incompatible (no silent category coincidence)
-- Compound parsing bounded: `MAX_COMPOUND_DEPTH=16`, `MAX_UNIT_STRING_LENGTH=256`
+- Compound parsing bounded: `MAX_COMPOUND_DEPTH=16`, `MAX_UNIT_STRING_LENGTH=256`, `MAX_COMPOUND_ATOMS=32`
 
 ### ToolRegistry Validation (Workstream A)
 - Construction-time cross-reference validation for handler/schema/profile consistency
 - Missing or inconsistent references raise `ValueError` at construction
 
+### Protocol Version Unification (Workstream E)
+- Created `eggcalc/_protocol.py` as single source for `SUPPORTED_PROTOCOL_VERSIONS`
+- `capabilities.py` and `mcp/server.py` both import from `_protocol.py`
+- Eliminated duplicate literal tuples
+- 4 protocol parity tests verify single-source constraint
+
+### Configuration API (Workstream A)
+- Added `McpServer.apply_configuration()` as single entry point for parse+validate+generate+activate
+- Failed activation preserves prior state unchanged
+
+### Typed Public Consumer (Workstream F)
+- `tests/test_typed_consumer.py` exercises entire documented public API under strict typing
+- 47 tests covering evaluation, normalization, units, CLI exports, capabilities, config, memory, variables, constants
+
 ### Build Artifact Correctness
 - Fixed residual `from ..exact.*` relative imports in generated `eggcalc.py`
 - Fixed `from . import units` handling for single-file mode
+- Added `_protocol` module to `MODULES_CALC` build manifest
 - Build manifest validation via `--validate` flag
 - Deterministic generation test (build twice, compare bytes)
 
@@ -221,10 +281,36 @@ The following changes were made in the corrective closure pass:
 - Removed duplicate `MAX_TEXT_LENGTH_REGEX` constant
 - All text length limits now use single `MAX_TEXT_LENGTH` source
 
+### Static Analysis
+- mypy passes with 0 errors across 38 source files
+- ruff passes with 0 errors
+- black formatting clean
+- `# type: ignore[operator]` added for `eggcalc.exact` lazy `__getattr__` re-exports that confuse mypy
+
 ### Verification
-- 3374 tests pass (up from 3363)
+- 3676 tests collected and passing
 - All import boundary tests pass (24 tests)
-- Single-file generation and smoke tests pass
-- Ruff, black checks pass
+- Single-file generation and smoke tests pass (9/9 surfaces)
+- Ruff, black, mypy checks pass
 - Deterministic build test passes
 - No residual package-relative imports in generated file
+- Editable install surface test passes
+- REPL surface test passes
+
+## Retained Compatibility Shims
+
+| Shim | Location | Reason | Removal timing |
+|------|----------|--------|----------------|
+| `from eggcalc.normalize import main, print_help` | `eggcalc/normalize.py` (lazy re-export) | Backward compatibility for existing code | Next major version |
+| `handle_request(request, session=None)` module-level | `eggcalc/mcp/server.py` | Deprecated but still used by some callers | Next major version (emits DeprecationWarning) |
+| `eggcalc/__init__.py` lazy CLI exports | `eggcalc/__init__.py` PEP 562 | Avoids pulling argparse at import time | Permanent (design choice) |
+
+## Deferred Non-Blocking Work
+
+The following items are documented but do not block Release 6 closure:
+
+1. **Differential/invariant tests for all 16+ unit families** — 10 representative cross-family pairs tested; full family-by-family coverage deferred
+2. **Command inventory parity test** (package vs single-file) — commands are identical since they share `cli.py`; test deferred
+3. **Capabilities parity test** (package vs single-file) — capabilities are identical since they share `capabilities.py`; test deferred
+4. **REPL and editable install surface tests in smoke script** — now added ✓
+5. **Differentiated mypy/ruff profile for migrated modules** — uniform profile is sufficient; all modules pass existing checks

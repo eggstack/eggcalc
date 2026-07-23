@@ -411,36 +411,40 @@ class TestVersionParity:
 
 
 class TestProtocolVersionParity:
-    """Protocol versions must be identical in server.py and capabilities.py."""
+    """Protocol versions must have one source in _protocol.py and be imported elsewhere."""
 
-    def test_server_and_capabilities_agree(self):
+    def test_protocol_source_is_single_file(self):
         import pathlib
         import re
 
-        server_src = pathlib.Path("eggcalc/mcp/server.py").read_text()
-        m = re.search(r"SUPPORTED_PROTOCOL_VERSIONS\s*=\s*\(([^)]+)\)", server_src)
-        assert m, "Could not find SUPPORTED_PROTOCOL_VERSIONS in server.py"
-        server_versions = tuple(
+        proto_src = pathlib.Path("eggcalc/_protocol.py").read_text()
+        m = re.search(r"SUPPORTED_PROTOCOL_VERSIONS.*?=.*?\(([^)]+)\)", proto_src)
+        assert m, "Could not find SUPPORTED_PROTOCOL_VERSIONS in _protocol.py"
+        proto_versions = tuple(
             v.strip().strip('"').strip("'")
             for v in m.group(1).split(",")
             if v.strip().strip('"').strip("'")
         )
+        assert len(proto_versions) >= 2, f"Expected >=2 protocol versions, got {proto_versions}"
+
+    def test_server_imports_from_protocol(self):
+        import pathlib
+
+        server_src = pathlib.Path("eggcalc/mcp/server.py").read_text()
+        assert "from eggcalc._protocol import" in server_src
+
+    def test_capabilities_imports_from_protocol(self):
+        import pathlib
 
         caps_src = pathlib.Path("eggcalc/capabilities.py").read_text()
-        m2 = re.search(
-            r"_SUPPORTED_PROTOCOL_VERSIONS:\s*tuple\[str,\s*\.\.\.\]\s*=\s*\(([^)]+)\)",
-            caps_src,
-        )
-        assert m2, "Could not find _SUPPORTED_PROTOCOL_VERSIONS in capabilities.py"
-        caps_versions = tuple(
-            v.strip().strip('"').strip("'")
-            for v in m2.group(1).split(",")
-            if v.strip().strip('"').strip("'")
-        )
+        assert "from ._protocol import" in caps_src
 
-        assert (
-            server_versions == caps_versions
-        ), f"Protocol version mismatch: server={server_versions}, caps={caps_versions}"
+    def test_all_sources_agree(self):
+        from eggcalc._protocol import SUPPORTED_PROTOCOL_VERSIONS as proto
+        from eggcalc.capabilities import detect_capabilities
+
+        caps = detect_capabilities()
+        assert caps.supported_protocol_versions == proto
 
 
 class TestPackageSingleFileParity:

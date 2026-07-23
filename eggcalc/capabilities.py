@@ -13,9 +13,7 @@ import os
 import sys
 from dataclasses import dataclass
 
-# Protocol versions supported by this eggcalc release.
-# Duplicated here to avoid a circular import with mcp.server.
-_SUPPORTED_PROTOCOL_VERSIONS: tuple[str, ...] = ("2024-11-05", "2025-11-25")
+from ._protocol import SUPPORTED_PROTOCOL_VERSIONS as _SUPPORTED_PROTOCOL_VERSIONS
 
 
 @dataclass(frozen=True)

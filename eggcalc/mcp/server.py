@@ -249,8 +249,10 @@ MAX_CANCELLED_REQUESTS = _parse_env_int(
     "EGGCALC_MCP_MAX_CANCELLED_REQUESTS", 10_000, 100, 1_000_000
 )
 
-SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")
-LATEST_SUPPORTED_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[-1]
+from eggcalc._protocol import (
+    LATEST_SUPPORTED_PROTOCOL_VERSION,
+    SUPPORTED_PROTOCOL_VERSIONS,
+)
 
 SUPPORTED_SCHEMA_KEYWORDS = frozenset(
     {
@@ -1573,6 +1575,41 @@ class McpServer:
             self._sessions.clear()
         for session in sessions_to_close:
             session.close()
+
+    def apply_configuration(
+        self,
+        *,
+        constants: dict[str, Any] | None = None,
+        functions: dict[str, Any] | None = None,
+        units: dict[str, Any] | None = None,
+        policy: str | None = None,
+    ) -> ConfigSnapshot:
+        """Parse, validate, and atomically activate a configuration change.
+
+        Single entry point for the full configuration lifecycle:
+        parse → validate → assign generation → construct snapshot →
+        activate on the server's evaluator.
+
+        Returns the new snapshot on success.  On failure the prior
+        configuration is preserved unchanged.
+        """
+        snapshot = parse_config_snapshot(
+            constants=constants,
+            functions=functions,
+            units=units,
+            policy=policy,
+        )
+        with self._lock:
+            new_gen = self._config_manager.current().generation + 1
+            validated = ConfigSnapshot(
+                generation=new_gen,
+                constants=dict(snapshot.constants),
+                functions=dict(snapshot.functions),
+                units=dict(snapshot.units),
+                policy=snapshot.policy,
+            )
+        self.activate_snapshot(validated)
+        return validated
 
     def activate_snapshot(self, snapshot: ConfigSnapshot) -> None:
         """Atomically activate a configuration snapshot.

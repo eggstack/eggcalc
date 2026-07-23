@@ -20,6 +20,7 @@ EGGCALC_DIR = os.path.join(os.path.dirname(__file__), "eggcalc")
 MODULES_CALC = [
     "units",
     "evaluator",
+    "_protocol",
     "normalize",
     "cli",
     "capabilities",
@@ -508,6 +509,12 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     code = code.replace("_diff_spans(", "diff_spans(")
     code = code.replace("_first_diff(", "first_diff(")
     code = code.replace("_levenshtein_distance(", "levenshtein_distance(")
+
+    # _protocol module: capabilities.py uses _SUPPORTED_PROTOCOL_VERSIONS (aliased)
+    code = code.replace(
+        "supported_protocol_versions=_SUPPORTED_PROTOCOL_VERSIONS,",
+        "supported_protocol_versions=SUPPORTED_PROTOCOL_VERSIONS,",
+    )
 
     return code, imports, exact_import_globals
 
