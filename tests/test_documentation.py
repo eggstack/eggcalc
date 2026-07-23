@@ -405,9 +405,9 @@ class TestVersionParity:
         assert m2, "Could not find version in pyproject.toml"
         pyproject_version = m2.group(1)
 
-        assert init_version == pyproject_version, (
-            f"Version mismatch: __init__={init_version!r}, pyproject={pyproject_version!r}"
-        )
+        assert (
+            init_version == pyproject_version
+        ), f"Version mismatch: __init__={init_version!r}, pyproject={pyproject_version!r}"
 
 
 class TestProtocolVersionParity:
@@ -418,9 +418,7 @@ class TestProtocolVersionParity:
         import re
 
         server_src = pathlib.Path("eggcalc/mcp/server.py").read_text()
-        m = re.search(
-            r"SUPPORTED_PROTOCOL_VERSIONS\s*=\s*\(([^)]+)\)", server_src
-        )
+        m = re.search(r"SUPPORTED_PROTOCOL_VERSIONS\s*=\s*\(([^)]+)\)", server_src)
         assert m, "Could not find SUPPORTED_PROTOCOL_VERSIONS in server.py"
         server_versions = tuple(
             v.strip().strip('"').strip("'")
@@ -440,9 +438,9 @@ class TestProtocolVersionParity:
             if v.strip().strip('"').strip("'")
         )
 
-        assert server_versions == caps_versions, (
-            f"Protocol version mismatch: server={server_versions}, caps={caps_versions}"
-        )
+        assert (
+            server_versions == caps_versions
+        ), f"Protocol version mismatch: server={server_versions}, caps={caps_versions}"
 
 
 class TestPackageSingleFileParity:
@@ -491,12 +489,12 @@ class TestPackageSingleFileParity:
         single_alias_count = int(lines[0])
         single_canonical_count = int(lines[1])
 
-        assert single_alias_count == pkg_alias_count, (
-            f"Alias count mismatch: package={pkg_alias_count}, single-file={single_alias_count}"
-        )
-        assert single_canonical_count == pkg_canonical_count, (
-            f"Canonical count mismatch: package={pkg_canonical_count}, single-file={single_canonical_count}"
-        )
+        assert (
+            single_alias_count == pkg_alias_count
+        ), f"Alias count mismatch: package={pkg_alias_count}, single-file={single_alias_count}"
+        assert (
+            single_canonical_count == pkg_canonical_count
+        ), f"Canonical count mismatch: package={pkg_canonical_count}, single-file={single_canonical_count}"
 
     def test_tool_schema_counts_match(self):
         """MCP tool schema counts must match between package and single-file."""
@@ -535,6 +533,6 @@ class TestPackageSingleFileParity:
         assert result.returncode == 0, f"Single-file query failed: {result.stderr}"
         single_schema_count = int(result.stdout.strip())
 
-        assert single_schema_count == pkg_schema_count, (
-            f"Schema count mismatch: package={pkg_schema_count}, single-file={single_schema_count}"
-        )
+        assert (
+            single_schema_count == pkg_schema_count
+        ), f"Schema count mismatch: package={pkg_schema_count}, single-file={single_schema_count}"

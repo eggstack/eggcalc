@@ -2278,7 +2278,7 @@ def _parse_compound_signature(
     op_idx, op = _find_last_top_level_op(unit)
     if op_idx != -1:
         left_str = unit[:op_idx]
-        right_str = unit[op_idx + len(op):]
+        right_str = unit[op_idx + len(op) :]
         left = _parse_compound_signature(left_str, _depth + 1)
         right = _parse_compound_signature(right_str, _depth + 1)
         if left is None or right is None:
