@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import textwrap
 
 # ---------------------------------------------------------------------------
 # Public API surface
@@ -380,3 +381,160 @@ class TestImportBoundaryClaims:
                 if mod:
                     for f in forbidden:
                         assert not mod.startswith(f), f"evaluator.py imports from {mod}"
+
+
+# ---------------------------------------------------------------------------
+# Authority parity (criterion 32, 33, 44)
+# ---------------------------------------------------------------------------
+
+
+class TestVersionParity:
+    """Package version must be consistent across pyproject.toml and __init__."""
+
+    def test_pyproject_matches_init(self):
+        import pathlib
+        import re
+
+        init_src = pathlib.Path("eggcalc/__init__.py").read_text()
+        m = re.search(r'__version__\s*=\s*"([^"]+)"', init_src)
+        assert m, "Could not find __version__ in __init__.py"
+        init_version = m.group(1)
+
+        pyproject = pathlib.Path("pyproject.toml").read_text()
+        m2 = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
+        assert m2, "Could not find version in pyproject.toml"
+        pyproject_version = m2.group(1)
+
+        assert init_version == pyproject_version, (
+            f"Version mismatch: __init__={init_version!r}, pyproject={pyproject_version!r}"
+        )
+
+
+class TestProtocolVersionParity:
+    """Protocol versions must be identical in server.py and capabilities.py."""
+
+    def test_server_and_capabilities_agree(self):
+        import pathlib
+        import re
+
+        server_src = pathlib.Path("eggcalc/mcp/server.py").read_text()
+        m = re.search(
+            r"SUPPORTED_PROTOCOL_VERSIONS\s*=\s*\(([^)]+)\)", server_src
+        )
+        assert m, "Could not find SUPPORTED_PROTOCOL_VERSIONS in server.py"
+        server_versions = tuple(
+            v.strip().strip('"').strip("'")
+            for v in m.group(1).split(",")
+            if v.strip().strip('"').strip("'")
+        )
+
+        caps_src = pathlib.Path("eggcalc/capabilities.py").read_text()
+        m2 = re.search(
+            r"_SUPPORTED_PROTOCOL_VERSIONS:\s*tuple\[str,\s*\.\.\.\]\s*=\s*\(([^)]+)\)",
+            caps_src,
+        )
+        assert m2, "Could not find _SUPPORTED_PROTOCOL_VERSIONS in capabilities.py"
+        caps_versions = tuple(
+            v.strip().strip('"').strip("'")
+            for v in m2.group(1).split(",")
+            if v.strip().strip('"').strip("'")
+        )
+
+        assert server_versions == caps_versions, (
+            f"Protocol version mismatch: server={server_versions}, caps={caps_versions}"
+        )
+
+
+class TestPackageSingleFileParity:
+    """Package and single-file must share the same unit/tool/command inventories."""
+
+    def test_unit_registry_counts_match(self):
+        """Unit alias and canonical counts must match between package and single-file."""
+        import pathlib
+        import subprocess
+        import sys
+
+        # Package counts
+        from eggcalc.units import build_unit_registry
+
+        reg = build_unit_registry()
+        pkg_alias_count = len(reg.all_aliases)
+        pkg_canonical_count = len(reg.all_canonicals)
+
+        # Build single-file and query its counts via subprocess
+        subprocess.run(
+            [sys.executable, "build_single.py"],
+            check=True,
+            capture_output=True,
+        )
+        single_path = pathlib.Path("eggcalc.py")
+        assert single_path.exists(), "eggcalc.py not found after build"
+
+        code = textwrap.dedent("""\
+            import importlib.util, sys
+            spec = importlib.util.spec_from_file_location("eggcalc_single", "eggcalc.py")
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules["eggcalc_single"] = mod
+            spec.loader.exec_module(mod)
+            from eggcalc.units import build_unit_registry
+            reg = build_unit_registry()
+            print(len(reg.all_aliases))
+            print(len(reg.all_canonicals))
+        """)
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"Single-file query failed: {result.stderr}"
+        lines = result.stdout.strip().split("\n")
+        single_alias_count = int(lines[0])
+        single_canonical_count = int(lines[1])
+
+        assert single_alias_count == pkg_alias_count, (
+            f"Alias count mismatch: package={pkg_alias_count}, single-file={single_alias_count}"
+        )
+        assert single_canonical_count == pkg_canonical_count, (
+            f"Canonical count mismatch: package={pkg_canonical_count}, single-file={single_canonical_count}"
+        )
+
+    def test_tool_schema_counts_match(self):
+        """MCP tool schema counts must match between package and single-file."""
+        import pathlib
+        import subprocess
+        import sys
+
+        # Package counts
+        from eggcalc.mcp.tools import TOOL_SCHEMAS
+
+        pkg_schema_count = len(TOOL_SCHEMAS)
+
+        # Build single-file and query its counts via subprocess
+        subprocess.run(
+            [sys.executable, "build_single.py"],
+            check=True,
+            capture_output=True,
+        )
+        single_path = pathlib.Path("eggcalc.py")
+        assert single_path.exists(), "eggcalc.py not found after build"
+
+        code = textwrap.dedent("""\
+            import importlib.util, sys
+            spec = importlib.util.spec_from_file_location("eggcalc_single", "eggcalc.py")
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules["eggcalc_single"] = mod
+            spec.loader.exec_module(mod)
+            from eggcalc.mcp.tools import TOOL_SCHEMAS
+            print(len(TOOL_SCHEMAS))
+        """)
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"Single-file query failed: {result.stderr}"
+        single_schema_count = int(result.stdout.strip())
+
+        assert single_schema_count == pkg_schema_count, (
+            f"Schema count mismatch: package={pkg_schema_count}, single-file={single_schema_count}"
+        )

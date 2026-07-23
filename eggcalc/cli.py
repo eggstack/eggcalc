@@ -458,9 +458,9 @@ def _cli_text_command(
         if result["warnings"]:
             for w in result["warnings"]:
                 kind = w["kind"].upper()
-                print(f"\u2717 {kind}: {w['message']}")
+                print(f"[!] {kind}: {w['message']}")
         else:
-            print("\u2713 No hidden characters")
+            print("[OK] No hidden characters")
         if result["confusables"]:
             print(f"\nConfusables found: {len(result['confusables'])}")
             for c in result["confusables"][:5]:
@@ -524,7 +524,7 @@ def _cli_text_command(
             print(f"Error: Invalid regex pattern: {e}", file=sys.stderr)
             return 1
         if not result["valid_pattern"]:
-            print(f"\u2717 Invalid regex pattern: {pattern}", file=sys.stderr)
+            print(f"[!] Invalid regex pattern: {pattern}", file=sys.stderr)
             return 1
         if json_output:
             import json
@@ -534,15 +534,15 @@ def _cli_text_command(
         if result["results"]:
             r = result["results"][0]
             if r["matches"]:
-                print(f"\u2713 Match: '{r['sample']}'")
+                print(f"[OK] Match: '{r['sample']}'")
                 if r["groups"]:
                     print(f"  Groups: {r['groups']}")
                 if r["groupdict"]:
                     print(f"  Named groups: {r['groupdict']}")
             else:
-                print("\u2717 No match")
+                print("[!] No match")
         else:
-            print("\u2717 No match")
+            print("[!] No match")
         return 0
 
     if cmd == "replace-check":
@@ -569,9 +569,9 @@ def _cli_text_command(
             return 0
         count = result["match_count"]
         if count == 0:
-            print("\u2717 No match for replacement.")
+            print("[!] No match for replacement.")
         elif count == 1:
-            print("\u2713 Replacement would apply cleanly to 1 match.")
+            print("[OK] Replacement would apply cleanly to 1 match.")
         else:
             print(f"\u221d Replacement is ambiguous: {count} matches found.")
         for f in result["findings"]:
@@ -642,7 +642,7 @@ def _cli_text_command(
             print(json.dumps(result))
             return 0
         if not result["patch_parse_ok"]:
-            print("\u2717 Failed to parse patch.")
+            print("[!] Failed to parse patch.")
             for f in result["findings"]:
                 print(f"  {f}")
             return 1
@@ -650,9 +650,9 @@ def _cli_text_command(
         applied = result["hunks_applied"]
         failed = result["hunks_failed"]
         if result["applies"]:
-            print(f"\u2713 Patch applies cleanly. {applied}/{total} hunks applied.")
+            print(f"[OK] Patch applies cleanly. {applied}/{total} hunks applied.")
         else:
-            print(f"\u2717 Patch fails: {failed}/{total} hunks failed.")
+            print(f"[!] Patch fails: {failed}/{total} hunks failed.")
         for f in result["findings"]:
             print(f"  {f}")
         return 0
@@ -670,7 +670,7 @@ def _cli_text_command(
             print(json.dumps(result))
             return 0
         if not result["parse_ok"]:
-            print("\u2717 Parse failed.")
+            print("[!] Parse failed.")
             for f in result["findings"]:
                 print(f"  {f}")
             return 1
@@ -741,9 +741,9 @@ def _cli_text_command(
             return 0
         entries = result["entries"]
         if result["parse_ok"] and not result["invalid_lines"]:
-            print(f"\u2713 Valid .env: {len(entries)} entry/entries.")
+            print(f"[OK] Valid .env: {len(entries)} entry/entries.")
         else:
-            print(f"\u2717 Invalid .env: {len(result['invalid_lines'])} invalid line(s).")
+            print(f"[!] Invalid .env: {len(result['invalid_lines'])} invalid line(s).")
         for f in result["findings"]:
             print(f"  {f}")
         return 0

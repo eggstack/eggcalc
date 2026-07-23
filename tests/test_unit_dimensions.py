@@ -538,3 +538,63 @@ class TestCompoundParsingBounds:
         nested = "/".join(["m"] * depth)
         result = _parse_compound_signature(nested)
         assert result is not None
+
+    def test_max_atoms_exceeded_returns_none(self):
+        """Exceeding MAX_COMPOUND_ATOMS must return None."""
+        import eggcalc.units as u
+
+        orig = u.MAX_COMPOUND_ATOMS
+        try:
+            u.MAX_COMPOUND_ATOMS = 3
+            # 3 operators = 4 atoms, exceeds limit of 3
+            result = _parse_compound_signature("a*b*c*d")
+            assert result is None
+        finally:
+            u.MAX_COMPOUND_ATOMS = orig
+
+    def test_max_atoms_boundary_succeeds(self):
+        """Expressions below MAX_COMPOUND_ATOMS must parse."""
+        import eggcalc.units as u
+
+        orig = u.MAX_COMPOUND_ATOMS
+        try:
+            u.MAX_COMPOUND_ATOMS = 4
+            # 3 operators = 4 atoms, within limit of 4
+            result = _parse_compound_signature("a*b*c*d")
+            assert result is not None
+        finally:
+            u.MAX_COMPOUND_ATOMS = orig
+
+
+class TestDuplicateAliasRejection:
+    """Registry construction must reject conflicting aliases (criterion 25)."""
+
+    def test_conflicting_canonical_rejected(self):
+        """Two aliases mapping to different canonicals must fail."""
+        from eggcalc.units import UNIT_BASE, build_unit_registry
+
+        # UNIT_BASE is {canonical: {alias: factor, ...}}
+        # Add the same alias to two different canonicals
+        orig_base = {k: dict(v) for k, v in UNIT_BASE.items()}
+        try:
+            UNIT_BASE["m"]["test_conflict_alias"] = 1.0
+            UNIT_BASE["s"]["test_conflict_alias"] = 1.0
+            with pytest.raises(ValueError, match="Conflicting alias"):
+                build_unit_registry()
+        finally:
+            UNIT_BASE.clear()
+            UNIT_BASE.update(orig_base)
+
+    def test_no_conflict_succeeds(self):
+        """Non-conflicting aliases must build successfully."""
+        from eggcalc.units import UNIT_BASE, build_unit_registry
+
+        orig_base = {k: dict(v) for k, v in UNIT_BASE.items()}
+        try:
+            # Same alias, same canonical, same scale — no conflict
+            UNIT_BASE["m"]["test_no_conflict"] = 1.0
+            reg = build_unit_registry()
+            assert "test_no_conflict" in reg.all_aliases
+        finally:
+            UNIT_BASE.clear()
+            UNIT_BASE.update(orig_base)

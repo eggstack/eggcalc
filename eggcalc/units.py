@@ -2247,6 +2247,12 @@ def _parse_compound_signature(
     if _depth > MAX_COMPOUND_DEPTH:
         return None
 
+    # Atom-count bound: count top-level operators (each creates a split).
+    # The total atoms = operators + 1, so reject if operators >= MAX_COMPOUND_ATOMS.
+    _op_count, _ = _count_top_level_ops(unit)
+    if _op_count >= MAX_COMPOUND_ATOMS:
+        return None
+
     # Strip a leading "1/" or "1//" or "1%" reciprocal marker (the
     # convention used by __rfloordiv__ / __rmod__). These are
     # semantically identical to having the unit on the other side.
@@ -2272,7 +2278,7 @@ def _parse_compound_signature(
     op_idx, op = _find_last_top_level_op(unit)
     if op_idx != -1:
         left_str = unit[:op_idx]
-        right_str = unit[op_idx + len(op) :]
+        right_str = unit[op_idx + len(op):]
         left = _parse_compound_signature(left_str, _depth + 1)
         right = _parse_compound_signature(right_str, _depth + 1)
         if left is None or right is None:
@@ -2294,6 +2300,40 @@ def _parse_compound_signature(
     num_only = tuple((b, e) for b, e in atom if e > 0)
     den_only = tuple((b, -e) for b, e in atom if e < 0)
     return num_only, den_only
+
+
+def _count_top_level_ops(unit: str) -> tuple[int, str]:
+    """Count top-level operators in a unit string.
+
+    Returns ``(count, last_op)`` where ``count`` is the number of
+    top-level ``*``, ``/``, ``//``, ``%`` operators (excluding those
+    inside ``**`` exponentiation sequences) and ``last_op`` is the
+    rightmost such operator string.
+    """
+    count = 0
+    last_op = ""
+    i = 0
+    while i < len(unit):
+        c = unit[i]
+        if c == "*" and i + 1 < len(unit) and unit[i + 1] == "*":
+            i += 2
+            continue
+        if c == "*":
+            count += 1
+            last_op = "*"
+        elif c == "/" and i + 1 < len(unit) and unit[i + 1] == "/":
+            count += 1
+            last_op = "//"
+            i += 2
+            continue
+        elif c == "/":
+            count += 1
+            last_op = "/"
+        elif c == "%":
+            count += 1
+            last_op = "%"
+        i += 1
+    return count, last_op
 
 
 def _find_last_top_level_op(unit: str) -> tuple[int, str]:

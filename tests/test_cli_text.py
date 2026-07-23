@@ -32,7 +32,7 @@ class TestCLIInspect:
         code, stdout, stderr = run_calc(["inspect", "hello"])
         assert code == 0
         assert "No hidden characters" in stdout
-        assert "\u2713" in stdout  # checkmark
+        assert "[OK]" in stdout  # checkmark
 
     def test_inspect_clean_text_unicode(self):
         """Clean Unicode text should pass inspection."""
@@ -120,14 +120,14 @@ class TestCLIRegex:
         code, stdout, stderr = run_calc(["regex", r"^\d+$", "12345"])
         assert code == 0
         assert "Match" in stdout
-        assert "\u2713" in stdout
+        assert "[OK]" in stdout
 
     def test_regex_no_match(self):
         """No match should be reported."""
         code, stdout, stderr = run_calc(["regex", r"^hello", "world"])
         assert code == 0
         assert "No match" in stdout
-        assert "\u2717" in stdout
+        assert "[!]" in stdout
 
     def test_regex_with_groups(self):
         """Capture groups should be displayed."""
@@ -356,14 +356,14 @@ class TestCLIDotenvCheck:
         code, stdout, stderr = run_calc(["-e", "dotenv-check DB_HOST=localhost DB_PORT=5432"])
         assert code == 0
         assert "Valid" in stdout
-        assert "\u2713" in stdout
+        assert "[OK]" in stdout
 
     def test_invalid_env(self):
         """Invalid .env should fail."""
         code, stdout, stderr = run_calc(["-e", "dotenv-check NO_EQUALS_SIGN"])
         assert code == 0
         assert "Invalid" in stdout
-        assert "\u2717" in stdout
+        assert "[!]" in stdout
 
     def test_json_output(self):
         """JSON output should be valid JSON."""
