@@ -12,6 +12,9 @@ Release 6 — Internal Architecture and Maintainability
 
 All checks pass on Python 3.14.2 (macOS), Python 3.11–3.14 on Linux/macOS/Windows.
 
+- **CI workflow run**: #30043943626
+- **All 9 jobs**: package, test (ubuntu-latest, 3.11–3.14), test (macos-latest, 3.11–3.12), test (windows-latest, 3.11–3.12) — all success
+
 ```
 ruff check .           → 0 errors
 black --check .        → 0 changes needed
