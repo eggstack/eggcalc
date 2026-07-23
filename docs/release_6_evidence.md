@@ -4,7 +4,7 @@ Release 6 — Internal Architecture and Maintainability
 
 ## Commit
 
-- **SHA**: `3825e7e` (corrective closure pass)
+- **SHA**: `e615feb` (corrective closure pass)
 - **Branch**: `main`
 - **Date**: 2026-07-23
 
@@ -12,7 +12,7 @@ Release 6 — Internal Architecture and Maintainability
 
 All checks pass on Python 3.14.2 (macOS), Python 3.11–3.14 on Linux/macOS/Windows.
 
-- **CI workflow run**: #30043943626
+- **CI workflow run**: #30044670718
 - **All 9 jobs**: package, test (ubuntu-latest, 3.11–3.14), test (macos-latest, 3.11–3.12), test (windows-latest, 3.11–3.12) — all success
 
 ```
