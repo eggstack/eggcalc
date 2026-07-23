@@ -24,6 +24,11 @@ Numeric = float | int | complex
 FLOAT_EPSILON = 1e-10
 MAX_RESULT_VALUE = 1e308
 
+# Resource bounds for compound unit parsing
+MAX_COMPOUND_DEPTH = 16
+MAX_COMPOUND_ATOMS = 32
+MAX_UNIT_STRING_LENGTH = 256
+
 
 # ---------------------------------------------------------------------------
 # Structural dimension model (D1-D2)
@@ -2189,6 +2194,7 @@ def get_unit_category(unit: str) -> str | None:
 
 def _parse_compound_signature(
     unit: str,
+    _depth: int = 0,
 ) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, int], ...]] | None:
     """Parse a compound unit string into (numerator, denominator) signatures.
 
@@ -2217,23 +2223,29 @@ def _parse_compound_signature(
     if not unit or not isinstance(unit, str):
         return None
 
+    # Resource bounds
+    if len(unit) > MAX_UNIT_STRING_LENGTH:
+        return None
+    if _depth > MAX_COMPOUND_DEPTH:
+        return None
+
     # Strip a leading "1/" or "1//" or "1%" reciprocal marker (the
     # convention used by __rfloordiv__ / __rmod__). These are
     # semantically identical to having the unit on the other side.
     if unit.startswith("1//"):
-        inner = _parse_compound_signature(unit[3:])
+        inner = _parse_compound_signature(unit[3:], _depth + 1)
         if inner is None:
             return None
         num, den = inner
         return den, num
     if unit.startswith("1/"):
-        inner = _parse_compound_signature(unit[2:])
+        inner = _parse_compound_signature(unit[2:], _depth + 1)
         if inner is None:
             return None
         num, den = inner
         return den, num
     if unit.startswith("1%"):
-        inner = _parse_compound_signature(unit[2:])
+        inner = _parse_compound_signature(unit[2:], _depth + 1)
         if inner is None:
             return None
         num, den = inner
@@ -2243,8 +2255,8 @@ def _parse_compound_signature(
     if op_idx != -1:
         left_str = unit[:op_idx]
         right_str = unit[op_idx + len(op) :]
-        left = _parse_compound_signature(left_str)
-        right = _parse_compound_signature(right_str)
+        left = _parse_compound_signature(left_str, _depth + 1)
+        right = _parse_compound_signature(right_str, _depth + 1)
         if left is None or right is None:
             return None
         if op == "*":

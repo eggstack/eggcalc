@@ -335,8 +335,12 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     # Units module references
     code = code.replace("units.UNIT_BASE", "UNIT_BASE")
     code = code.replace("units.UNIT_ALIASES", "UNIT_ALIASES")
+    code = code.replace("units.UNIT_CATEGORIES", "UNIT_CATEGORIES")
     code = code.replace("units.TEMPERATURE_CONVERSIONS", "TEMPERATURE_CONVERSIONS")
+    code = code.replace("units._UNITS_LOCK", "_UNITS_LOCK")
     code = code.replace("units._rebuild_conversions()", "_rebuild_conversions()")
+    code = code.replace("units._simplify_unit_string", "_simplify_unit_string")
+    code = code.replace("units._expand_short_compound", "_expand_short_compound")
 
     # Normalize references to modules now inlined
     code = code.replace(
@@ -712,7 +716,7 @@ if __name__ == "__main__":
     # Post-process: convert local `from <module> import` to global variable assignments.
     # In the single file, modules don't exist as separate packages.
     EXACT_MODULE_NAMES = {m.split("/")[-1] for m in MODULES_EXACT}
-    INLINED_NAMES = EXACT_MODULE_NAMES | {"evaluator", "units", "normalize", "capabilities"}
+    INLINED_NAMES = EXACT_MODULE_NAMES | {"evaluator", "units", "normalize", "capabilities", "cli"}
 
     def _replace_local_imports(text: str) -> str:
         """Replace local `from <module> import` with global variable assignments."""
@@ -729,8 +733,42 @@ if __name__ == "__main__":
                 and stripped.startswith("from ")
                 and " import " in stripped
             ):
-                # Extract module name
-                mod_name = stripped.split()[1].lstrip(".")
+                # Handle "from . import X" pattern (implicit relative import)
+                if stripped.startswith("from . import ") or stripped.startswith("from .. import "):
+                    # Extract the imported names after "import"
+                    after_import = stripped.split(" import ", 1)[1]
+                    # Check if any imported name is an inlined module
+                    skip = False
+                    alias = None
+                    orig_name = None
+                    for name in after_import.split(","):
+                        name = name.strip()
+                        # Handle "X as Y" aliases
+                        if " as " in name:
+                            orig_name, alias = name.split(" as ", 1)
+                            orig_name = orig_name.strip()
+                            alias = alias.strip()
+                        else:
+                            orig_name = name
+                            alias = None
+                        if orig_name in INLINED_NAMES or orig_name in EXACT_MODULE_NAMES:
+                            skip = True
+                            break
+                    if skip:
+                        # Replace with sys.modules lookup for the module
+                        target = alias if alias else orig_name
+                        indent = line[: len(line) - len(line.lstrip())]
+                        result.append(
+                            f"{indent}{target} = sys.modules.get(__name__.rsplit('.', 1)[0] + '.{orig_name}') if '.' in __name__ else sys.modules.get('{orig_name}')"
+                        )
+                        i += 1
+                        continue
+                    # Not an inlined module - keep it
+                    result.append(line)
+                    i += 1
+                    continue
+                # Extract module name (last component after stripping dots)
+                mod_name = stripped.split()[1].lstrip(".").split(".")[-1]
                 if mod_name in EXACT_MODULE_NAMES:
                     indent = line[: len(line) - len(line.lstrip())]
                     after_from = stripped[len("from ") :]
@@ -779,6 +817,42 @@ if __name__ == "__main__":
                 elif mod_name in INLINED_NAMES:
                     # Non-exact inlined module (evaluator, units, etc.) - just remove import
                     # The names are already globals in the single file
+                    # Also remove surrounding try/except block if present
+                    # but keep any function calls that follow (e.g. load_user_config())
+                    try_start = None
+                    for back in range(len(result) - 1, max(len(result) - 5, -1), -1):
+                        if result[back].strip() == "try:":
+                            try_start = back
+                            break
+                        elif result[back].strip():
+                            break  # non-empty line that isn't try:
+                    if try_start is not None:
+                        # Look forward for except block after this import
+                        j = i + 1
+                        while j < len(lines):
+                            s = lines[j].strip()
+                            if s.startswith("except ") or s.startswith("except("):
+                                # Found except - skip except line and its body
+                                j += 1
+                                except_indent = (
+                                    len(lines[j]) - len(lines[j].lstrip()) if j < len(lines) else 0
+                                )
+                                while j < len(lines):
+                                    ls = lines[j].strip()
+                                    if not ls or ls.startswith("#") or ls.startswith("pass"):
+                                        j += 1
+                                    elif len(lines[j]) - len(lines[j].lstrip()) >= except_indent:
+                                        j += 1
+                                    else:
+                                        break
+                                # j now points to line after except body
+                                # Set i to j - 1 so i += 1 at end makes i = j (the next line)
+                                i = j - 1
+                                result.pop(try_start)
+                                break
+                            elif s and not s.startswith("#"):
+                                break
+                            j += 1
                     i += 1
                     continue
             result.append(line)

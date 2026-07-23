@@ -17,9 +17,12 @@ from eggcalc.units import (
     DIM_MASS,
     DIM_TEMPERATURE,
     DIM_TIME,
+    MAX_COMPOUND_DEPTH,
+    MAX_UNIT_STRING_LENGTH,
     UnitDefinition,
     UnitRegistry,
     UnitValue,
+    _parse_compound_signature,
     _structural_dimension,
     are_units_compatible,
     build_unit_registry,
@@ -497,3 +500,41 @@ class TestDisplayCompatibility:
     def test_fractional_float(self):
         uv = UnitValue(1.5, "kg")
         assert repr(uv) == "1.5 kg"
+
+
+# ---------------------------------------------------------------------------
+# Compound parsing resource bounds (C2)
+# ---------------------------------------------------------------------------
+
+
+class TestCompoundParsingBounds:
+    """Compound parsing must enforce resource bounds."""
+
+    def test_max_depth_exceeded_returns_none(self):
+        """Exceeding MAX_COMPOUND_DEPTH must return None, not stack overflow."""
+        # Build a deeply nested expression: "m/m/m/m/..." beyond depth limit
+        depth = MAX_COMPOUND_DEPTH + 2
+        deeply_nested = "/".join(["m"] * depth)
+        result = _parse_compound_signature(deeply_nested)
+        assert result is None
+
+    def test_max_string_length_exceeded_returns_none(self):
+        """Exceeding MAX_UNIT_STRING_LENGTH must return None."""
+        long_unit = "m" * (MAX_UNIT_STRING_LENGTH + 1)
+        result = _parse_compound_signature(long_unit)
+        assert result is None
+
+    def test_normal_depth_succeeds(self):
+        """Normal compound expressions within bounds must parse successfully."""
+        result = _parse_compound_signature("m/s**2")
+        assert result is not None
+        num, den = result
+        assert ("m", 1) in num
+        assert ("s", 2) in den
+
+    def test_max_depth_boundary_succeeds(self):
+        """Expressions at exactly MAX_COMPOUND_DEPTH must parse."""
+        depth = MAX_COMPOUND_DEPTH
+        nested = "/".join(["m"] * depth)
+        result = _parse_compound_signature(nested)
+        assert result is not None

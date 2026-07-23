@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import filecmp
 import os
 import subprocess
 import sys
@@ -159,3 +160,55 @@ class TestBuildSingleFile:
         assert (
             pkg_result == single_result
         ), f"Mismatch for '{expr}': package={pkg_result!r}, single={single_result!r}"
+
+
+class TestBuildDeterminism:
+    """Single-file generation must be byte-for-byte deterministic."""
+
+    def test_deterministic_generation(self):
+        """Building twice from the same source must produce identical bytes."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
+            path1 = f.name
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
+            path2 = f.name
+        try:
+            for path in (path1, path2):
+                result = subprocess.run(
+                    [sys.executable, BUILD_SCRIPT, "-o", path],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                assert result.returncode == 0, f"Build failed: {result.stderr}"
+            assert filecmp.cmp(
+                path1, path2, shallow=False
+            ), "Two builds from the same source produced different output"
+        finally:
+            for p in (path1, path2):
+                if os.path.exists(p):
+                    os.unlink(p)
+
+
+class TestBuildManifestValidation:
+    """Build manifest must be self-consistent."""
+
+    def test_validate_build_manifest(self):
+        """validate_build_manifest() must return no errors."""
+        result = subprocess.run(
+            [sys.executable, BUILD_SCRIPT, "--validate"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, f"Manifest validation failed: {result.stderr}"
+        assert "ERROR" not in result.stdout, f"Manifest validation errors: {result.stdout}"
+
+    def test_no_residual_relative_imports(self, single_file_path):
+        """Generated file must not contain package-relative imports."""
+        with open(single_file_path, encoding="utf-8") as f:
+            content = f.read()
+        # Check for "from .." patterns that would fail in single-file mode
+        import re
+
+        violations = re.findall(r"from \.\.\w", content)
+        assert not violations, f"Residual relative imports found: {violations}"

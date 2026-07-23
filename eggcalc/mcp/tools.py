@@ -213,7 +213,6 @@ MAX_REGEX_SAMPLES = 100
 MAX_REGEX_SAMPLE_LENGTH = 10_000
 MAX_PATTERN_LENGTH_REGEX = 1000
 MAX_MATCHES_REGEX = 100
-MAX_TEXT_LENGTH_REGEX = 100_000
 REGEX_TIMEOUT_SECONDS = 5
 MAX_CONCURRENT_SPAWNED = 4
 MAX_PAIRWISE_ITEMS: int = 1000
@@ -1848,11 +1847,11 @@ def regex_finditer(
             tool="regex_finditer",
         )
 
-    if len(text) > MAX_TEXT_LENGTH_REGEX:
+    if len(text) > MAX_TEXT_LENGTH:
         return _error_response(
             "input_too_large",
-            f"Text length {len(text)} exceeds MAX_TEXT_LENGTH_REGEX {MAX_TEXT_LENGTH_REGEX}",
-            [f"Maximum input length is {MAX_TEXT_LENGTH_REGEX} characters"],
+            f"Text length {len(text)} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}",
+            [f"Maximum input length is {MAX_TEXT_LENGTH} characters"],
             tool="regex_finditer",
         )
 

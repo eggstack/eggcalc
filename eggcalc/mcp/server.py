@@ -627,6 +627,34 @@ class ToolRegistry:
             {name: tuple(tools) for name, tools in raw_profiles.items()}
         )
 
+        # Validate cross-reference consistency at construction time
+        handler_names = set(self._handlers.keys())
+        schema_names = set(self._schemas.keys())
+        metadata_names = set(self._metadata.keys())
+
+        # Every handler should have a schema
+        missing_schemas = handler_names - schema_names
+        if missing_schemas:
+            raise ValueError(f"Handlers without schemas: {sorted(missing_schemas)}")
+
+        # Every schema should have a handler
+        orphan_schemas = schema_names - handler_names
+        if orphan_schemas:
+            raise ValueError(f"Schemas without handlers: {sorted(orphan_schemas)}")
+
+        # Every metadata entry should reference a registered tool
+        orphan_metadata = metadata_names - handler_names
+        if orphan_metadata:
+            raise ValueError(f"Metadata for unregistered tools: {sorted(orphan_metadata)}")
+
+        # Every profile entry should reference a registered tool
+        for profile_name, profile_tools in self._profiles.items():
+            for tool_name in profile_tools:
+                if tool_name not in handler_names:
+                    raise ValueError(
+                        f"Profile {profile_name!r} references unknown tool: {tool_name!r}"
+                    )
+
     @property
     def handlers(self) -> MappingProxyType[str, Any]:
         return self._handlers

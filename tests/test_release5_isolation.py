@@ -190,7 +190,13 @@ class TestToolRegistry:
 
     def test_registry_custom_handlers(self):
         custom = {"my_tool": lambda **kw: None}
-        reg = ToolRegistry(handlers=custom, schemas={}, metadata={}, profiles={})
+        schema = {"inputSchema": {"type": "object", "properties": {}}}
+        reg = ToolRegistry(
+            handlers=custom,
+            schemas={"my_tool": schema},
+            metadata={"my_tool": {}},
+            profiles={"custom": ["my_tool"]},
+        )
         assert reg.handlers == custom
         assert reg.tool_names == ["my_tool"]
 
@@ -220,8 +226,13 @@ class TestToolRegistry:
         assert reg.has_tool(match)
 
     def test_registry_find_close_match_no_match(self):
+        handler = lambda **kw: None
+        schema = {"inputSchema": {"type": "object", "properties": {}}}
         reg = ToolRegistry(
-            handlers={"foo": lambda **kw: None}, schemas={}, metadata={}, profiles={}
+            handlers={"foo": handler},
+            schemas={"foo": schema},
+            metadata={"foo": {}},
+            profiles={"custom": ["foo"]},
         )
         assert reg.find_close_match("zzzzzzzzzzz") is None
 
@@ -289,11 +300,13 @@ class TestToolExecutor:
         def _slow(**kw):
             time.sleep(10)
 
+        handler = lambda **kw: None
+        schema = {"inputSchema": {"type": "object", "properties": {}}}
         registry = ToolRegistry(
-            handlers={"slow_tool": _slow},
-            schemas={},
-            metadata={},
-            profiles={},
+            handlers={"slow_tool": _slow, "_dummy": handler},
+            schemas={"slow_tool": schema, "_dummy": schema},
+            metadata={"slow_tool": {}, "_dummy": {}},
+            profiles={"custom": ["slow_tool", "_dummy"]},
         )
         executor_slow = ToolExecutor(McpServerConfig(max_tool_timeout_seconds=1), registry)
         result = executor_slow.call_tool("slow_tool", {}, request_id="t1")
@@ -709,9 +722,9 @@ class TestConcurrency:
 
         reg = ToolRegistry(
             handlers={"blocker": _blocking},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"blocker": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"blocker": {}},
+            profiles={"custom": ["blocker"]},
         )
         bounded = ToolExecutor(cfg, reg)
 
@@ -1046,9 +1059,9 @@ class TestConcurrencyStress:
         cfg = McpServerConfig(max_tool_timeout_seconds=1, max_tool_workers=2)
         reg = ToolRegistry(
             handlers={"always_slow": lambda **kw: time.sleep(100)},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"always_slow": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"always_slow": {}},
+            profiles={"custom": ["always_slow"]},
         )
         executor = ToolExecutor(cfg, reg)
         for i in range(5):
@@ -1057,9 +1070,9 @@ class TestConcurrencyStress:
         # After timeouts, a fast tool should still work
         fast_reg = ToolRegistry(
             handlers={"fast": lambda **kw: {"ok": True}},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"fast": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"fast": {}},
+            profiles={"custom": ["fast"]},
         )
         fast_exec = ToolExecutor(McpServerConfig(max_tool_timeout_seconds=5), fast_reg)
         result = fast_exec.call_tool("fast", {}, request_id="f1")
@@ -1171,9 +1184,9 @@ class TestSaturationRejection:
         cfg = McpServerConfig(max_tool_workers=1, max_tool_queue_size=2)
         reg = ToolRegistry(
             handlers={"blocker": _blocker},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"blocker": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"blocker": {}},
+            profiles={"custom": ["blocker"]},
         )
         executor = ToolExecutor(cfg, reg)
         max_inflight = cfg.max_tool_workers + cfg.max_tool_queue_size
@@ -1204,9 +1217,12 @@ class TestSaturationRejection:
 
         reg = ToolRegistry(
             handlers={"slow": _slow, "fast": lambda **kw: {"ok": True}},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={
+                "slow": {"inputSchema": {"type": "object", "properties": {}}},
+                "fast": {"inputSchema": {"type": "object", "properties": {}}},
+            },
+            metadata={"slow": {}, "fast": {}},
+            profiles={"custom": ["slow", "fast"]},
         )
         executor = ToolExecutor(cfg, reg)
         max_inflight = cfg.max_tool_workers + cfg.max_tool_queue_size
@@ -1262,9 +1278,9 @@ class TestOversizedOutputStorm:
         big = "x" * 2_000_000
         reg = ToolRegistry(
             handlers={"big_out": lambda **kw: {"data": big}},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"big_out": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"big_out": {}},
+            profiles={"custom": ["big_out"]},
         )
         executor = ToolExecutor(McpServerConfig(max_output_bytes=1000), reg)
         result = executor.call_tool("big_out", {}, request_id="big1")
@@ -1282,9 +1298,12 @@ class TestOversizedOutputStorm:
                 "big_out": lambda **kw: {"data": big},
                 "normal": lambda **kw: {"ok": True, "val": 42},
             },
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={
+                "big_out": {"inputSchema": {"type": "object", "properties": {}}},
+                "normal": {"inputSchema": {"type": "object", "properties": {}}},
+            },
+            metadata={"big_out": {}, "normal": {}},
+            profiles={"custom": ["big_out", "normal"]},
         )
         executor = ToolExecutor(McpServerConfig(max_output_bytes=1000), reg)
         for i in range(5):
@@ -1698,9 +1717,9 @@ class TestStressCounterCleanup:
         cfg = McpServerConfig(max_tool_timeout_seconds=1, max_tool_workers=2, max_tool_queue_size=1)
         reg = ToolRegistry(
             handlers={"slow": _slow},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"slow": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"slow": {}},
+            profiles={"custom": ["slow"]},
         )
         executor = ToolExecutor(cfg, reg)
         # Submit 2 tasks that block until we signal
@@ -1724,9 +1743,9 @@ class TestStressCounterCleanup:
         cfg = McpServerConfig(max_tool_workers=3, max_tool_queue_size=3)
         reg = ToolRegistry(
             handlers={"wait": lambda **kw: (barrier.wait(timeout=5), {"done": True})[1]},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"wait": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"wait": {}},
+            profiles={"custom": ["wait"]},
         )
         executor = ToolExecutor(cfg, reg)
         futures = []
@@ -1764,15 +1783,15 @@ class TestMultiServerIndependentEnforcement:
 
         reg1 = ToolRegistry(
             handlers={"slow": _blocker},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"slow": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"slow": {}},
+            profiles={"custom": ["slow"]},
         )
         reg2 = ToolRegistry(
             handlers={"slow": _blocker},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"slow": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"slow": {}},
+            profiles={"custom": ["slow"]},
         )
         exec1 = ToolExecutor(cfg1, reg1)
         exec2 = ToolExecutor(cfg2, reg2)
@@ -1804,15 +1823,31 @@ class TestMultiServerIndependentEnforcement:
         cfg2 = McpServerConfig(max_output_bytes=50_000)
         reg1 = ToolRegistry(
             handlers={"echo": lambda text="": text},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={
+                "echo": {
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {"text": {"type": "string"}},
+                        "required": [],
+                    }
+                }
+            },
+            metadata={"echo": {}},
+            profiles={"custom": ["echo"]},
         )
         reg2 = ToolRegistry(
             handlers={"echo": lambda text="": text},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={
+                "echo": {
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {"text": {"type": "string"}},
+                        "required": [],
+                    }
+                }
+            },
+            metadata={"echo": {}},
+            profiles={"custom": ["echo"]},
         )
         exec1 = ToolExecutor(cfg1, reg1)
         exec2 = ToolExecutor(cfg2, reg2)
@@ -1836,9 +1871,9 @@ class TestMultiServerIndependentEnforcement:
         cfg2 = McpServerConfig(max_requests_per_second=100)
         reg = ToolRegistry(
             handlers={"fast": lambda **kw: {"ok": True}},
-            schemas={},
-            metadata={},
-            profiles={},
+            schemas={"fast": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"fast": {}},
+            profiles={"custom": ["fast"]},
         )
         exec1 = ToolExecutor(cfg1, reg)
         exec2 = ToolExecutor(cfg2, reg)
@@ -1887,14 +1922,14 @@ class TestMultiServerIndependentEnforcement:
         reg1 = ToolRegistry(
             handlers={"tool_a": lambda x=0: x},
             schemas={"tool_a": schema1},
-            metadata={},
-            profiles={},
+            metadata={"tool_a": {}},
+            profiles={"custom": ["tool_a"]},
         )
         reg2 = ToolRegistry(
             handlers={"tool_a": lambda y=0: y},
             schemas={"tool_a": schema2},
-            metadata={},
-            profiles={},
+            metadata={"tool_a": {}},
+            profiles={"custom": ["tool_a"]},
         )
         cfg = McpServerConfig(max_tool_timeout_seconds=5)
         exec1 = ToolExecutor(cfg, reg1)
@@ -2055,6 +2090,8 @@ class TestRegistryNestedMutation:
         reg = ToolRegistry(
             handlers={"test_tool": handler},
             schemas={"test_tool": schema},
+            metadata={"test_tool": {}},
+            profiles={"custom": ["test_tool"]},
         )
         original = dict(reg.get_schema("test_tool")["inputSchema"]["properties"])
         # Mutate the original dict
@@ -2069,7 +2106,9 @@ class TestRegistryNestedMutation:
         metadata = {"tags": ["math", "basic"], "version": "1.0"}
         reg = ToolRegistry(
             handlers={"test_tool": handler},
+            schemas={"test_tool": {"inputSchema": {"type": "object", "properties": {}}}},
             metadata={"test_tool": metadata},
+            profiles={"custom": ["test_tool"]},
         )
         original_tags = list(reg.get_metadata("test_tool")["tags"])
         metadata["tags"].append("injected")
@@ -2082,6 +2121,8 @@ class TestRegistryNestedMutation:
         profile_tools = ["test_tool"]
         reg = ToolRegistry(
             handlers={"test_tool": handler},
+            schemas={"test_tool": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"test_tool": {}},
             profiles={"custom": profile_tools},
         )
         original = list(reg.get_profile_tools("custom"))
@@ -2095,6 +2136,8 @@ class TestRegistryNestedMutation:
         reg = ToolRegistry(
             handlers={"test_tool": handler},
             schemas={"test_tool": schema},
+            metadata={"test_tool": {}},
+            profiles={"custom": ["test_tool"]},
         )
         s1 = reg.get_schema("test_tool")
         s2 = reg.get_schema("test_tool")
@@ -2107,13 +2150,66 @@ class TestRegistryNestedMutation:
     def test_tool_names_is_immutable(self):
         """tool_names must return a sorted list (not a live reference)."""
         handler = lambda **kw: None
-        reg = ToolRegistry(handlers={"a": handler, "b": handler})
+        reg = ToolRegistry(
+            handlers={"a": handler, "b": handler},
+            schemas={
+                "a": {"inputSchema": {"type": "object", "properties": {}}},
+                "b": {"inputSchema": {"type": "object", "properties": {}}},
+            },
+            metadata={"a": {}, "b": {}},
+            profiles={"custom": ["a", "b"]},
+        )
         names = reg.tool_names
         assert isinstance(names, list)
         assert names == ["a", "b"]
         # Mutating the returned list should not affect the registry
         names.append("c")
         assert "c" not in reg.tool_names
+
+    def test_handler_without_schema_rejected(self):
+        """Construction must fail when a handler has no corresponding schema."""
+        handler = lambda **kw: None
+        with pytest.raises(ValueError, match="Handlers without schemas"):
+            ToolRegistry(
+                handlers={"test_tool": handler},
+                schemas={"other_tool": {"inputSchema": {"type": "object", "properties": {}}}},
+                metadata={"other_tool": {}},
+                profiles={"custom": ["other_tool"]},
+            )
+
+    def test_schema_without_handler_rejected(self):
+        """Construction must fail when a schema has no corresponding handler."""
+        schema = {"inputSchema": {"type": "object", "properties": {}}}
+        handler = lambda **kw: None
+        with pytest.raises(ValueError, match="Schemas without handlers"):
+            ToolRegistry(
+                handlers={"known_tool": handler},
+                schemas={"known_tool": schema, "orphan_tool": schema},
+                metadata={"known_tool": {}},
+                profiles={"custom": ["known_tool"]},
+            )
+
+    def test_metadata_for_unknown_tool_rejected(self):
+        """Construction must fail when metadata references an unknown tool."""
+        handler = lambda **kw: None
+        with pytest.raises(ValueError, match="Metadata for unregistered tools"):
+            ToolRegistry(
+                handlers={"test_tool": handler},
+                schemas={"test_tool": {"inputSchema": {"type": "object", "properties": {}}}},
+                metadata={"unknown_tool": {"tags": ["math"]}},
+                profiles={},
+            )
+
+    def test_profile_references_unknown_tool_rejected(self):
+        """Construction must fail when a profile references an unknown tool."""
+        handler = lambda **kw: None
+        with pytest.raises(ValueError, match="references unknown tool"):
+            ToolRegistry(
+                handlers={"test_tool": handler},
+                schemas={"test_tool": {"inputSchema": {"type": "object", "properties": {}}}},
+                metadata={"test_tool": {}},
+                profiles={"custom": ["test_tool", "nonexistent_tool"]},
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -2256,7 +2352,12 @@ class TestExecutorCancellationBeforeStart:
             max_tool_queue_size=1,
             max_tool_timeout_seconds=10,
         )
-        handler_reg = ToolRegistry(handlers={"blocker": blocking_handler})
+        handler_reg = ToolRegistry(
+            handlers={"blocker": blocking_handler},
+            schemas={"blocker": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"blocker": {}},
+            profiles={"custom": ["blocker"]},
+        )
         executor = ToolExecutor(config, handler_reg)
         try:
             # Block the single worker
@@ -2306,7 +2407,12 @@ class TestExecutorCancellationBeforeStart:
             max_tool_queue_size=4,
             max_tool_timeout_seconds=0.1,
         )
-        handler_reg = ToolRegistry(handlers={"slow": slow_handler})
+        handler_reg = ToolRegistry(
+            handlers={"slow": slow_handler},
+            schemas={"slow": {"inputSchema": {"type": "object", "properties": {}}}},
+            metadata={"slow": {}},
+            profiles={"custom": ["slow"]},
+        )
         executor = ToolExecutor(config, handler_reg)
         try:
             # This will timeout, but the worker should still be running
