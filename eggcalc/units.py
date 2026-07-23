@@ -431,10 +431,28 @@ def build_unit_registry() -> UnitRegistry:
     Constructs a :class:`UnitDefinition` for every unit in ``UNIT_BASE`` and
     every temperature unit, then verifies there are no duplicate aliases or
     conflicting definitions.
+
+    Raises ``ValueError`` if the same alias maps to conflicting definitions.
     """
     by_alias: dict[str, UnitDefinition] = {}
     by_canonical: dict[str, UnitDefinition] = {}
     dimensions: dict[str, Dimension] = {}
+
+    def _register_alias(alias: str, ud: UnitDefinition) -> None:
+        existing = by_alias.get(alias)
+        if existing is not None:
+            if existing.canonical != ud.canonical:
+                raise ValueError(
+                    f"Conflicting alias {alias!r}: "
+                    f"maps to {existing.canonical!r} and {ud.canonical!r}"
+                )
+            if existing.scale != ud.scale or existing.offset != ud.offset:
+                raise ValueError(
+                    f"Conflicting definition for alias {alias!r}: "
+                    f"scale/offset mismatch between {existing.canonical!r} "
+                    f"and {ud.canonical!r}"
+                )
+        by_alias[alias] = ud
 
     # -- multiplicative units from UNIT_BASE ------------------------------
     for base_key, variants in UNIT_BASE.items():
@@ -449,9 +467,7 @@ def build_unit_registry() -> UnitRegistry:
                 scale=factor,
                 aliases=(alias,),
             )
-            by_alias[alias] = ud
-            if factor == 1.0 and alias != base_key:
-                pass  # not canonical
+            _register_alias(alias, ud)
             if alias == base_key:
                 by_canonical[base_key] = ud
 
@@ -461,7 +477,7 @@ def build_unit_registry() -> UnitRegistry:
         if from_u not in by_alias:
             # Derive scale from K→from_u conversion (mult gives K→from_u)
             # For K→C: value * 1.0 + (-273.15), so C scale ~1.0 relative to K
-            by_alias[from_u] = UnitDefinition(
+            ud = UnitDefinition(
                 canonical=from_u,
                 dimension=temp_dim,
                 scale=1.0,
@@ -469,13 +485,15 @@ def build_unit_registry() -> UnitRegistry:
                 affine=True,
                 aliases=(from_u,),
             )
-            by_canonical[from_u] = by_alias[from_u]
+            _register_alias(from_u, ud)
+            by_canonical[from_u] = ud
     # Ensure K is registered
     if "K" not in by_alias:
-        by_alias["K"] = UnitDefinition(
+        ud = UnitDefinition(
             canonical="K", dimension=temp_dim, scale=1.0, affine=True, aliases=("K",)
         )
-        by_canonical["K"] = by_alias["K"]
+        _register_alias("K", ud)
+        by_canonical["K"] = ud
 
     return UnitRegistry(by_alias, by_canonical, dimensions)
 

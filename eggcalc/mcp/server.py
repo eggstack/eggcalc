@@ -1551,7 +1551,9 @@ class McpServer:
             session = self.create_session()
         elif session._closed:
             return _invalid_request(None, "Session is closed")
-        elif session._owner_id is not None and session._owner_id != id(self):
+        elif session._owner_id is None:
+            return _invalid_request(None, "Session is not bound to a server")
+        elif session._owner_id != id(self):
             return _invalid_request(None, "Session belongs to another server")
 
         return session.handle_message(request, server=self)
@@ -2558,6 +2560,7 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
         )
         compat = _get_compat_server()
         compat_session = McpSession(initial_state=McpSessionState.READY)
+        compat_session._bind_owner(compat)
         return compat.handle_request(request, session=compat_session)
 
     return session.handle_message(request)
