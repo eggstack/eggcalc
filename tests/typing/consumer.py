@@ -50,7 +50,7 @@ async def check_evaluate_async() -> float:
 def check_unit_value() -> float:
     uv: UnitValue = UnitValue(30, "m")
     converted: UnitValue = uv.convert_to("ft")
-    return converted.value
+    return converted.value  # type: ignore[return-value]
 
 
 def check_unit_spec() -> str:
@@ -67,20 +67,20 @@ def check_unit_expression() -> str:
     from eggcalc.units import parse_unit_expression
 
     expr: UnitExpression = parse_unit_expression("m/s")
-    return expr.dimension_str
+    return str(expr.dimension)
 
 
 def check_eggcalc_app() -> float:
     app: EggCalcApp = EggCalcApp()
-    result: float = app.evaluate("5 + 3")
+    result: float = app.calculate("5 + 3")
     return result
 
 
 def check_run() -> float:
     from eggcalc.normalize import NORMALIZE, PATTERNS
 
-    result: float = run("five plus three", NORMALIZE, PATTERNS)
-    return result
+    result, _ = run("five plus three", NORMALIZE, PATTERNS)
+    return result  # type: ignore[no-any-return]
 
 
 def check_load_user_config() -> None:

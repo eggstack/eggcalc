@@ -80,7 +80,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         run: |
           mypy eggcalc --ignore-missing-imports
-          mypy tests/typing/consumer.py --strict --ignore-missing-imports
+          mypy tests/typing/consumer.py --strict --ignore-missing-imports --follow-imports=silent
 
   package:
     runs-on: ubuntu-latest

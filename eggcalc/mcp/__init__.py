@@ -6,11 +6,14 @@ Provides stdio-based MCP server for text, Unicode, and measurement tools.
 
 from __future__ import annotations
 
+from eggcalc._protocol import (
+    LATEST_SUPPORTED_PROTOCOL_VERSION,
+    SUPPORTED_PROTOCOL_VERSIONS,
+)
+
 from . import tools
 from .schemas import TOOL_SCHEMAS
 from .server import (
-    LATEST_SUPPORTED_PROTOCOL_VERSION,
-    SUPPORTED_PROTOCOL_VERSIONS,
     ConfigCandidate,
     ConfigError,
     ConfigManager,
