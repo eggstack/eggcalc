@@ -717,7 +717,9 @@ class ToolRegistry:
             if not profile_name:
                 raise ValueError("Profile name must not be empty")
             if any(ord(c) < 32 or ord(c) == 127 for c in profile_name):
-                raise ValueError(f"Profile name must not contain control characters: {profile_name!r}")
+                raise ValueError(
+                    f"Profile name must not contain control characters: {profile_name!r}"
+                )
             if not isinstance(profile_tools, (list, tuple)):
                 raise ValueError(
                     f"Profile {profile_name!r} must be a list of tool names, "
@@ -726,9 +728,7 @@ class ToolRegistry:
             seen_in_profile: set[str] = set()
             for tool_name in profile_tools:
                 if tool_name in seen_in_profile:
-                    raise ValueError(
-                        f"Duplicate tool {tool_name!r} in profile {profile_name!r}"
-                    )
+                    raise ValueError(f"Duplicate tool {tool_name!r} in profile {profile_name!r}")
                 seen_in_profile.add(tool_name)
                 if tool_name not in handler_names:
                     raise ValueError(
@@ -1394,7 +1394,11 @@ def policy_from_server_config(config: McpServerConfig) -> EvaluationPolicy:
     - PERMISSIVE enables only features allowed by the immutable server config ceiling;
     - DEFAULT follows server config flags.
     """
-    policy = EvaluationPolicy(config.profile) if config.profile in EvaluationPolicy._value2member_map_ else EvaluationPolicy.DEFAULT
+    policy = (
+        EvaluationPolicy(config.profile)
+        if config.profile in EvaluationPolicy._value2member_map_
+        else EvaluationPolicy.DEFAULT
+    )
     # Map config flags to policy when profile is not an explicit policy value
     if config.profile in EvaluationPolicy._value2member_map_:
         return policy
@@ -1405,17 +1409,19 @@ def policy_from_server_config(config: McpServerConfig) -> EvaluationPolicy:
     return EvaluationPolicy.DEFAULT
 
 
-def build_runtime_context(
-    config: McpServerConfig, snapshot: ConfigSnapshot
-) -> RuntimeContext:
+def build_runtime_context(config: McpServerConfig, snapshot: ConfigSnapshot) -> RuntimeContext:
     """Build a RuntimeContext from a config and snapshot.
 
     Constructs a fresh evaluator from the immutable built-in base tables
     plus exactly the snapshot overlay.  The policy determines the
     evaluator's allow_random and allow_side_effects flags.
     """
-    policy = snapshot.policy if isinstance(snapshot.policy, EvaluationPolicy) else EvaluationPolicy(
-        snapshot.policy.value if hasattr(snapshot.policy, "value") else snapshot.policy
+    policy = (
+        snapshot.policy
+        if isinstance(snapshot.policy, EvaluationPolicy)
+        else EvaluationPolicy(
+            snapshot.policy.value if hasattr(snapshot.policy, "value") else snapshot.policy
+        )
     )
     # STRICT always disables both; PERMISSIVE enables only what config allows;
     # DEFAULT follows config flags.
@@ -1645,21 +1651,15 @@ class McpSession:
             return {"jsonrpc": "2.0", "id": request_id, "result": {}}
         elif method == "tools/list":
             if server is None:
-                return _invalid_request_error(
-                    request_id, "tools/list requires a server context"
-                )
+                return _invalid_request_error(request_id, "tools/list requires a server context")
             return _handle_list_tools(request, server=server)
         elif method == "tools/call":
             if server is None:
-                return _invalid_request_error(
-                    request_id, "tools/call requires a server context"
-                )
+                return _invalid_request_error(request_id, "tools/call requires a server context")
             return self._handle_call_tool_server(request, server, context)
         elif method == "profiles/list":
             if server is None:
-                return _invalid_request_error(
-                    request_id, "profiles/list requires a server context"
-                )
+                return _invalid_request_error(request_id, "profiles/list requires a server context")
             return _handle_list_profiles(request, server=server)
         elif method.startswith("notifications/"):
             # Unknown notifications are silently ignored per MCP spec
@@ -1898,8 +1898,7 @@ class McpServer:
         if self._config.profile != "full" and self._config.profile not in self._registry.profiles:
             available = ", ".join(sorted(self._registry.profiles))
             raise ValueError(
-                f"Unknown profile: {self._config.profile!r}. "
-                f"Available profiles: {available}"
+                f"Unknown profile: {self._config.profile!r}. " f"Available profiles: {available}"
             )
 
         # Build the initial RuntimeContext once at construction.
