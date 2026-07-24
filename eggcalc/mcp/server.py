@@ -583,13 +583,41 @@ def _deep_freeze(obj: Any) -> Any:
     return obj
 
 
+def freeze_owned(value: Any) -> Any:
+    """Recursively convert mutable containers to immutable equivalents."""
+    if isinstance(value, Mapping):
+        return MappingProxyType({k: freeze_owned(v) for k, v in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(freeze_owned(v) for v in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(freeze_owned(v) for v in value)
+    return value
+
+
+def thaw_owned(value: Any) -> Any:
+    """Recursively convert immutable containers back to mutable equivalents."""
+    if isinstance(value, MappingProxyType):
+        return {k: thaw_owned(v) for k, v in value.items()}
+    if isinstance(value, tuple):
+        return [thaw_owned(v) for v in value]
+    if isinstance(value, frozenset):
+        return {thaw_owned(v) for v in value}
+    return value
+
+
 def _deep_copy(obj: Any) -> Any:
-    """Recursively copy mutable containers so originals cannot mutate us."""
+    """Recursively copy mutable containers so originals cannot mutate us.
+
+    Converts frozen containers back to mutable equivalents:
+    MappingProxyType → dict, tuple → list, frozenset → set.
+    """
+    if isinstance(obj, MappingProxyType):
+        return {k: _deep_copy(v) for k, v in obj.items()}
     if isinstance(obj, dict):
         return {k: _deep_copy(v) for k, v in obj.items()}
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple)):
         return [_deep_copy(item) for item in obj]
-    if isinstance(obj, set):
+    if isinstance(obj, (set, frozenset)):
         return {_deep_copy(item) for item in obj}
     return obj
 
@@ -605,6 +633,10 @@ class ToolRegistry:
     registry through constructor inputs or accessor return values.
     """
 
+    _VALID_LLM_EXPOSURE: frozenset[str] = frozenset(
+        {"default", "contextual", "expert_only", "harness_only", "hidden"}
+    )
+
     def __init__(
         self,
         handlers: dict[str, Any] | None = None,
@@ -612,45 +644,52 @@ class ToolRegistry:
         metadata: dict[str, dict[str, Any]] | None = None,
         profiles: dict[str, list[str]] | None = None,
     ) -> None:
-        # Deep-copy all inputs so the registry owns independent data.
         raw_handlers = handlers or TOOL_HANDLERS
         raw_schemas = schemas or TOOL_SCHEMAS
         raw_metadata = metadata or TOOL_METADATA
         raw_profiles = profiles or TOOL_PROFILES
 
-        self._handlers = MappingProxyType(dict(raw_handlers))
-        self._schemas = MappingProxyType(
-            {name: MappingProxyType(_deep_copy(schema)) for name, schema in raw_schemas.items()}
-        )
-        self._metadata = MappingProxyType(
-            {name: MappingProxyType(_deep_copy(meta)) for name, meta in raw_metadata.items()}
-        )
-        self._profiles = MappingProxyType(
+        self._handlers: MappingProxyType[str, Any] = freeze_owned(dict(raw_handlers))
+        self._schemas: MappingProxyType[str, Any] = freeze_owned(raw_schemas)
+        self._metadata: MappingProxyType[str, Any] = freeze_owned(raw_metadata)
+        self._profiles: MappingProxyType[str, tuple[str, ...]] = freeze_owned(
             {name: tuple(tools) for name, tools in raw_profiles.items()}
         )
 
-        # Validate cross-reference consistency at construction time
         handler_names = set(self._handlers.keys())
+
+        seen_handlers: set[str] = set()
+        for name in self._handlers:
+            if name in seen_handlers:
+                raise ValueError(f"Duplicate tool handler: {name!r}")
+            seen_handlers.add(name)
+
         schema_names = set(self._schemas.keys())
         metadata_names = set(self._metadata.keys())
 
-        # Every handler should have a schema
         missing_schemas = handler_names - schema_names
         if missing_schemas:
             raise ValueError(f"Handlers without schemas: {sorted(missing_schemas)}")
 
-        # Every schema should have a handler
         orphan_schemas = schema_names - handler_names
         if orphan_schemas:
             raise ValueError(f"Schemas without handlers: {sorted(orphan_schemas)}")
 
-        # Every metadata entry should reference a registered tool
         orphan_metadata = metadata_names - handler_names
         if orphan_metadata:
             raise ValueError(f"Metadata for unregistered tools: {sorted(orphan_metadata)}")
 
-        # Every profile entry should reference a registered tool
+        for name in self._metadata:
+            exposure = self._metadata[name].get("llm_exposure")
+            if exposure is not None and exposure not in self._VALID_LLM_EXPOSURE:
+                raise ValueError(
+                    f"Unsupported llm_exposure {exposure!r} for tool {name!r}; "
+                    f"must be one of {sorted(self._VALID_LLM_EXPOSURE)}"
+                )
+
         for profile_name, profile_tools in self._profiles.items():
+            if not profile_name:
+                raise ValueError("Profile name must not be empty")
             for tool_name in profile_tools:
                 if tool_name not in handler_names:
                     raise ValueError(
@@ -674,8 +713,8 @@ class ToolRegistry:
         return self._profiles
 
     @property
-    def tool_names(self) -> list[str]:
-        return sorted(self._handlers.keys())
+    def tool_names(self) -> tuple[str, ...]:
+        return tuple(sorted(self._handlers.keys()))
 
     def has_tool(self, name: str) -> bool:
         return name in self._handlers
@@ -696,7 +735,8 @@ class ToolRegistry:
         meta = self._metadata.get(name)
         if meta is None:
             return {}
-        return dict(meta)
+        result: dict[str, Any] = _deep_copy(dict(meta))
+        return result
 
     def get_profile_tools(self, profile: str | None = None) -> list[str]:
         """Return sorted tool names for a profile."""
@@ -1047,6 +1087,14 @@ class ToolExecutor:
             return self._queued_count
 
 
+class EvaluationPolicy(enum.Enum):
+    """Valid evaluation policy values for server configuration."""
+
+    DEFAULT = "default"
+    STRICT = "strict"
+    PERMISSIVE = "permissive"
+
+
 @_dataclass(frozen=True)
 class ConfigSnapshot:
     """Deeply immutable configuration snapshot for atomic replacement.
@@ -1060,7 +1108,7 @@ class ConfigSnapshot:
     constants: Mapping[str, Any] = _field(default_factory=dict)
     functions: Mapping[str, Any] = _field(default_factory=dict)
     units: Mapping[str, Any] = _field(default_factory=dict)
-    policy: str = "default"
+    policy: EvaluationPolicy | str = EvaluationPolicy.DEFAULT
 
     def __post_init__(self) -> None:
         # Deep copy mutable defaults to prevent external mutation, then
@@ -1068,15 +1116,25 @@ class ConfigSnapshot:
         object.__setattr__(self, 'constants', MappingProxyType(dict(self.constants)))
         object.__setattr__(self, 'functions', MappingProxyType(dict(self.functions)))
         object.__setattr__(self, 'units', MappingProxyType(dict(self.units)))
+        # Accept str for backward compatibility, converting to EvaluationPolicy.
+        if isinstance(self.policy, str):
+            try:
+                object.__setattr__(self, 'policy', EvaluationPolicy(self.policy))
+            except ValueError:
+                raise ConfigError(
+                    f"Invalid policy {self.policy!r}; "
+                    f"must be one of {sorted(e.value for e in EvaluationPolicy)}"
+                )
 
     def to_dict(self) -> dict[str, Any]:
         """Return a plain dict view safe for serialization."""
+        policy_val = self.policy.value if isinstance(self.policy, EvaluationPolicy) else self.policy
         return {
             "generation": self.generation,
             "constants": dict(self.constants),
             "functions": {k: getattr(v, "__name__", str(v)) for k, v in self.functions.items()},
             "units": dict(self.units),
-            "policy": self.policy,
+            "policy": policy_val,
         }
 
 
@@ -1084,12 +1142,37 @@ class ConfigError(Exception):
     """Raised when configuration parsing or validation fails."""
 
 
+@_dataclass(frozen=True)
+class ConfigCandidate:
+    """Validated configuration candidate before snapshot construction.
+
+    Holds the parsed and validated constants, functions, and policy
+    ready to be turned into a ConfigSnapshot and RuntimeContext.
+    """
+
+    constants: Mapping[str, Any] = _field(default_factory=dict)
+    functions: Mapping[str, Any] = _field(default_factory=dict)
+    policy: EvaluationPolicy = EvaluationPolicy.DEFAULT
+
+
+@_dataclass(frozen=True)
+class RuntimeContext:
+    """Complete atomic configuration state for the server.
+
+    Pairs a ConfigSnapshot with the evaluator instance that was built
+    from it, enabling atomic replacement without partial updates.
+    """
+
+    snapshot: ConfigSnapshot
+    evaluator: Any  # _evaluator.Evaluator
+
+
 def parse_config_snapshot(
     *,
     constants: dict[str, Any] | None = None,
     functions: dict[str, Any] | None = None,
     units: dict[str, Any] | None = None,
-    policy: str | None = None,
+    policy: str | EvaluationPolicy | None = None,
 ) -> ConfigSnapshot:
     """Parse raw configuration values into a validated ConfigSnapshot.
 
@@ -1116,22 +1199,27 @@ def parse_config_snapshot(
                 raise ConfigError(f"Function '{name}' must be callable")
             parsed_functions[name] = value
 
-    parsed_units: dict[str, Any] = {}
-    if units is not None:
-        for name, value in units.items():
-            if not isinstance(name, str):
-                raise ConfigError(f"Unit name must be str, got {type(name).__name__}")
-            parsed_units[name] = value
+    if units:
+        raise ConfigError("custom units are not supported by server configuration")
 
-    valid_policies = ("default", "strict", "permissive")
-    if policy is not None and policy not in valid_policies:
-        raise ConfigError(f"Invalid policy '{policy}'; must be one of {valid_policies}")
+    if isinstance(policy, EvaluationPolicy):
+        resolved_policy: EvaluationPolicy = policy
+    elif isinstance(policy, str):
+        try:
+            resolved_policy = EvaluationPolicy(policy)
+        except ValueError:
+            valid_values = sorted(e.value for e in EvaluationPolicy)
+            raise ConfigError(f"Invalid policy {policy!r}; must be one of {valid_values}")
+    elif policy is None:
+        resolved_policy = EvaluationPolicy.DEFAULT
+    else:
+        raise ConfigError(f"Invalid policy type: {type(policy).__name__}")
 
     return ConfigSnapshot(
         constants=parsed_constants,
         functions=parsed_functions,
-        units=parsed_units,
-        policy=policy or "default",
+        units={},
+        policy=resolved_policy,
     )
 
 
@@ -1174,7 +1262,7 @@ class ConfigManager:
         constants: dict[str, Any] | None = None,
         functions: dict[str, Any] | None = None,
         units: dict[str, Any] | None = None,
-        policy: str | None = None,
+        policy: str | EvaluationPolicy | None = None,
     ) -> ConfigSnapshot:
         """Build the next snapshot with a manager-assigned generation, validate, and apply.
 
@@ -1496,6 +1584,7 @@ class McpServer:
         )
         self._executor = ToolExecutor(self._config, self._registry, self._evaluator)
         self._config_manager = ConfigManager()
+        self._runtime_context: RuntimeContext | None = None
         self._closed = False
         self._lock = threading.Lock()
         self._sessions: set[McpSession] = set()
@@ -1582,12 +1671,12 @@ class McpServer:
         constants: dict[str, Any] | None = None,
         functions: dict[str, Any] | None = None,
         units: dict[str, Any] | None = None,
-        policy: str | None = None,
+        policy: str | EvaluationPolicy | None = None,
     ) -> ConfigSnapshot:
         """Parse, validate, and atomically activate a configuration change.
 
         Single entry point for the full configuration lifecycle:
-        parse → validate → assign generation → construct snapshot →
+        parse -> validate -> assign generation -> construct snapshot ->
         activate on the server's evaluator.
 
         Returns the new snapshot on success.  On failure the prior
@@ -1599,6 +1688,16 @@ class McpServer:
             units=units,
             policy=policy,
         )
+        new_eval = _evaluator.Evaluator(
+            allow_random=self._config.allow_random,
+            allow_side_effects=self._config.allow_side_effects,
+        )
+        for name, value in snapshot.constants.items():
+            new_eval.CONSTANTS[name] = value
+        for name, value in snapshot.functions.items():
+            if callable(value):
+                new_eval.FUNCTIONS[name] = value
+
         with self._lock:
             new_gen = self._config_manager.current().generation + 1
             validated = ConfigSnapshot(
@@ -1608,7 +1707,22 @@ class McpServer:
                 units=dict(snapshot.units),
                 policy=snapshot.policy,
             )
-        self.activate_snapshot(validated)
+            ctx = RuntimeContext(snapshot=validated, evaluator=new_eval)
+
+            prev_constants = dict(self._evaluator.CONSTANTS)
+            prev_functions = dict(self._evaluator.FUNCTIONS)
+            try:
+                self._evaluator.CONSTANTS.update(new_eval.CONSTANTS)
+                self._evaluator.FUNCTIONS.update(new_eval.FUNCTIONS)
+                self._config_manager.replace(validated)
+                self._runtime_context = ctx
+            except Exception:
+                self._evaluator.CONSTANTS.clear()
+                self._evaluator.CONSTANTS.update(prev_constants)
+                self._evaluator.FUNCTIONS.clear()
+                self._evaluator.FUNCTIONS.update(prev_functions)
+                raise
+
         return validated
 
     def activate_snapshot(self, snapshot: ConfigSnapshot) -> None:
@@ -1822,7 +1936,7 @@ def _validate_value_against_schema(
         return f"Schema nesting too deep at '{path}'"
 
     # Reject boolean schemas (true/false) — we don't honor them.
-    if not isinstance(prop, dict):
+    if not isinstance(prop, (dict, MappingProxyType)):
         return f"Schema for '{path}' must be an object"
 
     expected_type = prop.get("type")
@@ -1831,8 +1945,8 @@ def _validate_value_against_schema(
 
     # JSON Schema allows type as a string or a list of strings (e.g.
     # ["string", "null"] for a nullable field). We support both forms.
-    if isinstance(expected_type, list):
-        type_options = expected_type
+    if isinstance(expected_type, (list, tuple)):
+        type_options = list(expected_type)
     elif isinstance(expected_type, str):
         type_options = [expected_type]
     else:
@@ -2372,8 +2486,8 @@ def _handle_list_tools(request: dict, server: McpServer | None = None) -> dict:
             entry = {
                 "name": name,
                 "description": schema["description"],
-                "inputSchema": schema["inputSchema"],
-                "outputSchema": schema.get("outputSchema"),
+                "inputSchema": thaw_owned(schema["inputSchema"]),
+                "outputSchema": thaw_owned(schema.get("outputSchema")),
                 "tier": schema.get("tier"),
                 "tags": schema.get("tags", []),
                 "deprecated": schema.get("deprecated", False),

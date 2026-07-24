@@ -83,20 +83,18 @@ import os
 
 
 def get_version() -> str:
-    """Get version from __init__.py"""
-    init_path = os.path.join(EGGCALC_DIR, "__init__.py")
-    with open(init_path, encoding="utf-8") as f:
+    """Get version from _version.py (single source of truth)."""
+    version_path = os.path.join(EGGCALC_DIR, "_version.py")
+    with open(version_path, encoding="utf-8") as f:
         for line in f:
             if line.startswith("__version__"):
-                import re as _re
-
-                m = _re.match(r'__version__\s*=\s*["\']([^"\']+)["\']', line)
+                m = re.match(r'__version__\s*=\s*["\']([^"\']+)["\']', line)
                 if m:
                     return m.group(1)
                 raise SystemExit(
-                    f"ERROR: Malformed __version__ line in {init_path}: {line.strip()!r}"
+                    f"ERROR: Malformed __version__ line in {version_path}: {line.strip()!r}"
                 )
-    raise SystemExit(f"ERROR: __version__ not found in {init_path}")
+    raise SystemExit(f"ERROR: __version__ not found in {version_path}")
 
 
 def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:

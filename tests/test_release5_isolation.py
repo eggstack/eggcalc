@@ -198,7 +198,7 @@ class TestToolRegistry:
             profiles={"custom": ["my_tool"]},
         )
         assert reg.handlers == custom
-        assert reg.tool_names == ["my_tool"]
+        assert reg.tool_names == ("my_tool",)
 
     def test_registry_has_tool(self):
         reg = ToolRegistry()
@@ -215,8 +215,8 @@ class TestToolRegistry:
     def test_registry_tool_names(self):
         reg = ToolRegistry()
         names = reg.tool_names
-        assert isinstance(names, list)
-        assert names == sorted(names)
+        assert isinstance(names, tuple)
+        assert names == tuple(sorted(names))
         assert len(names) == len(TOOL_HANDLERS)
 
     def test_registry_find_close_match(self):
@@ -353,7 +353,7 @@ class TestConfigSnapshot:
         assert snap.generation == 0
         assert snap.constants == {}
         assert snap.functions == {}
-        assert snap.policy == "default"
+        assert snap.policy == _server_mod.EvaluationPolicy.DEFAULT
 
     def test_snapshot_immutable(self):
         CS = _server_mod.ConfigSnapshot
@@ -365,9 +365,9 @@ class TestConfigSnapshot:
 
     def test_snapshot_custom_values(self):
         CS = _server_mod.ConfigSnapshot
-        snap = CS(generation=42, policy="custom")
+        snap = CS(generation=42, policy="strict")
         assert snap.generation == 42
-        assert snap.policy == "custom"
+        assert snap.policy == _server_mod.EvaluationPolicy.STRICT
 
 
 # ---------------------------------------------------------------------------
@@ -390,9 +390,9 @@ class TestConfigManager:
         CS = _server_mod.ConfigSnapshot
         CM = _server_mod.ConfigManager
         mgr = CM()
-        new_snap = CS(generation=1, policy="new")
+        new_snap = CS(generation=1, policy="permissive")
         mgr.replace(new_snap)
-        assert mgr.current().policy == "new"
+        assert mgr.current().policy == _server_mod.EvaluationPolicy.PERMISSIVE
         assert mgr.current().generation == 1
 
     def test_manager_replace_increments_generation(self):
@@ -1150,12 +1150,12 @@ class TestConcurrencyStress:
         CS = _server_mod.ConfigSnapshot
         s1 = McpServer()
         s2 = McpServer()
-        snap1 = CS(generation=1, constants={"x": 10}, policy="a")
-        snap2 = CS(generation=1, constants={"x": 20}, policy="b")
+        snap1 = CS(generation=1, constants={"x": 10}, policy="default")
+        snap2 = CS(generation=1, constants={"x": 20}, policy="strict")
         s1.config_manager.replace(snap1)
         s2.config_manager.replace(snap2)
-        assert s1.config_manager.current().policy == "a"
-        assert s2.config_manager.current().policy == "b"
+        assert s1.config_manager.current().policy == _server_mod.EvaluationPolicy.DEFAULT
+        assert s2.config_manager.current().policy == _server_mod.EvaluationPolicy.STRICT
         assert s1.config_manager.current().constants == {"x": 10}
         assert s2.config_manager.current().constants == {"x": 20}
         s1.close()
@@ -1631,7 +1631,7 @@ class TestWorkstreamG_ExecutorAccounting:
         reg = ToolRegistry(
             handlers={"slow": slow_handler},
             schemas={"slow": {"inputSchema": {"type": "object", "properties": {}}}},
-            metadata={"slow": {"llm_exposure": "full"}},
+            metadata={"slow": {"llm_exposure": "default"}},
             profiles={"full": ["slow"]},
         )
         executor = ToolExecutor(
@@ -2148,7 +2148,7 @@ class TestRegistryNestedMutation:
         assert "evil" not in reg.get_schema("test_tool")["inputSchema"]["properties"]
 
     def test_tool_names_is_immutable(self):
-        """tool_names must return a sorted list (not a live reference)."""
+        """tool_names must return an immutable sorted tuple (not a live reference)."""
         handler = lambda **kw: None
         reg = ToolRegistry(
             handlers={"a": handler, "b": handler},
@@ -2160,11 +2160,8 @@ class TestRegistryNestedMutation:
             profiles={"custom": ["a", "b"]},
         )
         names = reg.tool_names
-        assert isinstance(names, list)
-        assert names == ["a", "b"]
-        # Mutating the returned list should not affect the registry
-        names.append("c")
-        assert "c" not in reg.tool_names
+        assert isinstance(names, tuple)
+        assert names == ("a", "b")
 
     def test_handler_without_schema_rejected(self):
         """Construction must fail when a handler has no corresponding schema."""
@@ -2641,4 +2638,4 @@ class TestParseConfigSnapshot:
 
     def test_valid_policy(self):
         snap = self._parse(policy="strict")
-        assert snap.policy == "strict"
+        assert snap.policy == _server_mod.EvaluationPolicy.STRICT

@@ -1,0 +1,3360 @@
+{
+  "deg": {
+    "aliases": [
+      "deg",
+      "degree",
+      "degrees"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "scale_to_base": 0.017453292519943295,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "angle"
+  },
+  "rad": {
+    "aliases": [
+      "rad",
+      "radian",
+      "radians"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "angle"
+  },
+  "acre": {
+    "aliases": [
+      "acre",
+      "acres"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 4046.8564224,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "cm2": {
+    "aliases": [
+      "cm**2",
+      "cm2",
+      "cm^2",
+      "squarecentimeter",
+      "squarecentimeters"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.0001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "ft2": {
+    "aliases": [
+      "ft**2",
+      "ft2",
+      "ft^2",
+      "sqft",
+      "squarefeet",
+      "squarefoot"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.09290304,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "ha": {
+    "aliases": [
+      "ha",
+      "hectare",
+      "hectares"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 10000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "in2": {
+    "aliases": [
+      "in**2",
+      "in2",
+      "in^2",
+      "sqin",
+      "squareinch",
+      "squareinches"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.00064516,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "km2": {
+    "aliases": [
+      "km**2",
+      "km2",
+      "km^2",
+      "squarekilometer",
+      "squarekilometers"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "m2": {
+    "aliases": [
+      "m**2",
+      "m2",
+      "m^2",
+      "sqm",
+      "squaremeter",
+      "squaremeters"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "mi2": {
+    "aliases": [
+      "mi**2",
+      "mi2",
+      "mi^2",
+      "sqmi",
+      "squaremile",
+      "squaremiles"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 2589988.110336,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "mm2": {
+    "aliases": [
+      "mm**2",
+      "mm2",
+      "mm^2",
+      "squaremillimeter",
+      "squaremillimeters"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "yd2": {
+    "aliases": [
+      "squareyard",
+      "squareyards",
+      "sqyd",
+      "yd**2",
+      "yd2",
+      "yd^2"
+    ],
+    "dimension": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.83612736,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "area"
+  },
+  "A": {
+    "aliases": [
+      "A",
+      "Amperes",
+      "Amps",
+      "amp",
+      "ampere",
+      "amperes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "current"
+  },
+  "mA": {
+    "aliases": [
+      "mA",
+      "milliamp",
+      "milliampere"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "current"
+  },
+  "\u03bcA": {
+    "aliases": [
+      "microamp",
+      "microampere",
+      "uA",
+      "\u03bcA"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "current"
+  },
+  "B": {
+    "aliases": [
+      "B",
+      "byte",
+      "bytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "EB": {
+    "aliases": [
+      "EB",
+      "exabyte",
+      "exabytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1.152921504606847e+18,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "GB": {
+    "aliases": [
+      "GB",
+      "gigabyte",
+      "gigabytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1073741824.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "KB": {
+    "aliases": [
+      "KB",
+      "kilobyte",
+      "kilobytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1024.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "MB": {
+    "aliases": [
+      "MB",
+      "megabyte",
+      "megabytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1048576.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "PB": {
+    "aliases": [
+      "PB",
+      "petabyte",
+      "petabytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1125899906842624.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "TB": {
+    "aliases": [
+      "TB",
+      "terabyte",
+      "terabytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1099511627776.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "YB": {
+    "aliases": [
+      "YB",
+      "yottabyte",
+      "yottabytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1.2089258196146292e+24,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "ZB": {
+    "aliases": [
+      "ZB",
+      "zettabyte",
+      "zettabytes"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1.1805916207174113e+21,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "bit": {
+    "aliases": [
+      "bit",
+      "bits"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 0.125,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data"
+  },
+  "Gbps": {
+    "aliases": [
+      "Gbps",
+      "gigabit/s",
+      "gigabits/s",
+      "gigabps"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1000000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data_rate"
+  },
+  "Kbps": {
+    "aliases": [
+      "Kbps",
+      "kilobit/s",
+      "kilobits/s",
+      "kilobps"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data_rate"
+  },
+  "Mbps": {
+    "aliases": [
+      "Mbps",
+      "megabit/s",
+      "megabits/s",
+      "megabps"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data_rate"
+  },
+  "bps": {
+    "aliases": [
+      "bit/s",
+      "bits/s",
+      "bps"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "data_rate"
+  },
+  "BTU": {
+    "aliases": [
+      "BTU",
+      "btu"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1055.05585262,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "GJ": {
+    "aliases": [
+      "GJ",
+      "gigajoule",
+      "gigajoules"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "J": {
+    "aliases": [
+      "J",
+      "Joules",
+      "joule",
+      "joules"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "MJ": {
+    "aliases": [
+      "MJ",
+      "megajoule",
+      "megajoules"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "Wh": {
+    "aliases": [
+      "Wh",
+      "watt-hour",
+      "watt-hours"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 3600.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "cal": {
+    "aliases": [
+      "cal",
+      "calorie",
+      "calories"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 4.184,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "eV": {
+    "aliases": [
+      "eV",
+      "electronvolt",
+      "electronvolts",
+      "ev"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.602176634e-19,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "kJ": {
+    "aliases": [
+      "kJ",
+      "kilojoule",
+      "kilojoules"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "kWh": {
+    "aliases": [
+      "kWh",
+      "kilowatt-hour",
+      "kilowatt-hours"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 3600000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "kcal": {
+    "aliases": [
+      "kcal",
+      "kilocalorie",
+      "kilocalories"
+    ],
+    "dimension": [
+      2,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 4184.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "energy"
+  },
+  "N": {
+    "aliases": [
+      "N",
+      "Newtons",
+      "newton",
+      "newtons"
+    ],
+    "dimension": [
+      1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "force"
+  },
+  "dyne": {
+    "aliases": [
+      "dyne",
+      "dynes"
+    ],
+    "dimension": [
+      1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-05,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "force"
+  },
+  "kN": {
+    "aliases": [
+      "kN",
+      "kilonewton"
+    ],
+    "dimension": [
+      1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "force"
+  },
+  "lbf": {
+    "aliases": [
+      "lbf",
+      "poundforce"
+    ],
+    "dimension": [
+      1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 4.4482216152605,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "force"
+  },
+  "mN": {
+    "aliases": [
+      "mN",
+      "millinewton"
+    ],
+    "dimension": [
+      1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "force"
+  },
+  "GHz": {
+    "aliases": [
+      "GHZ",
+      "GHz",
+      "gigahertz"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "frequency"
+  },
+  "Hz": {
+    "aliases": [
+      "Hz",
+      "hertz"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "frequency"
+  },
+  "MHz": {
+    "aliases": [
+      "MHZ",
+      "MHz",
+      "megahertz"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "frequency"
+  },
+  "THz": {
+    "aliases": [
+      "THz",
+      "terahertz"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "frequency"
+  },
+  "kHz": {
+    "aliases": [
+      "KHZ",
+      "kHz",
+      "kilohertz"
+    ],
+    "dimension": [
+      0,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "frequency"
+  },
+  "angstrom": {
+    "aliases": [
+      "angstrom",
+      "angstroms"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-10,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "au": {
+    "aliases": [
+      "astronomicalunit",
+      "astronomicalunits",
+      "au"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 149597870700.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "chain": {
+    "aliases": [
+      "chain",
+      "chains"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 20.1168,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "cm": {
+    "aliases": [
+      "centimeter",
+      "centimeters",
+      "centimetre",
+      "centimetres",
+      "cm"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.01,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "fathom": {
+    "aliases": [
+      "fathom",
+      "fathoms"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.8288,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "fermi": {
+    "aliases": [
+      "fermi"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-15,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "ft": {
+    "aliases": [
+      "Feet",
+      "feet",
+      "foot",
+      "ft"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.3048,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "furlong": {
+    "aliases": [
+      "furlong",
+      "furlongs"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 201.168,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "inch": {
+    "aliases": [
+      "Inches",
+      "in",
+      "inch",
+      "inches"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.0254,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "km": {
+    "aliases": [
+      "KM",
+      "kilometer",
+      "kilometers",
+      "kilometre",
+      "kilometres",
+      "km"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "ly": {
+    "aliases": [
+      "lightyear",
+      "lightyears",
+      "ly"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 9460730472580800.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "m": {
+    "aliases": [
+      "Meters",
+      "m",
+      "meter",
+      "meters",
+      "metre",
+      "metres"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "mi": {
+    "aliases": [
+      "Miles",
+      "mi",
+      "mile",
+      "miles"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1609.344,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "mm": {
+    "aliases": [
+      "millimeter",
+      "millimeters",
+      "millimetre",
+      "millimetres",
+      "mm"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "nm": {
+    "aliases": [
+      "nanometer",
+      "nanometers",
+      "nm"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-09,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "nmi": {
+    "aliases": [
+      "nauticalmile",
+      "nauticalmiles",
+      "nmi"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1852.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "pc": {
+    "aliases": [
+      "parsec",
+      "parsecs",
+      "pc"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 3.085677581491367e+16,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "pm": {
+    "aliases": [
+      "picometer",
+      "picometers",
+      "pm"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-12,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "rd": {
+    "aliases": [
+      "rd",
+      "rod",
+      "rods"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 5.0292,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "smoot": {
+    "aliases": [
+      "smoot",
+      "smoots"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.7018,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "um": {
+    "aliases": [
+      "micrometer",
+      "micrometers",
+      "um",
+      "\u03bcm"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "yd": {
+    "aliases": [
+      "yard",
+      "yards",
+      "yd"
+    ],
+    "dimension": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.9144,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "length"
+  },
+  "ct": {
+    "aliases": [
+      "carat",
+      "carats",
+      "ct"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.0002,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "dr": {
+    "aliases": [
+      "dr",
+      "dram",
+      "drams"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.0017718452,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "g": {
+    "aliases": [
+      "Grams",
+      "g",
+      "gram",
+      "grams"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "gr": {
+    "aliases": [
+      "gr",
+      "grain",
+      "grains"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 6.479891e-05,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "kg": {
+    "aliases": [
+      "KG",
+      "Kilograms",
+      "kg",
+      "kilogram",
+      "kilograms"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "lb": {
+    "aliases": [
+      "Pounds",
+      "lb",
+      "lbs",
+      "pound",
+      "pounds"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.45359237,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "long_ton": {
+    "aliases": [
+      "imperial_ton",
+      "long_ton"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1016.0469,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "mg": {
+    "aliases": [
+      "mg",
+      "milligram",
+      "milligrams"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "ng": {
+    "aliases": [
+      "nanogram",
+      "nanograms",
+      "ng"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-12,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "oz": {
+    "aliases": [
+      "Ounces",
+      "ounce",
+      "ounces",
+      "oz"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.028349523125,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "slug": {
+    "aliases": [
+      "slug",
+      "slugs"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 14.593903,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "stone": {
+    "aliases": [
+      "st",
+      "stone",
+      "stones"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 6.35029318,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "ton": {
+    "aliases": [
+      "ton",
+      "tons"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 907.18474,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "tonne": {
+    "aliases": [
+      "tonne",
+      "tonnes"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "ug": {
+    "aliases": [
+      "microgram",
+      "micrograms",
+      "ug",
+      "\u03bcg"
+    ],
+    "dimension": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-09,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "mass"
+  },
+  "GW": {
+    "aliases": [
+      "GW",
+      "gigawatt",
+      "gigawatts"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "power"
+  },
+  "MW": {
+    "aliases": [
+      "MW",
+      "megawatt",
+      "megawatts"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "power"
+  },
+  "W": {
+    "aliases": [
+      "W",
+      "Watts",
+      "watt",
+      "watts"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "power"
+  },
+  "hp": {
+    "aliases": [
+      "horsepower",
+      "hp"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 745.6998715822702,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "power"
+  },
+  "kW": {
+    "aliases": [
+      "kW",
+      "kilowatt",
+      "kilowatts"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "power"
+  },
+  "mW": {
+    "aliases": [
+      "mW",
+      "milliwatt",
+      "milliwatts"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "power"
+  },
+  "GPa": {
+    "aliases": [
+      "GPa",
+      "gigapascal",
+      "gigapascals"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "MPa": {
+    "aliases": [
+      "MPa",
+      "megapascal",
+      "megapascals"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "Pa": {
+    "aliases": [
+      "Pa",
+      "Pascals",
+      "pascal",
+      "pascals"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "atm": {
+    "aliases": [
+      "atm",
+      "atmosphere",
+      "atmospheres"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 101325.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "bar": {
+    "aliases": [
+      "bar",
+      "bars"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 100000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "inH2O": {
+    "aliases": [
+      "inH2O"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 249.08891,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "inHg": {
+    "aliases": [
+      "inHg"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 3386.389,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "kPa": {
+    "aliases": [
+      "kPa",
+      "kilopascal",
+      "kilopascals"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "mbar": {
+    "aliases": [
+      "mbar",
+      "millibar"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 100.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "mmH2O": {
+    "aliases": [
+      "mmH2O"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 9.80665,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "mmHg": {
+    "aliases": [
+      "mmHg"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 133.32236842105,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "psi": {
+    "aliases": [
+      "psi",
+      "psia"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 6894.757293168,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "torr": {
+    "aliases": [
+      "torr"
+    ],
+    "dimension": [
+      -1,
+      1,
+      -2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 133.32236842105,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "pressure"
+  },
+  "km/h": {
+    "aliases": [
+      "kilometerperhour",
+      "kilometersperhour",
+      "km/h",
+      "kmh",
+      "kph"
+    ],
+    "dimension": [
+      1,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.2777777777777778,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "speed"
+  },
+  "kn": {
+    "aliases": [
+      "kn",
+      "knot",
+      "knots",
+      "kt"
+    ],
+    "dimension": [
+      1,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.5144444444444445,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "speed"
+  },
+  "m/s": {
+    "aliases": [
+      "m/s",
+      "meterpersecond",
+      "meterspersecond",
+      "mps"
+    ],
+    "dimension": [
+      1,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "speed"
+  },
+  "mach": {
+    "aliases": [
+      "mach"
+    ],
+    "dimension": [
+      1,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 340.29,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "speed"
+  },
+  "mph": {
+    "aliases": [
+      "mi/h",
+      "mileperhour",
+      "milesperhour",
+      "mph"
+    ],
+    "dimension": [
+      1,
+      0,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.44704,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "speed"
+  },
+  "century": {
+    "aliases": [
+      "centuries",
+      "century"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 3153600000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "d": {
+    "aliases": [
+      "d",
+      "day",
+      "days"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 86400.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "decade": {
+    "aliases": [
+      "decade",
+      "decades"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 315360000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "fortnight": {
+    "aliases": [
+      "fortnight",
+      "fortnights"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1209600.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "h": {
+    "aliases": [
+      "Hours",
+      "h",
+      "hour",
+      "hours",
+      "hr"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 3600.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "millennium": {
+    "aliases": [
+      "millennia",
+      "millennium"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 31536000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "min": {
+    "aliases": [
+      "Minutes",
+      "min",
+      "minute",
+      "minutes"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 60.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "ms": {
+    "aliases": [
+      "millisecond",
+      "milliseconds",
+      "ms"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "ns": {
+    "aliases": [
+      "nanosecond",
+      "nanoseconds",
+      "ns"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-09,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "ps": {
+    "aliases": [
+      "picosecond",
+      "picoseconds",
+      "ps"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-12,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "s": {
+    "aliases": [
+      "Seconds",
+      "s",
+      "sec",
+      "second",
+      "seconds",
+      "secs"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "us": {
+    "aliases": [
+      "microsecond",
+      "microseconds",
+      "us",
+      "\u03bcs"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "wk": {
+    "aliases": [
+      "week",
+      "weeks",
+      "wk"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 604800.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "yr": {
+    "aliases": [
+      "year",
+      "years",
+      "yr"
+    ],
+    "dimension": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 31536000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "time"
+  },
+  "V": {
+    "aliases": [
+      "V",
+      "Volts",
+      "volt",
+      "volts"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "voltage"
+  },
+  "kV": {
+    "aliases": [
+      "kV",
+      "kilovolt"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "voltage"
+  },
+  "mV": {
+    "aliases": [
+      "mV",
+      "millivolt"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "voltage"
+  },
+  "\u03bcV": {
+    "aliases": [
+      "microvolt",
+      "uV",
+      "\u03bcV"
+    ],
+    "dimension": [
+      2,
+      1,
+      -3,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "voltage"
+  },
+  "L": {
+    "aliases": [
+      "L",
+      "Liters",
+      "l",
+      "liter",
+      "liters",
+      "litre",
+      "litres"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "cm3": {
+    "aliases": [
+      "cc",
+      "cm**3",
+      "cm3",
+      "cm^3",
+      "cubiccentimeter",
+      "cubiccentimeters"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "cup": {
+    "aliases": [
+      "cup",
+      "cups"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.2365882365,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "floz": {
+    "aliases": [
+      "fl oz",
+      "floz",
+      "fluidounce",
+      "fluidounces"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.02957352954,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "ft3": {
+    "aliases": [
+      "cubicfeet",
+      "cubicfoot",
+      "ft**3",
+      "ft3",
+      "ft^3"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 28.316846592,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "gal": {
+    "aliases": [
+      "gal",
+      "gallon",
+      "gallons"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 3.785411784,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "in3": {
+    "aliases": [
+      "cubicinch",
+      "cubicinches",
+      "in**3",
+      "in3",
+      "in^3"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.016387064,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "km3": {
+    "aliases": [
+      "cubickilometer",
+      "cubickilometers",
+      "km**3",
+      "km3",
+      "km^3"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000000000000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "m3": {
+    "aliases": [
+      "cubicmeter",
+      "cubicmeters",
+      "m**3",
+      "m3",
+      "m^3"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "mL": {
+    "aliases": [
+      "mL",
+      "milliliter",
+      "milliliters",
+      "millilitre",
+      "millilitres"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.001,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "mi3": {
+    "aliases": [
+      "cubicmile",
+      "cubicmiles",
+      "mi**3",
+      "mi3",
+      "mi^3"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 4168181825000.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "mm3": {
+    "aliases": [
+      "cubicmillimeter",
+      "cubicmillimeters",
+      "mm**3",
+      "mm3",
+      "mm^3"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "pt": {
+    "aliases": [
+      "pint",
+      "pints",
+      "pt"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.473176473,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "qt": {
+    "aliases": [
+      "qt",
+      "quart",
+      "quarts"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.946352946,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "tbsp": {
+    "aliases": [
+      "tablespoon",
+      "tablespoons",
+      "tbsp"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.01478676477,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "tsp": {
+    "aliases": [
+      "teaspoon",
+      "teaspoons",
+      "tsp"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 0.00492892159,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "uL": {
+    "aliases": [
+      "microliter",
+      "microliters",
+      "uL",
+      "\u03bcL"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1e-06,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "yd3": {
+    "aliases": [
+      "cubicyard",
+      "cubicyards",
+      "yd**3",
+      "yd3",
+      "yd^3"
+    ],
+    "dimension": [
+      3,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 764.554857984,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "volume"
+  },
+  "K": {
+    "aliases": [
+      "K",
+      "Kelvin",
+      "degk",
+      "kelvin",
+      "kelvins",
+      "\u00b0K"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 0.0,
+    "affine": false,
+    "category": "temperature"
+  },
+  "C": {
+    "aliases": [
+      "C",
+      "Celsius",
+      "celsius",
+      "centigrade",
+      "degc",
+      "\u00b0C"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.0,
+    "offset_to_base": 273.15,
+    "affine": true,
+    "category": "temperature"
+  },
+  "F": {
+    "aliases": [
+      "F",
+      "Fahrenheit",
+      "degf",
+      "fahrenheit",
+      "\u00b0F"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.8,
+    "offset_to_base": 459.67,
+    "affine": true,
+    "category": "temperature"
+  },
+  "Ra": {
+    "aliases": [
+      "Ra",
+      "degr",
+      "rankine",
+      "\u00b0R"
+    ],
+    "dimension": [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "scale_to_base": 1.8,
+    "offset_to_base": 0.0,
+    "affine": true,
+    "category": "temperature"
+  }
+}

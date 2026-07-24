@@ -112,7 +112,14 @@ session = server.create_session()
 
 ### ToolRegistry
 
-Owns tool handlers, schemas, metadata, and profiles. Wraps the module-level `TOOL_HANDLERS`, `TOOL_SCHEMAS`, etc. Provides lookup by name, profile filtering, and close-match suggestions without relying on module globals.
+Owns tool handlers, schemas, metadata, and profiles. Wraps the module-level `TOOL_HANDLERS`, `TOOL_SCHEMAS`, etc. Provides lookup by name, profile filtering, and close-match suggestions without relying on module globals. Internal state is deeply immutable after construction via `freeze_owned()` — nested dicts, lists, and profile lists are `MappingProxyType`/`tuple`/`frozenset` so callers cannot mutate the registry through constructor inputs or accessor return values. `tool_names` returns `tuple[str, ...]` (not `list`).
+
+Validates at construction time:
+- Duplicate handler names
+- Schemas/metadata without corresponding handlers
+- Unsupported `llm_exposure` values
+- Empty profile names
+- Profiles referencing unknown tools
 
 ### ToolExecutor
 
@@ -120,7 +127,22 @@ Owns the bounded thread pool, argument validation, timeout enforcement, cancella
 
 ### ConfigSnapshot / ConfigManager
 
-`ConfigSnapshot` is a frozen dataclass for atomic configuration replacement with fields: `generation`, `constants`, `functions`, `units`, and `policy`. `__post_init__()` defensively copies all dict fields to prevent external mutation. `ConfigManager` holds the current snapshot behind a lock, supporting atomic swaps and generation tracking. This allows runtime config changes without corrupting in-flight requests.
+`ConfigSnapshot` is a frozen dataclass for atomic configuration replacement with fields: `generation`, `constants`, `functions`, `units`, and `policy`. The `policy` field is `EvaluationPolicy | str` (backward compatible — strings are auto-converted to the enum). `__post_init__()` defensively copies all dict fields to prevent external mutation. `ConfigManager` holds the current snapshot behind a lock, supporting atomic swaps and generation tracking. This allows runtime config changes without corrupting in-flight requests.
+
+### EvaluationPolicy
+
+```python
+class EvaluationPolicy(enum.Enum):
+    DEFAULT = "default"
+    STRICT = "strict"
+    PERMISSIVE = "permissive"
+```
+
+Valid evaluation policy values for server configuration. `parse_config_snapshot()` validates policy values and rejects invalid strings.
+
+### ConfigCandidate / RuntimeContext
+
+`ConfigCandidate` is a frozen dataclass holding validated constants, functions, and policy ready to be turned into a `ConfigSnapshot`. `RuntimeContext` is a frozen dataclass pairing a `ConfigSnapshot` with the `Evaluator` instance built from it, enabling atomic replacement without partial updates.
 
 ### Evaluator Policy Isolation
 

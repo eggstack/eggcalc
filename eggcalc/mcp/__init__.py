@@ -11,19 +11,24 @@ from .schemas import TOOL_SCHEMAS
 from .server import (
     LATEST_SUPPORTED_PROTOCOL_VERSION,
     SUPPORTED_PROTOCOL_VERSIONS,
+    ConfigCandidate,
     ConfigError,
     ConfigManager,
     ConfigSnapshot,
+    EvaluationPolicy,
     McpServer,
     McpServerConfig,
     McpSession,
     McpSessionState,
+    RuntimeContext,
     ToolExecutor,
     ToolRegistry,
     close_compatibility_server,
+    freeze_owned,
     handle_request,
     main,
     parse_config_snapshot,
+    thaw_owned,
 )
 
 __all__ = [
@@ -44,4 +49,9 @@ __all__ = [
     "ConfigManager",
     "ConfigError",
     "parse_config_snapshot",
+    "EvaluationPolicy",
+    "ConfigCandidate",
+    "RuntimeContext",
+    "freeze_owned",
+    "thaw_owned",
 ]

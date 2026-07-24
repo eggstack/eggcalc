@@ -100,13 +100,14 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 
 | Module | Role |
 |--------|------|
+| `eggcalc/_version.py` | Single source of truth for `__version__` (imported by `__init__.py`, read by `pyproject.toml` and `build_single.py`) |
 | `eggcalc/normalize.py` | NL tokenization, expression normalization (no CLI dispatch) |
 | `eggcalc/evaluator.py` | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
-| `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class |
+| `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class, `UnitSpec`, `UnitExpression` |
 | `eggcalc/cli.py` | CLI dispatch: argparse, REPL, text commands, help, main entry point. Text commands use lazy `importlib` loading of exact modules. |
 | `eggcalc/__main__.py` | Module entry, delegates to `cli.main()` |
 | `eggcalc/exact/` | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
-| `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor |
+| `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor, EvaluationPolicy, ConfigCandidate, RuntimeContext |
 | `build_single.py` | Assembles everything into `eggcalc.py` |
 
 ## Unit Conventions
@@ -116,6 +117,8 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 - Gas constant is `r`/`R` (8.314...). Rankine is `Ra`/`rankine`/`°R`. The `r`/`R` identifiers are **not** Rankine.
 - `5m ** 2` → `25.0 m**2` (power binds the unit). `5m / 2s` → `25.0 m/s` (denominator is wrapped in parens by the preprocessor).
 - British spellings (`metre`/`metres`, `litre`/`litres`) are included in aliases.
+- `UnitSpec` is a frozen dataclass for declarative unit specifications (canonical name, aliases, dimension, scale/offset factors, category). `UNIT_DEFINITIONS` is a tuple of 150+ `UnitSpec` entries.
+- `UnitExpression` is a frozen dataclass for structural compound units (factors as `(unit, exponent)` tuples, dimension, scale). `parse_unit_expression()` parses `"m/s"` → `UnitExpression` with bounded parsing.
 
 ## exact/ Module Notes
 
@@ -159,15 +162,18 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - **`handle_request(request, session=None)`**: When `session` is `None`, routes through an isolated compatibility `McpServer` for backward compatibility. **Deprecated** — emits `DeprecationWarning`. Callers should pass an explicit `McpSession` instance.
 - **`main()`**: Creates one `McpServer` per connection, which owns a `McpSession` for lifecycle management.
 - **Centralized error helpers:** `_jsonrpc_error()`, `_parse_error()`, `_method_not_found()`, `_invalid_params()`, `_internal_error()` in server.py.
-- **`ConfigSnapshot`**: Deeply immutable — fields are `MappingProxyType`, has `to_dict()` method.
+- **`ConfigSnapshot`**: Deeply immutable — fields are `MappingProxyType`, has `to_dict()` method. `policy` field is `EvaluationPolicy | str` (backward compatible).
 - **`ConfigManager.replace()`**: Validates generation is strictly increasing; stale/decreasing generations raise `ValueError`. `replace_validated()` uses manager-assigned monotonic generations.
-- **`ConfigError` / `parse_config_snapshot()`**: Configuration parsing with type/semantics validation before snapshot construction. Validates constant types (int/float/str/bool), function callability, unit names, and policy values.
+- **`ConfigError` / `parse_config_snapshot()`**: Configuration parsing with type/semantics validation before snapshot construction. Validates constant types (int/float/str/bool), function callability, unit names, and policy values. `parse_config_snapshot()` rejects non-empty custom units.
 - **`McpServer.activate_snapshot()`**: Atomically pushes snapshot constants and functions to the server's evaluator. On failure, rolls back to prior evaluator state.
 - **Schema validation:** `SUPPORTED_SCHEMA_KEYWORDS` frozenset defines which JSON Schema keywords the validator supports. `tests/test_mcp_schema_lint.py` walks all `TOOL_SCHEMAS` and fails on unsupported keywords.
 - **Session-aware test helpers:** `ready_session()` and `session_request(session, method, params, request_id)` in `tests/test_mcp_server.py`.
 - `McpServerConfig` frozen dataclass for immutable server configuration (profile, limits, timeouts, protocol versions)
 - `McpServer` class owns config, `ToolRegistry`, `ToolExecutor`, evaluator instance, `ConfigManager`, and session creation
-- `ToolRegistry` wraps tool handlers, schemas, metadata, and profiles with lookup methods; internal dicts are `MappingProxyType` (immutable after construction), nested schemas use `MappingProxyType`, profiles use tuples, accessors return copies; `get_schema()` returns deep copy; has `is_tool_visible(name, profile)` method.
+- `ToolRegistry` wraps tool handlers, schemas, metadata, and profiles with lookup methods; internal dicts are `MappingProxyType` via `freeze_owned()` for recursive immutability, nested schemas use `MappingProxyType`, profiles use tuples, `tool_names` returns `tuple[str, ...]`, `get_schema()` returns deep copy; has `is_tool_visible(name, profile)` method. Validates: duplicate handlers, unsupported `llm_exposure` values, empty profile names.
+- `freeze_owned()` and `thaw_owned()` utility functions for recursive immutability conversion of nested containers (`Mapping`→`MappingProxyType`, `list`→`tuple`, `set`→`frozenset` and back).
+- `EvaluationPolicy` enum (`DEFAULT`, `STRICT`, `PERMISSIVE`) for server evaluation configuration.
+- `ConfigCandidate` frozen dataclass for validated configuration before snapshot construction. `RuntimeContext` frozen dataclass pairing a `ConfigSnapshot` with its `Evaluator` instance.
 - `ToolExecutor` owns thread pool, validation, timeout, cancellation, and cleanup; has closed-state sealing preventing pool recreation after `close()`; has three counters: `_total_inflight`, `_queued_count`, `_active_count` with worker-wrapper lifecycle transitions.
 - **Evaluator binding:** `ToolExecutor` stores the server evaluator and sets `_server_evaluator` ContextVar via `_run_handler_in_thread()`. `evaluate_raw()` and `evaluate_with_timeout()` check this ContextVar, so `math_eval` uses the server's evaluator policy (allow_random, allow_side_effects) instead of the global default. `Evaluator` has instance-owned `_instance_random` generator via `random_seed` parameter.
 - **Timeout accounting:** `call_tool()` uses `Future.add_done_callback()` to release `_total_inflight` only when the future truly completes (not on caller timeout). Timed-out-but-still-running handlers continue consuming capacity until they finish.
@@ -185,7 +191,7 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 | `overview.md` | System architecture, data flow, module map |
 | `normalize.md` | NL tokenization pipeline |
 | `evaluator.md` | AST parsing, math functions, constants |
-| `units.md` | Unit definitions, conversions, UnitValue |
+| `units.md` | Unit definitions, conversions, UnitValue, UnitSpec, UnitExpression |
 | `cli.md` | CLI entry, options, text subcommands |
 | `api.md` | Public Python API surface |
 | `exact.md` | exact/ package (Unicode, text analysis) |
@@ -229,3 +235,4 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.
 12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Only `normalize`, `evaluator`, and `units` are loaded eagerly.
 13. **`Dimension(angle=True)` is not dimensionless** — Angle is a structural axis, not a compatibility alias for dimensionless. `rad + 1` is rejected.
+14. **`ToolRegistry.tool_names` returns `tuple[str, ...]`** — not `list[str]`. Use `list(registry.tool_names)` if you need a mutable list.

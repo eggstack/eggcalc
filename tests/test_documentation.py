@@ -395,19 +395,23 @@ class TestVersionParity:
         import pathlib
         import re
 
+        version_src = pathlib.Path("eggcalc/_version.py").read_text()
+        m = re.search(r'__version__\s*=\s*"([^"]+)"', version_src)
+        assert m, "Could not find __version__ in _version.py"
+        version_file_version = m.group(1)
+
         init_src = pathlib.Path("eggcalc/__init__.py").read_text()
-        m = re.search(r'__version__\s*=\s*"([^"]+)"', init_src)
-        assert m, "Could not find __version__ in __init__.py"
-        init_version = m.group(1)
+        assert (
+            "from ._version import __version__" in init_src
+        ), "__init__.py must import __version__ from _version"
 
         pyproject = pathlib.Path("pyproject.toml").read_text()
-        m2 = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
-        assert m2, "Could not find version in pyproject.toml"
-        pyproject_version = m2.group(1)
+        m2 = re.search(r'dynamic\s*=\s*\["version"\]', pyproject, re.MULTILINE)
+        assert m2, "pyproject.toml must use dynamic version"
 
-        assert (
-            init_version == pyproject_version
-        ), f"Version mismatch: __init__={init_version!r}, pyproject={pyproject_version!r}"
+        import eggcalc
+
+        assert eggcalc.__version__ == version_file_version
 
 
 class TestProtocolVersionParity:

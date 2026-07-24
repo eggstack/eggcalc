@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eggcalc"
-version = "1.1.6"
+dynamic = ["version"]
 description = "CLI calculator accepting natural language and unit conversion. Can be used as a CLI, python library, or MCP server for AI agents."
 readme = "README.md"
 license = {text = "MIT"}
@@ -57,6 +57,9 @@ Changelog = "https://github.com/eggstack/eggcalc/blob/main/CHANGELOG.md"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["eggcalc*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "eggcalc._version.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

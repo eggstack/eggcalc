@@ -23,6 +23,7 @@ Note: load_user_config_extended() is not exported as custom number/operator
 words via external config are not officially supported.
 """
 
+from ._version import __version__
 from .capabilities import RuntimeCapabilities, detect_capabilities
 from .evaluator import (
     DEFAULT_CACHE_SIZE,
@@ -74,10 +75,11 @@ from .units import (
     normalize_unit,
 )
 
-__version__ = "1.1.6"
 __author__ = "David Bowman"
 
 __all__ = [
+    # Version
+    "__version__",
     # Core evaluation
     "evaluate",
     "evaluate_raw",

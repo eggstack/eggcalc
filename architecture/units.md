@@ -1,6 +1,6 @@
 # units.py — Unit Definitions and Conversions
 
-2136 lines. Provides comprehensive unit conversion support for the calculator.
+4765 lines. Provides comprehensive unit conversion support for the calculator.
 
 ## Table of Contents
 
@@ -9,10 +9,13 @@
 - [Type Aliases](#type-aliases)
 - [Constants](#constants)
 - [UnitValue Class](#unitvalue-class)
+- [UnitSpec — Declarative Unit Specifications](#unitspec--declarative-unit-specifications)
+- [UNIT_DEFINITIONS](#unit_definitions)
 - [Unit Categories](#unit-categories)
 - [Unit Definition Structure](#unit-definition-structure)
 - [Unit Aliases](#unit-aliases)
 - [Compound Unit System](#compound-unit-system)
+- [UnitExpression — Structural Compound Units](#unitexpression--structural-compound-units)
 - [Functions](#functions)
 - [Internal Functions](#internal-functions)
 - [Module Dependencies](#module-dependencies)
@@ -165,6 +168,33 @@ uv + UnitValue(5, "m")     # → UnitValue(8.0, "m") — both have same unit
 ### Overflow Protection
 
 `UnitValue._check_overflow(result)` is called after every arithmetic operation. It raises `OverflowError` for non-finite float/complex results. Integer results skip the magnitude check (digit count is the relevant limit for arbitrary-precision ints).
+
+## UnitSpec — Declarative Unit Specifications
+
+`UnitSpec` is a frozen dataclass for declarative unit definitions:
+
+```python
+@dataclass(frozen=True)
+class UnitSpec:
+    canonical: str              # Canonical unit name (e.g. "m", "ft")
+    aliases: tuple[str, ...]    # All recognized aliases
+    dimension: Dimension        # Structural dimension
+    scale_to_base: float        # Multiplicative factor to base unit
+    offset_to_base: float = 0.0 # Additive offset (for temperature)
+    affine: bool = False        # Whether offset conversion is affine
+    display: str | None = None  # Display form
+    category: str = ""          # Category name
+```
+
+Each `UnitSpec` fully describes a unit: its canonical name, all aliases, its structural dimension, and the scale/offset to convert to the base unit of its category. This replaces scattered lookup tables with a single authoritative data source.
+
+## UNIT_DEFINITIONS
+
+```python
+UNIT_DEFINITIONS: tuple[UnitSpec, ...] = (...)
+```
+
+A tuple of 150+ `UnitSpec` entries covering all built-in units. Validated at module load time for: duplicate canonical names, duplicate aliases across specs, and zero scale values.
 
 ## Unit Categories
 
@@ -319,6 +349,27 @@ Builds pairwise conversion factors between derived unit expressions registered i
 ### _SHORT_COMPOUND_FORMS
 
 Maps short compound forms (`"m2"`, `"ft3"`, etc.) to equivalent forms (`"m2"`, `"m**2"`, `"m^2"`) so cross-form conversions succeed via `get_conversion_factor`.
+
+## UnitExpression — Structural Compound Units
+
+`UnitExpression` is a frozen dataclass for structural compound unit representation:
+
+```python
+@dataclass(frozen=True)
+class UnitExpression:
+    factors: tuple[tuple[str, int], ...]  # sorted (canonical_unit, exponent) pairs
+    dimension: Dimension
+    scale_to_base: float
+```
+
+### `parse_unit_expression(unit_str: str) -> UnitExpression`
+
+Parses a compound unit string into a frozen `UnitExpression`. Handles forms like `"m/s"`, `"kg*m/s**2"`, `"m**2"`. Rejects `"//"` and `"%"` as separators. Enforces resource bounds: `MAX_UNIT_STRING_LENGTH` (256), `MAX_COMPOUND_DEPTH` (16), `MAX_COMPOUND_ATOMS` (32), `MAX_ABS_UNIT_EXPONENT` (16). Fully consumes input — raises `ValueError` on leftover characters.
+
+```python
+expr = parse_unit_expression("m/s")
+# UnitExpression(factors=(('m', 1), ('s', -1)), dimension=Dimension(length=1, time=-1), ...)
+```
 
 ## Functions
 

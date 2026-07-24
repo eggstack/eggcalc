@@ -7,6 +7,7 @@ consistency requirements in the plan.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, TypedDict
 
 
@@ -4902,7 +4903,7 @@ def normal_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 def _compact_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """Compact an output schema by keeping top-level property keys/types only."""
-    if not isinstance(schema, dict):
+    if not isinstance(schema, (dict, Mapping)):
         return {"type": "object"}
 
     result: dict[str, Any] = {"type": schema.get("type", "object")}
@@ -4911,12 +4912,12 @@ def _compact_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
     if props:
         compact_props: dict[str, Any] = {}
         for prop_name, prop_def in props.items():
-            if isinstance(prop_def, dict):
+            if isinstance(prop_def, (dict, Mapping)):
                 cp: dict[str, Any] = {}
                 if "type" in prop_def:
                     cp["type"] = prop_def["type"]
                 if "enum" in prop_def:
-                    cp["enum"] = prop_def["enum"]
+                    cp["enum"] = list(prop_def["enum"])
                 compact_props[prop_name] = cp
             else:
                 compact_props[prop_name] = {}
@@ -4927,7 +4928,7 @@ def _compact_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 def _compact_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """Compact an input schema by stripping defaults and long descriptions."""
-    if not isinstance(schema, dict):
+    if not isinstance(schema, (dict, Mapping)):
         return schema
 
     compact: dict[str, Any] = {}
@@ -4936,7 +4937,7 @@ def _compact_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
     props = schema.get("properties", {})
     compact_props: dict[str, Any] = {}
     for prop_name, prop_def in props.items():
-        if not isinstance(prop_def, dict):
+        if not isinstance(prop_def, (dict, Mapping)):
             compact_props[prop_name] = prop_def
             continue
         cp: dict[str, Any] = {}
@@ -4945,10 +4946,10 @@ def _compact_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
             cp["type"] = prop_def["type"]
         # Keep enum
         if "enum" in prop_def:
-            cp["enum"] = prop_def["enum"]
+            cp["enum"] = list(prop_def["enum"])
         # Keep required sub-fields
         if "required" in prop_def:
-            cp["required"] = prop_def["required"]
+            cp["required"] = list(prop_def["required"])
         # Keep items for arrays
         if "items" in prop_def:
             cp["items"] = prop_def["items"]
@@ -4986,7 +4987,7 @@ def _compact_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 def _normal_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """Normal-detail input schema: keep types, required, enums, constraints, descriptions."""
-    if not isinstance(schema, dict):
+    if not isinstance(schema, (dict, Mapping)):
         return schema
 
     result: dict[str, Any] = {}
@@ -4995,7 +4996,7 @@ def _normal_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
     props = schema.get("properties", {})
     normal_props: dict[str, Any] = {}
     for prop_name, prop_def in props.items():
-        if not isinstance(prop_def, dict):
+        if not isinstance(prop_def, (dict, Mapping)):
             normal_props[prop_name] = prop_def
             continue
         np: dict[str, Any] = {}
@@ -5004,10 +5005,10 @@ def _normal_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
             np["type"] = prop_def["type"]
         # Keep enum
         if "enum" in prop_def:
-            np["enum"] = prop_def["enum"]
+            np["enum"] = list(prop_def["enum"])
         # Keep required sub-fields
         if "required" in prop_def:
-            np["required"] = prop_def["required"]
+            np["required"] = list(prop_def["required"])
         # Keep items for arrays
         if "items" in prop_def:
             np["items"] = prop_def["items"]
@@ -5045,7 +5046,7 @@ def _normal_input_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 def _normal_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """Normal-detail output schema: keep top-level property keys, types, and descriptions."""
-    if not isinstance(schema, dict):
+    if not isinstance(schema, (dict, Mapping)):
         return {"type": "object"}
 
     result: dict[str, Any] = {"type": schema.get("type", "object")}
@@ -5054,12 +5055,12 @@ def _normal_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
     if props:
         normal_props: dict[str, Any] = {}
         for prop_name, prop_def in props.items():
-            if isinstance(prop_def, dict):
+            if isinstance(prop_def, (dict, Mapping)):
                 np: dict[str, Any] = {}
                 if "type" in prop_def:
                     np["type"] = prop_def["type"]
                 if "enum" in prop_def:
-                    np["enum"] = prop_def["enum"]
+                    np["enum"] = list(prop_def["enum"])
                 # Include descriptions for output fields (truncated to 100 chars)
                 desc = prop_def.get("description", "")
                 if desc:
