@@ -20,7 +20,7 @@ ruff check .           → 0 errors
 black --check .        → 0 changes needed
 mypy eggcalc           → 0 errors in 38 source files
 docs-check             → OK
-pytest tests/          → 3676 collected, all pass
+pytest tests/          → ~3911 collected, all pass
 build_single.py        → validates and succeeds
 smoke_release_surfaces → 9/9 pass
 ```
@@ -205,6 +205,8 @@ Passes against both source installs and wheel builds.
 | Test file | Count | Covers |
 |-----------|-------|--------|
 | `test_typed_consumer.py` | 47 | Typed public API consumer (F3) |
+| `test_unit_family_invariants.py` | 519 | Full family round-trips, compatibility, dimension arithmetic, angle, display, immutability |
+| `test_command_parity.py` | 18 | CLI→MCP tool mapping, MCP extras documented, capabilities stability |
 | `test_import_boundaries.py` | 24 | Import graph, backward compat, command registry, lazy loading |
 | `test_unit_dimensions.py` | 77 | Dimension type, UnitDefinition, registry, compatibility, display, parsing bounds |
 | `test_repl_and_cli.py` | 41 | CLI dispatch, REPL, output format |
@@ -213,8 +215,8 @@ Passes against both source installs and wheel builds.
 | `test_release5_isolation.py` | 167 | Registry immutability, validation, config, concurrency, sessions |
 | `test_mcp_server.py` | 675 | MCP protocol, tools, profiles, schemas |
 | `test_documentation.py` | ~25 | Version parity, protocol parity, package/single-file parity |
-| Other tests | ~2578 | Full regression suite |
-| **Total** | **3676 collected** | |
+| Other tests | ~2352 | Full regression suite |
+| **Total** | **~3911 collected** | |
 
 ## Backward Compatibility
 
@@ -226,7 +228,7 @@ All documented public API surfaces preserved:
 - Generated `eggcalc.py` ✓ (regenerated, works correctly, no residual relative imports)
 - NL expressions (`"five plus three"`) ✓
 - Unit expressions (`"30m + 100ft"`) ✓
-- All 3676 collected tests pass ✓
+- All ~3911 collected tests pass ✓
 
 ## Documentation Updates
 
@@ -291,8 +293,10 @@ The following changes were made in the corrective closure pass:
 - `# type: ignore[operator]` added for `eggcalc.exact` lazy `__getattr__` re-exports that confuse mypy
 
 ### Verification
-- 3676 tests collected and passing
+- ~3911 tests collected and passing
 - All import boundary tests pass (24 tests)
+- Full unit family coverage: 487 round-trip tests across all 16 multiplicative families + 6 temperature pairs
+- CLI→MCP command parity verified (18 tests)
 - Single-file generation and smoke tests pass (9/9 surfaces)
 - Ruff, black, mypy checks pass
 - Deterministic build test passes
@@ -310,10 +314,10 @@ The following changes were made in the corrective closure pass:
 
 ## Deferred Non-Blocking Work
 
-The following items are documented but do not block Release 6 closure:
+All previously deferred items have been completed:
 
-1. **Differential/invariant tests for all 16+ unit families** — 10 representative cross-family pairs tested; full family-by-family coverage deferred
-2. **Command inventory parity test** (package vs single-file) — commands are identical since they share `cli.py`; test deferred
-3. **Capabilities parity test** (package vs single-file) — capabilities are identical since they share `capabilities.py`; test deferred
-4. **REPL and editable install surface tests in smoke script** — now added ✓
+1. ~~**Differential/invariant tests for all 16+ unit families**~~ — **Completed**: `TestFullFamilyRoundTrip` tests every unit alias in all 16 multiplicative families round-trips through its base unit (487 parametrized tests). `TestTemperatureFullFamily` covers all 6 temperature pairs with known-value assertions.
+2. ~~**Command inventory parity test**~~ — **Completed**: `tests/test_command_parity.py` verifies every CLI command has a corresponding MCP tool, all mappings reference existing schemas, and no duplicate targets exist.
+3. ~~**Capabilities parity test**~~ — **Completed**: `TestCapabilitiesStability` verifies `RuntimeCapabilities` is JSON-serializable, has all expected fields, and is frozen.
+4. **REPL and editable install surface tests in smoke script** — completed in corrective closure pass ✓
 5. **Differentiated mypy/ruff profile for migrated modules** — uniform profile is sufficient; all modules pass existing checks

@@ -326,3 +326,100 @@ class TestImmutability:
         d2 = Dimension(length=1)
         assert d1 == d2
         assert d1._tuple() == d2._tuple()
+
+
+# ---------------------------------------------------------------------------
+# Full family coverage: every unit round-trips through its base unit
+# ---------------------------------------------------------------------------
+
+_FAMILY_BASE_UNITS: dict[str, str] = {
+    "length": "m",
+    "mass": "kg",
+    "time": "s",
+    "data": "B",
+    "data_rate": "bps",
+    "volume": "L",
+    "pressure": "Pa",
+    "energy": "J",
+    "power": "W",
+    "force": "N",
+    "voltage": "V",
+    "current": "A",
+    "angle": "rad",
+    "speed": "m/s",
+    "area": "m2",
+    "frequency": "Hz",
+}
+
+# Collect all aliases belonging to each family
+from collections import defaultdict as _dd
+
+_FAMILY_UNITS: dict[str, list[str]] = _dd(list)
+for _alias, _fam in UNIT_CATEGORIES.items():
+    _FAMILY_UNITS[_fam].append(_alias)
+
+
+class TestFullFamilyRoundTrip:
+    """Every unit must round-trip through its family's base unit.
+
+    For each family, every alias converts to the base unit, then back.
+    The round-trip must recover the original value within tolerance.
+    """
+
+    @pytest.mark.parametrize(
+        "family,unit",
+        [
+            (fam, alias)
+            for fam, base in _FAMILY_BASE_UNITS.items()
+            for alias in _FAMILY_UNITS.get(fam, [])
+            if alias != base
+        ],
+        ids=[
+            f"{fam}:{alias}"
+            for fam, base in _FAMILY_BASE_UNITS.items()
+            for alias in _FAMILY_UNITS.get(fam, [])
+            if alias != base
+        ],
+    )
+    def test_unit_rounds_through_base(self, family: str, unit: str, registry: UnitRegistry):
+        base = _FAMILY_BASE_UNITS[family]
+        factor_to_base = get_conversion_factor(unit, base)
+        factor_from_base = get_conversion_factor(base, unit)
+        assert (
+            factor_to_base is not None
+        ), f"No conversion factor {unit} -> {base} in family {family}"
+        assert (
+            factor_from_base is not None
+        ), f"No conversion factor {base} -> {unit} in family {family}"
+        for value in [1.0, 100.0, 0.001, 1e6]:
+            via_base = value * factor_to_base * factor_from_base
+            assert via_base == pytest.approx(value, rel=1e-10), (
+                f"Round-trip {unit}->{base}->{unit} failed: " f"{value} -> {via_base}"
+            )
+
+
+class TestTemperatureFullFamily:
+    """Temperature has offset-based conversions; test all pairs."""
+
+    @pytest.mark.parametrize(
+        "from_u,to_u",
+        _TEMPERATURE_PAIRS,
+        ids=[f"{a}->{b}" for a, b in _TEMPERATURE_PAIRS],
+    )
+    def test_known_temperature_conversions(self, from_u: str, to_u: str):
+        if from_u == "K" and to_u == "C":
+            assert convert_temperature(273.15, "K", "C") == pytest.approx(0.0)
+        elif from_u == "C" and to_u == "F":
+            assert convert_temperature(100.0, "C", "F") == pytest.approx(212.0)
+        elif from_u == "K" and to_u == "F":
+            assert convert_temperature(273.15, "K", "F") == pytest.approx(32.0)
+        elif from_u == "C" and to_u == "K":
+            assert convert_temperature(0.0, "C", "K") == pytest.approx(273.15)
+        elif from_u == "F" and to_u == "C":
+            assert convert_temperature(212.0, "F", "C") == pytest.approx(100.0)
+        elif from_u == "F" and to_u == "K":
+            assert convert_temperature(32.0, "F", "K") == pytest.approx(273.15)
+        elif from_u == "K" and to_u == "Ra":
+            assert convert_temperature(273.15, "K", "Ra") == pytest.approx(491.67, abs=0.01)
+        elif from_u == "Ra" and to_u == "K":
+            assert convert_temperature(491.67, "Ra", "K") == pytest.approx(273.15, abs=0.01)
