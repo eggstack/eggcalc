@@ -55,7 +55,9 @@ jobs:
         run: black --check eggcalc tests
 
       - name: Build single-file distribution
-        run: python build_single.py
+        run: |
+          python build_single.py --validate
+          python build_single.py
 
       - name: Smoke test single-file build
         run: python eggcalc.py "5+3"
@@ -76,7 +78,9 @@ jobs:
 
       - name: Type check
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: mypy eggcalc --ignore-missing-imports
+        run: |
+          mypy eggcalc --ignore-missing-imports
+          mypy tests/typing/consumer.py --strict --ignore-missing-imports
 
   package:
     runs-on: ubuntu-latest

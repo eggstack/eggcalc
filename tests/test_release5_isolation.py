@@ -55,8 +55,12 @@ from eggcalc.mcp.server import (
 
 def _ready_session(server: McpServer | None = None) -> McpSession:
     """Create a session and complete the handshake to READY state."""
-    session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
-    handle_request(
+    if server is None:
+        from eggcalc.mcp.server import McpServer
+
+        server = McpServer()
+    session = server.create_session(McpSessionState.UNINITIALIZED)
+    server.handle_request(
         {
             "jsonrpc": "2.0",
             "id": 1,
@@ -69,7 +73,7 @@ def _ready_session(server: McpServer | None = None) -> McpSession:
         },
         session=session,
     )
-    handle_request(
+    server.handle_request(
         {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
         session=session,
     )
@@ -77,8 +81,19 @@ def _ready_session(server: McpServer | None = None) -> McpSession:
 
 
 def _session_request(session: McpSession, method: str, params: dict | None = None, request_id=1):
-    """Send a JSON-RPC request through a session."""
-    return handle_request(
+    """Send a JSON-RPC request through a session's owner server.
+
+    If the session has no owner, creates a temporary compat server for
+    test convenience (tests of owner routing use explicit servers).
+    """
+    try:
+        owner = session.owner
+    except RuntimeError:
+        from eggcalc.mcp.server import McpServer
+
+        owner = McpServer()
+        session._bind_owner(owner)
+    return owner.handle_request(
         {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params or {}},
         session=session,
     )
@@ -153,8 +168,17 @@ class TestMcpServerConfig:
         assert cfg.max_tool_workers == 1
 
     def test_config_rejects_unknown_profile(self):
+        # McpServerConfig validates syntax only; membership is checked at
+        # server construction against the supplied registry.
+        from eggcalc.mcp.server import McpServer, ToolRegistry
+
+        # Syntax-valid profile is accepted by McpServerConfig
+        cfg = McpServerConfig(profile="nonexistent_profile_xyz")
+        assert cfg.profile == "nonexistent_profile_xyz"
+
+        # But server construction rejects it against the default registry
         with pytest.raises(ValueError, match="Unknown profile"):
-            McpServerConfig(profile="nonexistent_profile_xyz")
+            McpServer(config=cfg, registry=ToolRegistry())
 
     def test_config_rejects_invalid_schema_detail(self):
         with pytest.raises(ValueError, match="Invalid schema detail"):

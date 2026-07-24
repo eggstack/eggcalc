@@ -114,14 +114,14 @@ class TestCancellationFIFOCap:
     def test_cancelled_requests_fifo_cap(self):
         from eggcalc.mcp.server import (
             MAX_CANCELLED_REQUESTS,
-            McpSession,
+            McpServer,
             McpSessionState,
-            handle_request,
         )
 
-        # Create a ready session
-        session = McpSession(initial_state=McpSessionState.UNINITIALIZED)
-        handle_request(
+        # Create a ready session bound to a server
+        server = McpServer()
+        session = server.create_session(McpSessionState.UNINITIALIZED)
+        server.handle_request(
             {
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -134,7 +134,7 @@ class TestCancellationFIFOCap:
             },
             session=session,
         )
-        handle_request(
+        server.handle_request(
             {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
             session=session,
         )
@@ -149,7 +149,7 @@ class TestCancellationFIFOCap:
             oldest = session._cancelled_requests_order[0]
 
         # Send one via handle_request — should evict the oldest.
-        handle_request(
+        server.handle_request(
             {
                 "jsonrpc": "2.0",
                 "method": "notifications/cancelled",

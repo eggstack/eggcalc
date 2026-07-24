@@ -149,15 +149,15 @@ class TestBaselineCoverage:
         assert c_spec.offset_to_base == 273.15
         assert c_spec.affine is True
 
-        # K -> F: value * 1.8 + (-459.67)
+        # F -> K: value * (5/9) + 255.3722222222222
         f_spec = defs_by_canonical["F"]
-        assert f_spec.scale_to_base == 1.8
-        assert f_spec.offset_to_base == 459.67
+        assert f_spec.scale_to_base == 5.0 / 9.0
+        assert f_spec.offset_to_base == 255.3722222222222
         assert f_spec.affine is True
 
-        # K -> Ra: value * 1.8
+        # Ra -> K: value * (5/9)
         ra_spec = defs_by_canonical["Ra"]
-        assert ra_spec.scale_to_base == 1.8
+        assert ra_spec.scale_to_base == 5.0 / 9.0
         assert ra_spec.offset_to_base == 0.0
         assert ra_spec.affine is True
 

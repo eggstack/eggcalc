@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 import warnings
+import weakref
 from collections import deque
 from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -529,9 +530,21 @@ class McpServerConfig:
 
     @staticmethod
     def _clamp_profile(profile: str) -> str:
-        if profile != "full" and profile not in TOOL_PROFILES:
-            available = ", ".join(sorted(TOOL_PROFILES))
-            raise ValueError(f"Unknown profile: {profile!r}. Available: {available}")
+        """Validate profile syntax only — membership is checked at server construction.
+
+        Accepts any non-empty string up to 128 characters with no control
+        characters.  The synthetic ``"full"`` profile is always syntactically
+        valid.  Actual profile membership is validated against the
+        :class:`ToolRegistry` supplied to :class:`McpServer`.
+        """
+        if not isinstance(profile, str):
+            raise ValueError(f"Profile must be a string, got {type(profile).__name__}")
+        if not profile:
+            raise ValueError("Profile must not be empty")
+        if len(profile) > 128:
+            raise ValueError(f"Profile exceeds 128 characters: {len(profile)}")
+        if any(ord(c) < 32 or ord(c) == 127 for c in profile):
+            raise ValueError("Profile must not contain control characters")
         return profile
 
     @staticmethod
@@ -658,6 +671,19 @@ class ToolRegistry:
 
         handler_names = set(self._handlers.keys())
 
+        # Detect case-normalized collisions — tool lookup is case-insensitive
+        # in find_close_match(), so two handlers that differ only in case
+        # would be ambiguous.
+        seen_normalized: set[str] = set()
+        for name in self._handlers:
+            norm = name.lower()
+            if norm in seen_normalized:
+                raise ValueError(
+                    f"Case-collision: {name!r} conflicts with another tool "
+                    f"that normalizes to {norm!r}"
+                )
+            seen_normalized.add(norm)
+
         seen_handlers: set[str] = set()
         for name in self._handlers:
             if name in seen_handlers:
@@ -690,7 +716,20 @@ class ToolRegistry:
         for profile_name, profile_tools in self._profiles.items():
             if not profile_name:
                 raise ValueError("Profile name must not be empty")
+            if any(ord(c) < 32 or ord(c) == 127 for c in profile_name):
+                raise ValueError(f"Profile name must not contain control characters: {profile_name!r}")
+            if not isinstance(profile_tools, (list, tuple)):
+                raise ValueError(
+                    f"Profile {profile_name!r} must be a list of tool names, "
+                    f"got {type(profile_tools).__name__}"
+                )
+            seen_in_profile: set[str] = set()
             for tool_name in profile_tools:
+                if tool_name in seen_in_profile:
+                    raise ValueError(
+                        f"Duplicate tool {tool_name!r} in profile {profile_name!r}"
+                    )
+                seen_in_profile.add(tool_name)
                 if tool_name not in handler_names:
                     raise ValueError(
                         f"Profile {profile_name!r} references unknown tool: {tool_name!r}"
@@ -767,19 +806,48 @@ class ToolRegistry:
         return _find_close_match(name, self._handlers)
 
 
+class ReservationState(enum.Enum):
+    """Lifecycle states for a tool-call reservation."""
+
+    QUEUED = "queued"
+    ACTIVE = "active"
+    RELEASED = "released"
+
+
+@_dataclass(eq=False)
+class Reservation:
+    """A single request's accounting reservation.
+
+    Transitions occur under the executor's accounting lock:
+
+    - accepted: none → QUEUED (total +1, queued +1)
+    - worker starts: QUEUED → ACTIVE (queued -1, active +1)
+    - queued cancel succeeds: QUEUED → RELEASED (queued -1, total -1)
+    - submit fails: QUEUED → RELEASED (queued -1, total -1)
+    - active handler finishes/raises: ACTIVE → RELEASED (active -1, total -1)
+    - shutdown cancels queued: QUEUED → RELEASED (queued -1, total -1)
+    """
+
+    state: ReservationState = ReservationState.QUEUED
+
+
 class ToolExecutor:
     """Owns tool validation, timeout, worker dispatch, and cleanup.
 
     Does not depend on session globals. Session state is passed explicitly.
 
-    State accounting uses three explicit counters:
+    State accounting uses a single reservation state machine with one
+    accounting lock.  Every accepted request receives exactly one
+    :class:`Reservation` that transitions through QUEUED → ACTIVE →
+    RELEASED exactly once.
 
-    - ``_total_inflight``: all reservations not yet fully released;
-    - ``_queued_count``: accepted futures that have not started executing;
-    - ``_active_count``: handlers currently executing on worker threads.
+    Counters derived from reservations:
 
-    Lifecycle transitions happen inside the worker wrapper so that
-    counters always reflect actual thread state.
+    - ``_total_inflight``: all reservations not yet RELEASED;
+    - ``_queued_count``: reservations in QUEUED state;
+    - ``_active_count``: reservations in ACTIVE state.
+
+    Invariant: ``total_inflight == queued_count + active_count``.
     """
 
     def __init__(
@@ -790,17 +858,20 @@ class ToolExecutor:
     ) -> None:
         self._config = config
         self._registry = registry
+        # Evaluator is passed per-call from the captured request context.
+        # A fallback is retained only for backward compatibility with
+        # callers that construct ToolExecutor directly without a server.
         self._evaluator = evaluator
         self._executor: ThreadPoolExecutor | None = None
         self._lock = threading.Lock()
         self._orphaned: set[multiprocessing.Process] = set()
         self._orphan_lock = threading.Lock()
+        # Unified accounting: one lock, one reservation per request.
+        self._accounting_lock = threading.Lock()
         self._total_inflight = 0
-        self._inflight_lock = threading.Lock()
         self._queued_count = 0
-        self._queued_lock = threading.Lock()
         self._active_count = 0
-        self._active_lock = threading.Lock()
+        self._reservations: set[Reservation] = set()
         self._closed = False
 
     def _get_executor(self) -> ThreadPoolExecutor:
@@ -817,6 +888,75 @@ class ToolExecutor:
                     )
         return self._executor
 
+    # -- Reservation state machine ----------------------------------------
+
+    def _reserve(self) -> Reservation | None:
+        """Accept a request: transition none → QUEUED.
+
+        Returns a Reservation on success, or None if the inflight limit
+        is reached.  Increments total_inflight and queued_count.
+        """
+        max_inflight = self._config.max_tool_workers + self._config.max_tool_queue_size
+        with self._accounting_lock:
+            if self._total_inflight >= max_inflight:
+                return None
+            self._total_inflight += 1
+            self._queued_count += 1
+            reservation = Reservation(state=ReservationState.QUEUED)
+            self._reservations.add(reservation)
+        return reservation
+
+    def _start(self, reservation: Reservation) -> bool:
+        """Transition QUEUED → ACTIVE.  Returns False if already released."""
+        with self._accounting_lock:
+            if reservation.state != ReservationState.QUEUED:
+                return False
+            reservation.state = ReservationState.ACTIVE
+            self._queued_count -= 1
+            self._active_count += 1
+        return True
+
+    def _release_queued(self, reservation: Reservation) -> bool:
+        """Release a QUEUED reservation: QUEUED → RELEASED.
+
+        Decrements queued_count and total_inflight.  Returns False if
+        the reservation was already released.
+        """
+        with self._accounting_lock:
+            if reservation.state != ReservationState.QUEUED:
+                return False
+            reservation.state = ReservationState.RELEASED
+            self._queued_count -= 1
+            self._total_inflight -= 1
+        return True
+
+    def _release_active(self, reservation: Reservation) -> bool:
+        """Release an ACTIVE reservation: ACTIVE → RELEASED.
+
+        Decrements active_count and total_inflight.  Returns False if
+        the reservation was already released.
+        """
+        with self._accounting_lock:
+            if reservation.state != ReservationState.ACTIVE:
+                return False
+            reservation.state = ReservationState.RELEASED
+            self._active_count -= 1
+            self._total_inflight -= 1
+        return True
+
+    def assert_accounting_invariants(self) -> None:
+        """Assert that accounting invariants hold.  Raises AssertionError on violation."""
+        with self._accounting_lock:
+            assert self._total_inflight == self._queued_count + self._active_count, (
+                f"Invariant violated: total={self._total_inflight} "
+                f"!= queued={self._queued_count} + active={self._active_count}"
+            )
+            assert min(self._total_inflight, self._queued_count, self._active_count) >= 0, (
+                f"Invariant violated: negative counter "
+                f"total={self._total_inflight} queued={self._queued_count} "
+                f"active={self._active_count}"
+            )
+
     def call_tool(
         self,
         name: str,
@@ -825,8 +965,13 @@ class ToolExecutor:
         cancelled_set: set[Any] | None = None,
         cancelled_order: deque[Any] | None = None,
         cancelled_lock: threading.Lock | None = None,
+        evaluator: _evaluator.Evaluator | None = None,
     ) -> dict:
-        """Execute a tool call with validation, timeout, and cancellation."""
+        """Execute a tool call with validation, timeout, and cancellation.
+
+        Uses the evaluator captured from the request context when provided;
+        falls back to the executor's own evaluator for backward compatibility.
+        """
         if self._closed:
             return {
                 "jsonrpc": "2.0",
@@ -863,72 +1008,61 @@ class ToolExecutor:
                 if schema_error is not None:
                     return self._invalid_arguments(request_id, name, schema_error)
 
+        # Use the context-captured evaluator, falling back to the
+        # executor's own evaluator for backward compatibility.
+        active_evaluator = evaluator if evaluator is not None else self._evaluator
+
         timed_out = False
         result = None
         future = None
+        reservation: Reservation | None = None
         try:
-            max_inflight = self._config.max_tool_workers + self._config.max_tool_queue_size
-            with self._inflight_lock:
-                if self._total_inflight >= max_inflight:
-                    return {
-                        "jsonrpc": "2.0",
-                        "id": request_id,
-                        "error": {
-                            "code": -32000,
-                            "message": (
-                                f"Server busy: {self._total_inflight} requests in flight "
-                                f"(limit {max_inflight})"
-                            ),
-                        },
-                    }
-                self._total_inflight += 1
+            # Accept the request: none → QUEUED
+            reservation = self._reserve()
+            if reservation is None:
+                max_inflight = self._config.max_tool_workers + self._config.max_tool_queue_size
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32000,
+                        "message": (
+                            f"Server busy: {self._total_inflight} requests in flight "
+                            f"(limit {max_inflight})"
+                        ),
+                    },
+                }
             try:
                 executor = self._get_executor()
 
                 def _worker_wrapper() -> Any:
                     """Run handler with lifecycle transitions for accurate counters."""
                     # Transition: queued → active
-                    with self._queued_lock:
-                        self._queued_count = max(0, self._queued_count - 1)
-                    with self._active_lock:
-                        self._active_count += 1
+                    if not self._start(reservation):
+                        return None  # Cancelled before start
                     try:
-                        return _run_handler_in_thread(handler, arguments, self._evaluator)
+                        return _run_handler_in_thread(handler, arguments, active_evaluator)
                     finally:
-                        with self._active_lock:
-                            self._active_count = max(0, self._active_count - 1)
+                        # Active completion releases active and total exactly once.
+                        self._release_active(reservation)
 
-                # Mark as queued BEFORE submit so the worker decrement
-                # cannot race ahead of the increment.
-                with self._queued_lock:
-                    self._queued_count += 1
                 future = executor.submit(_worker_wrapper)
-
-                def _on_future_done(f: Future) -> None:
-                    """Release inflight reservation when the future truly completes."""
-                    with self._inflight_lock:
-                        self._total_inflight = max(0, self._total_inflight - 1)
-
-                future.add_done_callback(_on_future_done)
 
                 result = future.result(timeout=self._config.max_tool_timeout_seconds)
             except BaseException:
-                # Only release the inflight reservation if the done_callback
-                # was never registered (submit failed → future is None).
-                # If future exists and completed, the callback handles it.
+                # Submit failed (future is None) → release the queued reservation.
                 if future is None:
-                    with self._inflight_lock:
-                        self._total_inflight = max(0, self._total_inflight - 1)
-                    with self._queued_lock:
-                        self._queued_count = max(0, self._queued_count - 1)
+                    self._release_queued(reservation)
                 raise
         except FuturesTimeoutError:
             timed_out = True
-            # Best-effort cancel: returns False if the task is already running.
-            # The done_callback will release _total_inflight when the future
-            # actually completes (success, error, or cancellation).
+            # Best-effort cancel: returns False if the task is already running
+            # or has completed.  If cancel succeeds (queued, not yet started),
+            # release the queued reservation.  If it fails, the worker wrapper's
+            # finally block owns the active release.
             if future is not None:
-                future.cancel()
+                if future.cancel() and reservation is not None:
+                    self._release_queued(reservation)
         except Exception as e:
             message = _sanitize_error(str(e))[:2000]
             return {
@@ -1033,12 +1167,26 @@ class ToolExecutor:
         }
 
     def close(self) -> None:
-        """Shut down the thread pool and clean up orphaned processes."""
+        """Shut down the thread pool and clean up orphaned processes.
+
+        Cancels queued futures, waits for active work to finish, and
+        releases any queued reservations that were cancelled before
+        the worker wrapper could run.
+        """
         with self._lock:
             self._closed = True
             if self._executor is not None:
                 self._executor.shutdown(wait=True, cancel_futures=True)
                 self._executor = None
+        # Release any QUEUED reservations that were cancelled by
+        # cancel_futures=True before the worker wrapper could run.
+        with self._accounting_lock:
+            for res in list(self._reservations):
+                if res.state == ReservationState.QUEUED:
+                    res.state = ReservationState.RELEASED
+                    self._queued_count -= 1
+                    self._total_inflight -= 1
+            self._reservations.clear()
         self._cleanup_orphans()
 
     def _cleanup_orphans(self) -> None:
@@ -1065,13 +1213,13 @@ class ToolExecutor:
     @property
     def active_workers(self) -> int:
         """Number of currently executing tool handlers."""
-        with self._active_lock:
+        with self._accounting_lock:
             return self._active_count
 
     @property
     def queued_count(self) -> int:
         """Number of accepted futures that have not started executing."""
-        with self._queued_lock:
+        with self._accounting_lock:
             return self._queued_count
 
     @property
@@ -1083,8 +1231,14 @@ class ToolExecutor:
     @property
     def pending_count(self) -> int:
         """Number of requests waiting to start execution (queued)."""
-        with self._queued_lock:
+        with self._accounting_lock:
             return self._queued_count
+
+    @property
+    def total_inflight(self) -> int:
+        """Number of requests not yet fully released (queued + active)."""
+        with self._accounting_lock:
+            return self._total_inflight
 
 
 class EvaluationPolicy(enum.Enum):
@@ -1117,9 +1271,19 @@ class ConfigSnapshot:
         object.__setattr__(self, 'functions', MappingProxyType(dict(self.functions)))
         object.__setattr__(self, 'units', MappingProxyType(dict(self.units)))
         # Accept str for backward compatibility, converting to EvaluationPolicy.
+        # Also handle EvaluationPolicy instances from reloaded modules (different class).
         if isinstance(self.policy, str):
             try:
                 object.__setattr__(self, 'policy', EvaluationPolicy(self.policy))
+            except ValueError:
+                raise ConfigError(
+                    f"Invalid policy {self.policy!r}; "
+                    f"must be one of {sorted(e.value for e in EvaluationPolicy)}"
+                )
+        elif not isinstance(self.policy, EvaluationPolicy) and hasattr(self.policy, "value"):
+            # EvaluationPolicy from a reloaded module — convert via its value
+            try:
+                object.__setattr__(self, 'policy', EvaluationPolicy(self.policy.value))
             except ValueError:
                 raise ConfigError(
                     f"Invalid policy {self.policy!r}; "
@@ -1164,7 +1328,118 @@ class RuntimeContext:
     """
 
     snapshot: ConfigSnapshot
-    evaluator: Any  # _evaluator.Evaluator
+    evaluator: _evaluator.Evaluator
+
+
+def parse_config_candidate(
+    *,
+    constants: dict[str, Any] | None = None,
+    functions: dict[str, Any] | None = None,
+    units: dict[str, Any] | None = None,
+    policy: str | EvaluationPolicy | None = None,
+) -> ConfigCandidate:
+    """Parse raw configuration values into a validated ConfigCandidate.
+
+    The candidate is the parser result and the input to context construction.
+    Raises ConfigError on invalid input.
+    """
+    parsed_constants: dict[str, Any] = {}
+    if constants is not None:
+        for name, value in constants.items():
+            if not isinstance(name, str):
+                raise ConfigError(f"Constant name must be str, got {type(name).__name__}")
+            if not isinstance(value, (int, float, str, bool)):
+                raise ConfigError(
+                    f"Constant '{name}' must be int/float/str/bool, " f"got {type(value).__name__}"
+                )
+            parsed_constants[name] = value
+
+    parsed_functions: dict[str, Any] = {}
+    if functions is not None:
+        for name, value in functions.items():
+            if not isinstance(name, str):
+                raise ConfigError(f"Function name must be str, got {type(name).__name__}")
+            if not callable(value):
+                raise ConfigError(f"Function '{name}' must be callable")
+            parsed_functions[name] = value
+
+    if units:
+        raise ConfigError("custom units are not supported by server configuration")
+
+    if isinstance(policy, EvaluationPolicy):
+        resolved_policy: EvaluationPolicy = policy
+    elif isinstance(policy, str):
+        try:
+            resolved_policy = EvaluationPolicy(policy)
+        except ValueError:
+            valid_values = sorted(e.value for e in EvaluationPolicy)
+            raise ConfigError(f"Invalid policy {policy!r}; must be one of {valid_values}")
+    elif policy is None:
+        resolved_policy = EvaluationPolicy.DEFAULT
+    else:
+        raise ConfigError(f"Invalid policy type: {type(policy).__name__}")
+
+    return ConfigCandidate(
+        constants=freeze_owned(parsed_constants),
+        functions=freeze_owned(parsed_functions),
+        policy=resolved_policy,
+    )
+
+
+def policy_from_server_config(config: McpServerConfig) -> EvaluationPolicy:
+    """Resolve the effective EvaluationPolicy from server config.
+
+    Precedence:
+    - STRICT always disables both allow_random and allow_side_effects;
+    - PERMISSIVE enables only features allowed by the immutable server config ceiling;
+    - DEFAULT follows server config flags.
+    """
+    policy = EvaluationPolicy(config.profile) if config.profile in EvaluationPolicy._value2member_map_ else EvaluationPolicy.DEFAULT
+    # Map config flags to policy when profile is not an explicit policy value
+    if config.profile in EvaluationPolicy._value2member_map_:
+        return policy
+    if config.allow_random and config.allow_side_effects:
+        return EvaluationPolicy.PERMISSIVE
+    if not config.allow_random and not config.allow_side_effects:
+        return EvaluationPolicy.STRICT
+    return EvaluationPolicy.DEFAULT
+
+
+def build_runtime_context(
+    config: McpServerConfig, snapshot: ConfigSnapshot
+) -> RuntimeContext:
+    """Build a RuntimeContext from a config and snapshot.
+
+    Constructs a fresh evaluator from the immutable built-in base tables
+    plus exactly the snapshot overlay.  The policy determines the
+    evaluator's allow_random and allow_side_effects flags.
+    """
+    policy = snapshot.policy if isinstance(snapshot.policy, EvaluationPolicy) else EvaluationPolicy(
+        snapshot.policy.value if hasattr(snapshot.policy, "value") else snapshot.policy
+    )
+    # STRICT always disables both; PERMISSIVE enables only what config allows;
+    # DEFAULT follows config flags.
+    if policy == EvaluationPolicy.STRICT:
+        allow_random, allow_side_effects = False, False
+    elif policy == EvaluationPolicy.PERMISSIVE:
+        allow_random = config.allow_random
+        allow_side_effects = config.allow_side_effects
+    else:
+        allow_random = config.allow_random
+        allow_side_effects = config.allow_side_effects
+
+    evaluator = _evaluator.Evaluator(
+        allow_random=allow_random,
+        allow_side_effects=allow_side_effects,
+    )
+    # Apply snapshot overlay to the fresh evaluator
+    for name, value in snapshot.constants.items():
+        evaluator.CONSTANTS[name] = value
+    for name, value in snapshot.functions.items():
+        if callable(value):
+            evaluator.FUNCTIONS[name] = value
+
+    return RuntimeContext(snapshot=snapshot, evaluator=evaluator)
 
 
 def parse_config_snapshot(
@@ -1320,7 +1595,9 @@ class McpSession:
         self.client_capabilities: dict | None = None
         self.request_id: str | None = None
         # Owner server binding — set once by the owning McpServer.
-        self._owner_id: int | None = None
+        # Uses a weak reference so the session does not prevent the
+        # server from being garbage collected.
+        self._owner_ref: weakref.ref[McpServer] | None = None
         self._owner_remove_callback: Any = None
         self._closed = False
         # Session-scoped cancellation records. Each session owns its own
@@ -1329,8 +1606,19 @@ class McpSession:
         self._cancelled_requests_order: deque[Any] = deque()
         self._cancelled_lock = threading.Lock()
 
-    def handle_message(self, request: dict, server: McpServer | None = None) -> dict | None:
-        """Route MCP request to appropriate handler with lifecycle enforcement."""
+    def handle_message(
+        self,
+        request: dict,
+        server: McpServer | None = None,
+        context: RuntimeContext | None = None,
+    ) -> dict | None:
+        """Route MCP request to appropriate handler with lifecycle enforcement.
+
+        When *server* and *context* are provided, all dispatch uses the
+        server-owned registry, executor, and evaluator.  Serverless
+        fallbacks are removed for tool/profile/cancellation dispatch —
+        those methods require a supplied owner server/context.
+        """
         method = request.get("method", "")
         request_id = request.get("id")
 
@@ -1346,27 +1634,33 @@ class McpSession:
             self._handle_notifications_initialized()
             return None
         elif method == "notifications/cancelled":
+            if server is None:
+                return _invalid_request_error(
+                    request_id,
+                    "notifications/cancelled requires a server context",
+                )
             self._handle_cancelled(request, server=server)
             return None
         elif method == "ping":
             return {"jsonrpc": "2.0", "id": request_id, "result": {}}
         elif method == "tools/list":
-            if server is not None:
-                return _handle_list_tools(request, server=server)
-            return _handle_list_tools(request)
+            if server is None:
+                return _invalid_request_error(
+                    request_id, "tools/list requires a server context"
+                )
+            return _handle_list_tools(request, server=server)
         elif method == "tools/call":
-            if server is not None:
-                return self._handle_call_tool_server(request, server)
-            return _handle_call_tool(
-                request,
-                cancelled_set=self._cancelled_requests,
-                cancelled_order=self._cancelled_requests_order,
-                cancelled_lock=self._cancelled_lock,
-            )
+            if server is None:
+                return _invalid_request_error(
+                    request_id, "tools/call requires a server context"
+                )
+            return self._handle_call_tool_server(request, server, context)
         elif method == "profiles/list":
-            if server is not None:
-                return _handle_list_profiles(request, server=server)
-            return _handle_list_profiles(request)
+            if server is None:
+                return _invalid_request_error(
+                    request_id, "profiles/list requires a server context"
+                )
+            return _handle_list_profiles(request, server=server)
         elif method.startswith("notifications/"):
             # Unknown notifications are silently ignored per MCP spec
             return None
@@ -1374,8 +1668,14 @@ class McpSession:
             display = method[:100] + "..." if len(method) > 100 else method
             return _method_not_found(request_id, display)
 
-    def _handle_call_tool_server(self, request: dict, server: McpServer) -> dict:
-        """Handle tools/call using server-owned executor for state isolation."""
+    def _handle_call_tool_server(
+        self, request: dict, server: McpServer, context: RuntimeContext | None = None
+    ) -> dict:
+        """Handle tools/call using server-owned executor for state isolation.
+
+        Uses the evaluator captured from the request context so that
+        concurrent requests observe a consistent configuration generation.
+        """
         params = request.get("params", {})
         if not isinstance(params, dict):
             return _invalid_request(request.get("id"), "Invalid params: expected object")
@@ -1411,6 +1711,7 @@ class McpSession:
                 ),
             )
 
+        evaluator = context.evaluator if context is not None else server.evaluator
         return server._executor.call_tool(
             name=name,
             arguments=arguments,
@@ -1418,6 +1719,7 @@ class McpSession:
             cancelled_set=self._cancelled_requests,
             cancelled_order=self._cancelled_requests_order,
             cancelled_lock=self._cancelled_lock,
+            evaluator=evaluator,
         )
 
     def close(self) -> None:
@@ -1438,11 +1740,23 @@ class McpSession:
                 pass  # Best-effort cleanup; server may already be closed.
         self._owner_remove_callback = None
 
+    @property
+    def owner(self) -> McpServer:
+        """Return the live owning server, raising if unavailable or closed."""
+        owner = self._owner_ref() if self._owner_ref else None
+        if owner is None:
+            raise RuntimeError("Session owner is unavailable")
+        if owner.closed:
+            raise RuntimeError("Session owner is closed")
+        return owner
+
     def _bind_owner(self, server: McpServer) -> None:
         """Bind this session to exactly one owning server. Called once by create_session."""
-        if self._owner_id is not None and self._owner_id != id(server):
-            raise RuntimeError("Session is already owned by another server")
-        self._owner_id = id(server)
+        if self._owner_ref is not None:
+            existing = self._owner_ref()
+            if existing is not None and existing is not server:
+                raise RuntimeError("Session is already owned by another server")
+        self._owner_ref = weakref.ref(server)
 
     def _check_ready_for_dispatch(self, method: str, request_id: Any) -> dict | None:
         """Check if session state allows this method to be dispatched."""
@@ -1578,13 +1892,32 @@ class McpServer:
     ) -> None:
         self._config = config or McpServerConfig()
         self._registry = registry or ToolRegistry()
-        self._evaluator = _evaluator.Evaluator(
-            allow_random=self._config.allow_random,
-            allow_side_effects=self._config.allow_side_effects,
+
+        # Validate that the configured profile is resolvable against the
+        # supplied registry.  The synthetic "full" profile is always valid.
+        if self._config.profile != "full" and self._config.profile not in self._registry.profiles:
+            available = ", ".join(sorted(self._registry.profiles))
+            raise ValueError(
+                f"Unknown profile: {self._config.profile!r}. "
+                f"Available profiles: {available}"
+            )
+
+        # Build the initial RuntimeContext once at construction.
+        # There is no separately authoritative mutable evaluator — the
+        # context's evaluator is the sole active evaluator.
+        initial_snapshot = ConfigSnapshot(
+            generation=0,
+            constants={},
+            functions={},
+            units={},
+            policy=policy_from_server_config(self._config),
         )
-        self._executor = ToolExecutor(self._config, self._registry, self._evaluator)
+        self._runtime_context = build_runtime_context(self._config, initial_snapshot)
+        self._executor = ToolExecutor(self._config, self._registry)
         self._config_manager = ConfigManager()
-        self._runtime_context: RuntimeContext | None = None
+        # Initialize the config manager with the initial snapshot directly
+        # (generation 0 is valid as the starting point).
+        self._config_manager._snapshot = initial_snapshot
         self._closed = False
         self._lock = threading.Lock()
         self._sessions: set[McpSession] = set()
@@ -1603,8 +1936,19 @@ class McpServer:
         return self._config_manager
 
     @property
+    def runtime_context(self) -> RuntimeContext:
+        """The server's active runtime context (never None during normal operation)."""
+        return self._runtime_context
+
+    @property
     def evaluator(self) -> _evaluator.Evaluator:
-        return self._evaluator
+        """Compatibility accessor returning the active evaluator from the runtime context."""
+        return self._runtime_context.evaluator
+
+    @property
+    def closed(self) -> bool:
+        """Whether this server has been shut down."""
+        return self._closed
 
     def create_session(
         self, initial_state: McpSessionState = McpSessionState.UNINITIALIZED
@@ -1623,7 +1967,12 @@ class McpServer:
             self._sessions.discard(session)
 
     def handle_request(self, request: Any, session: McpSession | None = None) -> dict | None:
-        """Handle a JSON-RPC request with server-owned dispatch."""
+        """Handle a JSON-RPC request with server-owned dispatch.
+
+        Captures the active RuntimeContext before queue admission so the
+        request has one stable semantic context from validation through
+        execution, even if a new configuration publishes while it is queued.
+        """
         if self._closed:
             return _invalid_request(None, "Server is closed")
 
@@ -1642,12 +1991,18 @@ class McpServer:
             session = self.create_session()
         elif session._closed:
             return _invalid_request(None, "Session is closed")
-        elif session._owner_id is None:
+        elif session._owner_ref is None:
             return _invalid_request(None, "Session is not bound to a server")
-        elif session._owner_id != id(self):
-            return _invalid_request(None, "Session belongs to another server")
+        else:
+            owner = session._owner_ref()
+            if owner is None:
+                return _invalid_request(None, "Session owner is unavailable")
+            if owner is not self:
+                return _invalid_request(None, "Session belongs to another server")
 
-        return session.handle_message(request, server=self)
+        # Capture one immutable context before dispatch.
+        context = self._runtime_context
+        return session.handle_message(request, server=self, context=context)
 
     def close(self) -> None:
         """Shut down the server, releasing workers and cleaning up."""
@@ -1676,76 +2031,74 @@ class McpServer:
         """Parse, validate, and atomically activate a configuration change.
 
         Single entry point for the full configuration lifecycle:
-        parse -> validate -> assign generation -> construct snapshot ->
-        activate on the server's evaluator.
+        parse -> validate -> construct snapshot -> build context ->
+        atomically assign.
+
+        This is a *replacement* operation: new overlay entries replace
+        previous ones entirely.  Built-ins remain available from immutable
+        evaluator base tables.
 
         Returns the new snapshot on success.  On failure the prior
         configuration is preserved unchanged.
         """
-        snapshot = parse_config_snapshot(
+        # 1. Parse and validate raw values to ConfigCandidate outside the lock
+        candidate = parse_config_candidate(
             constants=constants,
             functions=functions,
             units=units,
             policy=policy,
         )
-        new_eval = _evaluator.Evaluator(
-            allow_random=self._config.allow_random,
-            allow_side_effects=self._config.allow_side_effects,
-        )
-        for name, value in snapshot.constants.items():
-            new_eval.CONSTANTS[name] = value
-        for name, value in snapshot.functions.items():
-            if callable(value):
-                new_eval.FUNCTIONS[name] = value
 
+        # 2. Read the current context and expected generation
         with self._lock:
-            new_gen = self._config_manager.current().generation + 1
-            validated = ConfigSnapshot(
-                generation=new_gen,
-                constants=dict(snapshot.constants),
-                functions=dict(snapshot.functions),
-                units=dict(snapshot.units),
-                policy=snapshot.policy,
-            )
-            ctx = RuntimeContext(snapshot=validated, evaluator=new_eval)
+            current_context = self._runtime_context
+            expected_generation = current_context.snapshot.generation
+            new_gen = expected_generation + 1
 
-            prev_constants = dict(self._evaluator.CONSTANTS)
-            prev_functions = dict(self._evaluator.FUNCTIONS)
-            try:
-                self._evaluator.CONSTANTS.update(new_eval.CONSTANTS)
-                self._evaluator.FUNCTIONS.update(new_eval.FUNCTIONS)
-                self._config_manager.replace(validated)
-                self._runtime_context = ctx
-            except Exception:
-                self._evaluator.CONSTANTS.clear()
-                self._evaluator.CONSTANTS.update(prev_constants)
-                self._evaluator.FUNCTIONS.clear()
-                self._evaluator.FUNCTIONS.update(prev_functions)
-                raise
+        # 3. Construct a new evaluator from immutable built-ins plus exactly
+        #    the candidate overlay (outside the lock)
+        new_snapshot = ConfigSnapshot(
+            generation=new_gen,
+            constants=candidate.constants,
+            functions=candidate.functions,
+            units={},
+            policy=candidate.policy,
+        )
+        new_context = build_runtime_context(self._config, new_snapshot)
 
-        return validated
+        # 4. Acquire one activation lock
+        with self._lock:
+            # 5. Verify that the active generation still equals expected
+            if self._runtime_context.snapshot.generation != expected_generation:
+                raise ValueError(
+                    f"Stale generation: expected {expected_generation}, "
+                    f"got {self._runtime_context.snapshot.generation}"
+                )
+
+            # 6. Atomically assign the new runtime context
+            self._runtime_context = new_context
+            # 7. Publish the same snapshot to ConfigManager
+            self._config_manager.replace(new_snapshot)
+
+        return new_snapshot
 
     def activate_snapshot(self, snapshot: ConfigSnapshot) -> None:
         """Atomically activate a configuration snapshot.
 
-        Pushes constants, functions, and units from the snapshot into the
-        server's evaluator.  On failure the prior evaluator state is preserved.
+        Builds a fresh evaluator from the snapshot and atomically replaces
+        the active runtime context.  On failure the prior context is
+        preserved unchanged.
         """
-        prev_constants = dict(self._evaluator.CONSTANTS)
-        prev_functions = dict(self._evaluator.FUNCTIONS)
-        try:
-            for name, value in snapshot.constants.items():
-                self._evaluator.CONSTANTS[name] = value
-            for name, value in snapshot.functions.items():
-                if callable(value):
-                    self._evaluator.FUNCTIONS[name] = value
+        new_context = build_runtime_context(self._config, snapshot)
+        with self._lock:
+            # Verify generation is strictly increasing before replacing.
+            if snapshot.generation <= self._runtime_context.snapshot.generation:
+                raise ValueError(
+                    f"Snapshot generation {snapshot.generation} must be greater "
+                    f"than current {self._runtime_context.snapshot.generation}"
+                )
+            self._runtime_context = new_context
             self._config_manager.replace(snapshot)
-        except Exception:
-            self._evaluator.CONSTANTS.clear()
-            self._evaluator.CONSTANTS.update(prev_constants)
-            self._evaluator.FUNCTIONS.clear()
-            self._evaluator.FUNCTIONS.update(prev_functions)
-            raise
 
     def diagnostic(self) -> dict[str, Any]:
         """Return deterministic diagnostic information."""
@@ -1760,7 +2113,8 @@ class McpServer:
             "max_tool_workers": self._config.max_tool_workers,
             "active_workers": self._executor.active_workers,
             "max_tool_queue_size": self._config.max_tool_queue_size,
-            "pending_count": self._executor.pending_count,
+            "pending_count": self._executor.queued_count,
+            "total_inflight": self._executor.total_inflight,
             "max_tool_timeout": self._config.max_tool_timeout_seconds,
             "orphan_count": self._executor.orphan_count,
             "session_count": live_sessions,
@@ -2714,7 +3068,12 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
         compat_session._bind_owner(compat)
         return compat.handle_request(request, session=compat_session)
 
-    return session.handle_message(request)
+    # Explicit session: route through the session's owner server.
+    try:
+        owner = session.owner
+    except RuntimeError:
+        return _invalid_request(None, "Session owner is unavailable or closed")
+    return owner.handle_request(request, session=session)
 
 
 def main() -> int:

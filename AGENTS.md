@@ -74,18 +74,19 @@ black eggcalc tests
 
 # Type check
 mypy eggcalc --ignore-missing-imports
+mypy tests/typing/consumer.py --strict --ignore-missing-imports  # external consumer API surface
 
 # All checks at once (includes generated-doc drift check)
 make check
 
-# Build single-file distribution
-python build_single.py
+# Build single-file distribution (validates manifest first)
+python3 build_single.py --validate && python3 build_single.py
 
 # Install to ~/.local/bin/calc
 python install.py --install
 ```
 
-CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3" (smoke) → generate_mcp_docs.py --check → pytest → mypy` (mypy only on 3.12).
+CI order: `ruff → black --check → build_single.py --validate → build_single.py → python eggcalc.py "5+3" (smoke) → generate_mcp_docs.py --check → pytest → mypy (eggcalc + tests/typing/consumer.py --strict, only on 3.12)`.
 
 ## Constraints
 
@@ -108,12 +109,12 @@ CI order: `ruff → black --check → build_single.py → python eggcalc.py "5+3
 | `eggcalc/__main__.py` | Module entry, delegates to `cli.main()` |
 | `eggcalc/exact/` | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
 | `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor, EvaluationPolicy, ConfigCandidate, RuntimeContext |
-| `build_single.py` | Assembles everything into `eggcalc.py` |
+| `build_single.py` | Assembles everything into `eggcalc.py`. Uses `MODULE_MANIFEST` (tuple of `ModuleSpec` dataclasses) as the single source of truth for module ordering, dependencies, and validation. `MODULES_CALC`, `MODULES_EXACT`, `MODULES_MCP` are derived views. `validate_build_manifest()` checks for duplicates, missing files, unknown deps, cycles, and reachability. |
 
 ## Unit Conventions
 
 - Prefixed units (`kN`, `mV`, `mA`) map to themselves in `UNIT_ALIASES`. Word forms (`kilonewton`) alias to the prefixed symbol.
-- Temperature conversions use offset math (not multiplicative factors).
+- Temperature conversions use offset math (not multiplicative factors). Fahrenheit and Rankine use `scale_to_base=5/9` with correct unit-to-base offsets (F: 255.3722222222222, Ra: 0.0). Kelvin is the base unit (scale=1, offset=0). Celsius uses scale=1, offset=273.15.
 - Gas constant is `r`/`R` (8.314...). Rankine is `Ra`/`rankine`/`°R`. The `r`/`R` identifiers are **not** Rankine.
 - `5m ** 2` → `25.0 m**2` (power binds the unit). `5m / 2s` → `25.0 m/s` (denominator is wrapped in parens by the preprocessor).
 - British spellings (`metre`/`metres`, `litre`/`litres`) are included in aliases.
