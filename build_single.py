@@ -208,6 +208,20 @@ def get_version() -> str:
     raise SystemExit(f"ERROR: __version__ not found in {version_path}")
 
 
+def get_init_all() -> str:
+    """Extract the __all__ assignment from eggcalc/__init__.py for the single-file build."""
+    init_path = os.path.join(EGGCALC_DIR, "__init__.py")
+    with open(init_path, encoding="utf-8") as f:
+        source = f.read()
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
+        ):
+            return ast.get_source_segment(source, node) or ""
+    raise SystemExit("ERROR: __all__ not found in eggcalc/__init__.py")
+
+
 def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     """Extract code from a module, removing docstring and imports that will be inlined.
 
@@ -252,6 +266,7 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     cleaned: list[str] = []
     in_main_block = False
     in_multiline_import = False
+    in_all_assignment = False
     exact_import_globals: list[str] = []
     _skip_exact_names: set[str] = set()
 
@@ -397,6 +412,18 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
 
         # Remove __future__ imports (will be inlined once)
         if "from __future__" in line:
+            continue
+
+        # Strip __all__ assignments from all modules; the correct __all__
+        # from __init__.py is appended at the end of the single-file build.
+        if stripped.startswith("__all__") and "=" in stripped:
+            if stripped.endswith("]") or stripped.count("]") >= stripped.count("["):
+                continue  # Single-line __all__
+            in_all_assignment = True
+            continue
+        if in_all_assignment:
+            if "]" in stripped:
+                in_all_assignment = False
             continue
 
         # Handle simple "import X" statements - collect them if top-level
@@ -729,6 +756,11 @@ def build_single_file(output_path: str | None = None) -> str:
     content.append("_patch_apply_check = patch_apply_check\n")
     content.append("_patch_summary = patch_summary\n")
 
+    # Append the canonical __all__ from __init__.py so the single-file build
+    # has the correct public API surface (all per-module __all__ were stripped).
+    content.append("\n# === Public API surface (from __init__.py) ===\n")
+    content.append(get_init_all() + "\n")
+
     # Combined entry point
     content.append("\n# === Entry point ===\n")
     content.append("""
@@ -1037,7 +1069,8 @@ def _relative_import_targets(spec: ModuleSpec) -> set[str]:
         def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
             return
 
-        visit_AsyncFunctionDef = visit_FunctionDef
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            return
 
         def visit_ClassDef(self, node: ast.ClassDef) -> None:
             return

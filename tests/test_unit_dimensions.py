@@ -22,12 +22,12 @@ from eggcalc.units import (
     UnitDefinition,
     UnitRegistry,
     UnitValue,
-    _parse_compound_signature,
     _structural_dimension,
     are_units_compatible,
     build_unit_registry,
     get_conversion_factor,
     normalize_unit,
+    parse_unit_expression,
 )
 
 # ---------------------------------------------------------------------------
@@ -515,40 +515,37 @@ class TestCompoundParsingBounds:
         # Build a deeply nested expression: "m/m/m/m/..." beyond depth limit
         depth = MAX_COMPOUND_DEPTH + 2
         deeply_nested = "/".join(["m"] * depth)
-        result = _parse_compound_signature(deeply_nested)
-        assert result is None
+        with pytest.raises(ValueError):
+            parse_unit_expression(deeply_nested)
 
     def test_max_string_length_exceeded_returns_none(self):
-        """Exceeding MAX_UNIT_STRING_LENGTH must return None."""
+        """Exceeding MAX_UNIT_STRING_LENGTH must raise."""
         long_unit = "m" * (MAX_UNIT_STRING_LENGTH + 1)
-        result = _parse_compound_signature(long_unit)
-        assert result is None
+        with pytest.raises(ValueError):
+            parse_unit_expression(long_unit)
 
     def test_normal_depth_succeeds(self):
         """Normal compound expressions within bounds must parse successfully."""
-        result = _parse_compound_signature("m/s**2")
-        assert result is not None
-        num, den = result
-        assert ("m", 1) in num
-        assert ("s", 2) in den
+        result = parse_unit_expression("m/s**2")
+        assert result.factors == (("m", 1), ("s", -2))
 
     def test_max_depth_boundary_succeeds(self):
         """Expressions at exactly MAX_COMPOUND_DEPTH must parse."""
         depth = MAX_COMPOUND_DEPTH
-        nested = "/".join(["m"] * depth)
-        result = _parse_compound_signature(nested)
+        nested = "*".join(["m"] * depth)
+        result = parse_unit_expression(nested)
         assert result is not None
 
     def test_max_atoms_exceeded_returns_none(self):
-        """Exceeding MAX_COMPOUND_ATOMS must return None."""
+        """Exceeding MAX_COMPOUND_ATOMS must raise."""
         import eggcalc.units as u
 
         orig = u.MAX_COMPOUND_ATOMS
         try:
             u.MAX_COMPOUND_ATOMS = 3
             # 3 operators = 4 atoms, exceeds limit of 3
-            result = _parse_compound_signature("a*b*c*d")
-            assert result is None
+            with pytest.raises(ValueError):
+                parse_unit_expression("m*s*kg*J")
         finally:
             u.MAX_COMPOUND_ATOMS = orig
 
@@ -560,7 +557,7 @@ class TestCompoundParsingBounds:
         try:
             u.MAX_COMPOUND_ATOMS = 4
             # 3 operators = 4 atoms, within limit of 4
-            result = _parse_compound_signature("a*b*c*d")
+            result = parse_unit_expression("m*s*kg*J")
             assert result is not None
         finally:
             u.MAX_COMPOUND_ATOMS = orig

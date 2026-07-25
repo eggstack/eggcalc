@@ -1,0 +1,108 @@
+{
+  "architecture": "arm64",
+  "command": "scripts/measure_architecture_costs.py --output docs/performance/single_file.json --label single_file --samples 5 --single-file /tmp/eggcalc_perf.py",
+  "commit_sha": "800832196439558383d22300ef36870c997437da",
+  "label": "single_file",
+  "measurements": {
+    "cli_help": {
+      "mean_ms": 225.7256,
+      "median_ms": 225.8968,
+      "samples": 5,
+      "stdev_ms": 1.3424
+    },
+    "exact_command": {
+      "mean_ms": 228.2681,
+      "median_ms": 227.0333,
+      "samples": 5,
+      "stdev_ms": 1.9083
+    },
+    "import_eggcalc": {
+      "loaded_modules": 7,
+      "mean_ms": 820.0654,
+      "median_ms": 820.8575,
+      "peak_bytes": 34894990,
+      "samples": 5,
+      "stdev_ms": 2.1182
+    },
+    "import_evaluate": {
+      "loaded_modules": 7,
+      "mean_ms": 818.6657,
+      "median_ms": 815.8755,
+      "peak_bytes": 34896172,
+      "samples": 5,
+      "stdev_ms": 16.4285
+    },
+    "mcp_initialize": {
+      "loaded_modules": 35,
+      "mean_ms": 1021.1799,
+      "median_ms": 1020.2233,
+      "peak_bytes": 34918098,
+      "samples": 5,
+      "stdev_ms": 3.0114
+    },
+    "normal_expression": {
+      "loaded_modules": 7,
+      "mean_ms": 808.7748,
+      "median_ms": 808.6997,
+      "peak_bytes": 34895781,
+      "samples": 5,
+      "stdev_ms": 2.4719
+    },
+    "single_file_startup": {
+      "mean_ms": 449.7775,
+      "median_ms": 450.8199,
+      "samples": 5,
+      "stdev_ms": 5.1095
+    },
+    "tools_list_compact": {
+      "loaded_modules": 35,
+      "mean_ms": 1019.9334,
+      "median_ms": 1019.7273,
+      "peak_bytes": 35515989,
+      "samples": 5,
+      "stdev_ms": 6.6687
+    },
+    "tools_list_full": {
+      "loaded_modules": 35,
+      "mean_ms": 1015.0988,
+      "median_ms": 1016.1697,
+      "peak_bytes": 34927233,
+      "samples": 5,
+      "stdev_ms": 6.1247
+    },
+    "unit_parse_maximum": {
+      "loaded_modules": 7,
+      "mean_ms": 818.2461,
+      "median_ms": 817.7227,
+      "peak_bytes": 34896500,
+      "samples": 5,
+      "stdev_ms": 1.3026
+    },
+    "unit_parse_normal": {
+      "loaded_modules": 7,
+      "mean_ms": 806.8273,
+      "median_ms": 807.1078,
+      "peak_bytes": 34896365,
+      "samples": 5,
+      "stdev_ms": 1.1737
+    },
+    "unit_registry": {
+      "loaded_modules": 7,
+      "mean_ms": 810.8451,
+      "median_ms": 812.3053,
+      "peak_bytes": 34896564,
+      "samples": 5,
+      "stdev_ms": 4.7567
+    },
+    "unitvalue_arithmetic": {
+      "loaded_modules": 7,
+      "mean_ms": 821.008,
+      "median_ms": 817.3912,
+      "peak_bytes": 34905730,
+      "samples": 5,
+      "stdev_ms": 5.9045
+    }
+  },
+  "os": "Darwin",
+  "python": "3.14.2 (v3.14.2:df793163d58, Dec  5 2025, 12:18:06) [Clang 16.0.0 (clang-1600.0.26.6)]"
+}

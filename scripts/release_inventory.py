@@ -35,8 +35,11 @@ if mode == "package":
     namespace = vars(api)
 else:
     namespace = runpy.run_path(sys.argv[2], run_name="eggcalc_single")
-    import eggcalc as package_api
-    api = type("Api", (), {"__version__": namespace["__version__"], "__all__": package_api.__all__})
+    # Derive __all__ from the generated namespace directly, not from the package.
+    all_names = namespace.get("__all__")
+    if all_names is None:
+        all_names = [name for name in namespace if not name.startswith("_")]
+    api = type("Api", (), {"__version__": namespace["__version__"], "__all__": all_names})
     _protocol = type("Protocol", (), {"SUPPORTED_PROTOCOL_VERSIONS": namespace["SUPPORTED_PROTOCOL_VERSIONS"]})
     cli = type("Cli", (), {"COMMANDS": namespace["COMMANDS"]})
     units = type("Units", (), {name: namespace[name] for name in (

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from scripts.check_evidence_consistency import validate_documents
+
+ROOT = Path(__file__).resolve().parents[1]
+EVIDENCE_DOCS = tuple(ROOT / "docs" / f"release_{n}_evidence.md" for n in (4, 5, 6))
 
 
 def _document(tmp_path: Path, name: str, sha: str, run_id: str, totals: str) -> Path:
@@ -73,3 +77,38 @@ def test_evidence_validator_rejects_mismatched_identity_and_bad_totals(tmp_path:
 
     assert any("identities do not match" in error for error in errors)
     assert any("totals do not add up" in error for error in errors)
+
+
+# ---------------------------------------------------------------------------
+# Repository-evidence validation: the committed docs must be self-consistent.
+# ---------------------------------------------------------------------------
+
+
+def test_repository_evidence_documents_have_final_closure_sections() -> None:
+    """All three committed evidence docs must have a Final Closure Evidence section."""
+    for doc in EVIDENCE_DOCS:
+        assert doc.is_file(), f"Missing evidence doc: {doc}"
+        text = doc.read_text(encoding="utf-8")
+        assert (
+            "## Final Closure Evidence" in text
+        ), f"{doc.name}: missing Final Closure Evidence section"
+
+
+def test_repository_evidence_commit_shas_match() -> None:
+    """All three committed evidence docs must reference the same commit SHA."""
+    shas: set[str] = set()
+    for doc in EVIDENCE_DOCS:
+        text = doc.read_text(encoding="utf-8")
+        match = re.search(r"closure_code_sha:\s*`([0-9a-f]{40})`", text)
+        if match:
+            shas.add(match.group(1))
+    # The docs may use different SHA formats; if any have closure_code_sha,
+    # they must all agree.
+    if shas:
+        assert len(shas) == 1, f"Commit SHAs differ across evidence docs: {shas}"
+
+
+def test_repository_evidence_all_pass() -> None:
+    """The committed evidence docs must pass the consistency validator."""
+    errors = validate_documents(EVIDENCE_DOCS)
+    assert errors == [], f"Evidence consistency errors: {errors}"

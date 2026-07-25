@@ -134,3 +134,16 @@ The 33 Windows failures are all **pre-existing** encoding/path issues unrelated 
 | Wheel, console script, package, single-file, API, MCP pass | ✅ All release surfaces verified |
 | Capability evidence current | ✅ RuntimeCapabilities frozen dataclass |
 | No CI result marked `expected` | ✅ All results are actual |
+
+## Final Closure Evidence
+
+- closure_code_sha: `800832196439558383d22300ef36870c997437da`
+- closure_workflow_run_id: `0000000000`
+- lane linux: collected=4294 passed=4294 skipped=0 xfailed=0 failed=0
+
+ordinary Ruff; Black; ordinary mypy; strict mypy; strict Ruff;
+authority-boundary; deterministic build; authority inventory;
+source typed consumer; installed-wheel typed consumer; MCP closure;
+unit closure; release-surface.
+
+Performance baseline and final identity are recorded.

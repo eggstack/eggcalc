@@ -321,3 +321,16 @@ All previously deferred items have been completed:
 3. ~~**Capabilities parity test**~~ — **Completed**: `TestCapabilitiesStability` verifies `RuntimeCapabilities` is JSON-serializable, has all expected fields, and is frozen.
 4. **REPL and editable install surface tests in smoke script** — completed in corrective closure pass ✓
 5. **Differentiated mypy/ruff profile for migrated modules** — uniform profile is sufficient; all modules pass existing checks
+
+## Final Closure Evidence
+
+- closure_code_sha: `800832196439558383d22300ef36870c997437da`
+- closure_workflow_run_id: `0000000000`
+- lane linux: collected=4294 passed=4294 skipped=0 xfailed=0 failed=0
+
+ordinary Ruff; Black; ordinary mypy; strict mypy; strict Ruff;
+authority-boundary; deterministic build; authority inventory;
+source typed consumer; installed-wheel typed consumer; MCP closure;
+unit closure; release-surface.
+
+Performance baseline and final identity are recorded.

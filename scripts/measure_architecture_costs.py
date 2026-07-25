@@ -106,12 +106,12 @@ def collect(samples: int, single_file: Path | None = None) -> dict[str, object]:
         ),
         "unit_parse_normal": _timed_python(
             "from eggcalc import units; "
-            "getattr(units, 'parse_unit_expression', units._parse_compound_signature)('kg*m/s**2')",
+            "units.parse_unit_expression('kg*m/s**2')",
             samples,
         ),
         "unit_parse_maximum": _timed_python(
             "from eggcalc import units; "
-            "getattr(units, 'parse_unit_expression', units._parse_compound_signature)('*'.join(['m']*16+['s']*16))",
+            "units.parse_unit_expression('*'.join(['m']*16+['s']*16))",
             samples,
         ),
         "unitvalue_arithmetic": _timed_python(
