@@ -571,30 +571,44 @@ class TestDuplicateAliasRejection:
 
     def test_conflicting_canonical_rejected(self):
         """Two aliases mapping to different canonicals must fail."""
-        from eggcalc.units import UNIT_BASE, build_unit_registry
+        from eggcalc.units import DIM_LENGTH, DIM_TIME, UnitSpec, build_unit_registry
 
-        # UNIT_BASE is {canonical: {alias: factor, ...}}
-        # Add the same alias to two different canonicals
-        orig_base = {k: dict(v) for k, v in UNIT_BASE.items()}
-        try:
-            UNIT_BASE["m"]["test_conflict_alias"] = 1.0
-            UNIT_BASE["s"]["test_conflict_alias"] = 1.0
-            with pytest.raises(ValueError, match="Conflicting alias"):
-                build_unit_registry()
-        finally:
-            UNIT_BASE.clear()
-            UNIT_BASE.update(orig_base)
+        with pytest.raises(ValueError, match="Duplicate alias"):
+            build_unit_registry(
+                (
+                    UnitSpec(
+                        "m",
+                        ("m", "test_conflict_alias"),
+                        DIM_LENGTH,
+                        1.0,
+                        category="length",
+                        base_canonical="m",
+                    ),
+                    UnitSpec(
+                        "s",
+                        ("s", "test_conflict_alias"),
+                        DIM_TIME,
+                        1.0,
+                        category="time",
+                        base_canonical="s",
+                    ),
+                )
+            )
 
     def test_no_conflict_succeeds(self):
         """Non-conflicting aliases must build successfully."""
-        from eggcalc.units import UNIT_BASE, build_unit_registry
+        from eggcalc.units import DIM_LENGTH, UnitSpec, build_unit_registry
 
-        orig_base = {k: dict(v) for k, v in UNIT_BASE.items()}
-        try:
-            # Same alias, same canonical, same scale — no conflict
-            UNIT_BASE["m"]["test_no_conflict"] = 1.0
-            reg = build_unit_registry()
-            assert "test_no_conflict" in reg.all_aliases
-        finally:
-            UNIT_BASE.clear()
-            UNIT_BASE.update(orig_base)
+        reg = build_unit_registry(
+            (
+                UnitSpec(
+                    "m",
+                    ("m", "test_no_conflict"),
+                    DIM_LENGTH,
+                    1.0,
+                    category="length",
+                    base_canonical="m",
+                ),
+            )
+        )
+        assert "test_no_conflict" in reg.all_aliases

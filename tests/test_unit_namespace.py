@@ -195,26 +195,15 @@ class TestInchKeyword:
 class TestCustomUnitCategories:
     """C3: load_user_config supports (factor, category) tuples for CUSTOM_UNITS.
 
-    The normalization pipeline in normalize.py only knows about the
-    pre-registered units (via _UNITS_BY_LENGTH), so we test the post-
-    normalization layer (Evaluator.visit_BinOp) directly: when a custom
-    unit is registered in UNIT_BASE / UNIT_ALIASES / UNIT_CATEGORIES, the
-    Evaluator should pick it up via visit_Name + visit_BinOp.
+    User units are installed as validated declaration extensions and exposed
+    through generated immutable compatibility adapters.
     """
 
     def _register_custom(self, units_mod, name: str, factor: float, category: str) -> None:
-        with units_mod._UNITS_LOCK:
-            units_mod.UNIT_BASE.setdefault("m", {}).update({name: factor})
-            units_mod.UNIT_ALIASES[name] = name
-            units_mod.UNIT_CATEGORIES[name] = category
-            units_mod._rebuild_conversions()
+        units_mod.register_custom_units({"m": {name: (factor, category)}})
 
     def _unregister_custom(self, units_mod, name: str) -> None:
-        with units_mod._UNITS_LOCK:
-            units_mod.UNIT_BASE["m"].pop(name, None)
-            units_mod.UNIT_ALIASES.pop(name, None)
-            units_mod.UNIT_CATEGORIES.pop(name, None)
-            units_mod._rebuild_conversions()
+        units_mod.unregister_custom_units({name})
 
     def test_custom_unit_with_explicit_category(self):
         import eggcalc.units as units_mod

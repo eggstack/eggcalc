@@ -12,9 +12,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 EGGCALC_DIR = os.path.join(os.path.dirname(__file__), "eggcalc")
@@ -47,37 +48,123 @@ MODULE_MANIFEST: tuple[ModuleSpec, ...] = (
     ModuleSpec("_protocol", "_protocol.py", "core"),
     ModuleSpec("normalize", "normalize.py", "core", depends_on=("units", "evaluator")),
     ModuleSpec("capabilities", "capabilities.py", "core", depends_on=("_protocol",)),
-    ModuleSpec("cli", "cli.py", "core", depends_on=("units", "evaluator", "normalize", "capabilities")),
+    ModuleSpec(
+        "cli", "cli.py", "core", depends_on=("units", "evaluator", "normalize", "capabilities")
+    ),
     # -- exact text tools --------------------------------------------------
     ModuleSpec("exact.primitives", "exact/primitives.py", "exact"),
     ModuleSpec("exact.diff", "exact/diff.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.diff_analysis", "exact/diff_analysis.py", "exact", depends_on=("exact.diff",)),
+    ModuleSpec(
+        "exact.diff_analysis",
+        "exact/diff_analysis.py",
+        "exact",
+        depends_on=("exact.diff", "exact.patch"),
+    ),
     ModuleSpec("exact.validate", "exact/validate.py", "exact", depends_on=("exact.primitives",)),
     ModuleSpec("exact.measure", "exact/measure.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.unicode_tools", "exact/unicode_tools.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.synthesis", "exact/synthesis.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.confusables", "exact/confusables.py", "exact", depends_on=("exact.primitives",)),
+    ModuleSpec(
+        "exact.unicode_tools",
+        "exact/unicode_tools.py",
+        "exact",
+        depends_on=("exact.primitives", "exact.confusables"),
+    ),
+    ModuleSpec(
+        "exact.synthesis",
+        "exact/synthesis.py",
+        "exact",
+        depends_on=("exact.primitives", "exact.diff", "exact.measure", "exact.unicode_tools"),
+    ),
+    ModuleSpec(
+        "exact.confusables", "exact/confusables.py", "exact", depends_on=("exact.primitives",)
+    ),
     ModuleSpec("exact.config", "exact/config.py", "exact", depends_on=("exact.primitives",)),
     ModuleSpec("exact.shell", "exact/shell.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.path_tools", "exact/path_tools.py", "exact", depends_on=("exact.primitives",)),
+    ModuleSpec(
+        "exact.path_tools",
+        "exact/path_tools.py",
+        "exact",
+        depends_on=("exact.primitives", "exact.unicode_tools"),
+    ),
     ModuleSpec("exact.markdown", "exact/markdown.py", "exact", depends_on=("exact.primitives",)),
     ModuleSpec("exact.patch", "exact/patch.py", "exact", depends_on=("exact.primitives",)),
     ModuleSpec("exact.transform", "exact/transform.py", "exact", depends_on=("exact.primitives",)),
     ModuleSpec("exact.position", "exact/position.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.identifier", "exact/identifier.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.identifier_inspect", "exact/identifier_inspect.py", "exact", depends_on=("exact.identifier",)),
+    ModuleSpec(
+        "exact.identifier", "exact/identifier.py", "exact", depends_on=("exact.primitives",)
+    ),
+    ModuleSpec(
+        "exact.identifier_inspect",
+        "exact/identifier_inspect.py",
+        "exact",
+        depends_on=("exact.identifier", "exact.diff", "exact.unicode_tools"),
+    ),
     ModuleSpec("exact.glob", "exact/glob.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.unicode_policy", "exact/unicode_policy.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.inspect_prompt", "exact/inspect_prompt.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.cargo", "exact/cargo.py", "exact", depends_on=("exact.primitives",)),
+    ModuleSpec(
+        "exact.unicode_policy",
+        "exact/unicode_policy.py",
+        "exact",
+        depends_on=("exact.primitives", "exact.unicode_tools"),
+    ),
+    ModuleSpec(
+        "exact.inspect_prompt", "exact/inspect_prompt.py", "exact", depends_on=("exact.primitives",)
+    ),
+    ModuleSpec(
+        "exact.cargo",
+        "exact/cargo.py",
+        "exact",
+        depends_on=("exact.primitives", "exact.unicode_tools"),
+    ),
     ModuleSpec("exact.version", "exact/version.py", "exact", depends_on=("exact.primitives",)),
     ModuleSpec("exact.manifests", "exact/manifests.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.llm_hygiene", "exact/llm_hygiene.py", "exact", depends_on=("exact.primitives",)),
-    ModuleSpec("exact.repo_audit", "exact/repo_audit.py", "exact", depends_on=("exact.primitives",)),
+    ModuleSpec(
+        "exact.llm_hygiene", "exact/llm_hygiene.py", "exact", depends_on=("exact.primitives",)
+    ),
+    ModuleSpec(
+        "exact.repo_audit", "exact/repo_audit.py", "exact", depends_on=("exact.primitives",)
+    ),
     # -- MCP server --------------------------------------------------------
     ModuleSpec("mcp.schemas", "mcp/schemas.py", "mcp", depends_on=("exact.primitives",)),
-    ModuleSpec("mcp.tools", "mcp/tools.py", "mcp", depends_on=("mcp.schemas", "exact.primitives")),
-    ModuleSpec("mcp.server", "mcp/server.py", "mcp", depends_on=("mcp.schemas", "mcp.tools", "exact.primitives")),
+    ModuleSpec(
+        "mcp.tools",
+        "mcp/tools.py",
+        "mcp",
+        depends_on=(
+            "mcp.schemas",
+            "evaluator",
+            "units",
+            "exact.cargo",
+            "exact.config",
+            "exact.confusables",
+            "exact.diff",
+            "exact.diff_analysis",
+            "exact.glob",
+            "exact.identifier",
+            "exact.identifier_inspect",
+            "exact.inspect_prompt",
+            "exact.llm_hygiene",
+            "exact.manifests",
+            "exact.markdown",
+            "exact.measure",
+            "exact.patch",
+            "exact.path_tools",
+            "exact.position",
+            "exact.primitives",
+            "exact.repo_audit",
+            "exact.shell",
+            "exact.synthesis",
+            "exact.transform",
+            "exact.unicode_policy",
+            "exact.unicode_tools",
+            "exact.validate",
+            "exact.version",
+        ),
+    ),
+    ModuleSpec(
+        "mcp.server",
+        "mcp/server.py",
+        "mcp",
+        depends_on=("mcp.schemas", "mcp.tools", "evaluator", "capabilities"),
+    ),
 )
 
 # Derived compatibility views - generated, not manually maintained.
@@ -556,21 +643,6 @@ def build_single_file(output_path: str | None = None) -> str:
     all_module_code: list[str] = []
     all_exact_globals: list[str] = []
 
-    # Core calculator modules
-    for mod in MODULES_CALC:
-        code, imports, _ = get_module_code(mod)
-        all_module_code.append(f"\n# === {mod}.py ===\n")
-        all_module_code.append(code)
-        all_imports.extend(imports)
-
-    # Exact text tools
-    all_module_code.append("\n# === Exact text tools ===\n")
-    for mod in MODULES_EXACT:
-        code, imports, _ = get_module_code(mod)
-        all_module_code.append(f"\n# === {mod}.py ===\n")
-        all_module_code.append(code)
-        all_imports.extend(imports)
-
     # MCP server - rename functions that conflict with exact module names
     MCP_CONFLICT_FUNCTIONS = [
         "text_equal",
@@ -604,15 +676,21 @@ def build_single_file(output_path: str | None = None) -> str:
         "unicode_policy_check",
         "canonicalize_text",
     ]
-    all_module_code.append("\n# === MCP server ===\n")
-    for mod in MODULES_MCP:
-        code, imports, exact_globals = get_module_code(mod)
+    ordered_specs = _topological_sort(MODULE_MANIFEST)
+    emitted_groups: set[str] = set()
+    for spec in ordered_specs:
+        if not spec.include_single_file:
+            continue
+        if spec.group not in emitted_groups:
+            all_module_code.append(f"\n# === {spec.group.title()} modules ===\n")
+            emitted_groups.add(spec.group)
+        code, imports, exact_globals = get_module_code(spec.path.removesuffix(".py"))
         all_exact_globals.extend(exact_globals)
-        # Rename conflicting MCP wrapper functions so exact versions aren't overwritten
-        for fn_name in MCP_CONFLICT_FUNCTIONS:
-            code = code.replace(f"def {fn_name}(", f"def _mcp_{fn_name}(", 1)
-            code = code.replace(f'"{fn_name}": {fn_name},', f'"{fn_name}": _mcp_{fn_name},')
-        all_module_code.append(f"\n# === {mod}.py ===\n")
+        if spec.group == "mcp":
+            for fn_name in MCP_CONFLICT_FUNCTIONS:
+                code = code.replace(f"def {fn_name}(", f"def _mcp_{fn_name}(", 1)
+                code = code.replace(f'"{fn_name}": {fn_name},', f'"{fn_name}": _mcp_{fn_name},')
+        all_module_code.append(f"\n# === {spec.path} ===\n")
         all_module_code.append(code)
         all_imports.extend(imports)
 
@@ -931,7 +1009,61 @@ def _topological_sort(manifest: tuple[ModuleSpec, ...]) -> list[ModuleSpec]:
     return order
 
 
-def validate_build_manifest() -> list[str]:
+def _relative_import_targets(spec: ModuleSpec) -> set[str]:
+    """Return repository module targets referenced by relative imports."""
+    path = os.path.join(EGGCALC_DIR, spec.path)
+    try:
+        tree = ast.parse(open(path, encoding="utf-8").read(), filename=path)
+    except (OSError, SyntaxError):
+        return set()
+    package = spec.name.split(".")[:-1]
+    targets: set[str] = set()
+
+    class TopLevelImports(ast.NodeVisitor):
+        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+            if node.level == 0:
+                return
+            base = package[: max(0, len(package) - node.level + 1)]
+            if node.module:
+                targets.add(".".join((*base, *node.module.split("."))))
+            else:
+                for imported in node.names:
+                    # ``from .. import Evaluator`` imports a symbol, not a
+                    # repository module.  Only lowercase/module-shaped names
+                    # are candidates here; module targets are checked below.
+                    if imported.name.islower() or imported.name.startswith("_"):
+                        targets.add(".".join((*base, imported.name)))
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            return
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            return
+
+        def visit_If(self, node: ast.If) -> None:
+            # The module's CLI entrypoint import is a package-only wrapper;
+            # single-file assembly supplies its own entrypoint below.
+            if (
+                isinstance(node.test, ast.Compare)
+                and isinstance(node.test.left, ast.Name)
+                and node.test.left.id == "__name__"
+            ):
+                return
+            self.generic_visit(node)
+
+    TopLevelImports().visit(tree)
+    return targets
+
+
+def _literal_cli_targets() -> set[str]:
+    path = os.path.join(EGGCALC_DIR, "cli.py")
+    source = open(path, encoding="utf-8").read()
+    return set(re.findall(r'module\s*=\s*["\']([^"\']+)["\']', source))
+
+
+def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> list[str]:
     """Validate the build manifest for correctness.
 
     Checks:
@@ -940,7 +1072,7 @@ def validate_build_manifest() -> list[str]:
     - No unknown dependencies
     - No dependency cycles
     - No invalid group
-    - Required dependency ordered before consumer
+    - Deterministic dependency order is available through ``_topological_sort``
     - Inlined relative import targets absent from manifest
     - Lazy CLI target module present in manifest
     - Manifest entry never consumed
@@ -949,12 +1081,13 @@ def validate_build_manifest() -> list[str]:
 
     Returns a list of error strings (empty if valid).
     """
+    manifest = MODULE_MANIFEST if manifest is None else manifest
     errors: list[str] = []
 
     # 1. Duplicate names or paths
     seen_names: set[str] = set()
     seen_paths: set[str] = set()
-    for spec in MODULE_MANIFEST:
+    for spec in manifest:
         if spec.name in seen_names:
             errors.append(f"Duplicate module name: {spec.name!r}")
         seen_names.add(spec.name)
@@ -963,42 +1096,52 @@ def validate_build_manifest() -> list[str]:
         seen_paths.add(spec.path)
 
     # 2. Missing source files
-    for spec in MODULE_MANIFEST:
+    for spec in manifest:
         path = os.path.join(EGGCALC_DIR, spec.path)
         if not os.path.exists(path):
             errors.append(f"Module file not found: {path}")
 
     # 3. Unknown dependencies
-    name_set = {s.name for s in MODULE_MANIFEST}
-    for spec in MODULE_MANIFEST:
+    name_set = {s.name for s in manifest}
+    for spec in manifest:
         for dep in spec.depends_on:
             if dep not in name_set:
                 errors.append(f"Unknown dependency {dep!r} in {spec.name!r}")
 
     # 4. Dependency cycles (via topological sort)
     try:
-        _topological_sort(MODULE_MANIFEST)
+        _topological_sort(manifest)
     except ValueError as e:
         errors.append(str(e))
 
     # 5. Invalid group
     valid_groups = {"core", "exact", "mcp"}
-    for spec in MODULE_MANIFEST:
+    for spec in manifest:
         if spec.group not in valid_groups:
             errors.append(f"Invalid group {spec.group!r} for {spec.name!r}")
 
-    # 6. Required dependency ordered before consumer (declaration order)
-    decl_order = {s.name: i for i, s in enumerate(MODULE_MANIFEST)}
-    for spec in MODULE_MANIFEST:
-        for dep in spec.depends_on:
-            if dep in decl_order and decl_order[dep] >= decl_order[spec.name]:
+    # 6. Every top-level relative repository import and literal CLI target is
+    # declared as a dependency or package target.
+    for spec in manifest:
+        for target in _relative_import_targets(spec):
+            if (
+                target not in name_set
+                and not target.startswith("_")
+                and not any(name.startswith(target + ".") for name in name_set)
+            ):
+                errors.append(f"Undeclared relative import target {target!r} in {spec.name!r}")
+            elif target == "exact":
+                if not all(
+                    name in spec.depends_on for name in name_set if name.startswith("exact.")
+                ):
+                    errors.append(
+                        f"Package relative import target 'exact' is not fully declared for {spec.name!r}"
+                    )
+            elif target in name_set and target not in spec.depends_on:
                 errors.append(
-                    f"Order violation: {dep!r} must come before {spec.name!r} in manifest"
+                    f"Relative import target {target!r} is not declared as a dependency of {spec.name!r}"
                 )
-
-    # 7. Lazy CLI target module present in manifest
-    # cli.py uses importlib to load exact modules lazily; verify they're in the manifest.
-    lazy_targets = {"exact.primitives", "exact.synthesis", "exact.validate", "exact.diff"}
+    lazy_targets = {target.removeprefix("eggcalc.") for target in _literal_cli_targets()}
     for target in lazy_targets:
         if target not in name_set:
             errors.append(f"Lazy CLI target {target!r} absent from manifest")
@@ -1010,27 +1153,98 @@ def validate_build_manifest() -> list[str]:
     # not inlined and not reachable.
     reachable: set[str] = set()
     stack = ["cli", "mcp.server"]
-    name_to_spec = {s.name: s for s in MODULE_MANIFEST}
+    name_to_spec = {s.name: s for s in manifest}
     while stack:
         name = stack.pop()
         if name in reachable:
             continue
         reachable.add(name)
-        spec = name_to_spec.get(name)
-        if spec:
-            stack.extend(spec.depends_on)
+        reachable_spec = name_to_spec.get(name)
+        if reachable_spec:
+            stack.extend(reachable_spec.depends_on)
     # Exact modules are loaded lazily via importlib - add them all
-    for spec in MODULE_MANIFEST:
+    for spec in manifest:
         if spec.group == "exact":
             reachable.add(spec.name)
-    for spec in MODULE_MANIFEST:
+    for spec in manifest:
         if spec.name not in reachable and spec.include_single_file:
             errors.append(f"Manifest entry {spec.name!r} is not reachable from any entry point")
+
+    # 9. Ensure the assembled source has no package-relative imports left.
+    generated_parts: list[str] = []
+    for spec in _topological_sort(manifest):
+        if spec.include_single_file:
+            generated_parts.append(get_module_code(spec.path.removesuffix(".py"))[0])
+    generated = "\n".join(generated_parts)
+    if re.search(r"(?m)^from\s+\.\.?", generated):
+        errors.append("Residual package-relative import remains after generation")
+
+    # 10. Detect duplicate top-level definitions. Wrapper renames are the
+    # explicit allowlist for the intentionally colliding MCP/exact symbols.
+    allowlisted = {
+        f"_mcp_{name}"
+        for name in {
+            "text_equal",
+            "text_replace_check",
+            "line_range_extract",
+            "line_range_compare",
+            "text_window",
+            "list_compare",
+            "shell_split",
+            "shell_quote_join",
+            "argv_compare",
+        }
+    } | {
+        "text_equal",
+        "validate_json",
+        "json_compare",
+        "json_extract",
+        "json_shape",
+        "regex_finditer",
+        "regex_safety_check",
+        "validate_schema_light",
+        "list_compare",
+        "text_transform",
+        "text_position",
+        "escape_text",
+        "unescape_text",
+        "text_hash",
+        "path_normalize",
+        "identifier_analyze",
+        "text_window",
+        "json_canonicalize",
+        "json_query",
+        "text_replace_check",
+        "line_range_extract",
+        "line_range_compare",
+        "shell_split",
+        "shell_quote_join",
+        "main",
+    }
+    symbols: dict[str, str] = {}
+    for spec in manifest:
+        if not spec.include_single_file:
+            continue
+        path = os.path.join(EGGCALC_DIR, spec.path)
+        try:
+            tree = ast.parse(open(path, encoding="utf-8").read(), filename=path)
+        except (OSError, SyntaxError):
+            continue
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                name = node.name
+                if name in symbols and symbols[name] == spec.name:
+                    continue
+                if name in symbols and name not in allowlisted and not name.startswith("_"):
+                    errors.append(
+                        f"Duplicate generated global {name!r}: {symbols[name]} and {spec.name}"
+                    )
+                symbols[name] = spec.name
 
     return errors
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Build single-file eggcalc")
     parser.add_argument("-o", "--output", help="Output file path")
     parser.add_argument(

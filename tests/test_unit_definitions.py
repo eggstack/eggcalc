@@ -260,9 +260,8 @@ class TestUnitExpression:
 
     def test_compound_with_prefix(self):
         expr = parse_unit_expression("km/h")
-        # km resolves to canonical "m" via UnitRegistry, h resolves to "s"
-        assert ("m", 1) in expr.factors
-        assert ("s", -1) in expr.factors
+        assert ("km", 1) in expr.factors
+        assert ("h", -1) in expr.factors
         # km = 1000m, h = 3600s
         expected_scale = 1000.0 / 3600.0
         assert abs(expr.scale_to_base - expected_scale) < 1e-10

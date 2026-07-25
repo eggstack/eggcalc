@@ -24,15 +24,10 @@ from typing import Any, cast
 
 from .units import (
     UNIT_ALIASES,
-    UNIT_CONVERSIONS,
     UnitValue,
-    _align_compatible_units,
-    _floor_divide_quantities,
-    _modulo_quantities,
-    _pow_unit_string,
-    _simplify_unit_string,
     are_units_compatible,
     convert_temperature,
+    get_conversion_factor,
     get_unit_category,
     normalize_unit,
 )
@@ -396,39 +391,15 @@ def load_user_config() -> None:
 
         from . import units
 
-        with units._UNITS_LOCK:
-            for base, unit_dict in getattr(config, "CUSTOM_UNITS", {}).items():
-                config_changed = True
-                if base in units.UNIT_BASE:
-                    units.UNIT_BASE[base].update(unit_dict)
-                else:
-                    units.UNIT_BASE[base] = unit_dict
-                for unit_name, value in unit_dict.items():
-                    if isinstance(value, tuple) and len(value) == 2:
-                        _factor, category = value
-                        units.UNIT_CATEGORIES[unit_name] = category
-                    else:
-                        # Infer category from the first existing unit in this
-                        # base, or fall back to the base key itself.
-                        existing = next(
-                            iter(
-                                units.UNIT_CATEGORIES.get(u)
-                                for u in units.UNIT_BASE[base]
-                                if u in units.UNIT_CATEGORIES
-                            ),
-                            None,
-                        )
-                        units.UNIT_CATEGORIES[unit_name] = existing or base
-
-            for unit, canonical in getattr(config, "CUSTOM_ALIASES", {}).items():
-                units.UNIT_ALIASES[unit] = canonical
-                config_changed = True
-
-            for key, (mult, offset) in getattr(config, "CUSTOM_TEMP_CONVERSIONS", {}).items():
-                units.TEMPERATURE_CONVERSIONS[key] = (mult, offset)
-                config_changed = True
-
-        units._rebuild_conversions()
+        custom_units = getattr(config, "CUSTOM_UNITS", {})
+        custom_aliases = getattr(config, "CUSTOM_ALIASES", {})
+        if custom_units or custom_aliases:
+            units.register_custom_units(custom_units, custom_aliases)
+            config_changed = True
+        if getattr(config, "CUSTOM_TEMP_CONVERSIONS", {}):
+            raise ValueError(
+                "CUSTOM_TEMP_CONVERSIONS is no longer supported; declare affine units instead"
+            )
 
     _config_loaded = True
     if config_changed:
@@ -2109,23 +2080,7 @@ class Evaluator(ast.NodeVisitor):
             raise EvaluationError(f"Cannot parse: '{text}'")
 
     def _get_conversion_factor(self, from_unit: str, to_unit: str) -> float:
-        """Get conversion factor from one unit to another.
-
-        We read UNIT_CONVERSIONS via the units module to pick up the
-        live binding (build_single-time imports are stale after
-        _rebuild_conversions rebinds the global).
-        """
-        import sys
-
-        _units: Any = None
-        try:
-            from . import units as _units
-        except ImportError:
-            # Assembled single-file mode: try sys.modules
-            if "." in __name__:
-                _units = sys.modules.get(__name__.rsplit(".", 1)[0] + ".units")
-            else:
-                _units = sys.modules.get("units")
+        """Get a registry-derived multiplicative factor between two units."""
 
         from_unit = normalize_unit(from_unit)
         to_unit = normalize_unit(to_unit)
@@ -2133,33 +2088,10 @@ class Evaluator(ast.NodeVisitor):
         if from_unit == to_unit:
             return 1.0
 
-        # Cross-form compound normalization: "m2" <-> "m**2", "cm3" <-> "cm**3", etc.
-        if _units is not None and hasattr(_units, "_simplify_unit_string"):
-            simplified_from = _units._simplify_unit_string(from_unit)
-            if simplified_from is not None and simplified_from != from_unit:
-                from_unit = simplified_from
-            simplified_to = _units._simplify_unit_string(to_unit)
-            if simplified_to is not None and simplified_to != to_unit:
-                to_unit = simplified_to
-            if _units is not None and hasattr(_units, "_expand_short_compound"):
-                expanded_from = _units._expand_short_compound(from_unit)
-                if expanded_from != from_unit:
-                    from_unit = expanded_from
-                expanded_to = _units._expand_short_compound(to_unit)
-                if expanded_to != to_unit:
-                    to_unit = expanded_to
-
-        if from_unit == to_unit:
-            return 1.0
-
-        # Use the live binding if we found the units module, else the
-        # import-time binding (which works when nothing was rebuilt).
-        conversions = _units.UNIT_CONVERSIONS if _units is not None else UNIT_CONVERSIONS
-        key = (from_unit, to_unit)
-        if key in conversions:
-            return conversions[key]
-
-        raise EvaluationError(f"Cannot convert from '{from_unit}' to '{to_unit}'")
+        try:
+            return get_conversion_factor(from_unit, to_unit)
+        except ValueError as exc:
+            raise EvaluationError(f"Cannot convert from '{from_unit}' to '{to_unit}'") from exc
 
     def visit_Constant(self, node: ast.Constant) -> Any:
         """Visit a constant node."""
@@ -2211,23 +2143,6 @@ class Evaluator(ast.NodeVisitor):
         left = self.visit(node.left)
         right = self.visit(node.right)
         op_class = type(node.op)
-
-        # Get the name of the right operand if it's a Name node (for compound unit detection)
-        right_name: str | None = None
-        right_unit_name: str | None = None
-        if isinstance(node.right, ast.Name):
-            right_name = node.right.id
-            if right_name in UNIT_ALIASES:
-                right_unit_name = UNIT_ALIASES[right_name]
-
-        # Also detect a trailing unit on the right side when it is itself
-        # a parenthesized or preprocessed expression. E.g., "(5m) / (2s)"
-        # or "5m / 2*s" — the AST BinOp right is itself a BinOp/Name whose
-        # visited value is a UnitValue. We handle that via right being a
-        # UnitValue below, but we also accept a name-typed right whose
-        # normalized form is a unit.
-        if right_unit_name is None and isinstance(right, UnitValue) and right.unit:
-            right_unit_name = right.unit
 
         # Extract values and units
         left_val = left.value if isinstance(left, UnitValue) else left
@@ -2303,6 +2218,42 @@ class Evaluator(ast.NodeVisitor):
         if op_class not in self.BINOPS:
             raise EvaluationError(f"Unsupported binary operator: '{node.op.__class__.__name__}'")
 
+        # UnitValue owns all unit-bearing arithmetic.  This keeps evaluator
+        # dispatch aligned with the structural registry model instead of
+        # constructing semantic unit strings and reparsing them here.
+        if isinstance(left, UnitValue) or isinstance(right, UnitValue):
+            try:
+                if op_class is ast.Add:
+                    return left + right if isinstance(left, UnitValue) else right.__radd__(left)
+                if op_class is ast.Sub:
+                    return left - right if isinstance(left, UnitValue) else right.__rsub__(left)
+                if op_class is ast.Mult:
+                    return left * right if isinstance(left, UnitValue) else right.__rmul__(left)
+                if op_class is ast.Div:
+                    quotient = (
+                        left / right if isinstance(left, UnitValue) else right.__rtruediv__(left)
+                    )
+                    return (
+                        quotient.value
+                        if isinstance(quotient, UnitValue) and quotient.unit is None
+                        else quotient
+                    )
+                if op_class is ast.FloorDiv:
+                    quotient = (
+                        left // right if isinstance(left, UnitValue) else right.__rfloordiv__(left)
+                    )
+                    return (
+                        quotient.value
+                        if isinstance(quotient, UnitValue) and quotient.unit is None
+                        else quotient
+                    )
+                if op_class is ast.Mod:
+                    return left % right if isinstance(left, UnitValue) else right.__rmod__(left)
+                if op_class is ast.Pow and isinstance(left, UnitValue):
+                    return left**right
+            except (TypeError, ValueError, ZeroDivisionError) as exc:
+                raise EvaluationError(str(exc)) from exc
+
         try:
             result = self.BINOPS[op_class](left_val, right_val)
         except TypeError:
@@ -2342,79 +2293,8 @@ class Evaluator(ast.NodeVisitor):
         # Power operator with a unit on the right is physically nonsensical
         # (e.g., 2 ** 5m). Reject explicitly rather than silently dropping the
         # right-hand unit, which would let nonsense like "32.0 m" pass.
-        is_pow_dispatch = op_class is ast.Pow
-        if is_pow_dispatch and isinstance(right, UnitValue) and right.unit:
+        if op_class is ast.Pow and isinstance(right, UnitValue) and right.unit:
             raise EvaluationError(f"Cannot raise a value to a power with units ('{right.unit}')")
-
-        # Power operator: handle unit exponentiation (e.g., 5m ** 2 -> 25 m**2)
-        if is_pow_dispatch and isinstance(left, UnitValue) and left.unit:
-            if isinstance(right, int):
-                if right == 0:
-                    return result  # anything**0 is dimensionless
-                simplified = _pow_unit_string(left.unit, right) or f"{left.unit}**{right}"
-                return UnitValue(result, simplified)
-            if isinstance(right, float) and right.is_integer():
-                int_exp = int(right)
-                if int_exp == 0:
-                    return result
-                simplified = _pow_unit_string(left.unit, int_exp) or f"{left.unit}**{int_exp}"
-                return UnitValue(result, simplified)
-            # Non-integer exponent on a unit is physically nonsensical
-            raise EvaluationError(f"Cannot raise unit '{left.unit}' to non-integer power")
-
-        # Compound unit detection for division:
-        # 0. UnitValue / UnitValue with same units -> dimensionless (e.g., 5m / 3m -> 1.666...)
-        # 1. UnitValue / UnitValue with different units -> "left_unit/right_unit" (simplified)
-        # 2. UnitValue / number whose AST name is a unit -> "left_unit/name" (e.g., km/h, mi/h)
-        # 3. number / UnitValue with a unit -> "1/right_unit" (e.g., 5 / 2s -> 2.5 1/s)
-        if op_class is ast.Div and isinstance(right, UnitValue) and right.unit:
-            if isinstance(left, UnitValue) and left.unit:
-                aligned_left, aligned_right = _align_compatible_units(left, right)
-                if aligned_left.unit == aligned_right.unit:
-                    return aligned_left.value / aligned_right.value
-                compound = _simplify_unit_string(f"{aligned_left.unit}/{aligned_right.unit}")
-                return UnitValue(aligned_left.value / aligned_right.value, compound)
-            if not isinstance(left, UnitValue) and right_unit_name is None:
-                compound = _simplify_unit_string(f"1/{right.unit}")
-                if compound is None:
-                    return left_val / right_val
-                return UnitValue(left_val / right_val, compound)
-            if not isinstance(left, UnitValue) and right_unit_name:
-                compound = _simplify_unit_string(f"1/{right_unit_name}")
-                if compound is None:
-                    return left_val / right_val
-                return UnitValue(left_val / right_val, compound)
-        if op_class is ast.Div and isinstance(left, UnitValue) and left.unit:
-            if not isinstance(right, UnitValue) and right_unit_name:
-                compound = _simplify_unit_string(f"{left.unit}/{right_unit_name}")
-                return UnitValue(left_val / right_val, compound)
-
-        # Compound unit detection for floor division and modulo:
-        # Same-unit floor division -> dimensionless (e.g., 6m // 3m -> 2).
-        # Same-unit modulo -> remainder in divisor unit (e.g., 5m % 2m -> 1 m).
-        # Compatible different-units scale to avoid precision loss (1 m // 1 cm -> 100, not 99).
-        # Both cases delegate to the shared helpers in units.py so that
-        # UnitValue.__floordiv__/__mod__ and the evaluator share one semantic path.
-        if op_class in (ast.FloorDiv, ast.Mod) and isinstance(left, UnitValue) and left.unit:
-            if isinstance(right, UnitValue) and right.unit:
-                try:
-                    if op_class is ast.FloorDiv:
-                        return _floor_divide_quantities(left, right)
-                    return _modulo_quantities(left, right)
-                except ValueError as exc:
-                    raise EvaluationError(str(exc)) from exc
-
-        # Compound unit detection for multiplication:
-        # UnitValue * UnitValue -> simplified "left_unit*right_unit" (m*m -> m**2)
-        # UnitValue * number whose AST name is a unit -> "left_unit*name"
-        if op_class is ast.Mult and isinstance(left, UnitValue) and left.unit:
-            if isinstance(right, UnitValue) and right.unit:
-                aligned_left, aligned_right = _align_compatible_units(left, right)
-                compound = _simplify_unit_string(f"{aligned_left.unit}*{aligned_right.unit}")
-                return UnitValue(aligned_left.value * aligned_right.value, compound)
-            if not isinstance(right, UnitValue) and right_unit_name:
-                compound = _simplify_unit_string(f"{left.unit}*{right_unit_name}")
-                return UnitValue(left_val * right_val, compound)
 
         if result_unit is None:
             return result

@@ -58,6 +58,9 @@ Changelog = "https://github.com/eggstack/eggcalc/blob/main/CHANGELOG.md"
 where = ["."]
 include = ["eggcalc*"]
 
+[tool.setuptools.package-data]
+eggcalc = ["py.typed"]
+
 [tool.setuptools.dynamic]
 version = {attr = "eggcalc._version.__version__"}
 

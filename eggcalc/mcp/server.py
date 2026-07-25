@@ -25,7 +25,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass as _dataclass
 from dataclasses import field as _field
 from types import MappingProxyType
-from typing import Any
+from typing import Any, cast
 
 from .. import __version__
 from .. import evaluator as _evaluator
@@ -439,7 +439,7 @@ def _cleanup_orphaned_processes() -> None:
             logging.debug("Cleaned up orphaned MCP child process pid=%s", proc.pid)
 
 
-def _invalid_request(request_id: Any, message: str) -> dict:
+def _invalid_request(request_id: Any, message: str) -> dict[str, Any]:
     """Build JSON-RPC invalid request/params error."""
     return {
         "jsonrpc": "2.0",
@@ -454,28 +454,28 @@ def _invalid_request(request_id: Any, message: str) -> dict:
 _invalid_request_error = _invalid_request
 
 
-def _jsonrpc_error(request_id: Any, code: int, message: str) -> dict:
+def _jsonrpc_error(request_id: Any, code: int, message: str) -> dict[str, Any]:
     """Build a JSON-RPC error response."""
     return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
 
 
-def _parse_error(request_id: Any = None, message: str = "Parse error") -> dict:
+def _parse_error(request_id: Any = None, message: str = "Parse error") -> dict[str, Any]:
     """Build JSON-RPC parse error (-32700)."""
     return _jsonrpc_error(request_id, -32700, message)
 
 
-def _method_not_found(request_id: Any, method: str) -> dict:
+def _method_not_found(request_id: Any, method: str) -> dict[str, Any]:
     """Build JSON-RPC method not found error (-32601)."""
     display = method[:100] + "..." if len(method) > 100 else method
     return _jsonrpc_error(request_id, -32601, f"Method not found: {display}")
 
 
-def _invalid_params(request_id: Any, message: str) -> dict:
+def _invalid_params(request_id: Any, message: str) -> dict[str, Any]:
     """Build JSON-RPC invalid params error (-32602)."""
     return _jsonrpc_error(request_id, -32602, message)
 
 
-def _internal_error(request_id: Any, message: str) -> dict:
+def _internal_error(request_id: Any, message: str) -> dict[str, Any]:
     """Build JSON-RPC internal error (-32603)."""
     return _jsonrpc_error(request_id, -32603, f"Internal error: {message}")
 
@@ -502,11 +502,17 @@ class McpServerConfig:
     supported_protocol_versions: tuple[str, ...] = SUPPORTED_PROTOCOL_VERSIONS
     allow_random: bool = False
     allow_side_effects: bool = False
+    evaluation_policy: str = "default"
 
     def __post_init__(self) -> None:
         """Validate and clamp values after construction."""
         object.__setattr__(self, 'profile', self._clamp_profile(self.profile))
         object.__setattr__(self, 'schema_detail', self._clamp_schema_detail(self.schema_detail))
+        if self.evaluation_policy not in {policy.value for policy in EvaluationPolicy}:
+            raise ValueError(
+                f"Invalid evaluation_policy: {self.evaluation_policy!r}; "
+                f"expected one of {sorted(policy.value for policy in EvaluationPolicy)}"
+            )
         object.__setattr__(
             self, 'max_request_bytes', max(1000, min(self.max_request_bytes, 100_000_000))
         )
@@ -578,6 +584,7 @@ class McpServerConfig:
                 "EGGCALC_MCP_MAX_TOOL_WORKERS", _MAX_TOOL_WORKERS, 1, 128
             ),
             max_tool_queue_size=_parse_env_int("EGGCALC_MCP_MAX_TOOL_QUEUE_SIZE", 32, 1, 1000),
+            evaluation_policy=os.environ.get("EGGCALC_EVALUATION_POLICY", "default"),
         )
 
     @property
@@ -928,6 +935,7 @@ class ToolExecutor:
             reservation.state = ReservationState.RELEASED
             self._queued_count -= 1
             self._total_inflight -= 1
+            self._reservations.discard(reservation)
         return True
 
     def _release_active(self, reservation: Reservation) -> bool:
@@ -942,6 +950,7 @@ class ToolExecutor:
             reservation.state = ReservationState.RELEASED
             self._active_count -= 1
             self._total_inflight -= 1
+            self._reservations.discard(reservation)
         return True
 
     def assert_accounting_invariants(self) -> None:
@@ -956,6 +965,11 @@ class ToolExecutor:
                 f"total={self._total_inflight} queued={self._queued_count} "
                 f"active={self._active_count}"
             )
+            assert len(self._reservations) == self._total_inflight
+            assert all(
+                reservation.state is not ReservationState.RELEASED
+                for reservation in self._reservations
+            )
 
     def call_tool(
         self,
@@ -966,7 +980,7 @@ class ToolExecutor:
         cancelled_order: deque[Any] | None = None,
         cancelled_lock: threading.Lock | None = None,
         evaluator: _evaluator.Evaluator | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Execute a tool call with validation, timeout, and cancellation.
 
         Uses the evaluator captured from the request context when provided;
@@ -1128,14 +1142,14 @@ class ToolExecutor:
             "result": {"content": [{"type": "text", "text": serialized}]},
         }
 
-    def _tool_not_found(self, request_id: Any, name: str) -> dict:
+    def _tool_not_found(self, request_id: Any, name: str) -> dict[str, Any]:
         close = self._registry.find_close_match(name)
         msg = f"Unknown tool: {name}"
         if close:
             msg += f". Did you mean: {close}?"
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": msg}}
 
-    def _cancelled_response(self, request_id: Any, name: str) -> dict:
+    def _cancelled_response(self, request_id: Any, name: str) -> dict[str, Any]:
         return {
             "jsonrpc": "2.0",
             "id": request_id,
@@ -1159,7 +1173,7 @@ class ToolExecutor:
             },
         }
 
-    def _invalid_arguments(self, request_id: Any, name: str, error: str) -> dict:
+    def _invalid_arguments(self, request_id: Any, name: str, error: str) -> dict[str, Any]:
         return {
             "jsonrpc": "2.0",
             "id": request_id,
@@ -1240,6 +1254,12 @@ class ToolExecutor:
         with self._accounting_lock:
             return self._total_inflight
 
+    @property
+    def reservation_count(self) -> int:
+        """Number of live reservations retained for accounting."""
+        with self._accounting_lock:
+            return len(self._reservations)
+
 
 class EvaluationPolicy(enum.Enum):
     """Valid evaluation policy values for server configuration."""
@@ -1272,21 +1292,22 @@ class ConfigSnapshot:
         object.__setattr__(self, 'units', MappingProxyType(dict(self.units)))
         # Accept str for backward compatibility, converting to EvaluationPolicy.
         # Also handle EvaluationPolicy instances from reloaded modules (different class).
-        if isinstance(self.policy, str):
+        policy_value: object = self.policy
+        if isinstance(policy_value, str):
             try:
-                object.__setattr__(self, 'policy', EvaluationPolicy(self.policy))
+                object.__setattr__(self, 'policy', EvaluationPolicy(policy_value))
             except ValueError:
                 raise ConfigError(
-                    f"Invalid policy {self.policy!r}; "
+                    f"Invalid policy {policy_value!r}; "
                     f"must be one of {sorted(e.value for e in EvaluationPolicy)}"
                 )
-        elif not isinstance(self.policy, EvaluationPolicy) and hasattr(self.policy, "value"):
+        elif not isinstance(policy_value, EvaluationPolicy) and hasattr(policy_value, "value"):
             # EvaluationPolicy from a reloaded module — convert via its value
             try:
-                object.__setattr__(self, 'policy', EvaluationPolicy(self.policy.value))
+                object.__setattr__(self, 'policy', EvaluationPolicy(cast(Any, policy_value).value))
             except ValueError:
                 raise ConfigError(
-                    f"Invalid policy {self.policy!r}; "
+                    f"Invalid policy {policy_value!r}; "
                     f"must be one of {sorted(e.value for e in EvaluationPolicy)}"
                 )
 
@@ -1394,19 +1415,10 @@ def policy_from_server_config(config: McpServerConfig) -> EvaluationPolicy:
     - PERMISSIVE enables only features allowed by the immutable server config ceiling;
     - DEFAULT follows server config flags.
     """
-    policy = (
-        EvaluationPolicy(config.profile)
-        if config.profile in EvaluationPolicy._value2member_map_
-        else EvaluationPolicy.DEFAULT
-    )
-    # Map config flags to policy when profile is not an explicit policy value
-    if config.profile in EvaluationPolicy._value2member_map_:
-        return policy
-    if config.allow_random and config.allow_side_effects:
-        return EvaluationPolicy.PERMISSIVE
-    if not config.allow_random and not config.allow_side_effects:
-        return EvaluationPolicy.STRICT
-    return EvaluationPolicy.DEFAULT
+    # Tool profiles select exposure only.  They must never alter evaluator
+    # capabilities.  The explicit evaluation policy is an independent server
+    # configuration field, with DEFAULT preserving the configured ceilings.
+    return EvaluationPolicy(config.evaluation_policy)
 
 
 def build_runtime_context(config: McpServerConfig, snapshot: ConfigSnapshot) -> RuntimeContext:
@@ -1512,12 +1524,29 @@ class ConfigManager:
     increase monotonically; stale or decreasing generations are rejected.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, owner: McpServer | None = None) -> None:
+        self._owner_ref = weakref.ref(owner) if owner is not None else None
         self._snapshot = ConfigSnapshot()
         self._lock = threading.Lock()
 
     def current(self) -> ConfigSnapshot:
+        owner = self._owner_ref() if self._owner_ref is not None else None
+        if owner is not None:
+            return owner.runtime_context.snapshot
         return self._snapshot
+
+    def _validate_next(self, snapshot: ConfigSnapshot) -> None:
+        """Validate a snapshot without changing either authority."""
+        current = self.current()
+        if snapshot.generation <= current.generation:
+            raise ValueError(
+                f"Snapshot generation {snapshot.generation} must be greater "
+                f"than current {current.generation}"
+            )
+
+    def _set_snapshot(self, snapshot: ConfigSnapshot) -> None:
+        """Publish a validated snapshot as a non-raising pointer assignment."""
+        self._snapshot = snapshot
 
     def replace(self, snapshot: ConfigSnapshot) -> int:
         """Atomically replace the current snapshot.
@@ -1528,13 +1557,13 @@ class ConfigManager:
         Raises:
             ValueError: If the snapshot generation is not greater than current.
         """
+        owner = self._owner_ref() if self._owner_ref is not None else None
+        if owner is not None:
+            owner.activate_snapshot(snapshot)
+            return snapshot.generation
         with self._lock:
-            if snapshot.generation <= self._snapshot.generation:
-                raise ValueError(
-                    f"Snapshot generation {snapshot.generation} must be greater "
-                    f"than current {self._snapshot.generation}"
-                )
-            self._snapshot = snapshot
+            self._validate_next(snapshot)
+            self._set_snapshot(snapshot)
             return snapshot.generation
 
     def replace_validated(
@@ -1550,27 +1579,42 @@ class ConfigManager:
         Returns the new snapshot on success.  On failure the prior state
         is preserved unchanged.
         """
+        owner = self._owner_ref() if self._owner_ref is not None else None
+        if owner is not None:
+            current = owner.runtime_context.snapshot
+            snap = ConfigSnapshot(
+                generation=current.generation + 1,
+                constants=constants if constants is not None else dict(current.constants),
+                functions=functions if functions is not None else dict(current.functions),
+                units=units if units is not None else dict(current.units),
+                policy=policy if policy is not None else current.policy,
+            )
+            owner.activate_snapshot(snap)
+            return snap
         with self._lock:
             new_gen = self._snapshot.generation + 1
             prev = self._snapshot
-            try:
-                snap = ConfigSnapshot(
-                    generation=new_gen,
-                    constants=constants if constants is not None else dict(prev.constants),
-                    functions=functions if functions is not None else dict(prev.functions),
-                    units=units if units is not None else dict(prev.units),
-                    policy=policy if policy is not None else prev.policy,
-                )
-                self._snapshot = snap
-                return snap
-            except Exception:
-                # Rollback: restore prior snapshot unchanged
-                self._snapshot = prev
-                raise
+            snap = ConfigSnapshot(
+                generation=new_gen,
+                constants=constants if constants is not None else dict(prev.constants),
+                functions=functions if functions is not None else dict(prev.functions),
+                units=units if units is not None else dict(prev.units),
+                policy=policy if policy is not None else prev.policy,
+            )
+            self._validate_next(snap)
+            self._set_snapshot(snap)
+            return snap
 
     def invalidate(self) -> None:
+        current = self.current()
+        snapshot = ConfigSnapshot(generation=current.generation + 1)
+        owner = self._owner_ref() if self._owner_ref is not None else None
+        if owner is not None:
+            owner.activate_snapshot(snapshot)
+            return
         with self._lock:
-            self._snapshot = ConfigSnapshot(generation=self._snapshot.generation + 1)
+            self._validate_next(snapshot)
+            self._set_snapshot(snapshot)
 
 
 class McpSessionState(enum.Enum):
@@ -1597,13 +1641,14 @@ class McpSession:
         self.requested_version: str | None = None
         self.client_name: str | None = None
         self.client_version: str | None = None
-        self.client_info: dict | None = None
-        self.client_capabilities: dict | None = None
+        self.client_info: dict[str, Any] | None = None
+        self.client_capabilities: dict[str, Any] | None = None
         self.request_id: str | None = None
         # Owner server binding — set once by the owning McpServer.
         # Uses a weak reference so the session does not prevent the
         # server from being garbage collected.
         self._owner_ref: weakref.ref[McpServer] | None = None
+        self._owner_bound_once = False
         self._owner_remove_callback: Any = None
         self._closed = False
         # Session-scoped cancellation records. Each session owns its own
@@ -1614,10 +1659,10 @@ class McpSession:
 
     def handle_message(
         self,
-        request: dict,
+        request: dict[str, Any],
         server: McpServer | None = None,
         context: RuntimeContext | None = None,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         """Route MCP request to appropriate handler with lifecycle enforcement.
 
         When *server* and *context* are provided, all dispatch uses the
@@ -1627,6 +1672,17 @@ class McpSession:
         """
         method = request.get("method", "")
         request_id = request.get("id")
+
+        # Production protocol dispatch is owner-routed.  Ping and the local
+        # lifecycle notification are the only owner-independent methods.
+        if server is None and method not in {"ping", "notifications/initialized"}:
+            try:
+                server = self.owner
+            except RuntimeError:
+                return _invalid_request_error(
+                    request_id,
+                    "Production MCP dispatch requires a live owning server",
+                )
 
         # Lifecycle state check
         error = self._check_ready_for_dispatch(method, request_id)
@@ -1669,8 +1725,8 @@ class McpSession:
             return _method_not_found(request_id, display)
 
     def _handle_call_tool_server(
-        self, request: dict, server: McpServer, context: RuntimeContext | None = None
-    ) -> dict:
+        self, request: dict[str, Any], server: McpServer, context: RuntimeContext | None = None
+    ) -> dict[str, Any]:
         """Handle tools/call using server-owned executor for state isolation.
 
         Uses the evaluator captured from the request context so that
@@ -1752,13 +1808,12 @@ class McpSession:
 
     def _bind_owner(self, server: McpServer) -> None:
         """Bind this session to exactly one owning server. Called once by create_session."""
-        if self._owner_ref is not None:
-            existing = self._owner_ref()
-            if existing is not None and existing is not server:
-                raise RuntimeError("Session is already owned by another server")
+        if self._owner_bound_once:
+            raise RuntimeError("Session ownership is immutable")
+        self._owner_bound_once = True
         self._owner_ref = weakref.ref(server)
 
-    def _check_ready_for_dispatch(self, method: str, request_id: Any) -> dict | None:
+    def _check_ready_for_dispatch(self, method: str, request_id: Any) -> dict[str, Any] | None:
         """Check if session state allows this method to be dispatched."""
         # Closed sessions cannot dispatch
         if self._closed and method not in ("notifications/initialized", "notifications/cancelled"):
@@ -1787,7 +1842,9 @@ class McpSession:
 
         return None
 
-    def _handle_initialize(self, request: dict, server: McpServer | None = None) -> dict:
+    def _handle_initialize(
+        self, request: dict[str, Any], server: McpServer | None = None
+    ) -> dict[str, Any]:
         """Handle an initialize MCP request with parameter validation."""
         params = request.get("params")
         if not isinstance(params, dict):
@@ -1855,7 +1912,7 @@ class McpSession:
         if self.state.name == "INITIALIZING":
             self.state = McpSessionState.READY
 
-    def _handle_cancelled(self, request: dict, server: McpServer | None = None) -> None:
+    def _handle_cancelled(self, request: dict[str, Any], server: McpServer | None = None) -> None:
         """Handle notifications/cancelled using session-scoped cancellation state."""
         params = request.get("params", {})
         if not isinstance(params, dict):
@@ -1913,10 +1970,10 @@ class McpServer:
         )
         self._runtime_context = build_runtime_context(self._config, initial_snapshot)
         self._executor = ToolExecutor(self._config, self._registry)
-        self._config_manager = ConfigManager()
+        self._config_manager = ConfigManager(self)
         # Initialize the config manager with the initial snapshot directly
         # (generation 0 is valid as the starting point).
-        self._config_manager._snapshot = initial_snapshot
+        self._config_manager._set_snapshot(initial_snapshot)
         self._closed = False
         self._lock = threading.Lock()
         self._sessions: set[McpSession] = set()
@@ -1965,7 +2022,9 @@ class McpServer:
         with self._sessions_lock:
             self._sessions.discard(session)
 
-    def handle_request(self, request: Any, session: McpSession | None = None) -> dict | None:
+    def handle_request(
+        self, request: Any, session: McpSession | None = None
+    ) -> dict[str, Any] | None:
         """Handle a JSON-RPC request with server-owned dispatch.
 
         Captures the active RuntimeContext before queue admission so the
@@ -2074,10 +2133,11 @@ class McpServer:
                     f"got {self._runtime_context.snapshot.generation}"
                 )
 
-            # 6. Atomically assign the new runtime context
+            # Validate every operation that can raise before publication.
+            self._config_manager._validate_next(new_snapshot)
+            # These plain pointer assignments are the publication boundary.
             self._runtime_context = new_context
-            # 7. Publish the same snapshot to ConfigManager
-            self._config_manager.replace(new_snapshot)
+            self._config_manager._set_snapshot(new_snapshot)
 
         return new_snapshot
 
@@ -2096,12 +2156,15 @@ class McpServer:
                     f"Snapshot generation {snapshot.generation} must be greater "
                     f"than current {self._runtime_context.snapshot.generation}"
                 )
+            self._config_manager._validate_next(snapshot)
             self._runtime_context = new_context
-            self._config_manager.replace(snapshot)
+            self._config_manager._set_snapshot(snapshot)
 
     def diagnostic(self) -> dict[str, Any]:
         """Return deterministic diagnostic information."""
-        config_snap = self._config_manager.current()
+        with self._lock:
+            context = self._runtime_context
+        config_snap = context.snapshot
         with self._sessions_lock:
             live_sessions = sum(1 for s in self._sessions if not s._closed)
         return {
@@ -2268,7 +2331,7 @@ def _json_value_equal(a: Any, b: Any) -> bool:
 
 
 def _validate_value_against_schema(
-    value: Any, prop: dict, path: str, max_depth: int = 10
+    value: Any, prop: Mapping[str, Any], path: str, max_depth: int = 10
 ) -> str | None:
     """Validate a single value against a JSON schema property definition.
 
@@ -2319,14 +2382,14 @@ def _validate_value_against_schema(
         return f"Argument '{path}' has unknown 'type' value(s): {expected_type!r}"
 
     # Build the union of allowed Python types from the schema's type list.
-    allowed_types: list = []
+    allowed_types: list[Any] = []
     for t in type_options:
         mapped = type_map[t]
         if isinstance(mapped, tuple):
             allowed_types.extend(mapped)
         else:
             allowed_types.append(mapped)
-    allowed_types_tuple: tuple = tuple(allowed_types)
+    allowed_types_tuple: tuple[Any, ...] = tuple(allowed_types)
 
     if not isinstance(value, allowed_types_tuple):
         # Preserve the original "must be X" wording for single-type
@@ -2500,11 +2563,11 @@ def _validate_arguments_schema(
 
 
 def _handle_call_tool(
-    request: dict,
+    request: dict[str, Any],
     cancelled_set: set[Any] | None = None,
     cancelled_order: deque[Any] | None = None,
     cancelled_lock: threading.Lock | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Handle a tools/call MCP request."""
     # Lazily clean up any orphaned processes from previous timed-out requests
     _cleanup_orphaned_processes()
@@ -2623,7 +2686,7 @@ def _handle_call_tool(
 
     timed_out = False
     result = None
-    future: Future | None = None
+    future: Future[Any] | None = None
     try:
         # Submit to a bounded thread pool instead of spawning unbounded
         # daemon threads. This prevents thread accumulation when tools
@@ -2738,7 +2801,7 @@ def _handle_call_tool(
     }
 
 
-def _handle_list_tools(request: dict, server: McpServer | None = None) -> dict:
+def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None) -> dict[str, Any]:
     """Handle a tools/list MCP request with optional filtering.
 
     When *server* is provided, its config and registry are used instead
@@ -2857,7 +2920,7 @@ def _handle_list_tools(request: dict, server: McpServer | None = None) -> dict:
     }
 
 
-def _handle_initialize(request: dict) -> dict:
+def _handle_initialize(request: dict[str, Any]) -> dict[str, Any]:
     """Handle an initialize MCP request."""
     params = request.get("params")
     if not isinstance(params, dict):
@@ -2905,7 +2968,9 @@ def _handle_initialize(request: dict) -> dict:
     }
 
 
-def _handle_list_profiles(request: dict, server: McpServer | None = None) -> dict:
+def _handle_list_profiles(
+    request: dict[str, Any], server: McpServer | None = None
+) -> dict[str, Any]:
     """Handle a profiles/list MCP request.
 
     When *server* is provided, its config and registry are used instead
@@ -2917,17 +2982,26 @@ def _handle_list_profiles(request: dict, server: McpServer | None = None) -> dic
 
     if server is not None:
         active = server.config.profile
-        registry_profiles: MappingProxyType[str, Any] | dict[str, Any] = server.registry.profiles
+        profile_names = tuple(sorted(server.registry.profiles))
+        available_profiles = (
+            ("full", *profile_names) if "full" not in profile_names else profile_names
+        )
+        profiles_info = {
+            name: {
+                "tools": server.registry.get_profile_tools(name),
+                "tool_count": len(server.registry.get_profile_tools(name)),
+            }
+            for name in available_profiles
+        }
     else:
         active = get_active_profile()
-        registry_profiles = TOOL_PROFILES
-
-    profiles_info = {}
-    for name in PROFILE_NAMES:
-        tool_list = registry_profiles.get(name, [])
-        profiles_info[name] = {
-            "tools": tool_list,
-            "tool_count": len(tool_list),
+        available_profiles = tuple(PROFILE_NAMES)
+        profiles_info = {
+            name: {
+                "tools": list(TOOL_PROFILES.get(name, [])),
+                "tool_count": len(TOOL_PROFILES.get(name, [])),
+            }
+            for name in available_profiles
         }
 
     return {
@@ -2936,7 +3010,7 @@ def _handle_list_profiles(request: dict, server: McpServer | None = None) -> dic
         "result": {
             "active_profile": active,
             "profiles": profiles_info,
-            "available_profiles": PROFILE_NAMES,
+            "available_profiles": list(available_profiles),
         },
     }
 
@@ -2998,7 +3072,7 @@ def close_compatibility_server() -> None:
             _compat_server = None
 
 
-def handle_request(request: Any, session: McpSession | None = None) -> dict | None:
+def handle_request(request: Any, session: McpSession | None = None) -> dict[str, Any] | None:
     """Route MCP request to appropriate handler.
 
     If *session* is ``None`` the request is routed through an isolated

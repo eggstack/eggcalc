@@ -9,6 +9,8 @@ The file is excluded from pytest collection via conftest configuration.
 
 from __future__ import annotations
 
+from typing import cast
+
 from eggcalc import (
     EggCalcApp,
     evaluate,
@@ -19,7 +21,7 @@ from eggcalc import (
     load_user_config,
 )
 from eggcalc.normalize import run
-from eggcalc.units import UnitExpression, UnitSpec, UnitValue
+from eggcalc.units import Dimension, UnitExpression, UnitSpec, UnitValue
 
 
 def check_evaluate() -> float:
@@ -50,14 +52,14 @@ async def check_evaluate_async() -> float:
 def check_unit_value() -> float:
     uv: UnitValue = UnitValue(30, "m")
     converted: UnitValue = uv.convert_to("ft")
-    return converted.value  # type: ignore[return-value]
+    return float(cast(float, converted.value))
 
 
 def check_unit_spec() -> str:
     spec: UnitSpec = UnitSpec(
         canonical="m",
         aliases=("meter", "metres"),
-        dimension=__import__("eggcalc.units", fromlist=["Dimension"]).Dimension(length=1),
+        dimension=Dimension(length=1),
         scale_to_base=1.0,
     )
     return spec.canonical
@@ -80,7 +82,7 @@ def check_run() -> float:
     from eggcalc.normalize import NORMALIZE, PATTERNS
 
     result, _ = run("five plus three", NORMALIZE, PATTERNS)
-    return result  # type: ignore[no-any-return]
+    return cast(float, result)
 
 
 def check_load_user_config() -> None:

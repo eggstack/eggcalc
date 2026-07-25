@@ -93,6 +93,9 @@ def _session_request(session: McpSession, method: str, params: dict | None = Non
 
         owner = McpServer()
         session._bind_owner(owner)
+        # Keep the temporary owner alive for this compatibility test helper;
+        # production sessions intentionally hold only a weak owner reference.
+        session._test_owner = owner
     return owner.handle_request(
         {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params or {}},
         session=session,

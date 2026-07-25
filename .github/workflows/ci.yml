@@ -50,14 +50,41 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: ruff check eggcalc tests
 
+      - name: Strict migrated-module lint
+        if: matrix.os == 'ubuntu-latest'
+        run: ruff check --select E,F,I,UP,B,B904,C4 eggcalc/units.py eggcalc/mcp/server.py eggcalc/_protocol.py eggcalc/_version.py build_single.py
+
       - name: Format check
         if: matrix.os == 'ubuntu-latest'
         run: black --check eggcalc tests
+
+      - name: Type check
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: |
+          mypy eggcalc --ignore-missing-imports
+          mypy --config-file mypy-strict.ini eggcalc/units.py eggcalc/mcp/server.py eggcalc/_protocol.py eggcalc/_version.py build_single.py
+          mypy --config-file pyproject.toml tests/typing/consumer.py
+          PYTHONPATH=. python tests/typing/consumer.py
 
       - name: Build single-file distribution
         run: |
           python build_single.py --validate
           python build_single.py
+
+      - name: Validate authority and deterministic build
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: |
+          python scripts/check_authority_boundaries.py
+          python scripts/release_inventory.py --check
+          python build_single.py -o /tmp/eggcalc-build-a.py
+          python build_single.py -o /tmp/eggcalc-build-b.py
+          cmp /tmp/eggcalc-build-a.py /tmp/eggcalc-build-b.py
+
+      - name: Focused closure suites
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m pytest tests/test_final_mcp_authority_closure.py -v
+          python -m pytest tests/test_final_unit_authority.py tests/test_final_unit_expression.py -v
 
       - name: Smoke test single-file build
         run: python eggcalc.py "5+3"
@@ -75,12 +102,6 @@ jobs:
         with:
           name: coverage-report
           path: coverage.xml
-
-      - name: Type check
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: |
-          mypy eggcalc --ignore-missing-imports
-          mypy tests/typing/consumer.py --strict --ignore-missing-imports --follow-imports=silent
 
   package:
     runs-on: ubuntu-latest
@@ -113,3 +134,6 @@ jobs:
 
       - name: Release-surface smoke tests
         run: python scripts/smoke_release_surfaces.py
+
+      - name: Installed-wheel typed consumer
+        run: python scripts/verify_wheel_consumer.py dist/*.whl
