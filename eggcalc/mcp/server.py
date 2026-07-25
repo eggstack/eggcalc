@@ -2326,7 +2326,7 @@ def _json_value_equal(a: Any, b: Any) -> bool:
     if isinstance(a, list):
         if len(a) != len(b):
             return False
-        return all(_json_value_equal(x, y) for x, y in zip(a, b))
+        return all(_json_value_equal(x, y) for x, y in zip(a, b, strict=False))
     return bool(a == b)
 
 
@@ -2942,7 +2942,7 @@ def _handle_initialize(request: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(client_name, str) or not client_name.strip():
         return _invalid_params(request.get("id"), "clientInfo.name must be a non-empty string")
 
-    client_version = client_info.get("version", "")
+    client_info.get("version", "")
 
     # Version negotiation
     if protocol_version in SUPPORTED_PROTOCOL_VERSIONS:

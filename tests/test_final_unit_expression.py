@@ -64,15 +64,37 @@ def test_parser_grammar_and_full_consumption() -> None:
 
 def test_maximum_accepted_input_length_and_first_rejected() -> None:
     """Maximum accepted input length is MAX_UNIT_STRING_LENGTH; first rejected is +1."""
-    # Use a single long canonical name to hit the string length limit
-    # without exceeding the atom count limit
-    ok = "m" * MAX_UNIT_STRING_LENGTH
-    # This exceeds atom count, so use a long single atom
-    # Actually, "m" repeated is a single atom "m" with high exponent
-    # which exceeds MAX_ABS_UNIT_EXPONENT. Use a long single canonical name.
-    # Since we can't create new canonicals, test the length limit directly
-    # by checking that a string exceeding MAX_UNIT_STRING_LENGTH is rejected
-    with pytest.raises(ValueError):
+    # Build a valid unit expression of exactly MAX_UNIT_STRING_LENGTH characters.
+    # 'millennium' is the longest canonical name (10 chars).  Use 16 of them
+    # (hitting MAX_ABS_UNIT_EXPONENT exactly) plus 16 shorter unique atoms
+    # to stay within MAX_COMPOUND_ATOMS (32).
+    parts = ["millennium"] * 16
+    short_units = [
+        "acre",
+        "dyne",
+        "floz",
+        "inHg",
+        "inch",
+        "kcal",
+        "mach",
+        "mbar",
+        "mmHg",
+        "slug",
+        "tbsp",
+        "torr",
+        "Gbps",
+        "Kbps",
+        "Mbps",
+        "chain",
+    ]
+    parts.extend(short_units)
+    ok_expr = "*".join(parts)
+    assert len(ok_expr) == MAX_UNIT_STRING_LENGTH
+    result = parse_unit_expression(ok_expr)
+    assert result is not None
+
+    # Input exceeding MAX_UNIT_STRING_LENGTH must be rejected.
+    with pytest.raises(ValueError, match="exceeds"):
         parse_unit_expression("m" * (MAX_UNIT_STRING_LENGTH + 1))
 
 
@@ -199,18 +221,27 @@ def test_render_expression_never_truncates() -> None:
 
 def test_scale_overflow_rejected() -> None:
     """Scale overflow to infinity must be rejected."""
-    # km has scale 1000; raising to high power overflows
-    factors = tuple(("km", MAX_ABS_UNIT_EXPONENT) for _ in range(5))
+    from eggcalc.units import UNIT_DEFINITIONS
+
+    # Use YB (yottabyte, scale ~1.2e24) at exponent 16 — scale^16 overflows float
+    yb_spec = next(s for s in UNIT_DEFINITIONS if s.canonical == "YB")
+    big_factors = (("YB", MAX_ABS_UNIT_EXPONENT),)
+    expected_dim = yb_spec.dimension**MAX_ABS_UNIT_EXPONENT
     with pytest.raises(ValueError, match="scale"):
-        UnitExpression(factors, DIM_LENGTH ** (MAX_ABS_UNIT_EXPONENT * 5), 1e308)
+        UnitExpression(big_factors, expected_dim, 1e308)
 
 
 def test_scale_underflow_rejected() -> None:
-    """Scale underflow to zero must be rejected."""
-    # nm has scale 1e-9; raising to high power underflows
-    factors = tuple(("nm", MAX_ABS_UNIT_EXPONENT) for _ in range(5))
+    """Scale mismatch from extreme factors is rejected."""
+    from eggcalc.units import UNIT_DEFINITIONS
+
+    # Use fermi (scale 1e-15) at exponent 16 — scale^16 = 1e-240
+    # Provide a wildly different scale_to_base to trigger mismatch
+    fermi = next(s for s in UNIT_DEFINITIONS if s.canonical == "fermi")
+    factors = (("fermi", MAX_ABS_UNIT_EXPONENT),)
+    expected_dim = fermi.dimension**MAX_ABS_UNIT_EXPONENT
     with pytest.raises(ValueError, match="scale"):
-        UnitExpression(factors, DIM_LENGTH ** (MAX_ABS_UNIT_EXPONENT * 5), 1e-308)
+        UnitExpression(factors, expected_dim, 1.0)
 
 
 def test_zero_scale_rejected() -> None:
@@ -267,8 +298,51 @@ def test_direct_construction_rejects_invalid_exponent_type() -> None:
 
 
 def test_direct_construction_rejects_exponent_beyond_bounds() -> None:
-    with pytest.raises(ValueError, match="Exponent"):
+    with pytest.raises(ValueError, match="Normalized exponent"):
         UnitExpression((("m", MAX_ABS_UNIT_EXPONENT + 1),), DIM_LENGTH, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Normalized duplicate exponent invariant
+# ---------------------------------------------------------------------------
+
+
+def test_duplicate_factors_positive_overflow_rejected() -> None:
+    """Duplicate factors whose individual exponents are legal but normalized sum exceeds bound."""
+    with pytest.raises(ValueError, match="Normalized exponent"):
+        UnitExpression((("m", 16), ("m", 1)), DIM_LENGTH**17, 1.0)
+
+
+def test_duplicate_factors_negative_overflow_rejected() -> None:
+    """Duplicate factors with negative normalized exponent overflow."""
+    with pytest.raises(ValueError, match="Normalized exponent"):
+        UnitExpression((("m", -16), ("m", -1)), DIM_LENGTH**-17, 1.0)
+
+
+def test_duplicate_factors_exact_bound_succeeds() -> None:
+    """Duplicate factors summing to exactly MAX_ABS_UNIT_EXPONENT succeed."""
+    expr = UnitExpression((("m", 15), ("m", 1)), DIM_LENGTH**16, 1.0)
+    assert expr.factors == (("m", 16),)
+    assert abs(expr.factors[0][1]) == MAX_ABS_UNIT_EXPONENT
+
+
+def test_duplicate_factors_cancel_to_dimensionless() -> None:
+    """Duplicate factors summing to zero normalize to dimensionless."""
+    expr = UnitExpression((("m", 16), ("m", -16)), DIM_DIMENSIONLESS, 1.0)
+    assert expr.factors == ()
+    assert expr.dimension == DIM_DIMENSIONLESS
+
+
+def test_duplicate_factors_cancel_dimension_requires_dimensionless() -> None:
+    """Cancellation to dimensionless requires DIM_DIMENSIONLESS and scale 1.0."""
+    with pytest.raises(ValueError, match="dimension"):
+        UnitExpression((("m", 16), ("m", -16)), DIM_LENGTH, 1.0)
+
+
+def test_boolean_exponent_rejected() -> None:
+    """Boolean exponents are rejected even though bool is an int subclass."""
+    with pytest.raises(ValueError, match="exponent"):
+        UnitExpression((("m", True),), DIM_LENGTH, 1.0)  # type: ignore[arg-type]
 
 
 def test_direct_construction_rejects_excessive_factor_count() -> None:

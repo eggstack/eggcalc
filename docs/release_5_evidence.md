@@ -216,13 +216,4 @@ All residual state is documented in `architecture/mutable_state_inventory.md` wi
 
 ## Final Closure Evidence
 
-- closure_code_sha: `800832196439558383d22300ef36870c997437da`
-- closure_workflow_run_id: `0000000000`
-- lane linux: collected=4294 passed=4294 skipped=0 xfailed=0 failed=0
-
-ordinary Ruff; Black; ordinary mypy; strict mypy; strict Ruff;
-authority-boundary; deterministic build; authority inventory;
-source typed consumer; installed-wheel typed consumer; MCP closure;
-unit closure; release-surface.
-
-Performance baseline and final identity are recorded.
+Final closure evidence is intentionally absent until the code candidate receives a successful GitHub Actions workflow run. The historical sections above are retained for audit history and are not current release status. See `plans/017-releases-4-6-final-correctness-and-evidence-closure.md` for the two-phase closure protocol.

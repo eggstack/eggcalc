@@ -103,14 +103,15 @@ Ties canonical name, dimension, scale factor, offset, and aliases into one immut
 
 ### UnitRegistry
 
-431 aliases → 20 canonicals → 16 dimensions. Built from `UNIT_BASE`, `UNIT_ALIASES`, `TEMPERATURE_CONVERSIONS`.
+431 aliases → 20 canonicals → 16 dimensions. Built from `UNIT_DEFINITIONS` (the single declaration authority). Generated compatibility adapters: `UNIT_ALIASES`, `UNIT_BASE`, `UNIT_CATEGORIES`, `TEMPERATURE_CONVERSIONS`, `UNIT_CONVERSIONS`.
 
 ### Compound Parsing Resource Bounds (C2)
 
-- `MAX_COMPOUND_DEPTH = 16` — recursion depth limit
 - `MAX_UNIT_STRING_LENGTH = 256` — input string length limit
 - `MAX_COMPOUND_ATOMS = 32` — maximum atoms per compound expression
-- Deeply nested or excessively long inputs return `None` deterministically
+- `MAX_ABS_UNIT_EXPONENT = 16` — maximum exponent per factor (enforced post-merge)
+- `MAX_COMPOUND_DEPTH` — deprecated compatibility constant (the grammar has no recursive parentheses; structural depth is fixed at one)
+- Excessively long inputs or out-of-bound values raise `ValueError` deterministically
 
 ### Conversion Factor Parity
 
@@ -324,13 +325,4 @@ All previously deferred items have been completed:
 
 ## Final Closure Evidence
 
-- closure_code_sha: `800832196439558383d22300ef36870c997437da`
-- closure_workflow_run_id: `0000000000`
-- lane linux: collected=4294 passed=4294 skipped=0 xfailed=0 failed=0
-
-ordinary Ruff; Black; ordinary mypy; strict mypy; strict Ruff;
-authority-boundary; deterministic build; authority inventory;
-source typed consumer; installed-wheel typed consumer; MCP closure;
-unit closure; release-surface.
-
-Performance baseline and final identity are recorded.
+Final closure evidence is intentionally absent until the code candidate receives a successful GitHub Actions workflow run. The historical sections above are retained for audit history and are not current release status. See `plans/017-releases-4-6-final-correctness-and-evidence-closure.md` for the two-phase closure protocol.

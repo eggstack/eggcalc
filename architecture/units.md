@@ -364,7 +364,7 @@ class UnitExpression:
 
 ### `parse_unit_expression(unit_str: str) -> UnitExpression`
 
-Parses a compound unit string into a frozen `UnitExpression`. Handles forms like `"m/s"`, `"kg*m/s**2"`, `"m**2"`. Rejects `"//"` and `"%"` as separators. Enforces resource bounds: `MAX_UNIT_STRING_LENGTH` (256), `MAX_COMPOUND_DEPTH` (16), `MAX_COMPOUND_ATOMS` (32), `MAX_ABS_UNIT_EXPONENT` (16). Fully consumes input — raises `ValueError` on leftover characters.
+Parses a compound unit string into a frozen `UnitExpression`. Handles forms like `"m/s"`, `"kg*m/s**2"`, `"m**2"`. Rejects `"//"` and `"%"` as separators. Enforces resource bounds: `MAX_UNIT_STRING_LENGTH` (256), `MAX_COMPOUND_ATOMS` (32), `MAX_ABS_UNIT_EXPONENT` (16, enforced post-merge on duplicate factors). `MAX_COMPOUND_DEPTH` is a deprecated compatibility constant — the grammar has no recursive parentheses and structural depth is fixed at one. Fully consumes input — raises `ValueError` on leftover characters.
 
 ```python
 expr = parse_unit_expression("m/s")

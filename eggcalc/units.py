@@ -146,7 +146,7 @@ class Dimension:
         parts = []
         names = ["L", "M", "T", "I", "Θ", "N", "J", "Q"]
         vals = self._tuple()
-        for name, val in zip(names, vals):
+        for name, val in zip(names, vals, strict=False):
             if val != 0:
                 parts.append(f"{name}^{val}" if val != 1 else name)
         if self.angle:
@@ -2396,12 +2396,17 @@ class UnitExpression:
                 raise _unit_error("Unit expression factors must use canonical names")
             if not isinstance(exponent, int) or isinstance(exponent, bool):
                 raise _unit_error(f"Invalid exponent for {canonical!r}")
-            if abs(exponent) > MAX_ABS_UNIT_EXPONENT:
-                raise _unit_error(f"Exponent exceeds {MAX_ABS_UNIT_EXPONENT}")
             definition = registry.by_canonical(canonical)
             if definition is None:
                 raise _unit_error(f"Unknown canonical unit: {canonical!r}")
             combined[canonical] = combined.get(canonical, 0) + exponent
+
+        # Validate normalized (post-merge) exponents against the bound.
+        for canonical, exponent in combined.items():
+            if exponent and abs(exponent) > MAX_ABS_UNIT_EXPONENT:
+                raise _unit_error(
+                    f"Normalized exponent for {canonical!r} exceeds {MAX_ABS_UNIT_EXPONENT}"
+                )
 
         combined = {name: exponent for name, exponent in combined.items() if exponent}
         if len(combined) > MAX_COMPOUND_ATOMS:
@@ -3594,7 +3599,7 @@ def _simplify_unit_string(unit: str | None) -> str | None:
         if len(parts) == 1:
             return render_expression(parse_compat_factor(unit))
         expression = parse_compat_factor(parts[0])
-        for operator, part in zip(operators, parts[1:]):
+        for operator, part in zip(operators, parts[1:], strict=False):
             right = parse_compat_factor(part)
             expression = (
                 multiply_expressions(expression, right)
