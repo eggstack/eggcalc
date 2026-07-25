@@ -84,7 +84,9 @@ def export() -> dict[str, object]:
         "metadata": {
             "source_commit": "5a1bb34c9efa269ca6159217827f1742faa95d20",
             "source": "legacy public runtime behavior",
-            "exporter_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "exporter_sha256": hashlib.sha256(
+                Path(__file__).read_bytes().replace(b"\r\n", b"\n")
+            ).hexdigest(),
         },
         "aliases": aliases,
         "arithmetic": arithmetic,
@@ -100,7 +102,9 @@ def verify(fixture_path: Path) -> bool:
     """Verify that the committed fixture matches current exporter behavior."""
     fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
     expected_hash = fixture["metadata"]["exporter_sha256"]
-    actual_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    # Normalize line endings to LF before hashing for cross-platform consistency.
+    exporter_bytes = Path(__file__).read_bytes().replace(b"\r\n", b"\n")
+    actual_hash = hashlib.sha256(exporter_bytes).hexdigest()
 
     if actual_hash != expected_hash:
         print(

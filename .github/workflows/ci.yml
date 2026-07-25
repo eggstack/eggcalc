@@ -62,8 +62,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         run: |
           mypy eggcalc --ignore-missing-imports
-          mypy --config-file mypy-strict.ini eggcalc/units.py eggcalc/mcp/server.py eggcalc/_protocol.py eggcalc/_version.py build_single.py
-          mypy --config-file pyproject.toml tests/typing/consumer.py
+          mypy --config-file mypy-strict.ini --follow-imports=normal eggcalc/units.py eggcalc/mcp/server.py eggcalc/_protocol.py eggcalc/_version.py build_single.py
+          mypy --config-file mypy-strict.ini --strict --follow-imports=normal tests/typing/consumer.py
           PYTHONPATH=. python tests/typing/consumer.py
 
       - name: Build single-file distribution

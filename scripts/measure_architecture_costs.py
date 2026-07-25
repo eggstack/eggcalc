@@ -23,6 +23,8 @@ def _stats(values: list[float]) -> dict[str, float | int]:
         "median_ms": round(statistics.median(values) * 1000, 4),
         "mean_ms": round(statistics.mean(values) * 1000, 4),
         "stdev_ms": round(statistics.stdev(values) * 1000, 4) if len(values) > 1 else 0.0,
+        "min_ms": round(min(values) * 1000, 4),
+        "max_ms": round(max(values) * 1000, 4),
     }
 
 
@@ -78,8 +80,12 @@ def collect(samples: int, single_file: Path | None = None) -> dict[str, object]:
         "import_eggcalc": _timed_python("import eggcalc", samples),
         "import_evaluate": _timed_python("from eggcalc import evaluate", samples),
         "cli_help": _timed_command([sys.executable, "-m", "eggcalc", "--help"], samples),
-        "normal_expression": _timed_python("from eggcalc import evaluate; evaluate('5+3')", samples),
-        "exact_command": _timed_command([sys.executable, "-m", "eggcalc", "count", "hello"], samples),
+        "normal_expression": _timed_python(
+            "from eggcalc import evaluate; evaluate('5+3')", samples
+        ),
+        "exact_command": _timed_command(
+            [sys.executable, "-m", "eggcalc", "count", "hello"], samples
+        ),
         "mcp_initialize": _timed_python(
             "from eggcalc.mcp.server import McpServer, McpSessionState; "
             "s=McpServer(); q=s.create_session(McpSessionState.UNINITIALIZED); "
@@ -105,8 +111,7 @@ def collect(samples: int, single_file: Path | None = None) -> dict[str, object]:
             samples,
         ),
         "unit_parse_normal": _timed_python(
-            "from eggcalc import units; "
-            "units.parse_unit_expression('kg*m/s**2')",
+            "from eggcalc import units; " "units.parse_unit_expression('kg*m/s**2')",
             samples,
         ),
         "unit_parse_maximum": _timed_python(
@@ -133,24 +138,57 @@ def _commit_sha() -> str:
     return result.stdout.strip()
 
 
+def _is_dirty() -> bool:
+    result = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=ROOT, check=True, capture_output=True, text=True
+    )
+    return bool(result.stdout.strip())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--label", default="candidate")
     parser.add_argument("--samples", type=int, default=5)
+    parser.add_argument("--warmups", type=int, default=5)
     parser.add_argument("--single-file", type=Path)
+    parser.add_argument("--expected-sha", type=str, default=None)
     args = parser.parse_args()
-    if args.samples < 2:
-        raise SystemExit("--samples must be at least 2")
-    report = {
+    if args.samples < 15:
+        raise SystemExit("--samples must be at least 15")
+    if args.warmups < 5:
+        raise SystemExit("--warmups must be at least 5")
+
+    sha = _commit_sha()
+    if args.expected_sha and sha != args.expected_sha:
+        raise SystemExit(f"HEAD SHA {sha} does not match expected {args.expected_sha}")
+    if _is_dirty():
+        raise SystemExit("Working tree is dirty; commit or stash changes before measuring")
+
+    import datetime
+
+    report: dict[str, object] = {
         "label": args.label,
-        "commit_sha": _commit_sha(),
+        "commit_sha": sha,
+        "dirty": False,
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "os": platform.system(),
+        "os_release": platform.release(),
         "architecture": platform.machine(),
-        "python": sys.version,
+        "python_implementation": platform.python_implementation(),
+        "python_version": platform.python_version(),
         "command": " ".join(sys.argv),
-        "measurements": collect(args.samples, args.single_file),
+        "samples": args.samples,
+        "warmups": args.warmups,
     }
+
+    # Run warmups (not recorded)
+    for _ in range(args.warmups):
+        collect(1, args.single_file)
+
+    # Run measured samples
+    report["measurements"] = collect(args.samples, args.single_file)
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Written to {args.output}")

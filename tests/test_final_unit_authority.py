@@ -204,7 +204,9 @@ def test_fixture_metadata_source_commit_is_exact() -> None:
 def test_fixture_metadata_exporter_hash_matches() -> None:
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
     expected_hash = fixture["metadata"]["exporter_sha256"]
-    actual_hash = hashlib.sha256(EXPORTER.read_bytes()).hexdigest()
+    # Normalize line endings to LF before hashing for cross-platform consistency.
+    exporter_bytes = EXPORTER.read_bytes().replace(b"\r\n", b"\n")
+    actual_hash = hashlib.sha256(exporter_bytes).hexdigest()
     assert (
         actual_hash == expected_hash
     ), f"Exporter hash mismatch: expected {expected_hash}, got {actual_hash}"

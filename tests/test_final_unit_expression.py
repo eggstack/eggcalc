@@ -186,11 +186,49 @@ def test_affine_compound_power_rejected() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _build_rendered_string(target_len: int) -> tuple[tuple[tuple[str, int], ...], str]:
+    """Build factors that render to exactly target_len characters.
+
+    Returns (factors, expected_rendered_string).
+    Uses single-char unit names with exponent 1, separated by '*'.
+    """
+    # n single-char factors produce 2*n - 1 chars.
+    # Since 2*n - 1 is always odd, for even targets we need one multi-char factor.
+    # With n_single single-char + 1 last_len-char factor:
+    # total = 2*n_single + last_len = target_len
+    # For even target: last_len=2, n_single = (target_len - 2) // 2
+    # For odd target: last_len=1, n_single = (target_len - 1) // 2
+    if target_len % 2 == 0:
+        last_len = 2
+        n_single = (target_len - last_len) // 2
+    else:
+        last_len = 1
+        n_single = (target_len - last_len) // 2
+    factors = tuple(("a", 1) for _ in range(n_single)) + (("a" * last_len, 1),)
+    rendered = "*".join(name for name, _ in factors)
+    assert len(rendered) == target_len, f"Expected {target_len}, got {len(rendered)}"
+    return factors, rendered
+
+
 def test_canonical_exact_bound_acceptance() -> None:
     """An expression rendering to exactly MAX_CANONICAL_UNIT_LENGTH is accepted."""
-    # Use real unit canonicals repeated to build a long expression
-    expr = parse_unit_expression("m*m")
-    assert render_expression(expr) == "m**2"
+    from eggcalc.units import _UncheckedUnitExpression
+
+    factors, expected = _build_rendered_string(MAX_CANONICAL_UNIT_LENGTH)
+    expr = _UncheckedUnitExpression(factors, DIM_DIMENSIONLESS, 1.0)
+    result = render_expression(expr)
+    assert result == expected
+    assert len(result) == MAX_CANONICAL_UNIT_LENGTH
+
+
+def test_canonical_exact_bound_one_over_rejected() -> None:
+    """An expression rendering to MAX_CANONICAL_UNIT_LENGTH + 1 is rejected."""
+    from eggcalc.units import _UncheckedUnitExpression
+
+    factors, expected = _build_rendered_string(MAX_CANONICAL_UNIT_LENGTH + 1)
+    expr = _UncheckedUnitExpression(factors, DIM_DIMENSIONLESS, 1.0)
+    with pytest.raises(ValueError, match="exceeds"):
+        render_expression(expr)
 
 
 def test_canonical_over_bound_rejection() -> None:
@@ -214,6 +252,25 @@ def test_render_expression_never_truncates() -> None:
         assert len(result) > MAX_CANONICAL_UNIT_LENGTH
 
 
+def test_canonical_denominator_included_in_boundary() -> None:
+    """Denominator formatting is included in canonical length check."""
+    from eggcalc.units import _UncheckedUnitExpression
+
+    # Build a string with denominator that hits exactly MAX_CANONICAL_UNIT_LENGTH
+    # "a*a*...*a/b*b*...*b" format
+    # numerator: n factors, denominator: m factors
+    # total = (2n-1) + 1 + (2m-1) = 2n + 2m - 1
+    half = MAX_CANONICAL_UNIT_LENGTH // 2
+    n = (half + 1) // 2
+    m = (MAX_CANONICAL_UNIT_LENGTH - (2 * n - 1) - 1 + 1) // 2
+    numerator = tuple(("a", 1) for _ in range(n))
+    denominator = tuple(("b", -1) for _ in range(m))
+    factors = numerator + denominator
+    rendered = render_expression(_UncheckedUnitExpression(factors, DIM_DIMENSIONLESS, 1.0))
+    assert rendered is not None
+    assert len(rendered) <= MAX_CANONICAL_UNIT_LENGTH
+
+
 # ---------------------------------------------------------------------------
 # Finite-scale overflow and underflow
 # ---------------------------------------------------------------------------
@@ -232,14 +289,16 @@ def test_scale_overflow_rejected() -> None:
 
 
 def test_scale_underflow_rejected() -> None:
-    """Scale mismatch from extreme factors is rejected."""
+    """Genuine scale underflow to zero from extreme factor multiplication is rejected."""
     from eggcalc.units import UNIT_DEFINITIONS
 
-    # Use fermi (scale 1e-15) at exponent 16 — scale^16 = 1e-240
-    # Provide a wildly different scale_to_base to trigger mismatch
+    # Use fermi (scale 1e-15) at exponent 16 and nm (scale 1e-9) at exponent 16.
+    # Combined scale: (1e-15)^16 * (1e-9)^16 = 1e-384, which underflows to 0.0.
+    # Each individual normalized exponent remains within the configured bound.
     fermi = next(s for s in UNIT_DEFINITIONS if s.canonical == "fermi")
-    factors = (("fermi", MAX_ABS_UNIT_EXPONENT),)
-    expected_dim = fermi.dimension**MAX_ABS_UNIT_EXPONENT
+    nm = next(s for s in UNIT_DEFINITIONS if s.canonical == "nm")
+    factors = (("fermi", MAX_ABS_UNIT_EXPONENT), ("nm", MAX_ABS_UNIT_EXPONENT))
+    expected_dim = fermi.dimension**MAX_ABS_UNIT_EXPONENT * nm.dimension**MAX_ABS_UNIT_EXPONENT
     with pytest.raises(ValueError, match="scale"):
         UnitExpression(factors, expected_dim, 1.0)
 
