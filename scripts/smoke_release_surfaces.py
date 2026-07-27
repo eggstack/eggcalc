@@ -395,7 +395,9 @@ def test_repl_surface() -> None:
         if "4" in r.stdout:
             _pass("REPL output contains result")
         else:
-            _fail("REPL surface", f"returncode={r.returncode} stdout={r.stdout!r} stderr={r.stderr!r}")
+            _fail(
+                "REPL surface", f"returncode={r.returncode} stdout={r.stdout!r} stderr={r.stderr!r}"
+            )
 
 
 # --- Editable install surface --------------------------------------------

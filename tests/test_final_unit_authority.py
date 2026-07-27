@@ -44,7 +44,14 @@ from eggcalc.units import (
 
 FIXTURE = Path(__file__).parent / "fixtures" / "units" / "legacy-5a1bb34c.json"
 UNITS_FILE = Path(__file__).resolve().parents[1] / "eggcalc" / "units.py"
-EXPORTER = Path(__file__).resolve().parents[1] / "scripts" / "export_unit_baseline.py"
+EXPORTER = (
+    Path(__file__).resolve().parents[1]
+    / "tests"
+    / "fixtures"
+    / "units"
+    / "exporters"
+    / "export_legacy_5a1bb34c.py"
+)
 
 # Category -> base_canonical mapping (the single family-base authority).
 EXPECTED_BASES = {
@@ -236,9 +243,21 @@ def test_fixture_has_required_schema_fields() -> None:
 def test_fixture_does_not_import_unit_definitions() -> None:
     """The baseline exporter reads public API tables, not internal helpers."""
     exporter_source = EXPORTER.read_text(encoding="utf-8")
+    exporter_tree = ast.parse(exporter_source)
     # The exporter must not use removed internal helpers
     assert "_structural_dimension" not in exporter_source
     assert "_parse_compound_signature" not in exporter_source
+    # Per plan: exporter must not reference current declaration inventories
+    forbidden_names = {"UNIT_DEFINITIONS", "UnitSpec", "UnitRegistry", "_structural_dimension"}
+    for node in ast.walk(exporter_tree):
+        if isinstance(node, ast.Name) and node.id in forbidden_names:
+            raise AssertionError(
+                f"Exporter references forbidden name {node.id!r} at line {node.lineno}"
+            )
+        if isinstance(node, ast.Attribute) and node.attr in forbidden_names:
+            raise AssertionError(
+                f"Exporter references forbidden attribute {node.attr!r} at line {node.lineno}"
+            )
 
 
 # ---------------------------------------------------------------------------

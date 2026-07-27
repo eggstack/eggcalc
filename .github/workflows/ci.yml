@@ -76,7 +76,7 @@ jobs:
         run: |
           python scripts/check_authority_boundaries.py
           python scripts/release_inventory.py --check
-          python scripts/export_unit_baseline.py --verify tests/fixtures/units/legacy-5a1bb34c.json
+          python scripts/verify_unit_baseline_fixture.py tests/fixtures/units/legacy-5a1bb34c.json
           python scripts/check_evidence_consistency.py --candidate-state
           python build_single.py -o /tmp/eggcalc-build-a.py
           python build_single.py -o /tmp/eggcalc-build-b.py
@@ -96,7 +96,29 @@ jobs:
         run: python scripts/generate_mcp_docs.py --check
 
       - name: Test with coverage
-        run: pytest tests/ -v --cov=eggcalc --cov-report=xml --cov-report=term
+        run: pytest tests/ -v --cov=eggcalc --cov-report=xml --cov-report=term --junitxml=lane-results.xml
+
+      - name: Generate lane summary
+        if: always()
+        env:
+          CONCLUSION: ${{ job.status }}
+        run: |
+          python scripts/junit_to_lane_summary.py \
+            --junitxml lane-results.xml \
+            --os "${{ matrix.os }}" \
+            --python-version "${{ matrix.python-version }}" \
+            --job-name "test (${{ matrix.os }}, ${{ matrix.python-version }})" \
+            --workflow-run-id "${{ github.run_id }}" \
+            --workflow-head-sha "${{ github.sha }}" \
+            --conclusion "$CONCLUSION" \
+            --output lane-summary-${{ matrix.os }}-${{ matrix.python-version }}.json
+
+      - name: Upload lane summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lane-summary-${{ matrix.os }}-${{ matrix.python-version }}
+          path: lane-summary-${{ matrix.os }}-${{ matrix.python-version }}.json
 
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -104,6 +126,34 @@ jobs:
         with:
           name: coverage-report
           path: coverage.xml
+
+      - name: Lint summary
+        if: matrix.os == 'ubuntu-latest' && always()
+        run: |
+          python -c "
+          import json
+          import subprocess
+          from pathlib import Path
+          # Run ruff, capture status; structured summary.
+          result = subprocess.run(['ruff', 'check', 'eggcalc', 'tests'], capture_output=True, text=True)
+          summary = {
+            'check': 'ruff-ordinary',
+            'conclusion': 'success' if result.returncode == 0 else 'failure',
+            'output': (result.stdout + result.stderr)[:2048],
+            'workflow_run_id': '${{ github.run_id }}',
+            'workflow_head_sha': '${{ github.sha }}',
+          }
+          Path('lint-summary.json').write_text(json.dumps(summary, indent=2))
+          if result.returncode != 0:
+            raise SystemExit(1)
+          "
+
+      - name: Upload lint summary
+        if: matrix.os == 'ubuntu-latest' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-summary
+          path: lint-summary.json
 
   package:
     runs-on: ubuntu-latest
@@ -139,3 +189,39 @@ jobs:
 
       - name: Installed-wheel typed consumer
         run: python scripts/verify_wheel_consumer.py dist/*.whl
+
+      - name: Generate release inventory
+        run: |
+          python build_single.py -o /tmp/eggcalc-release.py
+          python scripts/release_inventory.py \
+            --wheel dist/*.whl \
+            --single-file /tmp/eggcalc-release.py \
+            --output inventory.json
+
+      - name: Compute artifact hashes
+        run: |
+          python -c "
+          import hashlib, json
+          from pathlib import Path
+          def sha256(p):
+              h = hashlib.sha256()
+              h.update(Path(p).read_bytes().replace(b'\r\n', b'\n'))
+              return h.hexdigest()
+          hashes = {}
+          for f in sorted(Path('dist').iterdir()):
+              hashes[f.name] = {'sha256': sha256(f), 'size_bytes': f.stat().st_size}
+          hashes['eggcalc_release.py'] = {'sha256': sha256('/tmp/eggcalc-release.py'), 'size_bytes': Path('/tmp/eggcalc-release.py').stat().st_size}
+          Path('artifact-hashes.json').write_text(json.dumps(hashes, indent=2))
+          "
+
+      - name: Upload inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-inventory
+          path: inventory.json
+
+      - name: Upload artifact hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-hashes
+          path: artifact-hashes.json

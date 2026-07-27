@@ -10185,7 +10185,13 @@
     "max_unit_string_length": 256
   },
   "metadata": {
-    "exporter_sha256": "11309957da324d0ea42aa7fdf0f5bb0d126e76cb1814bcce5e02a2b498b76e70",
+    "exporter_path": "tests/fixtures/units/exporters/export_legacy_5a1bb34c.py",
+    "exporter_sha256": "9640e406f4b84f5ac8c42ba2255bdaf5c68deded4d98043d476ec796e086477f",
+    "generation_command": "python tests/fixtures/units/exporters/export_legacy_5a1bb34c.py --baseline-checkout . --output tests/fixtures/units/legacy-5a1bb34c.json",
+    "platform": "linux",
+    "python_implementation": "cpython",
+    "python_version": "3.11.0",
+    "schema_version": 1,
     "source": "legacy public runtime behavior",
     "source_commit": "5a1bb34c9efa269ca6159217827f1742faa95d20"
   }

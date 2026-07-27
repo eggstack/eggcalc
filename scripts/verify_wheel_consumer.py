@@ -58,8 +58,15 @@ def main() -> int:
         if probe.returncode:
             return probe.returncode
 
-        # Run strict mypy type check
-        mypy_cmd = [str(python), "-m", "mypy"]
+        # Run strict mypy type check with explicit flags
+        mypy_cmd = [
+            str(python),
+            "-m",
+            "mypy",
+            "--strict",
+            "--follow-imports=normal",
+            "--ignore-missing-imports",
+        ]
         if mypy_config:
             mypy_cmd.extend(["--config-file", mypy_config])
         mypy_cmd.append(str(consumer))

@@ -3,24 +3,23 @@
 
 Supports two modes:
 
-- ``--candidate-state``: verifies that no placeholder final evidence exists
-  and that no stale SHA/workflow claims are present.  Used during the code
-  candidate phase before a successful CI run.
+- ``--candidate-state``: verifies that no placeholder final evidence exists,
+  no stale SHA/workflow claims are present, and no final manifest/snapshot
+  files exist.  Used during the code candidate phase.
 
 - ``--final``: requires the complete proof set including exact candidate SHA,
-  workflow run ID, lane totals, mandatory job names, and performance
-  identities.  Used after the code candidate receives a green CI run.
-
-The historical portions of the release records are deliberately ignored.  A
-document is eligible for final closure validation only after it contains a
-``## Final Closure Evidence`` section with exact candidate identity, lane
-totals, mandatory job names, and both performance identities.
+  workflow run ID, lane totals, mandatory job names, performance identities,
+  Git ancestry, evidence-only diff allowlist, and artifact hash consistency.
+  Used after the code candidate receives a green CI run.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -39,7 +38,7 @@ RUN_RE = re.compile(r"(?mi)^-\s*(?:closure_workflow_run_id|workflow_run_id):\s*`
 LANE_RE = re.compile(
     r"(?mi)^-\s*lane\s+[^:]+:\s*"
     r"collected=(\d+)\s+passed=(\d+)\s+skipped=(\d+)\s+"
-    r"xfail(?:ed)?=(\d+)\s+failed=(\d+)\s*$"
+    r"xfail(?:ed)?=(\d+)\s+xpassed=(\d+)\s+failed=(\d+)\s*$"
 )
 PLACEHOLDER_SHA = "800832196439558383d22300ef36870c997437da"
 PLACEHOLDER_RUN_ID = "0000000000"
@@ -58,6 +57,17 @@ MANDATORY_MARKERS = (
     "unit closure",
     "release-surface",
 )
+EVIDENCE_ALLOWLIST = {
+    "docs/release_4_evidence.md",
+    "docs/release_5_evidence.md",
+    "docs/release_6_evidence.md",
+    "docs/evidence/releases-4-6-final.json",
+    "docs/evidence/releases-4-6-ci-run.json",
+    "docs/evidence/releases-4-6-inventory.json",
+}
+FINAL_MANIFEST = ROOT / "docs" / "evidence" / "releases-4-6-final.json"
+FINAL_CI_RUN = ROOT / "docs" / "evidence" / "releases-4-6-ci-run.json"
+FINAL_INVENTORY = ROOT / "docs" / "evidence" / "releases-4-6-inventory.json"
 
 
 def _final_section(path: Path) -> str | None:
@@ -71,10 +81,8 @@ def _final_section(path: Path) -> str | None:
 def _is_placeholder_evidence(section: str) -> bool:
     """Check if the section contains only placeholder/unfinalized evidence."""
     lowered = section.lower()
-    # If it says "intentionally absent", it's the correct unfinalized state
     if "intentionally absent" in lowered:
         return True
-    # If it contains placeholder SHA or run ID, it's stale placeholder data
     if PLACEHOLDER_SHA in section:
         return True
     if PLACEHOLDER_RUN_ID in section:
@@ -86,7 +94,6 @@ def _has_real_evidence(section: str) -> bool:
     """Check if the section contains real (non-placeholder) evidence."""
     if _is_placeholder_evidence(section):
         return False
-    # Must have at least a SHA and run ID
     shas = SHA_RE.findall(section)
     runs = RUN_RE.findall(section)
     return len(shas) >= 1 and len(runs) >= 1
@@ -99,7 +106,63 @@ def _one_match(pattern: re.Pattern[str], section: str, label: str, path: Path) -
     return matches[0]
 
 
-def validate_candidate_state(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> list[str]:
+def _git_parent_sha() -> str | None:
+    """Return HEAD^ SHA or None if not a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD^"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def _git_head_sha() -> str | None:
+    """Return HEAD SHA or None if not a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def _git_diff_names(parent_sha: str, head_sha: str) -> set[str]:
+    """Return set of file names changed between parent and head."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", parent_sha, head_sha],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return set()
+
+
+def _sha256_file(path: Path) -> str:
+    """Compute SHA-256 of a file."""
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+def validate_candidate_state(
+    paths: tuple[Path, ...] = DEFAULT_DOCUMENTS,
+    *,
+    check_repo_files: bool = True,
+) -> list[str]:
     """Validate that no placeholder final evidence exists.
 
     Used during the code candidate phase.  Accepts either:
@@ -111,8 +174,19 @@ def validate_candidate_state(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> lis
     - Placeholder SHA (80083219...)
     - Placeholder workflow run ID (0000000000)
     - Stale claims that Releases 4-6 are closed with placeholder data
+    - Existence of final manifest, CI run snapshot, or inventory snapshot
+      (only when check_repo_files=True, the default for real repo validation)
     """
     errors: list[str] = []
+
+    # Reject final evidence files in candidate state
+    if check_repo_files:
+        for final_file in (FINAL_MANIFEST, FINAL_CI_RUN, FINAL_INVENTORY):
+            if final_file.is_file():
+                errors.append(
+                    f"Final evidence file exists during candidate phase: {final_file.name}"
+                )
+
     for path in paths:
         try:
             section = _final_section(path)
@@ -121,14 +195,11 @@ def validate_candidate_state(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> lis
             continue
 
         if section is None:
-            # No final section is acceptable in candidate state
             continue
 
         if _is_placeholder_evidence(section):
-            # Intentionally absent is the correct state
             if "intentionally absent" in section.lower():
                 continue
-            # Stale placeholder data
             if PLACEHOLDER_SHA in section:
                 errors.append(f"{path.name}: contains placeholder SHA {PLACEHOLDER_SHA[:12]}...")
             if PLACEHOLDER_RUN_ID in section:
@@ -141,6 +212,8 @@ def validate_candidate_state(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> lis
 def validate_final(
     paths: tuple[Path, ...] = DEFAULT_DOCUMENTS,
     candidate_sha: str | None = None,
+    *,
+    check_git_ancestry: bool = True,
 ) -> list[str]:
     """Validate complete final evidence.
 
@@ -151,6 +224,9 @@ def validate_final(
     - Exact lane totals that add up
     - All mandatory job markers present
     - Performance identities referenced
+    - Git ancestry: HEAD^ == candidate SHA
+    - Evidence diff is limited to the documented allowlist
+    - Artifact hashes match committed files
     - If candidate_sha is provided, all SHAs must match it
     """
     errors: list[str] = []
@@ -202,28 +278,153 @@ def validate_final(
         lanes = LANE_RE.findall(section)
         if not lanes:
             errors.append(f"{path.name}: no exact lane totals found")
-        for collected, passed, skipped, xfailed, failed in lanes:
-            if int(collected) != int(passed) + int(skipped) + int(xfailed) + int(failed):
+        for collected, passed, skipped, xfailed, xpassed, failed in lanes:
+            total = int(passed) + int(skipped) + int(xfailed) + int(xpassed) + int(failed)
+            if int(collected) != total:
                 errors.append(f"{path.name}: lane totals do not add up")
         if "baseline" not in lowered or "final" not in lowered:
             errors.append(f"{path.name}: performance section lacks baseline/final identity")
 
     if sections and len(sections) != len(paths):
         errors.append("Not all Release 4-6 documents contain valid final closure sections")
+
+    # --- Git ancestry verification ---
+    if candidate_sha and check_git_ancestry:
+        head = _git_head_sha()
+        parent = _git_parent_sha()
+        if head is None:
+            errors.append("Cannot verify Git ancestry: not a git repository")
+        elif parent is None:
+            errors.append("Cannot verify Git ancestry: HEAD has no parent")
+        else:
+            if parent != candidate_sha:
+                errors.append(
+                    f"Git ancestry: HEAD^ is {parent[:12]}..., expected candidate {candidate_sha[:12]}..."
+                )
+
+            # --- Evidence diff allowlist verification ---
+            changed = _git_diff_names(parent, head)
+            unexpected = changed - EVIDENCE_ALLOWLIST
+            if unexpected:
+                errors.append(
+                    f"Evidence commit modifies files outside allowlist: {', '.join(sorted(unexpected))}"
+                )
+
+    # --- Artifact hash verification ---
+    if FINAL_MANIFEST.is_file():
+        manifest = json.loads(FINAL_MANIFEST.read_text(encoding="utf-8"))
+        artifact_hashes = manifest.get("artifact_hashes", {})
+        for artifact_key, entry in artifact_hashes.items():
+            # Each entry maps to {"path": "...", "sha256": "...", "note": "..."} or a bare hash.
+            if isinstance(entry, dict):
+                info = entry
+                expected = info.get("sha256")
+                rel_path = info.get("path")
+                note = info.get("note", "")
+            else:
+                expected = entry
+                rel_path = None
+                note = ""
+            if not expected or not rel_path:
+                continue
+            # Built artefacts (wheel/sdist/single_file) are not committed.
+            # If the entry is flagged as a built/identity-only record, skip
+            # both existence and hash verification — the CI-built artifact
+            # has a different hash than any local build.
+            if "Built during" in note or "not committed" in note:
+                if not (isinstance(expected, str) and len(expected) == 64):
+                    errors.append(f"Artifact {artifact_key}: missing 64-char SHA-256")
+                continue
+            full = ROOT / rel_path
+            if not full.is_file():
+                errors.append(f"Artifact {artifact_key}: declared path {rel_path} does not exist")
+                continue
+            actual = _sha256_file(full)
+            if actual != expected:
+                errors.append(
+                    f"Artifact {artifact_key} ({rel_path}): "
+                    f"expected {expected[:12]}..., got {actual[:12]}..."
+                )
+
+        # Performance identity hash verification
+        perf = manifest.get("performance", {})
+        for label, info in perf.items():
+            if not isinstance(info, dict):
+                continue
+            rel_path = info.get("path")
+            expected = info.get("hash_sha256") or info.get("sha256")
+            if not rel_path or not expected:
+                continue
+            # Skip placeholder sentinel values.
+            if expected == "historical":
+                continue
+            full = ROOT / rel_path
+            if not full.is_file():
+                errors.append(f"Performance {label}: declared path {rel_path} does not exist")
+                continue
+            actual = _sha256_file(full)
+            if actual != expected:
+                errors.append(
+                    f"Performance {label} ({rel_path}): "
+                    f"expected {expected[:12]}..., got {actual[:12]}..."
+                )
+
+    if FINAL_INVENTORY.is_file():
+        inventory = json.loads(FINAL_INVENTORY.read_text(encoding="utf-8"))
+        inv_hash = inventory.get("exporter_hash")
+        exporter_path = ROOT / inventory.get("exporter_path", "")
+        if inv_hash and exporter_path.is_file():
+            actual = _sha256_file(exporter_path)
+            if actual != inv_hash:
+                errors.append(
+                    f"Inventory exporter hash mismatch: expected {inv_hash[:12]}..., got {actual[:12]}..."
+                )
+
+    # --- Candidate code tree unchanged check ---
+    if candidate_sha and check_git_ancestry:
+        try:
+            head = _git_head_sha()
+            parent = _git_parent_sha()
+            if head and parent:
+                result = subprocess.run(
+                    [
+                        "git",
+                        "diff",
+                        "--name-only",
+                        parent,
+                        head,
+                        "--",
+                        "eggcalc/",
+                        "tests/",
+                        "scripts/",
+                        ".github/",
+                        "build_single.py",
+                        "pyproject.toml",
+                        "mypy-strict.ini",
+                        "plans/",
+                    ],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                code_changes = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+                if code_changes:
+                    errors.append(
+                        "Candidate code tree changed in evidence commit: "
+                        + ", ".join(sorted(code_changes))
+                    )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
     return errors
 
 
 def validate_documents(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> list[str]:
-    """Backward-compatible validator: try final mode, fall back to candidate state.
-
-    Returns empty list if either mode passes.  For new code, use
-    ``validate_candidate_state`` or ``validate_final`` directly.
-    """
+    """Backward-compatible validator: try final mode, fall back to candidate state."""
     candidate_errors = validate_candidate_state(paths)
     if candidate_errors:
-        # Candidate state has issues (stale placeholders) - report them
         return candidate_errors
-    # Candidate state is valid. Check if there's real evidence to validate.
     has_any_real = False
     for path in paths:
         section = _final_section(path)
@@ -232,7 +433,6 @@ def validate_documents(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> list[str]
             break
     if has_any_real:
         return validate_final(paths)
-    # No real evidence yet - candidate state is the valid mode
     return []
 
 

@@ -143,9 +143,7 @@ def check() -> list[str]:
     for name in COMPATIBILITY_MAPS:
         nodes = assignments.get(name, [])
         if len(nodes) != 1:
-            errors.append(
-                f"{name}: expected exactly one top-level assignment, found {len(nodes)}"
-            )
+            errors.append(f"{name}: expected exactly one top-level assignment, found {len(nodes)}")
         else:
             # Verify it's not a manually maintained dict literal.
             node = nodes[0]
