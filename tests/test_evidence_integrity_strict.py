@@ -872,14 +872,21 @@ def test_evidence_commit_with_non_allowlisted_files_fails(
     docs = _write_evidence_docs(tmp_path, sha, "12345")
     monkeypatch_set(monkeypatch, FINAL_MANIFEST, _write_manifest(tmp_path, candidate_sha=sha))
     monkeypatch_set(monkeypatch, FINAL_CI_RUN, _write_ci_snapshot(tmp_path, candidate_sha=sha))
-    # Mock git ancestry to a single non-allowlisted file change.
+    # Mock git ancestry to a single non-allowlisted file change. Mock all three
+    # git helpers so the test is independent of the actual repository state.
+    original_head = mod._git_head_sha
+    original_parent = mod._git_parent_sha
     original_diff = mod._git_diff_names
+    mod._git_head_sha = lambda: sha  # type: ignore[assignment]
+    mod._git_parent_sha = lambda: sha  # type: ignore[assignment]
     mod._git_diff_names = lambda p, h: {"eggcalc/evaluator.py"}  # type: ignore[assignment]
     try:
         errors = validate_final(docs, candidate_sha=sha, check_git_ancestry=True)
     finally:
+        mod._git_head_sha = original_head  # type: ignore[assignment]
+        mod._git_parent_sha = original_parent  # type: ignore[assignment]
         mod._git_diff_names = original_diff  # type: ignore[assignment]
-    assert any("outside allowlist" in e for e in errors)
+    assert any("outside allowlist" in e for e in errors), f"expected allowlist error, got {errors}"
 
 
 # ---------------------------------------------------------------------------
