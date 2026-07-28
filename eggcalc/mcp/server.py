@@ -2314,9 +2314,17 @@ def _json_value_equal(a: Any, b: Any) -> bool:
     """Recursively compare two JSON-like values for structural equality.
 
     Used by uniqueItems to detect duplicates among unhashable items (dicts,
-    lists) as well as scalars. Floats compare exactly — JSON Schema does not
-    require a canonical NaN or ±0 representation, so we use Python's `==`.
+    lists) as well as scalars. JSON Schema treats all numbers as one numeric
+    domain, so int 1 and float 1.0 are equal.
     """
+    # JSON numeric domain: int and float compare by mathematical value
+    if (
+        isinstance(a, (int, float))
+        and not isinstance(a, bool)
+        and isinstance(b, (int, float))
+        and not isinstance(b, bool)
+    ):
+        return a == b
     if type(a) is not type(b):
         return False
     if isinstance(a, dict):
@@ -2460,8 +2468,9 @@ def _validate_value_against_schema(
             return f"Argument '{path}' value {value} must be < exclusiveMaximum {excl_max}"
         multiple = prop.get("multipleOf")
         if multiple is not None and multiple > 0 and not isinstance(value, bool):
-            remainder = value % multiple
-            if not _math.isclose(remainder, 0, rel_tol=1e-9, abs_tol=1e-12):
+            quotient = value / multiple
+            nearest_int = round(quotient)
+            if not _math.isclose(quotient, nearest_int, rel_tol=1e-9, abs_tol=1e-12):
                 return f"Argument '{path}' value {value} is not a multiple of {multiple}"
 
     # Recursive validation for nested objects (only when sub-schema defines properties)
@@ -2818,8 +2827,11 @@ def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None)
     profile_filter = params.get("profile")
     schema_detail_param = params.get("schema_detail")
 
-    if tier_filter is not None and not isinstance(tier_filter, int):
-        return _invalid_request(request_id, "Invalid 'tier' parameter: expected integer")
+    if tier_filter is not None:
+        if isinstance(tier_filter, bool) or not isinstance(tier_filter, int):
+            return _invalid_request(request_id, "Invalid 'tier' parameter: expected integer")
+        if tier_filter not in (0, 1, 2, 3):
+            return _invalid_request(request_id, "Invalid 'tier' parameter: expected 0, 1, 2, or 3")
     if tags_filter is not None and not isinstance(tags_filter, list):
         return _invalid_request(request_id, "Invalid 'tags' parameter: expected array")
     if tags_filter is not None and not all(isinstance(t, str) for t in tags_filter):

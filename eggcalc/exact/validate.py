@@ -1484,8 +1484,25 @@ def json_compare(
                 return
 
             if ignore_array_order and _is_serializable(a_val) and _is_serializable(b_val):
-                norm_a = sorted(_canonicalize_for_compare(v) for v in a_val)
-                norm_b = sorted(_canonicalize_for_compare(v) for v in b_val)
+
+                def _sort_key(v: Any) -> tuple[int, str]:
+                    # Type priority: None=0, bool=1, int/float=2, str=3, list=4, dict=5
+                    if v is None:
+                        p = 0
+                    elif isinstance(v, bool):
+                        p = 1
+                    elif isinstance(v, (int, float)):
+                        p = 2
+                    elif isinstance(v, str):
+                        p = 3
+                    elif isinstance(v, list):
+                        p = 4
+                    else:
+                        p = 5
+                    return (p, json.dumps(v, sort_keys=True, ensure_ascii=True))
+
+                norm_a = sorted((_canonicalize_for_compare(v) for v in a_val), key=_sort_key)
+                norm_b = sorted((_canonicalize_for_compare(v) for v in b_val), key=_sort_key)
                 if norm_a == norm_b:
                     return
                 for i in range(len(norm_a)):

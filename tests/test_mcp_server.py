@@ -11487,3 +11487,125 @@ class TestErrorNotificationConformance:
 
         resp = _internal_error(42, "boom")
         assert resp["error"]["code"] == -32603
+
+
+class TestBugFixJsonCompareArrayOrder:
+    """Bug fix: json_compare with ignore_array_order crashes on heterogeneous arrays."""
+
+    def test_mixed_scalar_types(self):
+        from eggcalc.exact.validate import json_compare
+
+        result = json_compare('["a", 1]', '[1, "a"]', ignore_array_order=True)
+        assert result["equal"] is True
+
+    def test_objects_in_array(self):
+        from eggcalc.exact.validate import json_compare
+
+        result = json_compare(
+            '[{"a": 1}, {"b": 2}]',
+            '[{"b": 2}, {"a": 1}]',
+            ignore_array_order=True,
+        )
+        assert result["equal"] is True
+
+    def test_nested_arrays(self):
+        from eggcalc.exact.validate import json_compare
+
+        result = json_compare('[[1, 2], [3]]', '[[3], [1, 2]]', ignore_array_order=True)
+        assert result["equal"] is True
+
+    def test_null_and_duplicates(self):
+        from eggcalc.exact.validate import json_compare
+
+        result = json_compare('[null, 1, 1]', '[1, null, 1]', ignore_array_order=True)
+        assert result["equal"] is True
+
+    def test_heterogeneous_unequal(self):
+        from eggcalc.exact.validate import json_compare
+
+        result = json_compare('["a", 1]', '["a", 2]', ignore_array_order=True)
+        assert result["equal"] is False
+
+
+class TestBugFixTierFilterValidation:
+    """Bug fix: tools/list tier filter rejects booleans and out-of-range integers."""
+
+    def test_bool_rejected(self):
+        session = ready_session()
+        response = session_request(session, "tools/list", {"tier": True})
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+
+    def test_negative_rejected(self):
+        session = ready_session()
+        response = session_request(session, "tools/list", {"tier": -1})
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+
+    def test_above_range_rejected(self):
+        session = ready_session()
+        response = session_request(session, "tools/list", {"tier": 999})
+        assert "error" in response
+        assert response["error"]["code"] == -32600
+
+    def test_valid_tiers_accepted(self):
+        session = ready_session()
+        for tier in (0, 1, 2, 3):
+            response = session_request(session, "tools/list", {"tier": tier})
+            assert "result" in response
+
+
+class TestBugFixUniqueItemsNumericEquality:
+    """Bug fix: uniqueItems treats int 1 and float 1.0 as equal JSON numbers."""
+
+    def test_int_float_equal(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema([1, 1.0], {"type": "array", "uniqueItems": True}, "x")
+        assert err is not None and "duplicate" in err
+
+    def test_zero_negative_zero_equal(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema([0, -0.0], {"type": "array", "uniqueItems": True}, "x")
+        assert err is not None and "duplicate" in err
+
+    def test_booleans_still_distinct_from_numbers(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema([True, 1], {"type": "array", "uniqueItems": True}, "x")
+        assert err is None
+
+
+class TestBugFixMultipleOfDecimal:
+    """Bug fix: multipleOf rejects valid decimal multiples like 0.3 % 0.1."""
+
+    def test_decimal_multiple(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema(0.3, {"type": "number", "multipleOf": 0.1}, "x")
+        assert err is None
+
+    def test_negative_decimal_multiple(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema(-0.3, {"type": "number", "multipleOf": 0.1}, "x")
+        assert err is None
+
+    def test_large_decimal_multiple(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema(10.5, {"type": "number", "multipleOf": 0.5}, "x")
+        assert err is None
+
+    def test_non_multiple_rejected(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema(0.35, {"type": "number", "multipleOf": 0.1}, "x")
+        assert err is not None and "multiple" in err
+
+    def test_integer_multiple_of(self):
+        from eggcalc.mcp.server import _validate_value_against_schema
+
+        err = _validate_value_against_schema(9, {"type": "number", "multipleOf": 3}, "x")
+        assert err is None
