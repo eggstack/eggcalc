@@ -52,9 +52,14 @@ def _run(
     env: dict[str, str] | None = None,
     timeout: float = 30.0,
     input_data: str | None = None,
+    *,
+    use_source_path: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     run_env = os.environ.copy()
-    run_env["PYTHONPATH"] = str(REPO_ROOT)
+    if use_source_path:
+        run_env["PYTHONPATH"] = str(REPO_ROOT)
+    else:
+        run_env.pop("PYTHONPATH", None)
     if env:
         run_env.update(env)
     return subprocess.run(
@@ -122,21 +127,43 @@ def test_wheel_install() -> None:
         _fail("wheel install", f"No .whl files in {DIST_DIR}")
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        venv_dir = Path(tmpdir) / "test_venv"
+        tmpdir_path = Path(tmpdir)
+        venv_dir = tmpdir_path / "test_venv"
         venv.create(str(venv_dir), with_pip=True)
         pip = venv_dir / "bin" / "pip"
 
-        r = _run([str(pip), "install", str(whl_files[0])])
+        r = _run([str(pip), "install", str(whl_files[0])], cwd=tmpdir, use_source_path=False)
         if r.returncode != 0:
             _fail("pip install wheel", r.stderr)
 
         python = venv_dir / "bin" / "python"
+
+        r = _run(
+            [
+                str(python),
+                "-c",
+                "import eggcalc, pathlib; "
+                "p = pathlib.Path(eggcalc.__file__).parent; "
+                "assert 'site-packages' in str(p) or 'dist-packages' in str(p), f'wrong path: {p}'; "
+                "assert (p / 'py.typed').is_file(), 'py.typed missing'; "
+                "print('ok')",
+            ],
+            cwd=tmpdir,
+            use_source_path=False,
+        )
+        if r.returncode == 0 and "ok" in r.stdout:
+            _pass("wheel import path is site-packages with py.typed")
+        else:
+            _fail("wheel import path", r.stderr)
+
         r = _run(
             [
                 str(python),
                 "-c",
                 "from eggcalc import evaluate; assert evaluate('2+2') == 4; print('ok')",
-            ]
+            ],
+            cwd=tmpdir,
+            use_source_path=False,
         )
         if r.returncode == 0 and "ok" in r.stdout:
             _pass("wheel evaluate('2+2') == 4")
@@ -148,7 +175,9 @@ def test_wheel_install() -> None:
                 str(python),
                 "-c",
                 "from eggcalc.units import UnitValue; u = UnitValue(1, 'm'); assert u.convert_to('ft').value > 3; print('ok')",
-            ]
+            ],
+            cwd=tmpdir,
+            use_source_path=False,
         )
         if r.returncode == 0 and "ok" in r.stdout:
             _pass("wheel unit conversion")
@@ -407,11 +436,12 @@ def test_editable_install() -> None:
     """Verify pip install -e . works and the installed package is functional."""
     _banner("Editable install in clean venv")
     with tempfile.TemporaryDirectory() as tmpdir:
-        venv_dir = Path(tmpdir) / "test_venv"
+        tmpdir_path = Path(tmpdir)
+        venv_dir = tmpdir_path / "test_venv"
         venv.create(str(venv_dir), with_pip=True)
         pip = venv_dir / "bin" / "pip"
 
-        r = _run([str(pip), "install", "-e", str(REPO_ROOT)])
+        r = _run([str(pip), "install", "-e", str(REPO_ROOT)], cwd=tmpdir, use_source_path=False)
         if r.returncode != 0:
             _fail("pip install -e .", r.stderr)
 
@@ -421,7 +451,9 @@ def test_editable_install() -> None:
                 str(python),
                 "-c",
                 "from eggcalc import evaluate; assert evaluate('2+2') == 4; print('ok')",
-            ]
+            ],
+            cwd=tmpdir,
+            use_source_path=False,
         )
         if r.returncode == 0 and "ok" in r.stdout:
             _pass("editable install evaluate('2+2') == 4")
@@ -433,7 +465,9 @@ def test_editable_install() -> None:
                 str(python),
                 "-c",
                 "from eggcalc import detect_capabilities; caps = detect_capabilities(); print(caps.mode)",
-            ]
+            ],
+            cwd=tmpdir,
+            use_source_path=False,
         )
         if r.returncode == 0 and "package" in r.stdout:
             _pass("editable install reports package mode")

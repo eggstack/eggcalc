@@ -28,23 +28,40 @@ Thank you for your interest in contributing to eggcalc! This document provides g
    pip install -e ".[dev]"
    ```
 
-4. Install pre-commit hooks:
+4. (Optional) Install pre-commit hooks:
    ```bash
-   pip install pre-commit
-   pre-commit install
+   make hooks
    ```
 
-## Running Tests
+## Verification
+
+The canonical correctness command is:
 
 ```bash
-# Run all tests
-pytest tests/
+make check
+```
 
-# Run with coverage
-pytest tests/ --cov=eggcalc --cov-report=term-missing
+This runs Ruff lint, Black format check, mypy type check, generated documentation drift check, and the full pytest suite.
 
-# Run specific test file
-pytest tests/test_clicalc.py -v
+For changes affecting packaging, entry points, generated single-file output, MCP startup, version metadata, or public exports, also run:
+
+```bash
+make package-check
+```
+
+### Individual targets
+
+```bash
+make test           # Run tests
+make test-cov       # Run tests with coverage
+make lint           # Ruff lint
+make format         # Format with black
+make format-check   # Check formatting (no changes)
+make typecheck      # Mypy type check
+make docs-check     # Check generated documentation drift
+make build          # Build wheel and sdist
+make package-check  # Validate wheel, sdist, and release surfaces
+make release-check  # Full correctness + package validation
 ```
 
 ## Code Style
@@ -55,33 +72,20 @@ This project uses the following tools:
 - **ruff** - Linting
 - **mypy** - Type checking
 
-Run them before committing:
-
-```bash
-# Format code
-black eggcalc tests
-
-# Lint code
-ruff check eggcalc tests --fix
-
-# Type check
-mypy eggcalc --ignore-missing-imports
-```
+Run `make check` to run all of them at once.
 
 ## Pull Request Process
 
 1. Create a feature branch from `main`
 2. Make your changes
-3. Ensure tests pass: `pytest tests/`
-4. Run linting: `ruff check eggcalc tests`
-5. Run formatting: `black eggcalc tests`
-6. Submit a pull request
+3. Run `make check` to verify correctness
+4. For packaging-related changes, also run `make package-check`
+5. Submit a pull request
 
 ### PR Checklist
 
-- [ ] Tests pass locally
-- [ ] Code is formatted with black
-- [ ] No linting errors from ruff
+- [ ] `make check` passes
+- [ ] `make package-check` passes (for packaging changes)
 - [ ] New features have tests
 - [ ] Documentation updated if needed
 

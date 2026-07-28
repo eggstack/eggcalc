@@ -1,3 +1,5 @@
+> **Historical record.** This document is not an active release gate. The project uses manual PyPI publication and product-focused CI as defined in [docs/releasing.md](releasing.md).
+
 # Release 6 Evidence
 
 Release 6 — Internal Architecture and Maintainability

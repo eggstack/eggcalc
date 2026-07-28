@@ -39,6 +39,7 @@ dev = [
     "mkdocstrings[python]>=0.24",
     "pre-commit>=3.0",
     "build>=0.10",
+    "twine>=5.0",
 ]
 docs = [
     "mkdocs>=1.5",

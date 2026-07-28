@@ -1,3 +1,5 @@
+> **Historical record.** This document is not an active release gate. The project uses manual PyPI publication and product-focused CI as defined in [docs/releasing.md](releasing.md).
+
 # Release 5 — Evidence Record
 
 ## Runtime

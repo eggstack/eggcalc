@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format check clean build publish docs generate-docs docs-check release-check
+.PHONY: help install dev test test-cov lint format format-check typecheck docs-check check clean build package-check release-check publish hooks
 
 help:
 	@echo "eggcalc - Development Commands"
@@ -6,28 +6,28 @@ help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  install     Install package"
-	@echo "  dev         Install with dev dependencies"
-	@echo "  test        Run tests"
-	@echo "  test-cov    Run tests with coverage"
-	@echo "  lint        Run linter (ruff)"
-	@echo "  format      Format code (black)"
-	@echo "  typecheck   Run type checker (mypy)"
-	@echo "  check       Run all checks (lint, format --check, typecheck, docs-check, test)"
-	@echo "  clean       Remove build artifacts"
-	@echo "  build       Build distribution packages"
-	@echo "  publish     Publish to PyPI (requires twine)"
-	@echo "  docs        Build documentation"
-	@echo "  release-check Run all checks + build + release-surface smoke tests"
-	@echo "  pre-commit  Install pre-commit hooks"
+	@echo "  install        Install package"
+	@echo "  dev            Install with dev dependencies (no hooks)"
+	@echo "  test           Run tests"
+	@echo "  test-cov       Run tests with coverage"
+	@echo "  lint           Run linter (ruff)"
+	@echo "  format         Format code (black)"
+	@echo "  format-check   Check formatting (black --check)"
+	@echo "  typecheck      Run type checker (mypy)"
+	@echo "  docs-check     Check generated documentation drift"
+	@echo "  check          Full correctness (lint + format-check + typecheck + docs-check + test)"
+	@echo "  clean          Remove build artifacts"
+	@echo "  build          Build distribution packages"
+	@echo "  package-check  Validate wheel, sdist, and release surfaces"
+	@echo "  release-check  Full correctness + package validation"
+	@echo "  publish        Upload to PyPI via twine"
+	@echo "  hooks          Install pre-commit hooks (optional)"
 
 install:
 	pip install -e .
 
 dev:
 	pip install -e ".[dev]"
-	pip install pre-commit
-	pre-commit install
 
 test:
 	pytest tests/ -v
@@ -47,14 +47,16 @@ format-check:
 typecheck:
 	mypy eggcalc --ignore-missing-imports
 
-check: lint format-check typecheck docs-check test
-	@echo "All checks passed!"
-
 generate-docs:
 	python3 scripts/generate_mcp_docs.py
 
 docs-check:
 	python3 scripts/generate_mcp_docs.py --check
+
+check: lint format-check typecheck docs-check
+	python build_single.py --validate
+	python -m pytest tests/ -v
+	@echo "All checks passed!"
 
 clean:
 	rm -rf build/ dist/ *.egg-info .pytest_cache .mypy_cache .ruff_cache
@@ -65,20 +67,16 @@ clean:
 build: clean
 	python -m build
 
-publish: build
-	twine upload dist/*
-
-docs:
-	@echo "Building docs with mkdocs..."
-	mkdocs build
-
-pre-commit:
-	pip install pre-commit
-	pre-commit install
-	pre-commit run --all-files
-
-release-check: check build
+package-check: build
+	twine check dist/*
 	python scripts/smoke_release_surfaces.py
 
-release: release-check
-	@echo "Ready to release! Run: git tag vX.Y.Z && git push --tags"
+release-check: check package-check
+	@echo "Release check passed!"
+
+publish: release-check
+	twine upload dist/*
+
+hooks:
+	pip install pre-commit
+	pre-commit install
