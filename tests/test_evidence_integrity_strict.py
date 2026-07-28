@@ -19,6 +19,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from scripts import check_evidence_consistency as mod
 from scripts.check_evidence_consistency import (
     FINAL_CI_RUN,
     FINAL_INVENTORY,
@@ -28,6 +31,20 @@ from scripts.check_evidence_consistency import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _restore_final_paths() -> object:
+    """Snapshot the module-level FINAL_* paths and restore after each test.
+
+    The strict tests reassign ``mod.FINAL_MANIFEST`` / ``mod.FINAL_CI_RUN`` /
+    ``mod.FINAL_INVENTORY`` to tmp_path-relative locations. Without this fixture,
+    those mutations leak into subsequent tests that read the real repository
+    evidence paths (e.g. ``test_evidence_consistency.py``).
+    """
+    saved = (mod.FINAL_MANIFEST, mod.FINAL_CI_RUN, mod.FINAL_INVENTORY)
+    yield None
+    mod.FINAL_MANIFEST, mod.FINAL_CI_RUN, mod.FINAL_INVENTORY = saved
 
 
 # ---------------------------------------------------------------------------
