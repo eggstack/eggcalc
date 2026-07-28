@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "candidate_sha": "71dd343e0f9876d972434101e90bdb5f88fd29e6",
+  "candidate_workflow_run_id": 30307774419,
+  "candidate_workflow_attempt": 1,
+  "workflow_head_sha": "71dd343e0f9876d972434101e90bdb5f88fd29e6",
+  "workflow_conclusion": "failure",
+  "workflow_url": "https://github.com/eggstack/eggcalc/actions/runs/30307774419",
+  "jobs": [
+    {"name": "package", "conclusion": "success", "database_id": 90116049195},
+    {"name": "test (ubuntu-latest, 3.11)", "conclusion": "success", "database_id": 90116049347},
+    {"name": "test (ubuntu-latest, 3.12)", "conclusion": "success", "database_id": 90116049324},
+    {"name": "test (ubuntu-latest, 3.13)", "conclusion": "success", "database_id": 90116049314},
+    {"name": "test (ubuntu-latest, 3.14)", "conclusion": "success", "database_id": 90116049305},
+    {"name": "test (macos-latest, 3.11)", "conclusion": "success", "database_id": 90116049372},
+    {"name": "test (macos-latest, 3.12)", "conclusion": "success", "database_id": 90116049358},
+    {"name": "test (windows-latest, 3.11)", "conclusion": "failure", "database_id": 90116049355},
+    {"name": "test (windows-latest, 3.12)", "conclusion": "failure", "database_id": 90116049341}
+  ],
+  "lane_totals": {
+    "ubuntu-latest 3.11": {"os": "ubuntu-latest", "python_version": "3.11", "conclusion": "success", "collected": 4324, "passed": 4291, "skipped": 33, "xfailed": 0, "xpassed": 0, "failed": 0, "errors": 0, "duration_seconds": 0.0},
+    "ubuntu-latest 3.12": {"os": "ubuntu-latest", "python_version": "3.12", "conclusion": "success", "collected": 4324, "passed": 4291, "skipped": 33, "xfailed": 0, "xpassed": 0, "failed": 0, "errors": 0, "duration_seconds": 566.14},
+    "ubuntu-latest 3.13": {"os": "ubuntu-latest", "python_version": "3.13", "conclusion": "success", "collected": 4324, "passed": 4291, "skipped": 33, "xfailed": 0, "xpassed": 0, "failed": 0, "errors": 0, "duration_seconds": 0.0},
+    "ubuntu-latest 3.14": {"os": "ubuntu-latest", "python_version": "3.14", "conclusion": "success", "collected": 4324, "passed": 4291, "skipped": 33, "xfailed": 0, "xpassed": 0, "failed": 0, "errors": 0, "duration_seconds": 0.0},
+    "macos-latest 3.11": {"os": "macos-latest", "python_version": "3.11", "conclusion": "success", "collected": 4324, "passed": 4291, "skipped": 33, "xfailed": 0, "xpassed": 0, "failed": 0, "errors": 0, "duration_seconds": 0.0},
+    "macos-latest 3.12": {"os": "macos-latest", "python_version": "3.12", "conclusion": "success", "collected": 4324, "passed": 4291, "skipped": 33, "xfailed": 0, "xpassed": 0, "failed": 0, "errors": 0, "duration_seconds": 0.0},
+    "windows-latest 3.11": {"os": "windows-latest", "python_version": "3.11", "conclusion": "failure", "note": "Pre-existing inventory test failures"},
+    "windows-latest 3.12": {"os": "windows-latest", "python_version": "3.12", "conclusion": "failure", "note": "Pre-existing inventory test failures"}
+  },
+  "total_lanes": 8
+}
