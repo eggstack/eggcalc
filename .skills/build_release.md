@@ -43,8 +43,9 @@ black --check eggcalc tests
 # Format (auto-fix)
 black eggcalc tests
 
-# Type check
+# Type check (includes strict consumer check via make typecheck)
 mypy eggcalc --ignore-missing-imports
+mypy --strict tests/typing/consumer.py
 
 # All checks at once
 make check

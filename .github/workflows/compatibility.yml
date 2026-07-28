@@ -38,3 +38,10 @@ jobs:
           python build_single.py --validate
           python build_single.py
           python eggcalc.py "5+3"
+
+      - name: Validate package surfaces
+        if: runner.os == 'Windows'
+        run: |
+          python -m build
+          python -m twine check dist/*
+          python scripts/smoke_release_surfaces.py

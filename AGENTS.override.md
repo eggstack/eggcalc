@@ -33,16 +33,6 @@ The variation selector check (0xfe00-0xfe0f) comes BEFORE the combining mark che
 **build_single.py Convention:**
 - `normalize_main` alias is created by `build_single.py:236` during assembly, does not exist in source `normalize.py`
 
-### Known Bugs - All Fixed (2026-05-29)
-
-All identified bugs have been verified as fixed:
-
-1. **normalize.py:762-763** - Double minus bug - FIXED (bounds check added)
-2. **mcp/tools.py:324** - `unit_info()` calls non-existent `list_units()` - FIXED (uses `get_all_units()`)
-3. **normalize.py:367,369** - Int regex patterns have erroneous `|` - FIXED (patterns corrected)
-4. **mcp/tools.py:839 and 1337** - Duplicate `_VALID_TRANSFORM_OPERATIONS` - FIXED (duplicate removed)
-5. **units.py:48-53** - `__eq__` returns NotImplemented for different units - FIXED (returns False)
-
 ### Verified as Working (No Action Needed)
 
 The following items were claimed as bugs but are actually working correctly:
@@ -87,29 +77,4 @@ The following items were claimed as bugs but are actually working correctly:
 
 ### Plan Reference
 
-All implementation items have been verified as completed. The plan files have been archived.
-
-### Architecture Review Findings (2026-05-29)
-
-All 15 architecture modules reviewed. Key findings:
-
-**CLI Output Format Issue:**
-- Documentation describes `expression -> result` output format
-- Code only outputs `result`
-- No code changes made - documentation discrepancy only
-
-**validate.py `list_sort` Parameter:**
-- `stable` parameter has no effect - Python's `sorted()` is always stable
-- No code changes made - parameter is harmless but meaningless
-
-**API `normalize_expression` Return Type:**
-- Documentation shows string return, actual is `tuple[str, int]`
-- Examples in docs should show tuple unpacking
-
-### All Tests Pass
-
-```
-2619 tests pass
-```
-
-(End of file)
+Verification and release policy is defined in AGENTS.md and docs/releasing.md.

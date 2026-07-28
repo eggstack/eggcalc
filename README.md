@@ -153,6 +153,7 @@ CUSTOM_ALIASES = {"meter": "m", "meters": "m"}
 ruff check eggcalc tests                  # Lint
 black eggcalc tests                       # Format
 mypy eggcalc --ignore-missing-imports     # Type check
+mypy --strict tests/typing/consumer.py    # Strict consumer API check
 make check                                # All checks (lint, format, typecheck, docs, test)
 python build_single.py                    # Build single-file distribution
 ```

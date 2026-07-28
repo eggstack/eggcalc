@@ -74,7 +74,7 @@ black eggcalc tests
 
 # Type check
 mypy eggcalc --ignore-missing-imports
-mypy tests/typing/consumer.py --strict --ignore-missing-imports  # external consumer API surface
+mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py  # external consumer API surface
 
 # All checks at once (includes generated-doc drift check)
 make check

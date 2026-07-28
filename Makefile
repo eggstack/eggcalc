@@ -46,6 +46,7 @@ format-check:
 
 typecheck:
 	mypy eggcalc --ignore-missing-imports
+	mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
 
 generate-docs:
 	python3 scripts/generate_mcp_docs.py
