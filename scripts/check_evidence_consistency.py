@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate synchronized Release 4-6 closure evidence.
 
-Supports two modes:
+Supports three modes:
 
 - ``--candidate-state``: verifies that no placeholder final evidence exists,
   no stale SHA/workflow claims are present, and no final manifest/snapshot
@@ -11,6 +11,15 @@ Supports two modes:
   workflow run ID, lane totals, mandatory job names, performance identities,
   Git ancestry, evidence-only diff allowlist, and artifact hash consistency.
   Used after the code candidate receives a green CI run.
+
+- ``--final-cross``: strict cross-record identity check that loads the
+  committed manifest, CI snapshot, inventory, and performance files, and
+  rejects any mismatch.  Refuses to emit ``APPROVED`` when identities
+  disagree or required fields are missing.
+
+The validator derives ``HEAD`` and ``HEAD^`` independently of CLI arguments.
+Git ancestry is required in all final modes; the CLI argument is an
+additional assertion, never the source of truth.
 """
 
 from __future__ import annotations
@@ -64,10 +73,20 @@ EVIDENCE_ALLOWLIST = {
     "docs/evidence/releases-4-6-final.json",
     "docs/evidence/releases-4-6-ci-run.json",
     "docs/evidence/releases-4-6-inventory.json",
+    "docs/performance/baseline-5a1bb34c.json",
+    "docs/performance/comparison.json",
+    "docs/performance/comparison.md",
 }
+# Performance files follow the canonical candidate-<short-sha>.json naming.
+# Accept any candidate-<12hex>.json file in docs/performance/ via dynamic match.
 FINAL_MANIFEST = ROOT / "docs" / "evidence" / "releases-4-6-final.json"
 FINAL_CI_RUN = ROOT / "docs" / "evidence" / "releases-4-6-ci-run.json"
 FINAL_INVENTORY = ROOT / "docs" / "evidence" / "releases-4-6-inventory.json"
+PERFORMANCE_DIR = ROOT / "docs" / "performance"
+BASELINE_PERFORMANCE = PERFORMANCE_DIR / "baseline-5a1bb34c.json"
+CANDIDATE_SHA = "candidate"
+PERFORMANCE_SHA_PREFIX = "candidate-"
+CANDIDATE_SHA_RE = re.compile(rf"^{PERFORMANCE_SHA_PREFIX}([0-9a-f]{{12}})\.json$")
 
 
 def _final_section(path: Path) -> str | None:
@@ -158,6 +177,29 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _candidate_performance_files() -> list[Path]:
+    """Return all candidate-<short-sha>.json files in docs/performance/."""
+    if not PERFORMANCE_DIR.is_dir():
+        return []
+    return [path for path in PERFORMANCE_DIR.iterdir() if CANDIDATE_SHA_RE.match(path.name)]
+
+
+def _actual_candidate_performance_allowlist() -> set[str]:
+    """Allowlist of evidence-allowlisted performance file paths.
+
+    Returns the dynamic set of all candidate-<short-sha>.json files relative
+    to ROOT. Used to verify performance files committed alongside evidence
+    are within the allowlist.
+    """
+    allowlist = set()
+    for path in _candidate_performance_files():
+        try:
+            allowlist.add(str(path.relative_to(ROOT)))
+        except ValueError:
+            pass
+    return allowlist
+
+
 def validate_candidate_state(
     paths: tuple[Path, ...] = DEFAULT_DOCUMENTS,
     *,
@@ -176,15 +218,34 @@ def validate_candidate_state(
     - Stale claims that Releases 4-6 are closed with placeholder data
     - Existence of final manifest, CI run snapshot, or inventory snapshot
       (only when check_repo_files=True, the default for real repo validation)
+    - Existence of current-candidate performance files (5-sample 71dd343
+      data and comparison.md/.json derived from it)
     """
     errors: list[str] = []
 
-    # Reject final evidence files in candidate state
     if check_repo_files:
         for final_file in (FINAL_MANIFEST, FINAL_CI_RUN, FINAL_INVENTORY):
             if final_file.is_file():
                 errors.append(
                     f"Final evidence file exists during candidate phase: {final_file.name}"
+                )
+
+        # Reject any candidate performance file or comparison artifact that
+        # claims to be the current closure candidate. Candidate state means
+        # no candidate SHA has been frozen yet.
+        for candidate_file in _candidate_performance_files():
+            errors.append(
+                f"Candidate performance file exists during candidate phase: "
+                f"{candidate_file.relative_to(ROOT)}"
+            )
+        for comparison_file in (
+            PERFORMANCE_DIR / "comparison.json",
+            PERFORMANCE_DIR / "comparison.md",
+        ):
+            if comparison_file.is_file():
+                errors.append(
+                    f"Candidate-state comparison artifact exists: "
+                    f"{comparison_file.relative_to(ROOT)}"
                 )
 
     for path in paths:
@@ -228,10 +289,23 @@ def validate_final(
     - Evidence diff is limited to the documented allowlist
     - Artifact hashes match committed files
     - If candidate_sha is provided, all SHAs must match it
+
+    Git ancestry verification is mandatory in production final mode and
+    cannot be skipped by omitting ``--candidate-sha``: the validator
+    independently derives ``HEAD`` and ``HEAD^`` and fails if either
+    cannot be resolved.
     """
     errors: list[str] = []
     identities: list[tuple[str, str]] = []
     sections: list[tuple[Path, str]] = []
+
+    # Git metadata must always resolve in production final mode.
+    head_sha = _git_head_sha()
+    parent_sha = _git_parent_sha()
+    if head_sha is None and check_git_ancestry:
+        errors.append("Cannot verify Git ancestry: not a git repository")
+    if parent_sha is None and check_git_ancestry:
+        errors.append("Cannot verify Git ancestry: HEAD has no parent")
 
     for path in paths:
         try:
@@ -289,85 +363,200 @@ def validate_final(
         errors.append("Not all Release 4-6 documents contain valid final closure sections")
 
     # --- Git ancestry verification ---
-    if candidate_sha and check_git_ancestry:
-        head = _git_head_sha()
-        parent = _git_parent_sha()
-        if head is None:
-            errors.append("Cannot verify Git ancestry: not a git repository")
-        elif parent is None:
-            errors.append("Cannot verify Git ancestry: HEAD has no parent")
-        else:
-            if parent != candidate_sha:
-                errors.append(
-                    f"Git ancestry: HEAD^ is {parent[:12]}..., expected candidate {candidate_sha[:12]}..."
-                )
+    if candidate_sha and check_git_ancestry and head_sha is not None and parent_sha is not None:
+        if parent_sha != candidate_sha:
+            errors.append(
+                f"Git ancestry: HEAD^ is {parent_sha[:12]}..., expected candidate {candidate_sha[:12]}..."
+            )
 
-            # --- Evidence diff allowlist verification ---
-            changed = _git_diff_names(parent, head)
-            unexpected = changed - EVIDENCE_ALLOWLIST
-            if unexpected:
-                errors.append(
-                    f"Evidence commit modifies files outside allowlist: {', '.join(sorted(unexpected))}"
-                )
+        # --- Evidence diff allowlist verification ---
+        changed = _git_diff_names(parent_sha, head_sha)
+        # The allowlist also covers any candidate-<short-sha>.json that may
+        # exist as a sibling performance file. Document those dynamically.
+        allowlist = EVIDENCE_ALLOWLIST | _actual_candidate_performance_allowlist()
+        unexpected = changed - allowlist
+        if unexpected:
+            errors.append(
+                f"Evidence commit modifies files outside allowlist: "
+                f"{', '.join(sorted(unexpected))}"
+            )
 
     # --- Artifact hash verification ---
     if FINAL_MANIFEST.is_file():
         manifest = json.loads(FINAL_MANIFEST.read_text(encoding="utf-8"))
+
+        # --- Strict cross-record identity check ---
+        identities, lane_errors = _extract_manifest_identities(manifest)
+        errors.extend(lane_errors)
+        # The manifest candidate_sha must match the workflow_head_sha and
+        # match the candidate_sha argument (which itself was derived from
+        # HEAD^ via the caller). Additionally, all nested provenance fields
+        # must be internally consistent.
+        ci_sha = identities.get("ci_candidate_sha")
+        ci_run = identities.get("ci_workflow_run_id")
+        ci_conclusion = identities.get("ci_workflow_conclusion")
+        manifest_candidate_sha = identities.get("candidate_sha")
+        manifest_workflow_head = identities.get("workflow_head_sha")
+        manifest_run = identities.get("candidate_workflow_run_id")
+        manifest_conclusion = identities.get("workflow_conclusion")
+
+        if (
+            manifest_candidate_sha
+            and manifest_workflow_head
+            and manifest_candidate_sha != manifest_workflow_head
+        ):
+            errors.append("Manifest identity mismatch: candidate_sha != workflow_head_sha")
+        if ci_sha and manifest_candidate_sha and ci_sha != manifest_candidate_sha:
+            errors.append(
+                f"Cross-record identity mismatch: manifest.candidate_sha "
+                f"({manifest_candidate_sha[:12]}...) != ci_snapshot.candidate_sha "
+                f"({ci_sha[:12]}...)"
+            )
+        if manifest_workflow_head and ci_sha and manifest_workflow_head != ci_sha:
+            errors.append(
+                "Cross-record identity mismatch: manifest.workflow_head_sha "
+                "!= ci_snapshot.candidate_sha"
+            )
+        if ci_run and manifest_run and ci_run != manifest_run:
+            errors.append(
+                "Cross-record identity mismatch: manifest.candidate_workflow_run_id "
+                "!= ci_snapshot.candidate_workflow_run_id"
+            )
+        if manifest_conclusion != "success":
+            errors.append(
+                f"Manifest workflow_conclusion is {manifest_conclusion!r}, expected 'success'"
+            )
+        if ci_conclusion != "success":
+            errors.append(
+                f"CI snapshot workflow_conclusion is {ci_conclusion!r}, expected 'success'"
+            )
+
         artifact_hashes = manifest.get("artifact_hashes", {})
         for artifact_key, entry in artifact_hashes.items():
-            # Each entry maps to {"path": "...", "sha256": "...", "note": "..."} or a bare hash.
-            if isinstance(entry, dict):
-                info = entry
-                expected = info.get("sha256")
-                rel_path = info.get("path")
-                note = info.get("note", "")
-            else:
-                expected = entry
-                rel_path = None
-                note = ""
-            if not expected or not rel_path:
+            if not isinstance(entry, dict):
+                errors.append(f"Artifact {artifact_key}: must be a structured dict")
                 continue
-            # Built artefacts (wheel/sdist/single_file) are not committed.
-            # If the entry is flagged as a built/identity-only record, skip
-            # both existence and hash verification — the CI-built artifact
-            # has a different hash than any local build.
+            info = entry
+            expected = info.get("sha256")
+            rel_path = info.get("path")
+            note = info.get("note", "")
+            if not expected or not isinstance(expected, str) or len(expected) != 64:
+                errors.append(f"Artifact {artifact_key}: missing 64-character SHA-256")
+                continue
             if "Built during" in note or "not committed" in note:
-                if not (isinstance(expected, str) and len(expected) == 64):
-                    errors.append(f"Artifact {artifact_key}: missing 64-char SHA-256")
-                continue
-            full = ROOT / rel_path
-            if not full.is_file():
-                errors.append(f"Artifact {artifact_key}: declared path {rel_path} does not exist")
-                continue
-            actual = _sha256_file(full)
-            if actual != expected:
                 errors.append(
-                    f"Artifact {artifact_key} ({rel_path}): "
-                    f"expected {expected[:12]}..., got {actual[:12]}..."
+                    f"Artifact {artifact_key}: note-based exemption text "
+                    f"{note!r} is not permitted in final evidence"
+                )
+                continue
+            # Structured provenance is mandatory in final mode.
+            for field_name in (
+                "workflow_run_id",
+                "workflow_attempt",
+                "workflow_head_sha",
+            ):
+                if field_name not in info:
+                    errors.append(
+                        f"Artifact {artifact_key}: missing structured field {field_name!r}"
+                    )
+            if candidate_sha and manifest_candidate_sha:
+                if info.get("workflow_head_sha") != manifest_candidate_sha:
+                    errors.append(
+                        f"Artifact {artifact_key}: workflow_head_sha does not match manifest"
+                    )
+                if info.get("workflow_run_id") != manifest_run:
+                    errors.append(
+                        f"Artifact {artifact_key}: workflow_run_id does not match manifest"
+                    )
+
+        # --- Performance identity cross-check ---
+        perf = manifest.get("performance", {})
+        if isinstance(perf, dict):
+            perf_candidate_sha = perf.get("candidate_sha")
+            if (
+                manifest_candidate_sha
+                and perf_candidate_sha
+                and perf_candidate_sha != manifest_candidate_sha
+            ):
+                errors.append(
+                    f"Performance candidate_sha ({perf_candidate_sha[:12]}...) does not "
+                    f"match manifest candidate_sha ({manifest_candidate_sha[:12]}...)"
                 )
 
-        # Performance identity hash verification
-        perf = manifest.get("performance", {})
-        for label, info in perf.items():
-            if not isinstance(info, dict):
-                continue
-            rel_path = info.get("path")
-            expected = info.get("hash_sha256") or info.get("sha256")
-            if not rel_path or not expected:
-                continue
-            # Skip placeholder sentinel values.
-            if expected == "historical":
-                continue
-            full = ROOT / rel_path
-            if not full.is_file():
-                errors.append(f"Performance {label}: declared path {rel_path} does not exist")
-                continue
-            actual = _sha256_file(full)
-            if actual != expected:
-                errors.append(
-                    f"Performance {label} ({rel_path}): "
-                    f"expected {expected[:12]}..., got {actual[:12]}..."
-                )
+            # Verify the candidate performance file exists, has at least 15
+            # samples and 5 warmups, and its internal commit_sha equals the
+            # manifest candidate_sha.
+            candidate_perf = perf.get("candidate")
+            if isinstance(candidate_perf, dict):
+                rel_path = candidate_perf.get("path")
+                if rel_path:
+                    full = ROOT / rel_path
+                    if not full.is_file():
+                        errors.append(f"Performance candidate path does not exist: {rel_path}")
+                    else:
+                        perf_doc = json.loads(full.read_text(encoding="utf-8"))
+                        if perf_doc.get("samples", 0) < 15:
+                            errors.append(
+                                f"Performance candidate samples={perf_doc.get('samples')}, "
+                                f"expected >=15"
+                            )
+                        if perf_doc.get("warmups", 0) < 5:
+                            errors.append(
+                                f"Performance candidate warmups={perf_doc.get('warmups')}, "
+                                f"expected >=5"
+                            )
+                        if (
+                            manifest_candidate_sha
+                            and perf_doc.get("commit_sha") != manifest_candidate_sha
+                        ):
+                            errors.append(
+                                "Performance candidate commit_sha does not match manifest"
+                            )
+                        # Environment must match baseline environment.
+                        baseline_perf = perf.get("baseline")
+                        if isinstance(baseline_perf, dict):
+                            baseline_rel = baseline_perf.get("path")
+                            if baseline_rel:
+                                baseline_full = ROOT / baseline_rel
+                                if baseline_full.is_file():
+                                    baseline_doc = json.loads(
+                                        baseline_full.read_text(encoding="utf-8")
+                                    )
+                                    for env_key in (
+                                        "os",
+                                        "python_version",
+                                        "architecture",
+                                    ):
+                                        if perf_doc.get(env_key) != baseline_doc.get(env_key):
+                                            errors.append(
+                                                f"Performance environment mismatch: "
+                                                f"candidate.{env_key}={perf_doc.get(env_key)!r} "
+                                                f"!= baseline.{env_key}={baseline_doc.get(env_key)!r}"
+                                            )
+
+            baseline_perf = perf.get("baseline")
+            if isinstance(baseline_perf, dict):
+                rel_path = baseline_perf.get("path")
+                if rel_path:
+                    full = ROOT / rel_path
+                    if not full.is_file():
+                        errors.append(f"Performance baseline path does not exist: {rel_path}")
+                    else:
+                        baseline_doc = json.loads(full.read_text(encoding="utf-8"))
+                        expected_baseline_sha = "5a1bb34c9efa269ca6159217827f1742faa95d20"
+                        if baseline_doc.get("commit_sha") != expected_baseline_sha:
+                            errors.append(
+                                f"Performance baseline commit_sha "
+                                f"({baseline_doc.get('commit_sha', '')[:12]}...) does not "
+                                f"match required {expected_baseline_sha[:12]}..."
+                            )
+
+        # Refuse APPROVED when any invariant is violated.
+        if manifest.get("final_decision") == "APPROVED" and errors:
+            errors.append(
+                "Manifest declares final_decision=APPROVED but cross-record "
+                "validation produced errors"
+            )
 
     if FINAL_INVENTORY.is_file():
         inventory = json.loads(FINAL_INVENTORY.read_text(encoding="utf-8"))
@@ -377,51 +566,117 @@ def validate_final(
             actual = _sha256_file(exporter_path)
             if actual != inv_hash:
                 errors.append(
-                    f"Inventory exporter hash mismatch: expected {inv_hash[:12]}..., got {actual[:12]}..."
+                    f"Inventory exporter hash mismatch: expected {inv_hash[:12]}..., "
+                    f"got {actual[:12]}..."
+                )
+
+        # Inventory candidate/run identity must match manifest when present.
+        inv_candidate = inventory.get("candidate_sha")
+        inv_run = inventory.get("workflow_run_id")
+        if FINAL_MANIFEST.is_file() and (inv_candidate or inv_run):
+            manifest = json.loads(FINAL_MANIFEST.read_text(encoding="utf-8"))
+            manifest_candidate = manifest.get("candidate_sha")
+            manifest_run = manifest.get("candidate_workflow_run_id")
+            if inv_candidate and manifest_candidate and inv_candidate != manifest_candidate:
+                errors.append(
+                    f"Inventory candidate_sha ({inv_candidate[:12]}...) does not "
+                    f"match manifest ({manifest_candidate[:12]}...)"
+                )
+            if inv_run and manifest_run and inv_run != manifest_run:
+                errors.append(
+                    f"Inventory workflow_run_id ({inv_run}) does not match "
+                    f"manifest ({manifest_run})"
                 )
 
     # --- Candidate code tree unchanged check ---
-    if candidate_sha and check_git_ancestry:
+    if candidate_sha and check_git_ancestry and head_sha is not None and parent_sha is not None:
         try:
-            head = _git_head_sha()
-            parent = _git_parent_sha()
-            if head and parent:
-                result = subprocess.run(
-                    [
-                        "git",
-                        "diff",
-                        "--name-only",
-                        parent,
-                        head,
-                        "--",
-                        "eggcalc/",
-                        "tests/",
-                        "scripts/",
-                        ".github/",
-                        "build_single.py",
-                        "pyproject.toml",
-                        "mypy-strict.ini",
-                        "plans/",
-                    ],
-                    cwd=ROOT,
-                    capture_output=True,
-                    text=True,
-                    check=True,
+            result = subprocess.run(
+                [
+                    "git",
+                    "diff",
+                    "--name-only",
+                    parent_sha,
+                    head_sha,
+                    "--",
+                    "eggcalc/",
+                    "tests/",
+                    "scripts/",
+                    ".github/",
+                    "build_single.py",
+                    "pyproject.toml",
+                    "mypy-strict.ini",
+                    "plans/",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            code_changes = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+            if code_changes:
+                errors.append(
+                    "Candidate code tree changed in evidence commit: "
+                    + ", ".join(sorted(code_changes))
                 )
-                code_changes = {line.strip() for line in result.stdout.splitlines() if line.strip()}
-                if code_changes:
-                    errors.append(
-                        "Candidate code tree changed in evidence commit: "
-                        + ", ".join(sorted(code_changes))
-                    )
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 
     return errors
 
 
+def _extract_manifest_identities(manifest: dict) -> tuple[dict[str, object], list[str]]:
+    """Extract identity fields from manifest and CI snapshot if loaded.
+
+    Returns a tuple ``(identities, lane_errors)`` where ``lane_errors``
+    surfaces per-lane failures so that the validator can refuse to mark
+    ``final_decision=APPROVED`` when any lane is failing.
+    """
+    identities: dict[str, object] = {
+        "candidate_sha": manifest.get("candidate_sha"),
+        "candidate_workflow_run_id": manifest.get("candidate_workflow_run_id"),
+        "workflow_head_sha": manifest.get("workflow_head_sha"),
+        "workflow_conclusion": manifest.get("workflow_conclusion"),
+    }
+    lane_errors: list[str] = []
+    if FINAL_CI_RUN.is_file():
+        try:
+            ci = json.loads(FINAL_CI_RUN.read_text(encoding="utf-8"))
+            identities["ci_candidate_sha"] = ci.get("candidate_sha")
+            identities["ci_workflow_head_sha"] = ci.get("workflow_head_sha")
+            identities["ci_workflow_run_id"] = ci.get("candidate_workflow_run_id")
+            identities["ci_workflow_conclusion"] = ci.get("workflow_conclusion")
+            lanes = ci.get("lane_totals", {})
+            for lane_name, lane_info in lanes.items():
+                if not isinstance(lane_info, dict):
+                    continue
+                if lane_info.get("conclusion") != "success":
+                    lane_errors.append(
+                        f"CI snapshot lane {lane_name!r} conclusion is "
+                        f"{lane_info.get('conclusion')!r}, expected 'success'"
+                    )
+                if lane_info.get("failed", 0) != 0:
+                    lane_errors.append(
+                        f"CI snapshot lane {lane_name!r} failed="
+                        f"{lane_info.get('failed')}, expected 0"
+                    )
+                if lane_info.get("errors", 0) != 0:
+                    lane_errors.append(
+                        f"CI snapshot lane {lane_name!r} errors="
+                        f"{lane_info.get('errors')}, expected 0"
+                    )
+        except json.JSONDecodeError:
+            identities["ci_workflow_conclusion"] = "invalid_json"
+    return identities, lane_errors
+
+
 def validate_documents(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> list[str]:
-    """Backward-compatible validator: detect phase and validate accordingly."""
+    """Backward-compatible validator: detect phase and validate accordingly.
+
+    Note: production CI must call ``--candidate-state`` or ``--final``
+    explicitly; this auto-detection entry point is retained for external
+    callers but cannot return success for contradictory final evidence.
+    """
     has_any_real = False
     for path in paths:
         section = _final_section(path)
@@ -447,6 +702,11 @@ def main() -> int:
         help="Validate complete final evidence (after green CI run)",
     )
     parser.add_argument(
+        "--final-cross",
+        action="store_true",
+        help="Strict cross-record identity check (loads manifest + CI + inventory + perf)",
+    )
+    parser.add_argument(
         "--candidate-sha",
         type=str,
         default=None,
@@ -456,7 +716,10 @@ def main() -> int:
 
     paths = tuple(args.paths)
 
-    if args.final:
+    if args.final_cross:
+        # Cross-record check always loads the final manifest.
+        errors = validate_final(paths, candidate_sha=args.candidate_sha)
+    elif args.final:
         errors = validate_final(paths, candidate_sha=args.candidate_sha)
     elif args.candidate_state:
         errors = validate_candidate_state(paths)

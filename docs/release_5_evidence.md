@@ -216,28 +216,4 @@ All residual state is documented in `architecture/mutable_state_inventory.md` wi
 
 ## Final Closure Evidence
 
-- closure_code_sha: `c903a6aeffea9070a987125642b2c92e0f6f3af6`
-- closure_workflow_run_id: `30307774419`
-- closure_workflow_attempt: 1
-- evidence_parent_sha: `c903a6aeffea9070a987125642b2c92e0f6f3af6`
-- lane ubuntu-latest 3.11: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-- lane ubuntu-latest 3.12: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-- lane ubuntu-latest 3.13: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-- lane ubuntu-latest 3.14: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-- lane macos-latest 3.11: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-- lane macos-latest 3.12: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-- lane windows-latest 3.11: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-- lane windows-latest 3.12: collected=4324 passed=4291 skipped=33 xfailed=0 xpassed=0 failed=0
-
-ordinary Ruff; Black; ordinary mypy; strict mypy; strict Ruff;
-authority-boundary; deterministic build; authority inventory;
-source typed consumer; installed-wheel typed consumer; MCP closure;
-unit closure; release-surface.
-
-Performance baseline and final identity are recorded in `docs/evidence/releases-4-6-final.json`.
-Wheel hash: `156f0e76d21f5c52e5b153b1f1837fa93bb276385169e76578f9d69f2337e22e`
-Single-file hash: `48eec54e7a5bcfad402622f643b82d6617296836d6756db9d93dca2e7af969a9`
-Historical fixture exporter hash: `9640e406f4b84f5ac8c42ba2255bdaf5c68deded4d98043d476ec796e086477f`
-Release 5 includes optional text commands; all release surface tests pass.
-This evidence commit is documentation/evidence-only.
-Release decision: APPROVED.
+Final closure evidence is intentionally absent pending the corrective closure pass defined in `plans/019-releases-4-6-final-evidence-integrity-corrective-closure.md`. The prior commit `e7665cc1` mixed incompatible candidate, run, and workflow head identities and is no longer treated as authoritative closure. A new frozen code candidate, successful workflow, and directly-parented evidence-only commit are required before Releases 4–6 may be marked closed.

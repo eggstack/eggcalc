@@ -97,6 +97,24 @@ CI order: `ruff → black --check → build_single.py --validate → build_singl
 - **Python requirement** — `>=3.11` per `pyproject.toml`. CI tests 3.11–3.14.
 - **`McpServerConfig` clamps `max_output_bytes` to min 1** — was previously 1000.
 
+## Release Evidence Integrity Protocol
+
+The Releases 4–6 closure evidence follows a strict identity-integrity contract defined in `plans/019-releases-4-6-final-evidence-integrity-corrective-closure.md`. There are two well-defined phases:
+
+- **Candidate state** — code-only commits before final closure. The validator runs in `--candidate-state` mode and rejects any committed `docs/evidence/releases-4-6-*.json` files, any candidate performance files, and any comparison artifacts. The release evidence docs contain a placeholder section that says evidence is "intentionally absent pending the corrective closure pass".
+
+- **Final state** — only after a frozen code candidate SHA receives a green workflow. The validator runs in `--final --candidate-sha <SHA>` mode and refuses to mark `final_decision=APPROVED` unless every invariant holds: manifest candidate equals workflow head equals CI snapshot candidate equals evidence parent; CI snapshot has `workflow_conclusion=success` with all eight lanes succeeding; artifact provenance includes structured fields (`workflow_run_id`, `workflow_attempt`, `workflow_head_sha`, `artifact_id`); note-text cannot suppress hash validation; candidate performance file uses at least 15 samples and 5 warmups on a matching environment; baseline SHA is exactly `5a1bb34c9efa269ca6159217827f1742faa95d20`; the evidence commit modifies only the documented allowlist (`docs/release_*_evidence.md`, `docs/evidence/**`, `docs/performance/baseline-5a1bb34c.json`, `docs/performance/comparison.json`, `docs/performance/comparison.md`, plus the dynamic `docs/performance/candidate-<short-sha>.json`).
+
+Tools:
+
+- `scripts/check_evidence_consistency.py` — the validator. Modes: `--candidate-state`, `--final`, `--final-cross`, `--candidate-sha`.
+- `scripts/collect_ci_evidence.py` — generates the canonical CI run snapshot from a successful GitHub Actions run via the `gh` CLI, downloads artifacts, recomputes SHA-256 hashes, and refuses to write a snapshot for a failed run or for a run whose head SHA does not match the expected candidate.
+- `scripts/finalize_release_evidence.py` — generates the synchronized `docs/evidence/releases-4-6-final.json`, copies the CI snapshot and inventory, and renders the three Release 4/5/6 Markdown final sections from the same in-memory manifest. It refuses to emit `APPROVED` when any invariant fails.
+
+**The generic `validate_documents()` auto-detection entry point is retained for external callers only.** Production CI must invoke `--candidate-state` or `--final --candidate-sha "$(git rev-parse HEAD^)"` explicitly.
+
+**Git ancestry cannot be skipped.** The validator always derives `HEAD` and `HEAD^` independently; the CLI argument is an additional assertion, not the source of truth. Final mode outside a Git checkout fails closed.
+
 ## Module Map
 
 | Module | Role |

@@ -77,7 +77,13 @@ jobs:
           python scripts/check_authority_boundaries.py
           python scripts/release_inventory.py --check
           python scripts/verify_unit_baseline_fixture.py tests/fixtures/units/legacy-5a1bb34c.json
-          python scripts/check_evidence_consistency.py
+          if [ -f docs/evidence/releases-4-6-final.json ]; then
+            python scripts/check_evidence_consistency.py \
+              --final \
+              --candidate-sha "$(git rev-parse HEAD^)"
+          else
+            python scripts/check_evidence_consistency.py --candidate-state
+          fi
           python build_single.py -o /tmp/eggcalc-build-a.py
           python build_single.py -o /tmp/eggcalc-build-b.py
           cmp /tmp/eggcalc-build-a.py /tmp/eggcalc-build-b.py

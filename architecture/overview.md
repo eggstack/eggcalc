@@ -339,6 +339,35 @@ make build         # Build distribution
 make release-check # All checks + build + smoke tests
 ```
 
+### Release Evidence Integrity
+
+Releases 4–6 follow a strict identity-integrity contract. The evidence set
+(`docs/evidence/releases-4-6-*.json`, `docs/performance/baseline-5a1bb34c.json`,
+`docs/performance/candidate-<short-sha>.json`, `docs/performance/comparison.{json,md}`,
+and the three `docs/release_*_evidence.md` Markdown final sections) is generated
+from a single in-memory manifest by `scripts/finalize_release_evidence.py` after
+the new code candidate receives a green workflow. The validator
+`scripts/check_evidence_consistency.py` enforces the contract in two modes:
+
+- `--candidate-state` — code-only commits before final closure. Rejects any
+  committed final manifest, CI snapshot, inventory, candidate performance
+  file, or comparison artifact.
+- `--final --candidate-sha <SHA>` — after a successful workflow. Refuses to
+  mark `final_decision=APPROVED` unless every invariant holds: manifest
+  candidate equals workflow head equals CI snapshot candidate equals
+  evidence parent; CI snapshot has `workflow_conclusion=success` with all
+  eight lanes succeeding; artifact provenance includes structured fields;
+  candidate performance file uses at least 15 samples and 5 warmups on a
+  matching environment; baseline SHA is exactly
+  `5a1bb34c9efa269ca6159217827f1742faa95d20`; the evidence commit
+  modifies only the documented allowlist.
+
+Production CI must invoke these modes explicitly. The generic
+`validate_documents()` auto-detection entry point is retained for external
+callers but cannot return success for contradictory final evidence. See
+`plans/019-releases-4-6-final-evidence-integrity-corrective-closure.md`
+for the full contract.
+
 ---
 
 ## Deep Dive Index
