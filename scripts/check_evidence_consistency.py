@@ -152,9 +152,9 @@ def _git_diff_names(parent_sha: str, head_sha: str) -> set[str]:
 
 
 def _sha256_file(path: Path) -> str:
-    """Compute SHA-256 of a file."""
+    """Compute SHA-256 of a file, normalizing line endings."""
     h = hashlib.sha256()
-    h.update(path.read_bytes())
+    h.update(path.read_bytes().replace(b"\r\n", b"\n"))
     return h.hexdigest()
 
 
@@ -421,10 +421,7 @@ def validate_final(
 
 
 def validate_documents(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> list[str]:
-    """Backward-compatible validator: try final mode, fall back to candidate state."""
-    candidate_errors = validate_candidate_state(paths)
-    if candidate_errors:
-        return candidate_errors
+    """Backward-compatible validator: detect phase and validate accordingly."""
     has_any_real = False
     for path in paths:
         section = _final_section(path)
@@ -433,7 +430,7 @@ def validate_documents(paths: tuple[Path, ...] = DEFAULT_DOCUMENTS) -> list[str]
             break
     if has_any_real:
         return validate_final(paths)
-    return []
+    return validate_candidate_state(paths)
 
 
 def main() -> int:

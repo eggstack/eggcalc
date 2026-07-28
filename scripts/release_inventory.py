@@ -176,8 +176,8 @@ def _collect_with_artifacts(
             "At least one of --wheel or --single-file must be provided for explicit artifact mode."
         )
 
-    with tempfile.TemporaryDirectory(prefix="eggcalc-inv-") as temp:
-        temp_path = Path(temp)
+    with tempfile.TemporaryDirectory(prefix="ec-inv-") as temp:
+        temp_path = Path(temp).resolve()
         probe_script = temp_path / "probe.py"
         probe_script.write_text(INVENTORY_CODE, encoding="utf-8")
 
@@ -189,7 +189,11 @@ def _collect_with_artifacts(
         if wheel is not None:
             venv_dir = temp_path / "wheel-venv"
             venv.create(venv_dir, with_pip=True, clear=True)
-            python = venv_dir / ("Scripts" if os.name == "nt" else "bin") / "python"
+            python = (
+                venv_dir
+                / ("Scripts" if os.name == "nt" else "bin")
+                / ("python.exe" if os.name == "nt" else "python")
+            )
             subprocess.run(
                 [str(python), "-m", "pip", "install", str(wheel.resolve()), "--no-deps"],
                 check=True,
@@ -243,7 +247,7 @@ def _collect_with_artifacts(
 
 def collect() -> dict[str, object]:
     """Build a fresh single-file and compare with package (CI --check mode)."""
-    with tempfile.TemporaryDirectory(prefix="eggcalc-inventory-") as temp:
+    with tempfile.TemporaryDirectory(prefix="ec-inventory-") as temp:
         generated = Path(temp) / "eggcalc.py"
         subprocess.run(
             [sys.executable, str(ROOT / "build_single.py"), "-o", str(generated)],

@@ -25,12 +25,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("wheel", type=Path)
     args = parser.parse_args()
-    with tempfile.TemporaryDirectory(prefix="eggcalc-wheel-consumer-") as temp:
-        temp_path = Path(temp)
+    with tempfile.TemporaryDirectory(prefix="ec-wheel-") as temp:
+        temp_path = Path(temp).resolve()
         venv = temp_path / "venv"
         consumer = temp_path / "consumer.py"
         subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
-        python = venv / ("Scripts" if os.name == "nt" else "bin") / "python"
+        python = (
+            venv
+            / ("Scripts" if os.name == "nt" else "bin")
+            / ("python.exe" if os.name == "nt" else "python")
+        )
         subprocess.run([str(python), "-m", "pip", "install", str(args.wheel)], check=True)
         subprocess.run([str(python), "-m", "pip", "install", "mypy>=1.0"], check=True)
         shutil.copy2(CONSUMER, consumer)

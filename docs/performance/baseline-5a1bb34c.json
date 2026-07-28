@@ -1,0 +1,133 @@
+{
+  "architecture": "aarch64",
+  "commit_sha": "5a1bb34c9efa269ca6159217827f1742faa95d20",
+  "cpu": "aarch64",
+  "dirty": false,
+  "label": "baseline",
+  "measurements": {
+    "cli_help": {
+      "max_ms": 833.4286,
+      "mean_ms": 825.032,
+      "median_ms": 827.6862,
+      "min_ms": 812.4843,
+      "raw_samples_ms": [
+        823.4919,
+        828.0692,
+        812.4843,
+        827.6862,
+        833.4286
+      ],
+      "samples": 5,
+      "stdev_ms": 7.8516
+    },
+    "import_eggcalc": {
+      "loaded_modules": 7,
+      "max_ms": 4495.5704,
+      "mean_ms": 4467.7697,
+      "median_ms": 4471.9896,
+      "min_ms": 4427.0832,
+      "peak_bytes": 31673228,
+      "raw_samples_ms": [
+        4427.0832,
+        4493.7636,
+        4450.4417,
+        4471.9896,
+        4495.5704
+      ],
+      "samples": 5,
+      "stdev_ms": 29.249
+    },
+    "import_evaluate": {
+      "loaded_modules": 7,
+      "max_ms": 4541.8983,
+      "mean_ms": 4442.4326,
+      "median_ms": 4414.2477,
+      "min_ms": 4391.8307,
+      "peak_bytes": 31673008,
+      "raw_samples_ms": [
+        4414.2477,
+        4391.8307,
+        4541.8983,
+        4405.3716,
+        4458.8149
+      ],
+      "samples": 5,
+      "stdev_ms": 61.0128
+    },
+    "normal_expression": {
+      "loaded_modules": 7,
+      "max_ms": 4519.0657,
+      "mean_ms": 4462.8428,
+      "median_ms": 4461.4196,
+      "min_ms": 4434.2282,
+      "peak_bytes": 31673308,
+      "raw_samples_ms": [
+        4434.5234,
+        4461.4196,
+        4434.2282,
+        4519.0657,
+        4464.9771
+      ],
+      "samples": 5,
+      "stdev_ms": 34.599
+    },
+    "unit_parse_normal": {
+      "loaded_modules": 7,
+      "max_ms": 4599.8341,
+      "mean_ms": 4562.3531,
+      "median_ms": 4555.2531,
+      "min_ms": 4528.3441,
+      "peak_bytes": 31673629,
+      "raw_samples_ms": [
+        4555.2531,
+        4552.0451,
+        4576.2892,
+        4599.8341,
+        4528.3441
+      ],
+      "samples": 5,
+      "stdev_ms": 26.9829
+    },
+    "unit_registry": {
+      "loaded_modules": 7,
+      "max_ms": 4611.0153,
+      "mean_ms": 4546.6357,
+      "median_ms": 4544.3708,
+      "min_ms": 4508.9446,
+      "peak_bytes": 31674349,
+      "raw_samples_ms": [
+        4611.0153,
+        4508.9446,
+        4513.3155,
+        4544.3708,
+        4555.5324
+      ],
+      "samples": 5,
+      "stdev_ms": 41.1092
+    },
+    "unitvalue_arithmetic": {
+      "loaded_modules": 7,
+      "max_ms": 4545.1973,
+      "mean_ms": 4465.866,
+      "median_ms": 4434.8576,
+      "min_ms": 4417.9602,
+      "peak_bytes": 31683036,
+      "raw_samples_ms": [
+        4545.1973,
+        4501.9679,
+        4417.9602,
+        4429.3467,
+        4434.8576
+      ],
+      "samples": 5,
+      "stdev_ms": 55.1972
+    }
+  },
+  "os": "Linux",
+  "os_release": "6.8.0-1060-raspi",
+  "python_implementation": "CPython",
+  "python_version": "3.12.3",
+  "samples": 5,
+  "timestamp": "2026-07-28T12:58:13.093683+00:00",
+  "warmups": 2
+}

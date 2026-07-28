@@ -77,7 +77,7 @@ jobs:
           python scripts/check_authority_boundaries.py
           python scripts/release_inventory.py --check
           python scripts/verify_unit_baseline_fixture.py tests/fixtures/units/legacy-5a1bb34c.json
-          python scripts/check_evidence_consistency.py --candidate-state
+          python scripts/check_evidence_consistency.py
           python build_single.py -o /tmp/eggcalc-build-a.py
           python build_single.py -o /tmp/eggcalc-build-b.py
           cmp /tmp/eggcalc-build-a.py /tmp/eggcalc-build-b.py
@@ -96,10 +96,17 @@ jobs:
         run: python scripts/generate_mcp_docs.py --check
 
       - name: Test with coverage
-        run: pytest tests/ -v --cov=eggcalc --cov-report=xml --cov-report=term --junitxml=lane-results.xml
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            pytest tests/ -v --junitxml=lane-results.xml
+          else
+            pytest tests/ -v --cov=eggcalc --cov-report=xml --cov-report=term --junitxml=lane-results.xml
+          fi
 
       - name: Generate lane summary
         if: always()
+        shell: bash
         env:
           CONCLUSION: ${{ job.status }}
         run: |

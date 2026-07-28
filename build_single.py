@@ -1003,7 +1003,8 @@ if __name__ == "__main__":
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(final_content)
 
-    os.chmod(output_path, os.stat(output_path).st_mode | 0o111)
+    if os.name != "nt":
+        os.chmod(output_path, os.stat(output_path).st_mode | 0o111)
 
     print(f"Built: {output_path}")
     print(f"  Core modules: {len(MODULES_CALC)}")

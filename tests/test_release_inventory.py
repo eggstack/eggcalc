@@ -93,7 +93,7 @@ def _run_check(single_file: Path, wheel: Path | None = None) -> subprocess.Compl
 
 def _run_inventory(**kwargs: object) -> dict[str, object]:
     """Run the inventory script in explicit artifact mode (no --check)."""
-    with tempfile.TemporaryDirectory(prefix="eggcalc-inventory-") as temp:
+    with tempfile.TemporaryDirectory(prefix="ec-inv-") as temp:
         output = Path(temp) / "inventory.json"
         cmd = [
             sys.executable,
@@ -410,11 +410,15 @@ def test_inventory_wheel_runs_outside_repository(tmp_path: Path) -> None:
     wheel = _build_wheel(src)
     single_file = _build_single_file(src)
 
-    with tempfile.TemporaryDirectory(prefix="eggcalc-isolated-") as temp:
+    with tempfile.TemporaryDirectory(prefix="ec-isolated-") as temp:
         temp_path = Path(temp)
         venv_dir = temp_path / "venv"
         venv.create(venv_dir, with_pip=True, clear=True)
-        python = venv_dir / ("Scripts" if sys.platform == "win32" else "bin") / "python"
+        python = (
+            venv_dir
+            / ("Scripts" if sys.platform == "win32" else "bin")
+            / ("python.exe" if sys.platform == "win32" else "python")
+        )
         subprocess.run(
             [str(python), "-m", "pip", "install", str(wheel.resolve()), "--no-deps"],
             check=True,
