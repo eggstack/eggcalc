@@ -132,24 +132,32 @@ def _split_windows_components(path: str) -> tuple[list[str], str | None]:
     return components, root
 
 
+_MAX_SUFFIXES = 32
+
+
 def _get_suffixes(name: str) -> list[str]:
-    """Extract all suffixes from a filename.
+    """Extract all suffixes from a filename using pathlib-compatible rules.
 
     For ".tar.gz" returns [".tar.gz", ".gz"]
     For ".txt" returns [".txt"]
+    For ".bashrc" returns [] (leading dot is not an extension separator)
+    For ".." returns []
+
+    Returns at most _MAX_SUFFIXES entries to bound output size.
     """
-    if not name or name == ".":
+    if not name or name == "." or name == "..":
         return []
 
-    parts = name.split(".")
-    if len(parts) <= 1:
+    last_dot = name.rfind(".")
+    if last_dot <= 0:
         return []
 
-    suffixes = []
-    for i in range(1, len(parts)):
-        suffix = "." + ".".join(parts[i:])
-        suffixes.append(suffix)
+    suffixes: list[str] = []
+    while last_dot > 0 and len(suffixes) < _MAX_SUFFIXES:
+        suffixes.append(name[last_dot:])
+        last_dot = name.rfind(".", 0, last_dot)
 
+    suffixes.reverse()
     return suffixes
 
 
@@ -243,7 +251,11 @@ def path_analyze(path: str, style: str = "auto") -> PathAnalyzeResult:
     if root and style == "posix":
         normalized = sep + normalized
     elif root and style == "windows":
-        normalized = root + sep + normalized if normalized_parts else root
+        joined = sep.join(normalized_parts) if normalized_parts else ""
+        if root_kind == "drive" and not is_abs:
+            normalized = root + joined if joined else root
+        else:
+            normalized = root + sep + joined if joined else root
 
     confusables = detect_confusables(path)
     if confusables:

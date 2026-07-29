@@ -244,6 +244,7 @@ def _normalize_transcript(responses: list[dict]) -> list[dict]:
             if isinstance(caps, dict) and "runtime" in caps:
                 rt = dict(caps["runtime"])
                 rt["mode"] = "<normalized>"
+                rt["eggcalc_version"] = "<normalized>"
                 new_caps = dict(caps)
                 new_caps["runtime"] = rt
                 result["capabilities"] = new_caps
@@ -325,27 +326,40 @@ def test_single_file_mcp_transcript():
 def test_package_and_single_file_transcripts_match():
     """Package and single-file MCP transcripts are structurally identical."""
     import os
+    import tempfile
 
-    single_file = os.path.join(os.path.dirname(__file__), "..", "eggcalc.py")
-    if not os.path.exists(single_file):
-        pytest.skip("eggcalc.py single-file not built yet")
-
-    pkg_responses = _run_mcp_transcript([sys.executable, "-m", "eggcalc", "--mcp"])
-    sf_responses = _run_mcp_transcript([sys.executable, single_file, "--mcp"])
-
-    pkg_norm = _normalize_transcript(pkg_responses)
-    sf_norm = _normalize_transcript(sf_responses)
-
-    assert len(pkg_norm) == len(
-        sf_norm
-    ), f"Different response counts: package={len(pkg_norm)}, single-file={len(sf_norm)}"
-
-    for i, (p, s) in enumerate(zip(pkg_norm, sf_norm)):
-        assert p == s, (
-            f"Transcript mismatch at response {i}:\n"
-            f"  package:      {json.dumps(p, indent=2)}\n"
-            f"  single-file:  {json.dumps(s, indent=2)}"
+    build_script = os.path.join(os.path.dirname(__file__), "..", "build_single.py")
+    with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
+        single_file = f.name
+    try:
+        result = subprocess.run(
+            [sys.executable, build_script, "-o", single_file],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
+        if result.returncode != 0:
+            pytest.skip(f"build_single.py failed: {result.stderr}")
+
+        pkg_responses = _run_mcp_transcript([sys.executable, "-m", "eggcalc", "--mcp"])
+        sf_responses = _run_mcp_transcript([sys.executable, single_file, "--mcp"])
+
+        pkg_norm = _normalize_transcript(pkg_responses)
+        sf_norm = _normalize_transcript(sf_responses)
+
+        assert len(pkg_norm) == len(
+            sf_norm
+        ), f"Different response counts: package={len(pkg_norm)}, single-file={len(sf_norm)}"
+
+        for i, (p, s) in enumerate(zip(pkg_norm, sf_norm)):
+            assert p == s, (
+                f"Transcript mismatch at response {i}:\n"
+                f"  package:      {json.dumps(p, indent=2)}\n"
+                f"  single-file:  {json.dumps(s, indent=2)}"
+            )
+    finally:
+        if os.path.exists(single_file):
+            os.unlink(single_file)
 
 
 def test_package_mcp_transcript_2024_11_05():

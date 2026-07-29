@@ -68,7 +68,7 @@
       "expected": {
         "hidden": true,
         "name": ".gitignore",
-        "suffix": ".gitignore"
+        "suffix": null
       }
     },
     {
