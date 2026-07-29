@@ -7,7 +7,7 @@ This file contains overrides and additions specific to this codebase. Items here
 ### Important Implementation Notes
 
 **Build Single File Convention:**
-The codebase must work when assembled by `build_single.py` into a single file. All code must be in one of the four core modules: `normalize.py`, `evaluator.py`, `units.py`, or `__main__.py`.
+The codebase must work when assembled by `build_single.py` into a single file. All code must be in one of the six core modules: `units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`. `__main__.py` is a thin entry point, not in the build manifest.
 
 **Key Architectural Distinctions:**
 - `run()` handles natural language AND unit conversions (normalizes first)

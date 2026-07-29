@@ -2,7 +2,7 @@
 
 ## What This Is
 
-`eggcalc` — a natural language math calculator (CLI, library, MCP server). Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file.
+`eggcalc` — a natural language math calculator (CLI, library, MCP server). Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file. Also see `AGENTS.override.md` for session-specific overrides (takes precedence over this file).
 
 ## Critical: Two Evaluation Paths
 
@@ -84,6 +84,12 @@ python3 build_single.py --validate && python3 build_single.py
 
 # Install to ~/.local/bin/calc
 python install.py --install
+
+# Install pre-commit hooks (black, ruff, trailing-whitespace, etc.)
+make hooks
+
+# Install with dev dependencies (for new contributors)
+make dev
 ```
 
 CI runs `make check` (lint, format-check, typecheck, docs-check, build validation, full pytest suite) followed by `make package-check` (twine check, installed-wheel smoke, single-file smoke). See [docs/releasing.md](docs/releasing.md) for the manual PyPI release procedure.
@@ -91,7 +97,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 ## Constraints
 
 - **Standard library only** — no pip packages in `eggcalc/`. Imports limited to: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`
-- **`build_single.py` compatibility** — all runtime code must live in one of the four core modules (`normalize.py`, `evaluator.py`, `units.py`, `__main__.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. Adding imports outside the allowed set will break the build.
+- **`build_single.py` compatibility** — all runtime code must live in one of the six core modules (`units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. `__main__.py` is a thin entry point (not in the manifest). Adding imports outside the allowed set will break the build.
 - **TypedDict over NamedTuple** — the codebase uses `TypedDict` for structured return types. TypedDict classes do NOT support `__slots__`.
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters. Applies to both single-expression and REPL modes.
 - **Python requirement** — `>=3.11` per `pyproject.toml`. Required CI uses 3.11; optional compatibility workflow tests 3.14 and Windows.
