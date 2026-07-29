@@ -233,6 +233,7 @@ class TestCliVersionFlag:
         assert result.returncode == 0
         assert "eggcalc" in result.stdout
         from eggcalc._version import __version__
+
         assert __version__ in result.stdout
 
     def test_cli_version_short_flag(self):
