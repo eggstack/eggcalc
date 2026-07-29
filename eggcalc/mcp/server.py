@@ -2409,14 +2409,18 @@ def _validate_value_against_schema(
         return f"Argument '{path}' must be one of [{', '.join(type_options)}], got {type(value).__name__}"
 
     # Bool is subclass of int in Python; reject bool when any numeric type is allowed
-    if any(t in ("integer", "number") for t in type_options) and isinstance(value, bool):
+    # but only if boolean is not also explicitly permitted in the type union.
+    if (
+        any(t in ("integer", "number") for t in type_options)
+        and isinstance(value, bool)
+        and "boolean" not in type_options
+    ):
         if len(type_options) == 1:
             return f"Argument '{path}' must be {type_options[0]}, got bool"
         return f"Argument '{path}' must be one of [{', '.join(type_options)}], got bool"
 
-    const_value = prop.get("const")
-    if const_value is not None and value != const_value:
-        return f"Argument '{path}' must equal {const_value!r}, got {value!r}"
+    if "const" in prop and not _json_value_equal(value, prop["const"]):
+        return f"Argument '{path}' must equal {prop['const']!r}, got {value!r}"
 
     enum_values = prop.get("enum")
     if enum_values is not None and value not in enum_values:

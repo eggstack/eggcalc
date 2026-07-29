@@ -87,11 +87,16 @@ def detect_capabilities() -> RuntimeCapabilities:
     supports_windows_paths = plat == "win32" or "msys" in plat or "cygwin" in plat
 
     try:
-        from importlib.metadata import version as _pkg_version
+        from ._version import __version__ as _mod_version
 
-        eggcalc_version = _pkg_version("eggcalc")
+        eggcalc_version = _mod_version
     except Exception:
-        eggcalc_version = "unknown"
+        try:
+            from importlib.metadata import version as _pkg_version
+
+            eggcalc_version = _pkg_version("eggcalc")
+        except Exception:
+            eggcalc_version = "unknown"
 
     try:
         start_method = multiprocessing.get_start_method()

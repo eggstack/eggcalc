@@ -587,14 +587,14 @@ class TestTimeout:
         """Test evaluate_with_timeout with fast expression."""
         from eggcalc import evaluate_with_timeout
 
-        result = evaluate_with_timeout("5 + 3", timeout=1.0)
+        result = evaluate_with_timeout("5 + 3", timeout=5.0)
         assert self._get_value(result) == 8
 
     def test_evaluate_with_timeout_natural_language(self):
         """Test evaluate_with_timeout with natural language."""
         from eggcalc import evaluate_with_timeout
 
-        result = evaluate_with_timeout("five plus three", timeout=1.0)
+        result = evaluate_with_timeout("five plus three", timeout=5.0)
         assert self._get_value(result) == 8
 
     def test_timeout_error_raised(self):

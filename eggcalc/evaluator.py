@@ -103,6 +103,7 @@ MAX_RESULT_DIGITS = 10000
 MAX_SHIFT_COUNT = 50000
 MAX_INPUT_LENGTH = 10_000  # max characters in expression string
 MAX_USER_VARIABLES = 1000  # cap on setvar entries per evaluator
+MAX_NAMED_REGISTERS = 1000  # cap on named memory registers per Memory instance
 DEFAULT_CACHE_SIZE = 1024
 MAX_CACHE_BYTES = 64 * 1024 * 1024  # 64 MB soft cap for _cache
 _SORTED_UNIT_ALIASES: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
@@ -1496,11 +1497,21 @@ class Memory:
         self._default_register: float = 0.0
         self._lock = threading.Lock()
 
+    def _validate_register_name(self, register: str) -> None:
+        """Validate a register name (internal, assumes lock held)."""
+        if not isinstance(register, str) or not register.strip():
+            raise ValueError("Register name must be a non-empty string")
+
     def _get_and_set(self, register: str, new_value: float) -> float:
         """Set a register value and return it (internal, assumes lock held)."""
         if register == "M":
             self._default_register = new_value
             return new_value
+        if register not in self._registers and len(self._registers) >= MAX_NAMED_REGISTERS:
+            raise MemoryError(
+                f"Named register limit reached ({MAX_NAMED_REGISTERS}). "
+                "Clear unused registers before adding new ones."
+            )
         self._registers[register] = new_value
         return new_value
 
@@ -1513,21 +1524,25 @@ class Memory:
     def store(self, value: float, register: str = "M") -> float:
         """Store value in register (default: M)."""
         with self._lock:
+            self._validate_register_name(register)
             return self._get_and_set(register, float(value))
 
     def recall(self, register: str = "M") -> float:
         """Recall value from register (default: M)."""
         with self._lock:
+            self._validate_register_name(register)
             return self._get(register)
 
     def add(self, value: float, register: str = "M") -> float:
         """Add value to register (M+)."""
         with self._lock:
+            self._validate_register_name(register)
             return self._get_and_set(register, self._get(register) + float(value))
 
     def subtract(self, value: float, register: str = "M") -> float:
         """Subtract value from register (M-)."""
         with self._lock:
+            self._validate_register_name(register)
             return self._get_and_set(register, self._get(register) - float(value))
 
     def clear(self, register: str | None = None) -> None:
@@ -1539,6 +1554,7 @@ class Memory:
             elif register == "M":
                 self._default_register = 0.0
             else:
+                self._validate_register_name(register)
                 self._registers.pop(register, None)
 
     def list_registers(self) -> dict[str, float]:

@@ -174,10 +174,12 @@ def path_analyze(path: str, style: str = "auto") -> PathAnalyzeResult:
         style = "windows" if detected else "posix"
 
     if style == "windows":
-        raw_components, root = _split_windows_components(path)
+        root_str, raw_components, is_abs, root_kind = _parse_path_root(path, "windows")
+        root = root_str if root_kind != "none" else None
         sep = "\\"
     else:
         raw_components, root = _split_posix_components(path)
+        is_abs = root is not None
         sep = "/"
 
     components = []
@@ -197,7 +199,7 @@ def path_analyze(path: str, style: str = "auto") -> PathAnalyzeResult:
             normalized_parts.append(comp)
 
     has_traversal = ".." in raw_components
-    absolute = root is not None
+    absolute = is_abs
 
     name = components[-1] if components else None
 
@@ -220,6 +222,10 @@ def path_analyze(path: str, style: str = "auto") -> PathAnalyzeResult:
             if root:
                 if style == "posix":
                     parent = sep + sep.join(parent_parts)
+                elif root_kind == "unc":
+                    parent = root + sep + sep.join(parent_parts)
+                elif not is_abs:
+                    parent = root + sep.join(parent_parts)
                 else:
                     parent = root + sep + sep.join(parent_parts)
             else:
@@ -236,6 +242,8 @@ def path_analyze(path: str, style: str = "auto") -> PathAnalyzeResult:
     normalized = sep.join(normalized_parts) if normalized_parts else ""
     if root and style == "posix":
         normalized = sep + normalized
+    elif root and style == "windows":
+        normalized = root + sep + normalized if normalized_parts else root
 
     confusables = detect_confusables(path)
     if confusables:
@@ -565,7 +573,8 @@ def path_scope_check(
 
     inside_root = target_cmp.startswith(root_prefix) or target_cmp == root_cmp
 
-    escapes_via_dotdot = ".." in target
+    _, target_components_raw, _, _ = _parse_path_root(target_pre, platform)
+    escapes_via_dotdot = ".." in target_components_raw
 
     relative_path = ""
     if inside_root:
