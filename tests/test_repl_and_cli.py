@@ -232,7 +232,8 @@ class TestCliVersionFlag:
         result = _run_cli("--version")
         assert result.returncode == 0
         assert "eggcalc" in result.stdout
-        assert "1.1.6" in result.stdout
+        from eggcalc._version import __version__
+        assert __version__ in result.stdout
 
     def test_cli_version_short_flag(self):
         """-v prints version string."""
