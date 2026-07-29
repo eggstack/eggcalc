@@ -10,7 +10,7 @@ Guide agents through building, testing, and releasing eggcalc.
 .venv/bin/python build_single.py
 ```
 Assembles `eggcalc/` into a single portable `eggcalc.py`. The build script:
-- Concatenates core modules (normalize.py, evaluator.py, units.py, __main__.py)
+- Concatenates core modules (units.py, evaluator.py, normalize.py, cli.py, capabilities.py, `_protocol.py`)
 - Concatenates exact/ and mcp/ sub-packages
 - Renames `main()` → `normalize_main()` and `mcp_main()` to avoid conflicts
 - Handles aliased imports (e.g., `count_graphemes as _count_graphemes`)
@@ -26,8 +26,10 @@ Assembles `eggcalc/` into a single portable `eggcalc.py`. The build script:
 
 ## CI Pipeline Order
 ```
-ruff → black --check → build_single.py → python eggcalc.py "5+3" (smoke) → generate_mcp_docs.py --check → pytest → mypy
+ruff → black --check → build_single.py → python eggcalc.py "5+3" (smoke) → pytest → mypy
 ```
+- `make check` runs all of the above (lint + format-check + typecheck + docs-check + full test suite)
+- `docs-check` runs `python scripts/generate_mcp_docs.py --check` to verify generated docs aren't stale
 - mypy only runs on Python 3.12
 - All checks must pass before merge
 
@@ -60,8 +62,8 @@ python install.py --install
 ## Version Bumping
 
 When releasing a new version:
-1. Update version in `pyproject.toml`
-2. Update `__version__` in `eggcalc/__init__.py`
+1. Update version in `pyproject.toml` (via `eggcalc/_version.py`)
+2. Update `__version__` in `eggcalc/_version.py`
 3. Update `docs/installation.md` version examples
 4. Add entry to `docs/changelog.md`
 5. Run full test suite to verify

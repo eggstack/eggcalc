@@ -130,7 +130,7 @@ AI agent integration via Model Context Protocol:
 
 ```bash
 calc --mcp
-# Exposes 64 deterministic tools to AI agents
+# Exposes 77 deterministic tools to AI agents
 ```
 
 See [MCP Server](mcp.md) for detailed tool documentation.

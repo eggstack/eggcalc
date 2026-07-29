@@ -25,7 +25,7 @@ When updating code, always check if documentation needs updating:
 6. **MCP tools** — Check `architecture/mcp.md` and `docs/mcp.md` for tool count/names
 7. **Unit categories** — Check `architecture/units.md` and `docs/units.md`
 8. **Constants** — Check `architecture/evaluator.md` and `docs/constants.md`
-9. **Version** — Update in `pyproject.toml`, `__init__.py`, and `docs/installation.md`
+9. **Version** — Update in `eggcalc/_version.py` and `docs/installation.md`
 
 ## Common Documentation Issues
 
@@ -37,7 +37,6 @@ Line counts drift as code evolves. Update these locations:
 
 ### Stale Test Count
 Run `pytest --co -q | tail -1` to get current count, then update:
-- `AGENTS.md` (if referenced)
 - `.skills/testing.md` Current Test Count section
 - `.skills/architecture_review.md` Note section
 

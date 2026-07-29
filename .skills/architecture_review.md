@@ -75,7 +75,7 @@ For each module, examine:
 - Data structure field mismatches (verify against actual code)
 - Parameter name alignment (docs sometimes use different names than code)
 
-**Note:** The architecture review has been completed. All 15 module reviews were performed and findings incorporated into the documentation. Test count: 2619 (as of 2026-07-07).
+**Note:** The architecture review has been completed. All module reviews were performed and findings incorporated into the documentation. Test count: 4311 (as of 2026-07-29).
 
 ## Architecture Review Findings (2026-05-28 through 2026-05-29)
 

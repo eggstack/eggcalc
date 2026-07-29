@@ -95,6 +95,7 @@ The codebase is organized into three subsystems plus supporting infrastructure.
 | `glob.py` | Glob pattern matching | `glob_match()` |
 | `config.py` | .env and INI file validation | `dotenv_validate()`, `ini_validate()` |
 | `patch.py` | Unified diff parsing and simulation | `patch_apply_check()`, `patch_summary()` |
+| `path_tools.py` | Path comparison and scoping | `path_compare()`, `path_scope_check()` |
 | `inspect_prompt.py` | Hidden char/ANSI/instruction detection | `prompt_input_inspect()` |
 | `markdown.py` | Markdown structure analysis and link checking | `markdown_structure()`, `code_fence_extract()` |
 | `shell.py` | Shell command parsing and argv comparison | `shell_split()`, `shell_quote_join()`, `argv_compare()` |

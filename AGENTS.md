@@ -210,8 +210,10 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 | `units.md` | Unit definitions, conversions, UnitValue, UnitSpec, UnitExpression |
 | `cli.md` | CLI entry, options, text subcommands |
 | `api.md` | Public Python API surface |
+| `capabilities.md` | Runtime capability detection, RuntimeCapabilities |
 | `exact.md` | exact/ package (Unicode, text analysis) |
 | `mcp.md` | MCP server, tool schemas, profiles |
+| `build.md` | build_single.py, MODULE_MANIFEST, single-file assembly |
 | `primitives.md` | UTF-8, codepoints, invisible chars |
 | `unicode_tools.md` | Script detection, confusables |
 | `measure.md` | Text metrics (lines, words, chars) |
@@ -219,6 +221,8 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 | `validate.md` | Bracket/JSON/regex validation |
 | `synthesis.md` | Higher-level text analysis |
 | `confusables.md` | Auto-generated homoglyph data |
+| `authority_inventory.md` | Single authoritative source for every major registry/constant/contract |
+| `mutable_state_inventory.md` | Inventory of all mutable process-global state |
 
 ## Config Loading Safety
 

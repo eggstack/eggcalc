@@ -71,7 +71,7 @@ python install.py
 
 ```bash
 calc --version
-# eggcalc 1.1.4
+# eggcalc 1.1.8
 
 calc "one plus one"
 # 2

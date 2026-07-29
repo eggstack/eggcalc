@@ -59,10 +59,13 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 ### Module Organization
 
 #### Core modules (combined by build_single.py)
+- `eggcalc/units.py` - Unit definitions, conversions
+- `eggcalc/evaluator.py` - AST evaluation, EggCalcApp
 - `eggcalc/normalize.py` - NL processing
-- `eggcalc/evaluator.py` - AST evaluation
-- `eggcalc/units.py` - Unit definitions
-- `eggcalc/__main__.py` - CLI entry
+- `eggcalc/cli.py` - CLI dispatch, REPL, text commands
+- `eggcalc/capabilities.py` - Runtime capability detection
+- `eggcalc/_protocol.py` - MCP protocol version constants
+- `eggcalc/__main__.py` - Thin entry point (not in build manifest)
 
 #### exact/ modules (25 submodules, always separate)
 - `primitives.py` - UTF-8, codepoints, visible_repr

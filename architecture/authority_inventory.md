@@ -8,8 +8,8 @@ copies is caught by the test suites listed in the "Tests" column.
 
 | Item | Authoritative source | Adapters / exports | Tests |
 |------|---------------------|-------------------|-------|
-| Package version | `pyproject.toml:7` + `eggcalc/__init__.py:77` | `build_single.py` reads `__init__.py` → writes `eggcalc.py` | `test_import_boundaries` (version string present) |
-| `eggcalc.__version__` | `eggcalc/__init__.py:77` | Lazy re-export via `__getattr__` in `__init__.py` | `test_import_boundaries` |
+| Package version | `eggcalc/_version.py` (single source of truth) | `pyproject.toml` reads via `setuptools.dynamic`; `__init__.py` re-exports; `build_single.py` embeds | `test_import_boundaries` (version string present) |
+| `eggcalc.__version__` | `eggcalc/_version.py` | Re-exported by `eggcalc/__init__.py` (line 26) | `test_import_boundaries` |
 
 ## MCP Protocol Versions
 
