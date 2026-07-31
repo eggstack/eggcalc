@@ -230,7 +230,8 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 
 | Path | Entry Point | When |
 |------|-------------|------|
-| CLI | `maybe_load_cli_config()` in cli.py | Once at CLI startup (`main()`) |
+| CLI (calculator eval / REPL) | `maybe_load_cli_config()` in cli.py | After mode classification, only for expression evaluation or REPL |
+| CLI (informational / MCP / text commands) | *not called* | `--help`, `--version`, `--capabilities`, `--mcp`, and text commands never load config |
 | API (opt-in) | `_ensure_config_loaded()` in evaluator.py | Only when `EGGCALC_LOAD_CONFIG=1` is set |
 | MCP server | Handled by `McpServerConfig.from_environment()` and `main()` | `EGGCALC_NO_CONFIG=1` set in `main()` setup |
 
@@ -239,6 +240,8 @@ Library APIs (`evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evalua
 The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCALC_NO_CONFIG` env var. Both early-return paths set `_config_loaded = True` to prevent re-entry.
 
 **Do not** add import-time config loading back to `__init__.py`. Library import must remain side-effect-free.
+
+**Do not** move `maybe_load_cli_config()` before mode classification in `main()`. Informational commands, MCP, and text commands must not execute cwd-local Python as a side effect.
 
 ## Common Pitfalls
 

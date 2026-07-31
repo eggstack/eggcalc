@@ -7,7 +7,6 @@
 - [CLI Options](#cli-options)
 - [Text Commands](#text-commands)
 - [Interactive REPL](#interactive-repl)
-- [Shell Glob Detection](#shell-glob-detection)
 - [Output Formats](#output-formats)
 - [Error Handling](#error-handling)
 
@@ -25,7 +24,17 @@ It adjusts `sys.path` to ensure the parent of the `eggcalc` package directory is
 
 `main()` in `normalize.py` handles all CLI parsing and execution. When assembled into a single file by `build_single.py`, it is aliased as `normalize_main()` to avoid conflict with the MCP server's `main()` function.
 
-At startup, `main()` calls `maybe_load_cli_config()` to load `eggcalc_config.py` from the working directory. This is the only path that triggers config loading for the CLI. The library import path (`import eggcalc`) does NOT load config.
+### Dispatch order and trust boundary
+
+`main()` classifies the mode **before** loading user configuration:
+
+1. Construct argparse parser and parse argv.
+2. Handle informational exits (`--capabilities`, `--mcp`, `--version`, `--usage`, `--help` / no arguments) — no config loaded.
+3. Classify text commands via `_cli_text_command()` — no config loaded.
+4. For calculator expression evaluation or REPL startup, call `maybe_load_cli_config()` exactly once.
+5. Evaluate expression or enter REPL.
+
+This ensures `eggcalc_config.py` is never executed for help, version, capabilities, MCP startup, or text-command invocations.
 
 `maybe_load_cli_config()` checks `EGGCALC_NO_CONFIG=1` env var to skip loading. It imports `load_user_config` from `eggcalc.evaluator` (with a fallback for single-file mode) and calls it.
 
@@ -56,7 +65,17 @@ Expression arguments (positional) are joined with spaces to form the expression 
 
 ## Text Commands
 
-The CLI includes built-in text inspection commands, dispatched by `_cli_text_command()` before math evaluation. If the first token matches a known command, it is handled; otherwise the expression continues to math evaluation.
+The CLI includes built-in text inspection commands, dispatched by `_cli_text_command()` before math evaluation. Text commands do **not** require user configuration — they operate only on their explicit arguments and use lazy-loaded exact-tool modules.
+
+`_cli_text_command()` returns a `_CommandStatus` enum with three states:
+
+| State | Meaning |
+|-------|---------|
+| `NOT_HANDLED` | First token is not a recognized text command; continue to math evaluation. |
+| `SUCCESS` | Recognized command completed successfully. |
+| `ERROR` | Recognized command completed with an error (caller returns nonzero without falling through to math evaluation). |
+
+This prevents a recognized command with invalid arguments from printing a command-specific error **and then** a second unrelated calculator error.
 
 All text commands accept `--json` for machine-readable output.
 
@@ -181,21 +200,6 @@ Commands in REPL:
 
 REPL uses readline for input history (when available). History is persisted to `~/.eggcalc_history` and restored on next session. Input length is capped at 100,000 characters per line.
 
-## Shell Glob Detection
-
-The CLI detects when `*` is expanded by the shell (glob pattern) and warns the user to quote expressions:
-
-```
-Error: Possible shell glob expansion detected.
-The '*' character was expanded to file(s): [...]
-Please quote your expression:
-  calc "30 * 3"
-Or use -e flag:
-  calc -e "30 * 3"
-```
-
-Detection works by checking if any positional argument matches an existing file or directory in the current working directory. The check triggers when there are more than one positional arguments (e.g., `30 * 3` becomes `30 file1 file2 file3` after glob expansion).
-
 ## Output Formats
 
 ### Plain (default)
@@ -237,4 +241,4 @@ Errors are printed to stderr with user-friendly messages:
 - `Input too long ({len} chars, max {max})` — REPL line length exceeded
 - `Expression nesting too deep (max {max})` — Parenthesis nesting exceeded
 
-`--verbose` and `--show` are accepted for compatibility, but plain output remains result-only. In `--verbose` mode, full tracebacks are printed for non-standard exceptions.
+`--verbose` and `--show` are accepted for compatibility, but plain output remains result-only.

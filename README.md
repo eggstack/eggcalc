@@ -18,7 +18,7 @@ Written in pure Python with no external dependencies, it can be used as a CLI to
 ## Requirements
 
 - **Python 3.11 or higher** (3.10 is no longer supported)
-- **Operating systems:** Linux, macOS, Windows (tested in CI on all three)
+- **Operating systems:** Linux, macOS, Windows
 - All tools and features are fully available on every supported runtime — no reduced capability set
 
 ### Migrating from Python 3.10

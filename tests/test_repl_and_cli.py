@@ -7,7 +7,6 @@ import sys
 from unittest.mock import patch
 
 from eggcalc.cli import _run_repl
-from eggcalc.cli import run_cli as _run_cli_for_wrap
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -136,10 +135,10 @@ class TestReplEdgeCases:
 
         from eggcalc.cli import run_cli as _orig_run_cli
 
-        def mock_run_cli(expression, output_format="plain", show_expression=True):
+        def mock_run_cli(expression, output_format="plain"):
             if expression == "10 + 2":
                 raise KeyboardInterrupt()
-            return _orig_run_cli(expression, output_format, show_expression)
+            return _orig_run_cli(expression, output_format)
 
         with (
             patch("builtins.input", side_effect=mock_input),
@@ -191,32 +190,6 @@ class TestReplEdgeCases:
         with patch("builtins.input", side_effect=["EXIT"]):
             exit_code = _run_repl()
         assert exit_code == 0
-
-    def test_repl_show_expression_true(self, capsys):
-        """REPL passes show_expression=True to run_cli()."""
-        with (
-            patch("builtins.input", side_effect=["5 + 3", EOFError]),
-            patch("eggcalc.cli.run_cli", wraps=_run_cli_for_wrap) as mock_run,
-        ):
-            exit_code = _run_repl(show_expression=True)
-        assert exit_code == 0
-        mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        show_expr = kwargs.get("show_expression", args[2] if len(args) > 2 else None)
-        assert show_expr is True
-
-    def test_repl_show_expression_false(self, capsys):
-        """REPL passes show_expression=False to run_cli()."""
-        with (
-            patch("builtins.input", side_effect=["5 + 3", EOFError]),
-            patch("eggcalc.cli.run_cli", wraps=_run_cli_for_wrap) as mock_run,
-        ):
-            exit_code = _run_repl(show_expression=False)
-        assert exit_code == 0
-        mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        show_expr = kwargs.get("show_expression", args[2] if len(args) > 2 else None)
-        assert show_expr is False
 
 
 # ---------------------------------------------------------------------------

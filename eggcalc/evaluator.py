@@ -223,7 +223,7 @@ _orphaned_eval_lock: threading.Lock = threading.Lock()
 
 
 def _check_constant_unit_collisions() -> None:
-    """Warn at import time if any CONSTANTS entry collides with a UNIT_ALIASES.
+    """Record constant/unit alias collisions at import time.
 
     With the visit_Name order (units first, then constants), one-letter
     constant names like 'h' (Planck), 'g' (gravity), 'k' (Boltzmann), 'c'
@@ -236,29 +236,18 @@ def _check_constant_unit_collisions() -> None:
     Rankine, which uses the 'Ra' alias). Rankine is accessible as 'Ra',
     'rankine', 'degr', and '°R'.
 
-    The warning is emitted at most once per process. A process-wide sentinel
-    is stashed on the ``warnings`` module (a singleton) so the package and
-    the inlined single-file build share the flag.
+    Collision information is logged at DEBUG level.  Ordinary
+    ``import eggcalc`` never writes to stdout or stderr.
     """
-    import warnings
-
-    if getattr(warnings, "_eggcalc_collision_warned", False):
-        return
-    warnings._eggcalc_collision_warned = True  # type: ignore[attr-defined]
-    # In assembled single-file mode, UNIT_ALIASES is inlined at the top.
-    # In package mode, _IS_ASSEMBLED is False and we use the imported name.
     aliases = UNIT_ALIASES
     collisions: list[str] = []
     for c in Evaluator.CONSTANTS:
         if c in aliases:
             collisions.append(c)
     if collisions:
-        import sys
-
-        print(
-            f"Warning: UNIT_ALIASES shadow CONSTANTS (unreachable as "
-            f"constants; use long form): {sorted(collisions)}",
-            file=sys.stderr,
+        logging.getLogger(__name__).debug(
+            "UNIT_ALIASES shadow CONSTANTS (unreachable as constants; " "use long form): %s",
+            sorted(collisions),
         )
 
 

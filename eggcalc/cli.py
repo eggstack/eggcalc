@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from enum import Enum, auto
 from typing import Any, TypedDict
 
 from .evaluator import EvaluationError, evaluate
@@ -29,6 +30,19 @@ __all__ = [
 ]
 
 _DELIM = "|||"
+
+
+class _CommandStatus(Enum):
+    """Result of text-command dispatch.
+
+    NOT_HANDLED: first token is not a recognized text command.
+    SUCCESS:     recognized command completed successfully.
+    ERROR:       recognized command completed with an error.
+    """
+
+    NOT_HANDLED = auto()
+    SUCCESS = auto()
+    ERROR = auto()
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +216,6 @@ def _reset_handler_cache() -> None:
 def run_cli(
     expression: str,
     output_format: str = "plain",
-    show_expression: bool = True,
 ) -> tuple[Any, int]:
     """Process a single expression: normalize, evaluate, and print result.
 
@@ -245,7 +258,7 @@ def run_cli(
         return None, 1
 
 
-def _run_repl(show_expression: bool = True) -> int:
+def _run_repl() -> int:
     """Run interactive REPL mode."""
 
     import atexit
@@ -309,7 +322,7 @@ def _run_repl(show_expression: bool = True) -> int:
             continue
 
         try:
-            result, exit_code = run_cli(line, "plain", show_expression)
+            result, exit_code = run_cli(line, "plain")
         except KeyboardInterrupt:
             print()
             continue
@@ -413,7 +426,7 @@ def print_help() -> None:
 
 def _cli_text_command(
     expression: str, json_output: bool = False, argv: list[str] | None = None
-) -> int:
+) -> _CommandStatus:
     """Handle text commands before math evaluation.
 
     Dispatches through the declarative :data:`COMMANDS` registry.  If ``argv``
@@ -421,7 +434,9 @@ def _cli_text_command(
     otherwise ``expression`` is whitespace-split.
 
     Returns:
-        0 if command was handled, 1 if expression should continue to math eval
+        _CommandStatus.NOT_HANDLED if the first token is not a recognized command.
+        _CommandStatus.SUCCESS if the command completed successfully.
+        _CommandStatus.ERROR if the command was recognized but failed.
     """
     if argv is not None:
         parts = argv
@@ -429,16 +444,16 @@ def _cli_text_command(
         parts = expression.split()
 
     if not parts:
-        return 1
+        return _CommandStatus.NOT_HANDLED
 
     cmd = parts[0].lower()
     spec = _COMMAND_NAME_TO_SPEC.get(cmd)
     if spec is None:
-        return 1
+        return _CommandStatus.NOT_HANDLED
 
     if len(parts) < spec.get("min_args", 2):
         print(f"Usage: {spec['usage']}", file=sys.stderr)
-        return 1
+        return _CommandStatus.ERROR
 
     handler_name = spec["handler"]
     handler = _get_handler(handler_name)
@@ -449,12 +464,12 @@ def _cli_text_command(
             result: Any = handler(text, include_codepoints=False, include_confusables=True)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         if result["warnings"]:
             for w in result["warnings"]:
                 kind = w["kind"].upper()
@@ -465,7 +480,7 @@ def _cli_text_command(
             print(f"\nConfusables found: {len(result['confusables'])}")
             for c in result["confusables"][:5]:
                 print(f"  '{c['char']}' (looks like '{c['confusable_with']}') at {c['index']}")
-        return 0
+        return _CommandStatus.SUCCESS
 
     if cmd == "count":
         text = " ".join(parts[1:])
@@ -476,14 +491,14 @@ def _cli_text_command(
                 result = handler(text, target=char)
             except ValueError as e:
                 print(f"Error: {e}", file=sys.stderr)
-                return 1
+                return _CommandStatus.ERROR
             if json_output:
                 import json
 
                 print(json.dumps(result))
-                return 0
+                return _CommandStatus.SUCCESS
             print(f"'{char}' appears {result['count']} time(s) in \"{text}\"")
-            return 0
+            return _CommandStatus.SUCCESS
         try:
             if " " in text:
                 result = handler(text)
@@ -491,7 +506,7 @@ def _cli_text_command(
                     import json
 
                     print(json.dumps(result))
-                    return 0
+                    return _CommandStatus.SUCCESS
                 if isinstance(result, dict):
                     print(f"\"{text}\":")
                     print(f"  {len(text)} characters")
@@ -501,19 +516,19 @@ def _cli_text_command(
                         print(f"  {display}: {count}")
                     if len(result) > 10:
                         print(f"  ... and {len(result) - 10} more unique chars")
-                return 0
+                return _CommandStatus.SUCCESS
             else:
                 result = handler(text)
                 if json_output:
                     import json
 
                     print(json.dumps(result))
-                    return 0
+                    return _CommandStatus.SUCCESS
                 print(f"\"{text}\": {len(text)} character(s)")
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
-        return 0
+            return _CommandStatus.ERROR
+        return _CommandStatus.SUCCESS
 
     if cmd == "regex":
         pattern = parts[1]
@@ -522,15 +537,15 @@ def _cli_text_command(
             result = handler(pattern, [text])
         except re.error as e:
             print(f"Error: Invalid regex pattern: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if not result["valid_pattern"]:
             print(f"[!] Invalid regex pattern: {pattern}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         if result["results"]:
             r = result["results"][0]
             if r["matches"]:
@@ -543,17 +558,17 @@ def _cli_text_command(
                 print("[!] No match")
         else:
             print("[!] No match")
-        return 0
+        return _CommandStatus.SUCCESS
 
     if cmd == "replace-check":
         raw = " ".join(parts[1:]).strip()
         if _DELIM not in raw:
             print(f"Usage: {spec['usage']}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         segments = raw.split(_DELIM, 2)
         if len(segments) < 3:
             print(f"Usage: {spec['usage']}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         old = segments[0].strip()
         new = segments[1].strip()
         text = segments[2].strip()
@@ -561,12 +576,12 @@ def _cli_text_command(
             result = handler(text, old, new, return_preview=True)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         count = result["match_count"]
         if count == 0:
             print("[!] No match for replacement.")
@@ -576,13 +591,13 @@ def _cli_text_command(
             print(f"\u221d Replacement is ambiguous: {count} matches found.")
         for f in result["findings"]:
             print(f"  {f['kind']}: {f['message']}")
-        return 0
+        return _CommandStatus.SUCCESS
 
     if cmd == "lines":
         split_parts = expression.strip().split(None, 2)
         if len(split_parts) < 3:
             print(f"Usage: {spec['usage']}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         range_str = split_parts[1]
         text = split_parts[2]
         if "-" in range_str:
@@ -592,60 +607,60 @@ def _cli_text_command(
                 end_line = int(end_str)
             except ValueError:
                 print(f"Error: Invalid line range '{range_str}'", file=sys.stderr)
-                return 1
+                return _CommandStatus.ERROR
         else:
             try:
                 start_line = int(range_str)
                 end_line = start_line
             except ValueError:
                 print(f"Error: Invalid line number '{range_str}'", file=sys.stderr)
-                return 1
+                return _CommandStatus.ERROR
         try:
             result = handler(text, start_line, end_line, include_line_numbers=True)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         if not result["valid_range"]:
             for f in result["findings"]:
                 print(f"  {f['kind']}: {f['message']}")
-            return 1
+            return _CommandStatus.ERROR
         for line_info in result["lines"]:
             num = line_info.get("line", "")
             content = line_info.get("text", "")
             print(f"{num}: {content}")
-        return 0
+        return _CommandStatus.SUCCESS
 
     if cmd == "patch-check":
         raw = " ".join(parts[1:]).strip()
         if _DELIM not in raw:
             print(f"Usage: {spec['usage']}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         segments = raw.split(_DELIM, 1)
         if len(segments) < 2:
             print(f"Usage: {spec['usage']}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         original = segments[0].strip()
         patch_text = segments[1].strip()
         try:
             result = handler(original, patch_text)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         if not result["patch_parse_ok"]:
             print("[!] Failed to parse patch.")
             for f in result["findings"]:
                 print(f"  {f}")
-            return 1
+            return _CommandStatus.ERROR
         total = result["hunks_total"]
         applied = result["hunks_applied"]
         failed = result["hunks_failed"]
@@ -655,7 +670,7 @@ def _cli_text_command(
             print(f"[!] Patch fails: {failed}/{total} hunks failed.")
         for f in result["findings"]:
             print(f"  {f}")
-        return 0
+        return _CommandStatus.SUCCESS
 
     if cmd == "shell-split":
         command = " ".join(parts[1:])
@@ -663,17 +678,17 @@ def _cli_text_command(
             result = handler(command)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         if not result["parse_ok"]:
             print("[!] Parse failed.")
             for f in result["findings"]:
                 print(f"  {f}")
-            return 1
+            return _CommandStatus.ERROR
         argv_out = result["argv"]
         print(f"Parsed {result['argc']} token(s): {argv_out}")
         features = result["features"]
@@ -682,24 +697,24 @@ def _cli_text_command(
             print(f"Contains: {', '.join(active)}")
         for f in result["findings"]:
             print(f"  {f}")
-        return 0
+        return _CommandStatus.SUCCESS
 
     if cmd == "md-structure":
         split_parts = expression.strip().split(None, 1)
         if len(split_parts) < 2:
             print(f"Usage: {spec['usage']}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         text = split_parts[1]
         try:
             result = handler(text)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         headings = result["headings"]
         fences = result["code_fences"]
         links = result["links"]
@@ -725,7 +740,7 @@ def _cli_text_command(
             print("Markdown is empty or has no structural elements.")
         for f in result["findings"]:
             print(f"  {f}")
-        return 0
+        return _CommandStatus.SUCCESS
 
     if cmd == "dotenv-check":
         text = " ".join(parts[1:])
@@ -733,12 +748,12 @@ def _cli_text_command(
             result = handler(text)
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
-            return 1
+            return _CommandStatus.ERROR
         if json_output:
             import json
 
             print(json.dumps(result))
-            return 0
+            return _CommandStatus.SUCCESS
         entries = result["entries"]
         if result["parse_ok"] and not result["invalid_lines"]:
             print(f"[OK] Valid .env: {len(entries)} entry/entries.")
@@ -746,9 +761,9 @@ def _cli_text_command(
             print(f"[!] Invalid .env: {len(result['invalid_lines'])} invalid line(s).")
         for f in result["findings"]:
             print(f"  {f}")
-        return 0
+        return _CommandStatus.SUCCESS
 
-    return 1
+    return _CommandStatus.NOT_HANDLED
 
 
 def maybe_load_cli_config() -> None:
@@ -774,12 +789,9 @@ def maybe_load_cli_config() -> None:
 
 def main() -> int:
     """Main entry point for CLI."""
-    import os
     import signal
 
     import eggcalc
-
-    maybe_load_cli_config()
 
     try:
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)
@@ -851,6 +863,8 @@ def main() -> int:
 
     args = parser.parse_args()
 
+    # --- Informational modes (no user config needed) ---
+
     if args.capabilities:
         from .capabilities import detect_capabilities
 
@@ -883,54 +897,29 @@ def main() -> int:
         parser.print_help()
         return 0
 
+    # --- Calculator modes (config loaded here, after mode classification) ---
+
     if args.interactive:
-        return _run_repl(show_expression=True)
+        maybe_load_cli_config()
+        return _run_repl()
 
     if args.single_expr:
         expression = args.single_expr
-        quiet_by_default = True
     else:
         expression = " ".join(args.expression)
-        quiet_by_default = False
 
-    # Detect shell glob expansion (e.g., "python eggcalc.py 30 * 3" expands "*" to files)
-    if args.expression and len(args.expression) > 1:
-        # Check if any argument is a file or directory that exists (likely from glob expansion)
-        cwd = os.getcwd()
-        glob_indicators = []
-        for arg in args.expression:
-            path = os.path.join(cwd, arg)
-            if (
-                os.path.exists(path)
-                and arg not in (".", "..")
-                and not arg.startswith("./")
-                and not arg.startswith("../")
-            ):
-                glob_indicators.append(arg)
-
-        if glob_indicators:
-            error_lines = [
-                "Error: Possible shell glob expansion detected.",
-                f"The '*' character was expanded to file(s): {glob_indicators[:5]}{'...' if len(glob_indicators) > 5 else ''}",
-                "Please quote your expression:",
-                f'  calc "{" ".join(args.expression)}"',
-                "Or use -e flag:",
-                f'  calc -e "{" ".join(args.expression)}"',
-            ]
-            for line in error_lines:
-                print(line, file=sys.stderr)
-            return 1
-
-    # Try text commands first (inspect, count, regex, etc.)
-    # When invoked with positional args, pass the argv list directly so quoted
-    # arguments (e.g. text containing spaces) are preserved verbatim.
+    # Try text commands first (inspect, count, regex, etc.).
+    # Text commands do NOT require user config — they operate only on
+    # their explicit arguments and use lazy-loaded exact-tool modules.
     text_argv = args.expression if args.expression else None
     cmd_result = _cli_text_command(expression, json_output=args.json, argv=text_argv)
-    if cmd_result == 0:
-        return 0  # Command was handled
+    if cmd_result is _CommandStatus.SUCCESS:
+        return 0
+    if cmd_result is _CommandStatus.ERROR:
+        return 1
 
+    # Not a recognized text command — treat as calculator expression.
+    maybe_load_cli_config()
     output_format = "json" if args.json else "plain"
-    show_expression = not args.quiet and ((args.verbose or args.show) or not quiet_by_default)
-
-    _, exit_code = run_cli(expression, output_format, show_expression)
+    _, exit_code = run_cli(expression, output_format)
     return exit_code
