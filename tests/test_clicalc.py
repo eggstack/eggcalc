@@ -564,7 +564,7 @@ class TestCaching:
 
     def test_register_function_clears_global_cache(self):
         """Changing a global function should not return stale evaluate_cached results."""
-        from eggcalc import evaluate_cached, register_function
+        from eggcalc import evaluate_cached, get_default_evaluator, register_function
 
         register_function("globalcacheprobefunc", lambda: 10)
         assert self._get_value(evaluate_cached("globalcacheprobefunc()")) == 10
@@ -572,6 +572,9 @@ class TestCaching:
         register_function("globalcacheprobefunc", lambda: 20)
 
         assert self._get_value(evaluate_cached("globalcacheprobefunc()")) == 20
+
+        # Clean up: remove custom function so it doesn't pollute later tests
+        get_default_evaluator().FUNCTIONS.pop("globalcacheprobefunc", None)
 
 
 class TestTimeout:

@@ -3441,6 +3441,13 @@ def register_custom_units(
                 factor_value, configured_category = raw_value
                 if not isinstance(configured_category, str):
                     raise ValueError(f"Invalid custom-unit category for {canonical!r}")
+                # Validate that explicit category matches base unit's category
+                if configured_category != base_definition.category:
+                    raise ValueError(
+                        f"Custom-unit category '{configured_category}' for "
+                        f"{canonical!r} does not match base unit '{base}' "
+                        f"category '{base_definition.category}'"
+                    )
                 category = configured_category
             if not isinstance(canonical, str) or not isinstance(factor_value, (int, float)):
                 raise ValueError(f"Invalid custom-unit declaration for {canonical!r}")

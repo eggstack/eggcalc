@@ -19,6 +19,8 @@ import random
 import re
 import threading
 from collections import OrderedDict
+from dataclasses import dataclass
+from enum import Enum, auto
 from queue import Empty as _QueueEmpty
 from typing import Any, cast
 
@@ -210,6 +212,300 @@ _STRING_NAME_FUNCTIONS: frozenset[str] = frozenset(
 # vacuum" unit rather than the speed-of-light constant. Use long-form names
 # ('speedoflight', 'boltzmann', 'gasconstant') for clarity.
 _UNREACHABLE_CONSTANT_ALIASES: frozenset[str] = frozenset()
+
+
+# ---------------------------------------------------------------------------
+# Unit-aware function contracts (Workstreams A-B)
+# ---------------------------------------------------------------------------
+
+
+class UnitPolicy(Enum):
+    """Dimensional policy for built-in functions.
+
+    Each built-in function exposed by the evaluator has an explicit policy.
+    Unknown/user functions default to DIMENSIONLESS.
+    """
+
+    DIMENSIONLESS = auto()
+    ANGLE_INPUT = auto()
+    ANGLE_OUTPUT = auto()
+    PRESERVE_SINGLE = auto()
+    COMPATIBLE_REDUCER = auto()
+    ROOT = auto()
+    HYPOT = auto()
+    ATAN2 = auto()
+    CUSTOM = auto()
+
+
+@dataclass(frozen=True)
+class FunctionSpec:
+    """Colocated callable and its dimensional policy."""
+
+    function: Any
+    unit_policy: UnitPolicy
+
+
+def _preserve_single(name: str, func: Any, args: list[Any]) -> Any:
+    """Single-value transform that preserves UnitValue."""
+    if len(args) != 1:
+        raise EvaluationError(f"{name}() requires exactly 1 argument, got {len(args)}")
+    arg = args[0]
+    unit = getattr(arg, "unit", None) if isinstance(arg, UnitValue) else None
+    val = arg.value if isinstance(arg, UnitValue) else arg
+    result = func(val)
+    if unit is not None:
+        return UnitValue(result, unit)
+    return result
+
+
+def _compatible_reducer(name: str, func: Any, args: list[Any]) -> Any:
+    """Reducer that requires all arguments dimensionless or all compatible."""
+    if not args:
+        return func()
+    has_unit = [isinstance(a, UnitValue) and a.unit is not None for a in args]
+    if not any(has_unit):
+        return func(*args)
+    if all(has_unit):
+        units = [a.unit for a in args]
+        if len(set(units)) > 1:
+            base_unit = units[0]
+            converted_vals: list[float] = []
+            for a in args:
+                try:
+                    converted_vals.append(a.convert_to(base_unit).value)
+                except (ValueError, TypeError):
+                    raise EvaluationError(
+                        f"{name}() requires compatible units; "
+                        f"received incompatible units '{units[0]}' and '{a.unit}'"
+                    )
+            result = func(*converted_vals)
+            return UnitValue(result, base_unit)
+        else:
+            result = func(*[a.value for a in args])
+            return UnitValue(result, units[0])
+    raise EvaluationError(
+        f"{name}() requires compatible units; received a mix of dimensionless and dimensional arguments"
+    )
+
+
+def _angle_input_dispatch(name: str, func: Any, args: list[Any]) -> Any:
+    """Trig function: accept dimensionless (radians) or angle UnitValue."""
+    if len(args) != 1:
+        raise EvaluationError(f"{name}() requires exactly 1 argument, got {len(args)}")
+    arg = args[0]
+    if isinstance(arg, UnitValue):
+        if arg.unit is None:
+            return func(arg.value)
+        cat = get_unit_category(arg.unit)
+        if cat == "angle":
+            try:
+                radians_val = arg.value * get_conversion_factor(arg.unit, "rad")
+            except (ValueError, TypeError):
+                raise EvaluationError(f"{name}() cannot convert angle unit '{arg.unit}' to radians")
+            return func(radians_val)
+        raise EvaluationError(
+            f"{name}() requires a dimensionless or angle argument, got unit '{arg.unit}'"
+        )
+    return func(arg)
+
+
+def _sqrt_dispatch(args: list[Any]) -> Any:
+    """sqrt: dimensionless or even-exponent dimensional."""
+    from .units import _get_unit_registry
+
+    def _get_reg() -> Any:
+        return _get_unit_registry()
+
+    if len(args) != 1:
+        raise EvaluationError("sqrt() requires exactly 1 argument")
+    arg = args[0]
+    if isinstance(arg, UnitValue):
+        if arg.unit is None:
+            return _sqrt(arg.value)
+        expr = arg._unit_expr
+        all_even = all(e % 2 == 0 for _, e in expr.factors)
+        if all_even:
+            from .units import (
+                DIM_DIMENSIONLESS,
+                UnitExpression,
+                _get_unit_registry,
+                render_expression,
+            )
+
+            new_factors = tuple((u, e // 2) for u, e in expr.factors)
+            # Compute the expected dimension and scale from halved factors
+            registry = _get_unit_registry()
+            expected_dimension = DIM_DIMENSIONLESS
+            expected_scale = 1.0
+            for canonical, exponent in new_factors:
+                if registry is not None:
+                    definition = registry.by_canonical(canonical)
+                    if definition is not None:
+                        expected_dimension = expected_dimension * (definition.dimension**exponent)
+                        expected_scale *= definition.scale**exponent
+            new_expr = UnitExpression.__new__(UnitExpression)
+            object.__setattr__(new_expr, "factors", new_factors)
+            object.__setattr__(new_expr, "dimension", expected_dimension)
+            object.__setattr__(new_expr, "scale_to_base", expected_scale)
+            new_unit = render_expression(new_expr)
+            val = _sqrt(arg.value)
+            return UnitValue(val, new_unit)
+        raise EvaluationError(
+            f"sqrt() cannot represent the square root of unit '{arg.unit}' with integer exponents"
+        )
+    return _sqrt(arg)
+
+
+def _hypot_dispatch(args: list[Any]) -> Any:
+    """hypot: all compatible or all dimensionless."""
+    if not args:
+        return math.hypot()
+    has_unit = [isinstance(a, UnitValue) and a.unit is not None for a in args]
+    if not any(has_unit):
+        return math.hypot(*args)
+    if all(has_unit):
+        units = [a.unit for a in args]
+        base_unit = units[0]
+        vals: list[float] = []
+        for a in args:
+            try:
+                vals.append(a.convert_to(base_unit).value)
+            except (ValueError, TypeError):
+                raise EvaluationError(
+                    f"hypot() requires compatible units; received incompatible units "
+                    f"'{units[0]}' and '{a.unit}'"
+                )
+        return UnitValue(math.hypot(*vals), base_unit)
+    raise EvaluationError(
+        "hypot() requires compatible units; received a mix of dimensionless and dimensional arguments"
+    )
+
+
+def _atan2_dispatch(args: list[Any]) -> Any:
+    """atan2: both dimensionless or both compatible."""
+    if len(args) != 2:
+        raise EvaluationError("atan2() requires exactly 2 arguments")
+    y, x = args
+    y_is_uv = isinstance(y, UnitValue) and y.unit is not None
+    x_is_uv = isinstance(x, UnitValue) and x.unit is not None
+    if not y_is_uv and not x_is_uv:
+        yv = y.value if isinstance(y, UnitValue) else y
+        xv = x.value if isinstance(x, UnitValue) else x
+        return math.atan2(cast(float, yv), cast(float, xv))
+    if y_is_uv and x_is_uv:
+        try:
+            xv_converted = x.convert_to(y.unit)
+            return math.atan2(y.value, xv_converted.value)
+        except (ValueError, TypeError):
+            raise EvaluationError(
+                f"atan2() requires compatible units; received '{y.unit}' and '{x.unit}'"
+            )
+    raise EvaluationError(
+        "atan2() requires compatible units; received a mix of dimensionless and dimensional arguments"
+    )
+
+
+def _build_function_specs() -> dict[str, FunctionSpec]:
+    """Build the authoritative function→policy mapping from Evaluator.FUNCTIONS."""
+    specs: dict[str, FunctionSpec] = {}
+    funcs = Evaluator.FUNCTIONS
+    for name in (
+        "sin",
+        "cos",
+        "tan",
+    ):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.ANGLE_INPUT)
+    for name in (
+        "asin",
+        "acos",
+        "atan",
+    ):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.ANGLE_OUTPUT)
+    for name in ("sinh", "cosh", "tanh", "asinh", "acosh", "atanh"):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+    for name in ("log", "ln", "log10", "log2", "log1p", "exp", "expm1"):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+    for name in ("sign",):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.PRESERVE_SINGLE)
+    for name in (
+        "cbrt",
+        "pow",
+        "factorial",
+        "fact",
+        "gcd",
+        "lcm",
+        "perm",
+        "comb",
+        "nPr",
+        "nCr",
+        "isprime",
+        "is_prime",
+        "primefactors",
+        "prime_factors",
+        "nextprime",
+        "next_prime",
+        "prevprime",
+        "prev_prime",
+        "bin",
+        "hex",
+        "oct",
+        "bitand",
+        "bitor",
+        "bitxor",
+        "bitnot",
+        "bitlshift",
+        "bitrshift",
+        "randint",
+        "randrange",
+        "expm1",
+    ):
+        if name not in specs:
+            specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+    for name in (
+        "mean",
+        "median",
+        "mode",
+        "std",
+        "std_sample",
+        "stds",
+        "variance",
+        "var",
+        "variance_sample",
+        "vars",
+        "var_sample",
+        "sum",
+        "max",
+        "min",
+    ):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.COMPATIBLE_REDUCER)
+    specs["sqrt"] = FunctionSpec(funcs["sqrt"], UnitPolicy.ROOT)
+    specs["hypot"] = FunctionSpec(funcs["hypot"], UnitPolicy.HYPOT)
+    specs["atan2"] = FunctionSpec(funcs["atan2"], UnitPolicy.ATAN2)
+    specs["abs"] = FunctionSpec(funcs["abs"], UnitPolicy.PRESERVE_SINGLE)
+    specs["round"] = FunctionSpec(funcs["round"], UnitPolicy.PRESERVE_SINGLE)
+    specs["floor"] = FunctionSpec(funcs["floor"], UnitPolicy.PRESERVE_SINGLE)
+    specs["ceil"] = FunctionSpec(funcs["ceil"], UnitPolicy.PRESERVE_SINGLE)
+    specs["trunc"] = FunctionSpec(funcs["trunc"], UnitPolicy.PRESERVE_SINGLE)
+    for name in ("clamp", "percentof", "percent_of", "aspercent", "as_percent"):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+    for name in ("real", "imag", "conj", "conjugate", "phase", "polar", "rect"):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+    for name in ("degrees", "radians"):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+    for name in ("random", "randint", "randrange", "uniform", "randn", "gauss", "seed"):
+        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+    return specs
+
+
+_FUNCTION_SPECS: dict[str, FunctionSpec] | None = None
+
+
+def _get_function_specs() -> dict[str, FunctionSpec]:
+    """Lazily build and return the function→policy mapping."""
+    global _FUNCTION_SPECS
+    if _FUNCTION_SPECS is None:
+        _FUNCTION_SPECS = _build_function_specs()
+    return _FUNCTION_SPECS
 
 
 # Set of child processes that survived terminate+kill in MCP mode.
@@ -2349,9 +2645,6 @@ class Evaluator(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> Any:
         """Visit a function call node."""
-        if node.keywords:
-            raise EvaluationError("Keyword arguments are not supported")
-
         func_name = None
         if isinstance(node.func, ast.Name):
             func_name = node.func.id
@@ -2360,9 +2653,7 @@ class Evaluator(ast.NodeVisitor):
                 func_name = node.func.attr
 
         if func_name is None:
-            raise EvaluationError(
-                "Only simple function calls are supported " "(e.g. sin(x), sqrt(y))"
-            )
+            raise EvaluationError("Only simple function calls are supported (e.g. sin(x), sqrt(y))")
         if func_name not in self.FUNCTIONS:
             raise EvaluationError(f"Function '{func_name}' is not allowed")
 
@@ -2398,17 +2689,13 @@ class Evaluator(ast.NodeVisitor):
             convert_args: list[Any] = []
             for i, arg in enumerate(node.args):
                 result = self.visit(arg)
-                # Pass the full UnitValue, not just the value
                 convert_args.append(result)
             try:
                 return self.FUNCTIONS[func_name](*convert_args)
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 
-        # Special handling for variable-management functions (setvar/getvar/delvar):
-        # the first argument is a variable name (string), which must remain a
-        # string even if it happens to collide with a constant or unit name
-        # (e.g., setvar("pi", 5) should bind "pi", not replace math.pi).
+        # Special handling for variable-management functions (setvar/getvar/delvar)
         if func_name in _STRING_NAME_FUNCTIONS:
             name_args: list[Any] = []
             for i, arg in enumerate(node.args):
@@ -2421,32 +2708,100 @@ class Evaluator(ast.NodeVisitor):
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 
-        # Extract values from arguments, handling UnitValues
-        args: list[Any] = []
-        for arg in node.args:
-            result = self.visit(arg)
-            # Reject UnitValue-with-unit for functions that semantically
-            # require a dimensionless argument. The previous behavior was
-            # to silently strip the unit and return a misleading
-            # dimensionless result (e.g. fact(5m) -> 120).
+        # Keyword argument handling: allow ndigits for round()
+        kwargs: dict[str, Any] = {}
+        if node.keywords:
             if (
-                func_name in _DIMENSIONLESS_REQUIRED_FUNCTIONS
-                and isinstance(result, UnitValue)
-                and result.unit is not None
+                func_name == "round"
+                and len(node.keywords) == 1
+                and node.keywords[0].arg == "ndigits"
             ):
-                raise EvaluationError(
-                    f"Function '{func_name}()' requires a dimensionless "
-                    f"argument, got value with unit '{result.unit}'"
-                )
-            if isinstance(result, UnitValue):
-                args.append(result.value)
+                kwargs["ndigits"] = self.visit(node.keywords[0].value)
             else:
-                args.append(result)
+                raise EvaluationError("Keyword arguments are not supported")
+
+        # Evaluate arguments
+        args: list[Any] = [self.visit(arg) for arg in node.args]
+
+        # Look up unit policy for this function
+        spec = _get_function_specs().get(func_name)
+        if spec is None:
+            # User-registered or unknown function: default to dimensionless
+            for arg in args:
+                if isinstance(arg, UnitValue) and arg.unit is not None:
+                    raise EvaluationError(
+                        f"Function '{func_name}()' requires a dimensionless "
+                        f"argument, got value with unit '{arg.unit}'"
+                    )
+            plain_args = [a.value if isinstance(a, UnitValue) else a for a in args]
+            try:
+                return self.FUNCTIONS[func_name](*plain_args, **kwargs)
+            except OverflowError:
+                raise EvaluationError("Result too large") from None
+            except (ValueError, TypeError, ZeroDivisionError) as e:
+                raise EvaluationError(str(e)) from None
+
+        policy = spec.unit_policy
+        # Use self.FUNCTIONS[func_name] instead of spec.function to preserve
+        # instance-bound closures (e.g., instance-specific random generators).
+        inst_func = self.FUNCTIONS[func_name]
 
         try:
-            return self.FUNCTIONS[func_name](*args)
+            if policy is UnitPolicy.DIMENSIONLESS:
+                for arg in args:
+                    if isinstance(arg, UnitValue) and arg.unit is not None:
+                        raise EvaluationError(
+                            f"Function '{func_name}()' requires a dimensionless "
+                            f"argument, got value with unit '{arg.unit}'"
+                        )
+                plain_args = [a.value if isinstance(a, UnitValue) else a for a in args]
+                return inst_func(*plain_args, **kwargs)
+
+            elif policy is UnitPolicy.ANGLE_INPUT:
+                return _angle_input_dispatch(func_name, inst_func, args)
+
+            elif policy is UnitPolicy.ANGLE_OUTPUT:
+                for arg in args:
+                    if isinstance(arg, UnitValue) and arg.unit is not None:
+                        raise EvaluationError(
+                            f"Function '{func_name}()' requires a dimensionless "
+                            f"argument, got value with unit '{arg.unit}'"
+                        )
+                plain_args = [a.value if isinstance(a, UnitValue) else a for a in args]
+                return inst_func(*plain_args, **kwargs)
+
+            elif policy is UnitPolicy.PRESERVE_SINGLE:
+                if func_name == "round":
+                    arg = args[0]
+                    unit = getattr(arg, "unit", None) if isinstance(arg, UnitValue) else None
+                    val = arg.value if isinstance(arg, UnitValue) else arg
+                    nd = kwargs.get("ndigits", args[1] if len(args) > 1 else 0)
+                    result = round(cast(float, val), nd)
+                    if unit is not None:
+                        return UnitValue(result, unit)
+                    return result
+                return _preserve_single(func_name, inst_func, args)
+
+            elif policy is UnitPolicy.COMPATIBLE_REDUCER:
+                return _compatible_reducer(func_name, inst_func, args)
+
+            elif policy is UnitPolicy.ROOT:
+                return _sqrt_dispatch(args)
+
+            elif policy is UnitPolicy.HYPOT:
+                return _hypot_dispatch(args)
+
+            elif policy is UnitPolicy.ATAN2:
+                return _atan2_dispatch(args)
+
+            else:
+                plain_args = [a.value if isinstance(a, UnitValue) else a for a in args]
+                return inst_func(*plain_args, **kwargs)
+
         except OverflowError:
             raise EvaluationError("Result too large") from None
+        except EvaluationError:
+            raise
         except (ValueError, TypeError, ZeroDivisionError) as e:
             raise EvaluationError(str(e)) from None
 
@@ -2583,7 +2938,7 @@ def evaluate_raw(expression: str, _evaluator: Evaluator | None = None) -> Any:
     )
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
-    ev = _evaluator or _server_evaluator.get() or _default_evaluator
+    ev = _evaluator if _evaluator is not None else (_server_evaluator.get() or _default_evaluator)
     return ev.evaluate(normalized)
 
 
@@ -2593,20 +2948,57 @@ class TimeoutError(Exception):
     pass
 
 
+def _snapshot_evaluator_state(ev: Evaluator) -> dict[str, Any]:
+    """Create a pickle-safe snapshot of evaluator state for timeout workers.
+
+    Returns a plain dict with constants, variables, memory registers, and
+    flags. Arbitrary registered callables that are not built-in functions
+    cause an immediate EvaluationError.
+    """
+    # Detect custom (non-built-in) registered functions
+    builtin_funcs = set(Evaluator.FUNCTIONS.keys())
+    custom_names = [name for name in ev.FUNCTIONS if name not in builtin_funcs]
+    if custom_names:
+        raise EvaluationError(
+            f"evaluate_with_timeout() does not support custom registered "
+            f"functions: {', '.join(sorted(custom_names))}. "
+            f"Use evaluate() for expressions with custom functions."
+        )
+
+    constants: dict[str, Any] = {}
+    for name, val in ev.CONSTANTS.items():
+        if isinstance(val, (int, float, complex, bool, str)):
+            constants[name] = val
+
+    with ev._var_lock:
+        variables: dict[str, Any] = dict(ev._user_variables)
+
+    memory: dict[str, float] = ev._memory.list_registers()
+
+    return {
+        "constants": constants,
+        "variables": variables,
+        "memory": memory,
+        "allow_random": ev._allow_random,
+        "allow_side_effects": ev._allow_side_effects,
+    }
+
+
 def _evaluate_with_timeout_worker(
     expr: str,
     result_queue: multiprocessing.Queue,
     allow_random: bool = True,
     allow_side_effects: bool = True,
+    state_snapshot: dict[str, Any] | None = None,
 ) -> None:
     """Run evaluation in a child process and put result in queue.
 
     Must be a module-level function (not nested) so it can be pickled
     by the 'spawn' multiprocessing start method.
 
-    Creates a local ``Evaluator`` instance with the given policy flags
-    instead of mutating the module-level ``_default_evaluator``. This
-    ensures child processes do not share or alter parent evaluator state.
+    When ``state_snapshot`` is provided, the child evaluator is
+    reconstructed with the parent's constants, variables, and memory
+    registers, ensuring parity between ordinary and timeout evaluation.
 
     Note: ``resource.setrlimit(RLIMIT_AS, ...)`` is a Linux/POSIX feature.
     On macOS, the kernel silently ignores ``RLIMIT_AS`` and the
@@ -2620,8 +3012,6 @@ def _evaluate_with_timeout_worker(
 
         resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
     except (ImportError, ValueError, OSError):
-        # RLIMIT_AS may not be supported or enforced on all platforms (e.g., macOS).
-        # On failure, we rely solely on the time-based timeout for protection.
         pass
     try:
         _ensure_config_loaded()
@@ -2629,6 +3019,14 @@ def _evaluate_with_timeout_worker(
             allow_random=allow_random,
             allow_side_effects=allow_side_effects,
         )
+        # Reconstruct parent state in the child evaluator
+        if state_snapshot is not None:
+            for name, val in state_snapshot.get("constants", {}).items():
+                child_evaluator.CONSTANTS[name] = val
+            for name, val in state_snapshot.get("variables", {}).items():
+                child_evaluator._user_variables[name] = val
+            for register, val in state_snapshot.get("memory", {}).items():
+                child_evaluator._memory.store(val, register)
         result = evaluate_raw(expr, _evaluator=child_evaluator)
         result_queue.put(("ok", result))
     except Exception as exc:
@@ -2696,11 +3094,16 @@ def evaluate_with_timeout(
         Expressions that exceed MAX_EXPONENT (10000) or MAX_FACTORIAL (1000)
         will fail with EvaluationError before the timeout is reached.
 
+        Custom registered callables cannot be serialized across process
+        boundaries. If the parent evaluator has custom (non-built-in)
+        functions registered, this function raises EvaluationError
+        immediately. Use evaluate() for expressions with custom functions.
+
     Example:
-        >>> result = evaluate_with_timeout("sum([i**2 for i in range(100)])", timeout=1.0)
+        >>> result = evaluate_with_timeout("2**100 + 3**50", timeout=1.0)
         # May raise TimeoutError for slow expressions
     """
-    effective = _evaluator or _server_evaluator.get()
+    effective = _evaluator if _evaluator is not None else _server_evaluator.get()
     if allow_random is None:
         allow_random = (
             effective._allow_random if effective is not None else _default_evaluator._allow_random
@@ -2711,6 +3114,9 @@ def evaluate_with_timeout(
             if effective is not None
             else _default_evaluator._allow_side_effects
         )
+    # Create state snapshot for timeout worker parity
+    source_evaluator = effective if effective is not None else _default_evaluator
+    state_snapshot = _snapshot_evaluator_state(source_evaluator)
     ctx = _get_eval_multiprocessing_context()
     queue: multiprocessing.Queue = ctx.Queue()
     proc: Any = None
@@ -2729,7 +3135,7 @@ def evaluate_with_timeout(
         try:
             proc = ctx.Process(  # type: ignore[attr-defined]
                 target=_evaluate_with_timeout_worker,
-                args=(expression, queue, allow_random, allow_side_effects),
+                args=(expression, queue, allow_random, allow_side_effects, state_snapshot),
             )
             proc.start()
         except Exception:

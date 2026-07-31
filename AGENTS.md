@@ -57,6 +57,28 @@ evaluate_raw("5m % 2s")   # → EvaluationError (incompatible dimensions)
 
 **When writing tests:** use `evaluate()` for direct AST evaluator behavior (e.g. `"5+3"`, `"2**10"`). Use `evaluate_raw()`, CLI subprocesses, or `run()` for natural-language and unit parsing behavior.
 
+### Unit-aware function contracts
+
+Every built-in function has an explicit `UnitPolicy` (defined in `evaluator.py`). The centralized dispatcher in `visit_Call` enforces these policies:
+
+- **DIMENSIONLESS**: Reject `UnitValue` with unit (`log`, `exp`, `gcd`, `factorial`, etc.)
+- **ANGLE_INPUT**: Accept dimensionless (radians) or angle `UnitValue` with degree conversion (`sin`, `cos`, `tan`)
+- **ANGLE_OUTPUT**: Accept dimensionless, reject dimensional (`asin`, `acos`, `atan`)
+- **PRESERVE_SINGLE**: Single arg, preserve unit on result (`abs`, `round`, `floor`, `ceil`, `trunc`, `sign`)
+- **COMPATIBLE_REDUCER**: All args dimensionless or all compatible units (`mean`, `min`, `max`, `median`, `std`, `sum`)
+- **ROOT**: Dimensionless or even-exponent unit; halve exponents (`sqrt`)
+- **HYPOT/ATAN2**: Both dimensionless or both compatible units
+
+User-registered functions default to DIMENSIONLESS. Custom callables are rejected by `evaluate_with_timeout()`.
+
+### Angle conversion
+
+Trig functions convert angle `UnitValue` to radians before calling `math`:
+```python
+evaluate_raw("sin(90*deg)")  # → 1.0 (converted to π/2 radians)
+evaluate_raw("sin(1*m)")     # → EvaluationError (non-angle dimension)
+```
+
 ## Commands
 
 ```bash

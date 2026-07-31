@@ -451,6 +451,44 @@ result.convert_to("ft")  # → UnitValue(198.5, "ft")
 
 The evaluator supports compound units in division and multiplication (e.g., `5m / 2s` → `2.5 m/s`), unit exponentiation (`5m ** 2` → `25.0 m**2`), and temperature conversions (with offset math). Cross-scale temperature addition is rejected; subtraction produces a delta.
 
+### Unit-Aware Function Contracts
+
+Every built-in function has an explicit `UnitPolicy` that controls how `UnitValue` arguments are handled. This prevents silent unit stripping (e.g., `sqrt(4*m) → 2` with meter lost).
+
+| Policy | Behavior | Example functions |
+|--------|----------|-------------------|
+| `DIMENSIONLESS` | Reject `UnitValue` with unit | `log`, `exp`, `gcd`, `factorial`, `clamp` |
+| `ANGLE_INPUT` | Accept dimensionless (radians) or angle `UnitValue`; convert to radians | `sin`, `cos`, `tan` |
+| `ANGLE_OUTPUT` | Accept dimensionless; reject dimensional | `asin`, `acos`, `atan` |
+| `PRESERVE_SINGLE` | Single arg, preserve unit on result | `abs`, `round`, `floor`, `ceil`, `trunc`, `sign` |
+| `COMPATIBLE_REDUCER` | All args dimensionless or all compatible units | `mean`, `min`, `max`, `median`, `std`, `sum` |
+| `ROOT` | Dimensionless or even-exponent unit; halve exponents | `sqrt` |
+| `HYPOT` | All args dimensionless or all compatible units | `hypot` |
+| `ATAN2` | Both dimensionless or both compatible units | `atan2` |
+
+User-registered functions default to `DIMENSIONLESS` (reject `UnitValue`).
+
+Examples:
+```python
+evaluate_raw("sin(90*deg)")      # → 1.0 (degree conversion)
+evaluate_raw("sin(1*m)")         # → EvaluationError
+evaluate_raw("sqrt(4*m**2)")     # → 2.0 m
+evaluate_raw("sqrt(4*m)")        # → EvaluationError
+evaluate_raw("mean(1*m, 100*cm)") # → 1.0 m
+evaluate_raw("hypot(3*m, 4*s)")  # → EvaluationError
+evaluate_raw("abs(-5*m)")        # → 5 m
+```
+
+### Timeout Evaluator State Parity
+
+`evaluate_with_timeout()` reconstructs the parent evaluator's state in the child process:
+- Registered scalar constants
+- User variables
+- Memory registers
+- `allow_random` / `allow_side_effects` flags
+
+Custom registered callables cannot be serialized across process boundaries and cause `evaluate_with_timeout()` to fail immediately with `EvaluationError`. Use `evaluate()` for expressions with custom functions.
+
 See [units.md](units.md) for unit conversion details.
 
 ## Module Dependencies
