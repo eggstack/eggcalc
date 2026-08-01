@@ -411,6 +411,37 @@ class TestAngleModel:
         with pytest.raises(EvaluationError, match="dimensionless or angle"):
             evaluate_raw("sin(1*m)")
 
+    def test_compound_angle_deg_per_s(self):
+        """deg/s produces angular velocity with angle=True dimension."""
+        result = evaluate_raw("30*deg/s")
+        assert isinstance(result, UnitValue)
+        assert result.value == 30
+        assert result.unit == "deg/s"
+
+    def test_compound_angle_rad_per_s(self):
+        result = evaluate_raw("5*rad/s")
+        assert isinstance(result, UnitValue)
+        assert result.value == 5
+
+    def test_compound_angle_cancel(self):
+        """deg/s * s cancels time, leaving direct angle."""
+        result = evaluate_raw("30*deg/s * 2*s")
+        assert isinstance(result, UnitValue)
+        assert abs(result.value - 60) < 1e-10
+        assert result.unit == "deg"
+
+    def test_compound_angle_rejected_by_trig(self):
+        """Angular velocity (deg/s) must not be accepted as angle input."""
+        with pytest.raises(EvaluationError, match="dimensionless or angle"):
+            evaluate_raw("sin(1*deg/s)")
+
+    def test_compound_angle_division(self):
+        """180*deg / (pi*s) produces angular velocity."""
+        result = evaluate_raw("180*deg / (pi*s)")
+        assert isinstance(result, UnitValue)
+        assert abs(result.value - 57.2958) < 0.01
+        assert result.unit == "deg/s"
+
 
 # ---------------------------------------------------------------------------
 # Workstream D: Timeout evaluator state parity
@@ -461,6 +492,33 @@ class TestTimeoutStateParity:
         ev = Evaluator()
         with pytest.raises(TimeoutError):
             evaluate_with_timeout("2**2**2**2**2**2**2**2", timeout=0.01, _evaluator=ev)
+
+    def test_timeout_allow_random_true(self):
+        """allow_random=True permits random functions in timeout worker."""
+        ev = Evaluator(allow_random=True)
+        result = evaluate_with_timeout("random()", timeout=5.0, _evaluator=ev)
+        assert isinstance(result, float)
+        assert 0.0 <= result < 1.0
+
+    def test_timeout_allow_random_false(self):
+        """allow_random=False rejects random functions in timeout worker."""
+        ev = Evaluator(allow_random=False)
+        with pytest.raises(EvaluationError, match="non-deterministic"):
+            evaluate_with_timeout("random()", timeout=5.0, _evaluator=ev)
+
+    def test_timeout_allow_side_effects_false(self):
+        """allow_side_effects=False rejects state-mutating functions."""
+        ev = Evaluator(allow_side_effects=False)
+        with pytest.raises(EvaluationError, match="mutates evaluator state"):
+            evaluate_with_timeout("store(42)", timeout=5.0, _evaluator=ev)
+
+    def test_timeout_allow_side_effects_override(self):
+        """Explicit allow_side_effects=True overrides parent evaluator."""
+        ev = Evaluator(allow_side_effects=False)
+        result = evaluate_with_timeout(
+            "store(42)", timeout=5.0, _evaluator=ev, allow_side_effects=True
+        )
+        assert result == 42.0
 
 
 # ---------------------------------------------------------------------------
