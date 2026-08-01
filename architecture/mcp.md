@@ -446,10 +446,10 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
 
 | Method | Handler | Description |
 |--------|---------|-------------|
-| `initialize` | `_handle_initialize()` | Initialize connection, return capabilities |
+| `initialize` | `McpSession._handle_initialize()` | Initialize connection, return capabilities |
 | `notifications/initialized` | None (returns None) | Client acknowledgment |
 | `tools/list` | `_handle_list_tools()` | List available tools (with filtering) |
-| `tools/call` | `_handle_call_tool()` | Execute a tool |
+| `tools/call` | `McpSession._handle_call_tool_server()` | Execute a tool |
 | `profiles/list` | `_handle_list_profiles()` | List all profiles and their tools |
 | `notifications/cancelled` | None (records cancellation) | Client-side request cancellation |
 | `ping` | Inline response | Health check, returns empty result |

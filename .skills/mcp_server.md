@@ -20,7 +20,7 @@ return {"result": str(value), "type": type(value).__name__}
 return _error_response("ErrorType", error_message, hints)
 ```
 
-**In server.py `_handle_call_tool()`**, results are wrapped in MCP format:
+**In `McpSession._handle_call_tool_server()`**, results are wrapped in MCP format:
 ```python
 return {
     "jsonrpc": "2.0",

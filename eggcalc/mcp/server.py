@@ -20,7 +20,7 @@ import warnings
 import weakref
 from collections import deque
 from collections.abc import Mapping
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass as _dataclass
 from dataclasses import field as _field
@@ -592,17 +592,6 @@ class McpServerConfig:
         return self.supported_protocol_versions[-1]
 
 
-def _deep_freeze(obj: Any) -> Any:
-    """Recursively convert mutable containers to immutable equivalents."""
-    if isinstance(obj, dict):
-        return MappingProxyType({k: _deep_freeze(v) for k, v in obj.items()})
-    if isinstance(obj, list):
-        return tuple(_deep_freeze(item) for item in obj)
-    if isinstance(obj, set):
-        return frozenset(_deep_freeze(item) for item in obj)
-    return obj
-
-
 def freeze_owned(value: Any) -> Any:
     """Recursively convert mutable containers to immutable equivalents."""
     if isinstance(value, Mapping):
@@ -618,28 +607,13 @@ def thaw_owned(value: Any) -> Any:
     """Recursively convert immutable containers back to mutable equivalents."""
     if isinstance(value, MappingProxyType):
         return {k: thaw_owned(v) for k, v in value.items()}
-    if isinstance(value, tuple):
+    if isinstance(value, dict):
+        return {k: thaw_owned(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
         return [thaw_owned(v) for v in value]
-    if isinstance(value, frozenset):
+    if isinstance(value, (set, frozenset)):
         return {thaw_owned(v) for v in value}
     return value
-
-
-def _deep_copy(obj: Any) -> Any:
-    """Recursively copy mutable containers so originals cannot mutate us.
-
-    Converts frozen containers back to mutable equivalents:
-    MappingProxyType → dict, tuple → list, frozenset → set.
-    """
-    if isinstance(obj, MappingProxyType):
-        return {k: _deep_copy(v) for k, v in obj.items()}
-    if isinstance(obj, dict):
-        return {k: _deep_copy(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_deep_copy(item) for item in obj]
-    if isinstance(obj, (set, frozenset)):
-        return {_deep_copy(item) for item in obj}
-    return obj
 
 
 class ToolRegistry:
@@ -774,14 +748,14 @@ class ToolRegistry:
             return None
         # Return a deep copy so callers cannot mutate internal state
         # through nested dicts (e.g. inputSchema.properties).
-        result: dict[str, Any] = _deep_copy(dict(schema))
+        result: dict[str, Any] = thaw_owned(dict(schema))
         return result
 
     def get_metadata(self, name: str) -> dict[str, Any]:
         meta = self._metadata.get(name)
         if meta is None:
             return {}
-        result: dict[str, Any] = _deep_copy(dict(meta))
+        result: dict[str, Any] = thaw_owned(dict(meta))
         return result
 
     def get_profile_tools(self, profile: str | None = None) -> list[str]:
@@ -1361,50 +1335,37 @@ def parse_config_candidate(
 ) -> ConfigCandidate:
     """Parse raw configuration values into a validated ConfigCandidate.
 
-    The candidate is the parser result and the input to context construction.
-    Raises ConfigError on invalid input.
+    Delegates to parse_config_snapshot for validation, then extracts
+    the fields into a ConfigCandidate.  Raises ConfigError on invalid input.
     """
-    parsed_constants: dict[str, Any] = {}
-    if constants is not None:
-        for name, value in constants.items():
-            if not isinstance(name, str):
-                raise ConfigError(f"Constant name must be str, got {type(name).__name__}")
-            if not isinstance(value, (int, float, str, bool)):
-                raise ConfigError(
-                    f"Constant '{name}' must be int/float/str/bool, " f"got {type(value).__name__}"
-                )
-            parsed_constants[name] = value
-
-    parsed_functions: dict[str, Any] = {}
-    if functions is not None:
-        for name, value in functions.items():
-            if not isinstance(name, str):
-                raise ConfigError(f"Function name must be str, got {type(name).__name__}")
-            if not callable(value):
-                raise ConfigError(f"Function '{name}' must be callable")
-            parsed_functions[name] = value
-
-    if units:
-        raise ConfigError("custom units are not supported by server configuration")
-
-    if isinstance(policy, EvaluationPolicy):
-        resolved_policy: EvaluationPolicy = policy
-    elif isinstance(policy, str):
-        try:
-            resolved_policy = EvaluationPolicy(policy)
-        except ValueError:
-            valid_values = sorted(e.value for e in EvaluationPolicy)
-            raise ConfigError(f"Invalid policy {policy!r}; must be one of {valid_values}")
-    elif policy is None:
-        resolved_policy = EvaluationPolicy.DEFAULT
-    else:
-        raise ConfigError(f"Invalid policy type: {type(policy).__name__}")
-
+    snapshot = parse_config_snapshot(
+        constants=constants,
+        functions=functions,
+        units=units,
+        policy=policy,
+    )
+    resolved_policy = (
+        snapshot.policy
+        if isinstance(snapshot.policy, EvaluationPolicy)
+        else EvaluationPolicy(snapshot.policy)
+    )
     return ConfigCandidate(
-        constants=freeze_owned(parsed_constants),
-        functions=freeze_owned(parsed_functions),
+        constants=snapshot.constants,
+        functions=snapshot.functions,
         policy=resolved_policy,
     )
+
+
+def _effective_policy(policy: EvaluationPolicy) -> EvaluationPolicy:
+    """Resolve the effective evaluation policy.
+
+    PERMISSIVE is a compatibility alias for DEFAULT behavior.
+    Only STRICT has a distinct runtime effect (disabling both
+    allow_random and allow_side_effects).
+    """
+    if policy is EvaluationPolicy.PERMISSIVE:
+        return EvaluationPolicy.DEFAULT
+    return policy
 
 
 def policy_from_server_config(config: McpServerConfig) -> EvaluationPolicy:
@@ -1435,13 +1396,12 @@ def build_runtime_context(config: McpServerConfig, snapshot: ConfigSnapshot) -> 
             snapshot.policy.value if hasattr(snapshot.policy, "value") else snapshot.policy
         )
     )
-    # STRICT always disables both; PERMISSIVE enables only what config allows;
-    # DEFAULT follows config flags.
-    if policy == EvaluationPolicy.STRICT:
+    # Normalize PERMISSIVE to DEFAULT (they are equivalent).
+    effective = _effective_policy(policy)
+    # STRICT always disables both; DEFAULT (including PERMISSIVE alias)
+    # follows config flags.
+    if effective == EvaluationPolicy.STRICT:
         allow_random, allow_side_effects = False, False
-    elif policy == EvaluationPolicy.PERMISSIVE:
-        allow_random = config.allow_random
-        allow_side_effects = config.allow_side_effects
     else:
         allow_random = config.allow_random
         allow_side_effects = config.allow_side_effects
@@ -1576,34 +1536,47 @@ class ConfigManager:
     ) -> ConfigSnapshot:
         """Build the next snapshot with a manager-assigned generation, validate, and apply.
 
-        Returns the new snapshot on success.  On failure the prior state
-        is preserved unchanged.
+        Validates all input through parse_config_snapshot before constructing
+        the snapshot.  Returns the new snapshot on success.  On failure the
+        prior state is preserved unchanged.
         """
         owner = self._owner_ref() if self._owner_ref is not None else None
         if owner is not None:
             current = owner.runtime_context.snapshot
-            snap = ConfigSnapshot(
-                generation=current.generation + 1,
+            snap = parse_config_snapshot(
                 constants=constants if constants is not None else dict(current.constants),
                 functions=functions if functions is not None else dict(current.functions),
                 units=units if units is not None else dict(current.units),
                 policy=policy if policy is not None else current.policy,
             )
-            owner.activate_snapshot(snap)
-            return snap
+            validated_snap = ConfigSnapshot(
+                generation=current.generation + 1,
+                constants=snap.constants,
+                functions=snap.functions,
+                units=snap.units,
+                policy=snap.policy,
+            )
+            owner.activate_snapshot(validated_snap)
+            return validated_snap
         with self._lock:
             new_gen = self._snapshot.generation + 1
             prev = self._snapshot
-            snap = ConfigSnapshot(
-                generation=new_gen,
+            snap = parse_config_snapshot(
                 constants=constants if constants is not None else dict(prev.constants),
                 functions=functions if functions is not None else dict(prev.functions),
                 units=units if units is not None else dict(prev.units),
                 policy=policy if policy is not None else prev.policy,
             )
-            self._validate_next(snap)
-            self._set_snapshot(snap)
-            return snap
+            validated_snap = ConfigSnapshot(
+                generation=new_gen,
+                constants=snap.constants,
+                functions=snap.functions,
+                units=snap.units,
+                policy=snap.policy,
+            )
+            self._validate_next(validated_snap)
+            self._set_snapshot(validated_snap)
+            return validated_snap
 
     def invalidate(self) -> None:
         current = self.current()
@@ -2575,245 +2548,6 @@ def _validate_arguments_schema(
     return None
 
 
-def _handle_call_tool(
-    request: dict[str, Any],
-    cancelled_set: set[Any] | None = None,
-    cancelled_order: deque[Any] | None = None,
-    cancelled_lock: threading.Lock | None = None,
-) -> dict[str, Any]:
-    """Handle a tools/call MCP request."""
-    # Lazily clean up any orphaned processes from previous timed-out requests
-    _cleanup_orphaned_processes()
-
-    params = request.get("params", {})
-    if not isinstance(params, dict):
-        return _invalid_request(request.get("id"), "Invalid params: expected object")
-
-    name = params.get("name", "")
-    arguments = params.get("arguments", {})
-    if not isinstance(name, str) or not name:
-        return _invalid_request(request.get("id"), "Invalid params: missing tool name")
-    if not isinstance(arguments, dict):
-        return _invalid_request(request.get("id"), "Invalid arguments: expected object")
-
-    if name not in TOOL_HANDLERS:
-        close = _find_close_match(name, TOOL_HANDLERS)
-        msg = f"Unknown tool: {name}"
-        if close:
-            msg += f". Did you mean: {close}?"
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "error": {
-                "code": -32601,
-                "message": msg,
-            },
-        }
-
-    # Enforce active profile: reject tools not in the current profile
-    profile = get_active_profile()
-    try:
-        profile_tools = get_profile_tools(profile)
-    except ValueError as e:
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "error": {
-                "code": -32602,
-                "message": str(e),
-            },
-        }
-    if name not in profile_tools:
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "error": {
-                "code": -32602,
-                "message": (
-                    f"Tool '{name}' is not available in profile '{profile}'. "
-                    f"Use tools/list to see available tools, or switch profile."
-                ),
-            },
-        }
-
-    # Validate arguments against handler signature before calling
-    handler = TOOL_HANDLERS[name]
-    validation_error = _validate_arguments(handler, arguments)
-    if validation_error is not None:
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "error": {
-                "code": -32602,
-                "message": f"Invalid arguments for tool '{name}': {validation_error}",
-            },
-        }
-
-    schema_error = _validate_arguments_schema(name, arguments)
-    if schema_error is not None:
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "error": {
-                "code": -32602,
-                "message": f"Invalid arguments for tool '{name}': {schema_error}",
-            },
-        }
-
-    req_id = request.get("id")
-    _c_lock = cancelled_lock
-    _c_set = cancelled_set
-    _c_order = cancelled_order
-    if _c_lock is not None and _c_set is not None:
-        with _c_lock:
-            if req_id is not None and req_id in _c_set:
-                # Remove from both the set and the FIFO order queue
-                _c_set.discard(req_id)
-                if _c_order is not None:
-                    try:
-                        _c_order.remove(req_id)
-                    except ValueError:
-                        pass
-                return {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "result": {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": json.dumps(
-                                    {
-                                        "ok": False,
-                                        "error": f"Tool '{name}' request was cancelled",
-                                        "error_type": "cancelled",
-                                        "hints": [],
-                                        "tool": name,
-                                        "warnings": [],
-                                    }
-                                ),
-                            }
-                        ],
-                        "isError": True,
-                    },
-                }
-
-    timed_out = False
-    result = None
-    future: Future[Any] | None = None
-    try:
-        # Submit to a bounded thread pool instead of spawning unbounded
-        # daemon threads. This prevents thread accumulation when tools
-        # consistently time out under sustained load. The pool provides
-        # natural back-pressure: tasks queue when all workers are busy.
-        executor = _get_tool_executor()
-        future = executor.submit(_run_handler_in_thread, handler, arguments)
-        result = future.result(timeout=MAX_TOOL_TIMEOUT_SECONDS)
-    except FuturesTimeoutError:
-        timed_out = True
-        # Cancel the future so the worker thread can return promptly.
-        # cancel() is best-effort: it returns False if the task is
-        # already running, in which case the worker will complete on
-        # its own. In either case, we MUST not block waiting on the
-        # future; just log and return a timeout error to the client.
-        if future is not None:
-            cancelled = future.cancel()
-            if not cancelled:
-                logging.warning(
-                    "MCP tool '%s' timed out after %ds; "
-                    "worker already running and cannot be cancelled",
-                    name,
-                    MAX_TOOL_TIMEOUT_SECONDS,
-                )
-            else:
-                logging.info(
-                    "MCP tool '%s' cancelled before execution began",
-                    name,
-                )
-    except Exception as e:
-        message = _sanitize_error(str(e))[:2000]
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "error": {
-                "code": -32000,
-                "message": f"Tool execution error: {message}",
-            },
-        }
-
-    if timed_out:
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "result": {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(
-                            {
-                                "ok": False,
-                                "error": f"Tool '{name}' execution timed out after {MAX_TOOL_TIMEOUT_SECONDS}s",
-                                "error_type": "timeout",
-                                "hints": ["Try a simpler input or shorter text"],
-                                "tool": name,
-                                "warnings": [],
-                            }
-                        ),
-                    }
-                ],
-                "isError": True,
-            },
-        }
-
-    # If result is an error envelope, return as MCP tool result with isError
-    if isinstance(result, dict) and result.get("ok") is False:
-        serialized = json.dumps(result)
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "result": {
-                "content": [{"type": "text", "text": serialized}],
-                "isError": True,
-            },
-        }
-
-    serialized = json.dumps(result)
-    if len(serialized.encode("utf-8")) > MAX_OUTPUT_BYTES:
-        truncated = {
-            "ok": False,
-            "tool": name,
-            "error_type": "output_too_large",
-            "error": f"Output exceeds {MAX_OUTPUT_BYTES} bytes and was truncated",
-            "hints": ["Try reducing input size or using a summary/detail option"],
-            "warnings": ["Output was truncated due to size limit"],
-        }
-        return {
-            "jsonrpc": "2.0",
-            "id": request.get("id"),
-            "result": {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(truncated),
-                    }
-                ],
-                "isError": True,
-            },
-        }
-
-    return {
-        "jsonrpc": "2.0",
-        "id": request.get("id"),
-        "result": {
-            "content": [
-                {
-                    "type": "text",
-                    "text": serialized,
-                }
-            ]
-        },
-    }
-
-
 def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None) -> dict[str, Any]:
     """Handle a tools/list MCP request with optional filtering.
 
@@ -2933,54 +2667,6 @@ def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None)
         "jsonrpc": "2.0",
         "id": request.get("id"),
         "result": {"tools": tools},
-    }
-
-
-def _handle_initialize(request: dict[str, Any]) -> dict[str, Any]:
-    """Handle an initialize MCP request."""
-    params = request.get("params")
-    if not isinstance(params, dict):
-        return _invalid_params(request.get("id"), "initialize params must be an object")
-
-    protocol_version = params.get("protocolVersion")
-    if not isinstance(protocol_version, str) or not protocol_version.strip():
-        return _invalid_params(request.get("id"), "protocolVersion must be a non-empty string")
-
-    capabilities = params.get("capabilities")
-    if not isinstance(capabilities, dict):
-        return _invalid_params(request.get("id"), "capabilities must be an object")
-
-    client_info = params.get("clientInfo")
-    if not isinstance(client_info, dict):
-        return _invalid_params(request.get("id"), "clientInfo must be an object")
-
-    client_name = client_info.get("name")
-    if not isinstance(client_name, str) or not client_name.strip():
-        return _invalid_params(request.get("id"), "clientInfo.name must be a non-empty string")
-
-    client_info.get("version", "")
-
-    # Version negotiation
-    if protocol_version in SUPPORTED_PROTOCOL_VERSIONS:
-        negotiated = protocol_version
-    else:
-        negotiated = LATEST_SUPPORTED_PROTOCOL_VERSION
-
-    caps = detect_capabilities()
-    return {
-        "jsonrpc": "2.0",
-        "id": request.get("id"),
-        "result": {
-            "protocolVersion": negotiated,
-            "capabilities": {
-                "tools": {"listChanged": False},
-                "runtime": caps.to_dict(),
-            },
-            "serverInfo": {
-                "name": "eggcalc",
-                "version": __version__,
-            },
-        },
     }
 
 
