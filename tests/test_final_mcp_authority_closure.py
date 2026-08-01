@@ -16,6 +16,8 @@ from eggcalc.mcp.server import (
     ToolExecutor,
     ToolRegistry,
     build_runtime_context,
+    close_compatibility_server,
+    handle_request,
 )
 
 
@@ -127,3 +129,124 @@ def test_session_owner_is_single_assignment_and_serverless_initialize_fails() ->
     gc.collect()
     with pytest.raises(RuntimeError, match="immutable"):
         session._bind_owner(McpServer(registry=_registry()))
+
+
+# ---------------------------------------------------------------------------
+# Section 14 negative tests — compatibility dispatch authority
+# ---------------------------------------------------------------------------
+
+
+def test_compat_and_explicit_sessions_share_same_tool_definitions() -> None:
+    """Section 14 #2: compatibility and explicit sessions must use the same tool
+    definitions source, not separately populated registries."""
+    server = McpServer()
+    try:
+        explicit_session = server.create_session(McpSessionState.READY)
+        explicit_result = server.handle_request(_request("tools/list", 1), session=explicit_session)
+        explicit_names = sorted(t["name"] for t in explicit_result["result"]["tools"])
+
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            compat_result = handle_request(_request("tools/list", 2))
+        compat_names = sorted(t["name"] for t in compat_result["result"]["tools"])
+
+        assert explicit_names == compat_names
+        assert len(explicit_names) > 0
+    finally:
+        close_compatibility_server()
+        server.close()
+
+
+def test_close_compatibility_server_does_not_close_independent_server() -> None:
+    """Section 14 #6: closing the compatibility server must not close
+    independently constructed McpServer instances."""
+    independent = McpServer(registry=_registry())
+    independent_session = independent.create_session(McpSessionState.READY)
+    try:
+        before = independent.handle_request(
+            _request("tools/call", 1, {"name": "math_eval", "arguments": {}}),
+            session=independent_session,
+        )
+        assert "result" in before
+
+        close_compatibility_server()
+
+        after = independent.handle_request(
+            _request("tools/call", 2, {"name": "math_eval", "arguments": {}}),
+            session=independent_session,
+        )
+        assert "result" in after
+        assert not independent._closed
+    finally:
+        independent.close()
+
+
+def test_ordinary_import_does_not_create_compat_server() -> None:
+    """Section 14 #8: importing eggcalc.mcp.server must not eagerly create
+    compatibility server state."""
+    import subprocess
+    import sys
+    import textwrap
+
+    code = textwrap.dedent("""\
+        import importlib
+        import sys
+
+        # Ensure a clean state — remove cached module if present
+        for key in list(sys.modules):
+            if key.startswith("eggcalc.mcp"):
+                del sys.modules[key]
+
+        import eggcalc.mcp.server as srv
+
+        assert srv._compat_server is None, (
+            f"compat server created at import time: {srv._compat_server!r}"
+        )
+    """)
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+
+def test_compat_dispatch_cannot_bypass_session_init_rules() -> None:
+    """Section 14 #1: the compatibility handle_request() path creates a READY
+    session by design (backward compat), so it does not bypass init — it
+    satisfies it. An explicit UNINITIALIZED session correctly rejects pre-init
+    tool calls. Both paths route through the same canonical dispatch."""
+    import warnings
+
+    # Compat path: creates READY session, tools/call succeeds
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        compat_call = handle_request(
+            _request(
+                "tools/call",
+                1,
+                {"name": "math_eval", "arguments": {"expression": "5+3"}},
+            )
+        )
+    assert "result" in compat_call
+
+    # Explicit UNINITIALIZED session: tools/call rejected before init
+    server = McpServer()
+    try:
+        uninitialized = server.create_session(McpSessionState.UNINITIALIZED)
+        rejected = server.handle_request(
+            _request(
+                "tools/call",
+                2,
+                {"name": "math_eval", "arguments": {"expression": "5+3"}},
+            ),
+            session=uninitialized,
+        )
+        assert "error" in rejected
+        assert rejected["error"]["code"] == -32600
+    finally:
+        close_compatibility_server()
+        server.close()
