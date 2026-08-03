@@ -82,7 +82,7 @@ The codebase is organized into three subsystems plus supporting infrastructure.
 |--------|------|-------------|
 | [`primitives.py`](primitives.md) | UTF-8 bytes, codepoints, Unicode normalization, invisible chars | `utf8_bytes()`, `codepoints()`, `normalize_unicode()`, `find_invisibles()` |
 | [`unicode_tools.py`](unicode_tools.md) | Script detection, confusable identification, mixed scripts | `unicode_script()`, `detect_confusables()`, `detect_mixed_scripts()` |
-| [`confusables.py`](confusables.md) | Auto-generated homoglyph data (~176KB, 6565 entries) | `CONFUSABLES` dict |
+| [`confusables.py`](confusables.md) | Auto-generated homoglyph data (compressed payload, 6565 entries, lazy decode) | `CONFUSABLES` lazy mapping |
 | [`measure.py`](measure.md) | Text metrics: line, word, character category counts | `line_metrics()`, `word_metrics()`, `char_category_metrics()` |
 | [`diff.py`](diff.md) | String diffing: first diff, Levenshtein, LCS, diff spans | `first_diff()`, `levenshtein_distance()`, `diff_spans()` |
 | `diff_analysis.py` | Structural analysis of unified diffs and patches | `diff_touched_paths()`, `diff_hunk_ranges()`, `unified_diff_validate()` |
@@ -421,7 +421,7 @@ exact/
     ├── diff.py → primitives
     ├── validate.py → primitives
     ├── synthesis.py → all exact modules (high-level orchestrator)
-    ├── confusables.py (auto-generated data only — ~176KB)
+    ├── confusables.py (auto-generated compressed data — ~40KB)
     ├── config.py, shell.py, path_tools.py, markdown.py, patch.py
     ├── transform.py, position.py, identifier.py, identifier_inspect.py
     ├── glob.py, unicode_policy.py, cargo.py, version.py
@@ -513,7 +513,7 @@ See [docs/releasing.md](../docs/releasing.md) for the manual PyPI release proced
 
 ## Constraints
 
-- **Standard library only** — no pip packages in `eggcalc/`. Imports limited to: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`
+- **Standard library only** — no pip packages in `eggcalc/`. Imports limited to: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`, `zlib`, `base64`
 - **`build_single.py` compatibility** — all runtime code must live in one of the six core modules or the `exact/` and `mcp/` packages
 - **TypedDict over NamedTuple** — for structured return types
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters
@@ -556,7 +556,7 @@ Each component has a dedicated architecture document. Use this index to navigate
 | exact/ (overview) | [exact.md](exact.md) | Package-level architecture, all 25 submodule APIs |
 | primitives.py | [primitives.md](primitives.md) | UTF-8 bytes, codepoints, Unicode normalization, invisible chars |
 | unicode_tools.py | [unicode_tools.md](unicode_tools.md) | Script detection, confusable identification, mixed scripts |
-| confusables.py | [confusables.md](confusables.md) | Auto-generated homoglyph data (~176KB) |
+| confusables.py | [confusables.md](confusables.md) | Auto-generated homoglyph data (compressed, lazy decode) |
 | measure.py | [measure.md](measure.md) | Text metrics: line, word, character category counts |
 | diff.py | [diff.md](diff.md) | String diffing: first diff, common prefix/suffix, Levenshtein distance |
 | validate.py | [validate.md](validate.md) | Bracket checking, JSON/TOML validation, regex safety |

@@ -65,7 +65,7 @@ python3 build_single.py -o /path     # Custom output path
 - All runtime code must live in one of the six core modules or `exact/`/`mcp/` packages
 - No imports outside the allowed set (standard library only)
 - `__main__.py` is a thin entry point (not in the manifest)
-- `confusables.py` is auto-generated data (~176KB) — included as-is
+- `confusables.py` is auto-generated with compressed payload (~40KB) — included as-is
 
 ## install.py
 

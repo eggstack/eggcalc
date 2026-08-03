@@ -12,7 +12,7 @@
 
 ## Purpose
 
-Contains the confusables table derived from Unicode Standard Annex #39 (UTS #39) for detecting homoglyph attacks. This is auto-generated data (~176KB, ~6580 lines) and should not be edited manually.
+Contains the confusables table derived from Unicode Standard Annex #39 (UTS #39) for detecting homoglyph attacks. This is an auto-generated file (~40KB) containing a zlib-compressed base85 payload and a lazy `_LazyConfusables` mapping (6565 entries). Data is decoded on first access, not at import time. Do not edit manually.
 
 ## Data Source
 
@@ -26,26 +26,13 @@ Generated from the official Unicode `confusables.txt` file:
 
 ## Data Structure
 
-The file exports a single dictionary constant:
+The file exports a lazy `Mapping` that decodes a compressed payload on first access:
 
 ```python
-CONFUSABLES: dict[str, str] = {
-    # key:   "U+XXXX" — the codepoint of the potentially-confusing character
-    # value: space-separated codepoints of the confusable equivalent sequence
-    #
-    # 1:1 mappings (single codepoint → single codepoint):
-    "U+0430": "U+0061",        # Cyrillic 'а' → Latin 'a'
-    "U+004F": "U+006C",        # Latin 'O' → Latin 'l'
-    "U+0030": "U+004F",        # Digit '0' → Latin 'O'
-    "U+0031": "U+006C",        # Digit '1' → Latin 'l'
-    #
-    # 1:N mappings (single codepoint → multi-codepoint sequence):
-    "U+00C6": "U+0041 U+0045", # Latin 'Æ' → 'AE'
-    "U+00D8": "U+004F U+0338", # Latin 'Ø' → 'O' + combining solidus
-    "U+0022": "U+0027 U+0027", # Quotation mark → two apostrophes
-    "U+0025": "U+00BA U+002F U+2080", # Percent → 'º/₀'
-}
+CONFUSABLES: Mapping[str, str] = _LazyConfusables()
 ```
+
+The `_LazyConfusables` class stores a zlib-compressed base85 payload and decodes it into a `dict[str, str]` on first access. After decoding, the dict is cached for subsequent lookups. The mapping supports `__getitem__`, `__contains__`, `__iter__`, and `__len__`.
 
 **Keys** are uppercase hex codepoints prefixed with `U+` (e.g., `"U+0430"`). **Values** are space-separated `U+XXXX` sequences representing the confusable equivalent — this may be a single codepoint or multiple codepoints.
 

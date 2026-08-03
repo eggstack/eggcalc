@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
 from types import MappingProxyType
 
@@ -3257,13 +3257,90 @@ class UnitValue:
 
 
 # Pre-computed conversion factors: (from_unit, to_unit) -> factor.
-# These are empty placeholders, populated as immutable MappingProxyType
-# adapters by _install_generated_adapters() from UNIT_DEFINITIONS.
+# UNIT_ALIASES, UNIT_BASE, UNIT_CATEGORIES, TEMPERATURE_CONVERSIONS are
+# immutable MappingProxyType adapters populated by _install_generated_adapters().
+# UNIT_CONVERSIONS is a lazy Mapping that computes pairwise factors on demand
+# from the canonical unit registry (Workstream B optimisation).
 UNIT_ALIASES: dict[str, str] = {}
 UNIT_BASE: dict[str, dict[str, float]] = {}
 UNIT_CATEGORIES: dict[str, str] = {}
 TEMPERATURE_CONVERSIONS: dict[tuple[str, str], tuple[float, float]] = {}
 UNIT_CONVERSIONS: dict[tuple[str, str], float] = {}
+
+
+# ---------------------------------------------------------------------------
+# Lazy pairwise conversion mapping (Workstream B)
+# ---------------------------------------------------------------------------
+
+
+class _LazyUnitConversions(Mapping):
+    """Lazily-computed pairwise conversion factor mapping.
+
+    Computes ``source_scale / target_scale`` on demand from the canonical
+    unit registry rather than materializing all N^2 alias pairs eagerly.
+    ``__iter__`` and ``__len__`` generate keys on the fly so that
+    ``dict(UNIT_CONVERSIONS)`` produces the same result as the former eager
+    MappingProxyType without allocating the full table at import time.
+    """
+
+    __slots__ = ("_registry",)
+    _registry: UnitRegistry
+
+    def __init__(self, registry: UnitRegistry) -> None:
+        object.__setattr__(self, "_registry", registry)
+
+    def _non_affine_definitions(self) -> tuple[UnitDefinition, ...]:
+        return tuple(d for d in self._registry.definitions if not d.affine)
+
+    def __getitem__(self, key: tuple[str, str]) -> float:
+        source_alias, target_alias = key
+        source_def = self._registry.by_alias(source_alias) or self._registry.by_canonical(
+            source_alias
+        )
+        target_def = self._registry.by_alias(target_alias) or self._registry.by_canonical(
+            target_alias
+        )
+        if source_def is None or target_def is None:
+            raise KeyError(key)
+        if source_def.affine or target_def.affine:
+            raise KeyError(key)
+        if source_def.dimension != target_def.dimension:
+            raise KeyError(key)
+        if source_def.canonical == target_def.canonical:
+            raise KeyError(key)
+        factor: float = source_def.scale / target_def.scale
+        return factor
+
+    def __iter__(self) -> Iterator[tuple[str, str]]:
+        for source in self._non_affine_definitions():
+            for target in self._non_affine_definitions():
+                if source.dimension != target.dimension or source.canonical == target.canonical:
+                    continue
+                for source_alias in source.aliases:
+                    for target_alias in target.aliases:
+                        yield (source_alias, target_alias)
+
+    def __len__(self) -> int:
+        count = 0
+        non_affine = self._non_affine_definitions()
+        for source in non_affine:
+            for target in non_affine:
+                if source.dimension != target.dimension or source.canonical == target.canonical:
+                    continue
+                count += len(source.aliases) * len(target.aliases)
+        return count
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, tuple) or len(key) != 2:
+            return False
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
+
+    def __repr__(self) -> str:
+        return f"<_LazyUnitConversions len={len(self)}>"
 
 
 # Compatibility hook; conversion behavior remains registry-owned.
@@ -3404,17 +3481,7 @@ def _install_generated_adapters(
         }
     )
     TEMPERATURE_CONVERSIONS = _generated_temperature_conversions(registry)  # type: ignore[assignment]
-    pairwise: dict[tuple[str, str], float] = {}
-    non_affine = [definition for definition in registry.definitions if not definition.affine]
-    for source in non_affine:
-        for target in non_affine:
-            if source.dimension != target.dimension or source.canonical == target.canonical:
-                continue
-            factor = source.scale / target.scale
-            for source_alias in source.aliases:
-                for target_alias in target.aliases:
-                    pairwise[(source_alias, target_alias)] = factor
-    UNIT_CONVERSIONS = MappingProxyType(pairwise)  # type: ignore[assignment]
+    UNIT_CONVERSIONS = _LazyUnitConversions(registry)  # type: ignore[assignment]
     _refresh_compatibility_consumers()
 
 
@@ -3653,5 +3720,4 @@ def _rebuild_conversions() -> None:
     global UNIT_CONVERSIONS
     registry = _get_unit_registry()
     if registry is not None:
-        # Recreate the immutable adapter from the declarations only.
-        UNIT_CONVERSIONS = MappingProxyType({})  # type: ignore[assignment]
+        UNIT_CONVERSIONS = _LazyUnitConversions(registry)  # type: ignore[assignment]

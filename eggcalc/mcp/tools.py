@@ -18,192 +18,6 @@ from typing import Any, Literal, cast
 
 from .. import EvaluationError
 from ..evaluator import evaluate_with_timeout
-from ..exact import (
-    check_brackets as _check_brackets,
-)
-from ..exact import (
-    glob_match as _glob_match,
-)
-from ..exact import (
-    identifier_inspect as _identifier_inspect,
-)
-from ..exact import (
-    identifier_table_inspect as _identifier_table_inspect,
-)
-from ..exact import (
-    json_compare as _json_compare,
-)
-from ..exact import (
-    json_extract as _json_extract,
-)
-from ..exact import (
-    json_shape as _json_shape,
-)
-from ..exact import (
-    list_dedupe as _list_dedupe,
-)
-from ..exact import (
-    list_sort as _list_sort,
-)
-from ..exact import (
-    prompt_input_inspect as _prompt_input_inspect,
-)
-from ..exact import (
-    regex_finditer as _regex_finditer,
-)
-from ..exact import (
-    regex_safety_check as _regex_safety_check,
-)
-from ..exact import (
-    regex_test as _regex_test,
-)
-from ..exact import (
-    text_position as _text_position,
-)
-from ..exact import (
-    toml_shape as _toml_shape,
-)
-from ..exact import (
-    validate_json as _validate_json,
-)
-from ..exact import (
-    validate_schema_light as _validate_schema_light,
-)
-from ..exact import (
-    validate_toml_text as _validate_toml_text,
-)
-from ..exact import (
-    version_compare as _version_compare,
-)
-from ..exact.cargo import (
-    cargo_toml_inspect as _cargo_toml_inspect,
-)
-from ..exact.config import (
-    dotenv_validate as _dotenv_validate,
-)
-from ..exact.config import (
-    ini_validate as _ini_validate,
-)
-from ..exact.identifier import (
-    identifier_analyze as _identifier_analyze,
-)
-from ..exact.llm_hygiene import (
-    llm_json_output_check as _llm_json_output_check,
-)
-from ..exact.manifests import (
-    go_mod_inspect as _go_mod_inspect,
-)
-from ..exact.manifests import (
-    lockfile_summary as _lockfile_summary,
-)
-from ..exact.manifests import (
-    package_json_inspect as _package_json_inspect,
-)
-from ..exact.manifests import (
-    pyproject_inspect as _pyproject_inspect,
-)
-from ..exact.manifests import (
-    requirements_inspect as _requirements_inspect,
-)
-from ..exact.markdown import (
-    code_fence_extract as _code_fence_extract,
-)
-from ..exact.markdown import (
-    markdown_link_check_lexical as _markdown_link_check_lexical,
-)
-from ..exact.markdown import (
-    markdown_structure as _markdown_structure,
-)
-from ..exact.path_tools import (
-    path_analyze as _path_analyze,
-)
-from ..exact.path_tools import (
-    path_compare as _path_compare,
-)
-from ..exact.path_tools import (
-    path_normalize as _path_normalize,
-)
-from ..exact.path_tools import (
-    path_scope_check as _path_scope_check,
-)
-from ..exact.primitives import (
-    count_graphemes as _count_graphemes,
-)
-from ..exact.primitives import (
-    truncate_to_grapheme as _truncate_to_grapheme,
-)
-from ..exact.repo_audit import (
-    repo_file_inventory as _repo_file_inventory,
-)
-from ..exact.shell import (
-    argv_compare as _argv_compare,
-)
-from ..exact.shell import (
-    shell_quote_join as _shell_quote_join,
-)
-from ..exact.shell import (
-    shell_split as _shell_split,
-)
-from ..exact.synthesis import (
-    count_chars as _count_chars,
-)
-from ..exact.synthesis import (
-    explain_diff as _explain_diff,
-)
-from ..exact.synthesis import (
-    inspect_text as _inspect_text,
-)
-from ..exact.synthesis import (
-    line_range_compare as _line_range_compare,
-)
-from ..exact.synthesis import (
-    line_range_extract as _line_range_extract,
-)
-from ..exact.synthesis import (
-    list_compare as _list_compare,
-)
-from ..exact.synthesis import (
-    measure_text as _measure_text,
-)
-from ..exact.synthesis import (
-    text_equal as _text_equal,
-)
-from ..exact.synthesis import (
-    text_replace_check as _text_replace_check,
-)
-from ..exact.synthesis import (
-    text_window as _text_window,
-)
-from ..exact.transform import (
-    escape_text as _escape_text,
-)
-from ..exact.transform import (
-    text_fingerprint as _text_fingerprint,
-)
-from ..exact.transform import (
-    text_hash as _text_hash,
-)
-from ..exact.transform import (
-    text_transform as _text_transform,
-)
-from ..exact.transform import (
-    unescape_text as _unescape_text,
-)
-from ..exact.unicode_policy import (
-    canonicalize_text as _canonicalize_text,
-)
-from ..exact.unicode_policy import (
-    unicode_policy_check as _unicode_policy_check,
-)
-from ..exact.validate import (
-    json_canonicalize as _json_canonicalize,
-)
-from ..exact.validate import (
-    json_query as _json_query,
-)
-from ..exact.version import (
-    check_version_constraint as _check_version_constraint,
-)
 from .schemas import TOOL_SCHEMAS, ErrorEnvelope
 
 MAX_TEXT_LENGTH = 100_000
@@ -464,6 +278,8 @@ def _regex_test_worker(
     result_queue: multiprocessing.Queue,
 ) -> None:
     """Run regex test in a child process. Must be top-level for pickling."""
+    from ..exact import regex_test as _regex_test
+
     try:
         import resource
 
@@ -497,6 +313,8 @@ def _regex_finditer_worker(
     result_queue: multiprocessing.Queue,
 ) -> None:
     """Run regex finditer in a child process. Must be top-level for pickling."""
+    from ..exact import regex_finditer as _regex_finditer
+
     try:
         import resource
 
@@ -923,6 +741,8 @@ def text_measure(text: str, detail: str = "normal") -> dict:
     Returns:
         Success envelope with metrics, or error envelope.
     """
+    from ..exact.synthesis import measure_text as _measure_text
+
     if (err := _require_str(text, "text", "text_measure")) is not None:
         return err
 
@@ -983,6 +803,8 @@ def text_equal(
     Returns:
         Success envelope with comparison result, or error envelope.
     """
+    from ..exact.synthesis import text_equal as _text_equal
+
     valid_normalizations = {"raw", "NFC", "NFD", "NFKC", "NFKD"}
     if normalization not in valid_normalizations:
         return _error_response(
@@ -1034,6 +856,8 @@ def text_diff_explain(
     Returns:
         Success envelope with diff explanation, or error envelope.
     """
+    from ..exact.synthesis import explain_diff as _explain_diff
+
     if (err := _require_str(a, "a", "text_diff_explain")) is not None:
         return err
     if (err := _require_str(b, "b", "text_diff_explain")) is not None:
@@ -1092,6 +916,8 @@ def text_inspect(
     Returns:
         Success envelope with inspection result, or error envelope.
     """
+    from ..exact.synthesis import inspect_text as _inspect_text
+
     if (err := _require_str(text, "text", "text_inspect")) is not None:
         return err
 
@@ -1198,6 +1024,9 @@ def text_count(
     Returns:
         Success envelope with count result, or error envelope.
     """
+    from ..exact.primitives import count_graphemes as _count_graphemes
+    from ..exact.synthesis import count_chars as _count_chars
+
     if (err := _require_str(text, "text", "text_count")) is not None:
         return err
 
@@ -1275,6 +1104,8 @@ def validate_brackets(text: str, pairs: dict[str, str] | None = None) -> dict:
     Returns:
         Success envelope with bracket check result, or error envelope.
     """
+    from ..exact import check_brackets as _check_brackets
+
     if (err := _require_str(text, "text", "validate_brackets")) is not None:
         return err
 
@@ -1324,6 +1155,8 @@ def validate_json(text: str) -> dict:
     Returns:
         Success envelope with validation result, or error envelope.
     """
+    from ..exact import validate_json as _validate_json
+
     if (err := _require_str(text, "text", "validate_json")) is not None:
         return err
 
@@ -1370,6 +1203,8 @@ def validate_toml(text: str, detail: str = "normal") -> dict:
     Returns:
         Success envelope with validation result, or error envelope.
     """
+    from ..exact import validate_toml_text as _validate_toml_text
+
     if (err := _require_str(text, "text", "validate_toml")) is not None:
         return err
 
@@ -1429,6 +1264,8 @@ def json_compare(
     Returns:
         Success envelope with comparison result, or error envelope.
     """
+    from ..exact import json_compare as _json_compare
+
     if (err := _require_str(a, "a", "json_compare")) is not None:
         return err
     if (err := _require_str(b, "b", "json_compare")) is not None:
@@ -1528,6 +1365,8 @@ def validate_regex(
     Returns:
         Success envelope with regex test results, or error envelope.
     """
+    from ..exact import regex_safety_check as _regex_safety_check
+
     if not isinstance(pattern, str):
         return _error_response(
             "invalid_arguments",
@@ -1675,6 +1514,8 @@ def json_extract(
     Returns:
         Success envelope with extraction result, or error envelope.
     """
+    from ..exact import json_extract as _json_extract
+
     if (err := _require_str(text, "text", "json_extract")) is not None:
         return err
 
@@ -1755,6 +1596,8 @@ def json_shape(
     Returns:
         Success envelope with shape result, or error envelope.
     """
+    from ..exact import json_shape as _json_shape
+
     if (err := _require_str(text, "text", "json_shape")) is not None:
         return err
 
@@ -1834,6 +1677,8 @@ def regex_finditer(
     Returns:
         Success envelope with matches result, or error envelope.
     """
+    from ..exact import regex_safety_check as _regex_safety_check
+
     if not isinstance(text, str):
         return _error_response(
             "invalid_arguments",
@@ -1968,6 +1813,8 @@ def regex_safety_check(pattern: str) -> dict:
     Returns:
         Success envelope with safety check result, or error envelope.
     """
+    from ..exact import regex_safety_check as _regex_safety_check
+
     if err := _require_str(pattern, "pattern", "regex_safety_check"):
         return err
     if len(pattern) > MAX_PATTERN_LENGTH_REGEX:
@@ -2014,6 +1861,8 @@ def validate_schema_light(text: str, schema: dict, detail: str = "normal") -> di
     Returns:
         Success envelope with validation result, or error envelope.
     """
+    from ..exact import validate_schema_light as _validate_schema_light
+
     if (err := _require_str(text, "text", "validate_schema_light")) is not None:
         return err
 
@@ -2127,6 +1976,8 @@ def list_compare(
     Returns:
         Success envelope with comparison result, or error envelope.
     """
+    from ..exact.synthesis import list_compare as _list_compare
+
     if not isinstance(a, list) or not isinstance(b, list):
         return _error_response(
             "invalid_arguments",
@@ -2342,6 +2193,9 @@ def text_truncate(text: str, max_graphemes: int) -> dict:
     Returns:
         Success envelope with truncation result, or error envelope.
     """
+    from ..exact.primitives import count_graphemes as _count_graphemes
+    from ..exact.primitives import truncate_to_grapheme as _truncate_to_grapheme
+
     if (err := _require_str(text, "text", "text_truncate")) is not None:
         return err
 
@@ -2391,6 +2245,8 @@ def text_transform(text: str, operations: list[str], detail: str = "normal") -> 
     Returns:
         Success envelope with transformation result, or error envelope.
     """
+    from ..exact.transform import text_transform as _text_transform
+
     if (err := _require_str(text, "text", "text_transform")) is not None:
         return err
 
@@ -2470,6 +2326,8 @@ def text_position(
     Returns:
         Success envelope with position result, or error envelope.
     """
+    from ..exact import text_position as _text_position
+
     if (err := _require_str(text, "text", "text_position")) is not None:
         return err
 
@@ -2541,6 +2399,8 @@ def escape_text(text: str, mode: str, detail: str = "normal") -> dict:
     Returns:
         Success envelope with escape result, or error envelope.
     """
+    from ..exact.transform import escape_text as _escape_text
+
     if (err := _require_str(text, "text", "escape_text")) is not None:
         return err
 
@@ -2602,6 +2462,8 @@ def unescape_text(text: str, mode: str, detail: str = "normal") -> dict:
     Returns:
         Success envelope with unescape result, or error envelope.
     """
+    from ..exact.transform import unescape_text as _unescape_text
+
     if (err := _require_str(text, "text", "unescape_text")) is not None:
         return err
 
@@ -2664,6 +2526,8 @@ def text_hash(
     Returns:
         Success envelope with hash result, or error envelope.
     """
+    from ..exact.transform import text_hash as _text_hash
+
     if (err := _require_str(text, "text", "text_hash")) is not None:
         return err
 
@@ -2735,6 +2599,8 @@ def path_analyze_mcp(path: str, style: str = "auto", detail: str = "normal") -> 
     Returns:
         Success envelope with path analysis result, or error envelope.
     """
+    from ..exact.path_tools import path_analyze as _path_analyze
+
     if (err := _require_str(path, "path", "path_analyze")) is not None:
         return err
 
@@ -2823,6 +2689,8 @@ def path_normalize(
     Returns:
         Success envelope with path normalization result, or error envelope.
     """
+    from ..exact.path_tools import path_normalize as _path_normalize
+
     if (err := _require_str(path, "path", "path_normalize")) is not None:
         return err
 
@@ -2863,6 +2731,8 @@ def path_compare_mcp(
     Returns:
         Success envelope with comparison result, or error envelope.
     """
+    from ..exact.path_tools import path_compare as _path_compare
+
     if (err := _require_str(left, "left", "path_compare")) is not None:
         return err
     if (err := _require_str(right, "right", "path_compare")) is not None:
@@ -2905,6 +2775,8 @@ def path_scope_check_mcp(
     Returns:
         Success envelope with scope check result, or error envelope.
     """
+    from ..exact.path_tools import path_scope_check as _path_scope_check
+
     if (err := _require_str(root, "root", "path_scope_check")) is not None:
         return err
     if (err := _require_str(target, "target", "path_scope_check")) is not None:
@@ -2941,6 +2813,8 @@ def identifier_analyze(
     Returns:
         Success envelope with analysis result, or error envelope.
     """
+    from ..exact.identifier import identifier_analyze as _identifier_analyze
+
     if (err := _require_str(text, "text", "identifier_analyze")) is not None:
         return err
 
@@ -3004,6 +2878,8 @@ def text_window(
     Returns:
         Success envelope with text_window result, or error envelope.
     """
+    from ..exact.synthesis import text_window as _text_window
+
     if (err := _require_str(text, "text", "text_window")) is not None:
         return err
 
@@ -3090,6 +2966,8 @@ def json_canonicalize(
     Returns:
         Success envelope with canonicalization result, or error envelope.
     """
+    from ..exact.validate import json_canonicalize as _json_canonicalize
+
     if (err := _require_str(text, "text", "json_canonicalize")) is not None:
         return err
 
@@ -3127,6 +3005,8 @@ def json_query(text: str, pointer: str = "") -> dict:
     Returns:
         Success envelope with query result, or error envelope.
     """
+    from ..exact.validate import json_query as _json_query
+
     if (err := _require_str(text, "text", "json_query")) is not None:
         return err
 
@@ -3174,6 +3054,8 @@ def glob_match_mcp(
     Returns:
         Success envelope with match result, or error envelope.
     """
+    from ..exact import glob_match as _glob_match
+
     valid_platforms = {"posix", "windows"}
     if platform not in valid_platforms:
         return _error_response(
@@ -3214,6 +3096,8 @@ def text_fingerprint_mcp(
     Returns:
         Success envelope with fingerprint result, or error envelope.
     """
+    from ..exact.transform import text_fingerprint as _text_fingerprint
+
     if (err := _require_str(text, "text", "text_fingerprint")) is not None:
         return err
 
@@ -3262,6 +3146,8 @@ def identifier_inspect_mcp(
     Returns:
         Success envelope with inspection result, or error envelope.
     """
+    from ..exact import identifier_inspect as _identifier_inspect
+
     if not isinstance(identifiers, list):
         return _error_response(
             "invalid_arguments",
@@ -3379,6 +3265,8 @@ def markdown_structure_mcp(
     Returns:
         Success envelope with Markdown structure, or error envelope.
     """
+    from ..exact.markdown import markdown_structure as _markdown_structure
+
     if (err := _require_str(text, "text", "markdown_structure")) is not None:
         return err
 
@@ -3410,6 +3298,8 @@ def code_fence_extract_mcp(
     Returns:
         Success envelope with extracted code blocks, or error envelope.
     """
+    from ..exact.markdown import code_fence_extract as _code_fence_extract
+
     if (err := _require_str(text, "text", "code_fence_extract")) is not None:
         return err
 
@@ -3439,6 +3329,8 @@ def version_compare_mcp(
     Returns:
         Success envelope with comparison result, or error envelope.
     """
+    from ..exact import version_compare as _version_compare
+
     valid_schemes = {"semver", "loose"}
     if scheme not in valid_schemes:
         return _error_response(
@@ -3475,6 +3367,8 @@ def toml_shape_mcp(
     Returns:
         Success envelope with shape result, or error envelope.
     """
+    from ..exact import toml_shape as _toml_shape
+
     if (err := _require_str(text, "text", "toml_shape")) is not None:
         return err
 
@@ -3536,6 +3430,8 @@ def list_dedupe_mcp(
     Returns:
         Success envelope with deduped list, or error envelope.
     """
+    from ..exact import list_dedupe as _list_dedupe
+
     if (err := _validate_str_list(items, "items", "list_dedupe")) is not None:
         return err
 
@@ -3584,6 +3480,8 @@ def list_sort_mcp(
     Returns:
         Success envelope with sorted list, or error envelope.
     """
+    from ..exact import list_sort as _list_sort
+
     if (err := _validate_str_list(items, "items", "list_sort")) is not None:
         return err
 
@@ -3639,6 +3537,8 @@ def text_replace_check(
     Returns:
         Success envelope with replace check result, or error envelope.
     """
+    from ..exact.synthesis import text_replace_check as _text_replace_check
+
     if (err := _require_str(text, "text", "text_replace_check")) is not None:
         return err
     if (err := _require_str(old, "old", "text_replace_check")) is not None:
@@ -3719,6 +3619,8 @@ def line_range_extract(
     Returns:
         Success envelope with line range extract result, or error envelope.
     """
+    from ..exact.synthesis import line_range_extract as _line_range_extract
+
     if (err := _require_str(text, "text", "line_range_extract")) is not None:
         return err
 
@@ -3790,6 +3692,8 @@ def line_range_compare(
     Returns:
         Success envelope with line range compare result, or error envelope.
     """
+    from ..exact.synthesis import line_range_compare as _line_range_compare
+
     if not isinstance(left_text, str) or not isinstance(right_text, str):
         return _error_response(
             "invalid_arguments",
@@ -3879,6 +3783,8 @@ def shell_split(
     Returns:
         Success envelope with parsed argv and features, or error envelope.
     """
+    from ..exact.shell import shell_split as _shell_split
+
     if (err := _require_str(command, "command", "shell_split")) is not None:
         return err
 
@@ -3913,6 +3819,8 @@ def shell_quote_join(
     Returns:
         Success envelope with quoted command and roundtrip status, or error envelope.
     """
+    from ..exact.shell import shell_quote_join as _shell_quote_join
+
     if (err := _validate_str_list(argv, "argv", "shell_quote_join")) is not None:
         return err
 
@@ -3953,6 +3861,8 @@ def shell_argv_compare(
     Returns:
         Success envelope with comparison results, or error envelope.
     """
+    from ..exact.shell import argv_compare as _argv_compare
+
     valid_shells = {"posix"}
     if shell not in valid_shells:
         return _error_response(
@@ -4030,6 +3940,8 @@ def _dotenv_validate_worker(
 
     Must be a top-level function for spawn pickling.
     """
+    from ..exact.config import dotenv_validate as _dotenv_validate
+
     try:
         import resource
 
@@ -4069,6 +3981,8 @@ def dotenv_validate_mcp(
     Returns:
         Success envelope with validation result, or error envelope.
     """
+    from ..exact import regex_safety_check as _regex_safety_check
+
     if (err := _require_str(text, "text", "dotenv_validate")) is not None:
         return err
 
@@ -4190,6 +4104,8 @@ def ini_validate_mcp(
     Returns:
         Success envelope with validation result, or error envelope.
     """
+    from ..exact.config import ini_validate as _ini_validate
+
     if (err := _require_str(text, "text", "ini_validate")) is not None:
         return err
 
@@ -4489,6 +4405,8 @@ def unicode_policy_check_mcp(
     Returns:
         Success envelope with policy check result, or error envelope.
     """
+    from ..exact.unicode_policy import unicode_policy_check as _unicode_policy_check
+
     if (err := _require_str(text, "text", "unicode_policy_check")) is not None:
         return err
 
@@ -4541,6 +4459,8 @@ def canonicalize_text_mcp(
     Returns:
         Success envelope with canonicalization result, or error envelope.
     """
+    from ..exact.unicode_policy import canonicalize_text as _canonicalize_text
+
     if (err := _require_str(text, "text", "canonicalize_text")) is not None:
         return err
 
@@ -4582,6 +4502,8 @@ def identifier_table_inspect_mcp(
     Returns:
         Success envelope with inspection result, or error envelope.
     """
+    from ..exact import identifier_table_inspect as _identifier_table_inspect
+
     if not isinstance(identifiers, list):
         return _error_response(
             "invalid_arguments",
@@ -4733,6 +4655,8 @@ def version_constraint_check_mcp(
     Returns:
         Success envelope with constraint check result, or error envelope.
     """
+    from ..exact.version import check_version_constraint as _check_version_constraint
+
     if not isinstance(version, str):
         return _error_response(
             "invalid_arguments",
@@ -4829,6 +4753,8 @@ def cargo_toml_inspect_mcp(
     Returns:
         Success envelope with Cargo.toml inspection result, or error envelope.
     """
+    from ..exact.cargo import cargo_toml_inspect as _cargo_toml_inspect
+
     if (err := _require_str(text, "text", "cargo_toml_inspect")) is not None:
         return err
 
@@ -4881,6 +4807,8 @@ def prompt_input_inspect_mcp(
     Returns:
         Success envelope with inspection result, or error envelope.
     """
+    from ..exact import prompt_input_inspect as _prompt_input_inspect
+
     if (err := _require_str(text, "text", "prompt_input_inspect")) is not None:
         return err
 
@@ -6073,6 +6001,8 @@ def structured_data_compare(
 
 def pyproject_inspect_mcp(text: str) -> dict:
     """Inspect pyproject.toml text without network or filesystem access."""
+    from ..exact.manifests import pyproject_inspect as _pyproject_inspect
+
     if (err := _require_str(text, "text", "pyproject_inspect")) is not None:
         return err
     try:
@@ -6097,6 +6027,8 @@ def pyproject_inspect_mcp(text: str) -> dict:
 
 def package_json_inspect_mcp(text: str) -> dict:
     """Inspect package.json text without network or filesystem access."""
+    from ..exact.manifests import package_json_inspect as _package_json_inspect
+
     if (err := _require_str(text, "text", "package_json_inspect")) is not None:
         return err
     try:
@@ -6124,6 +6056,8 @@ def package_json_inspect_mcp(text: str) -> dict:
 
 def requirements_inspect_mcp(text: str) -> dict:
     """Inspect requirements.txt-style text without network access."""
+    from ..exact.manifests import requirements_inspect as _requirements_inspect
+
     if (err := _require_str(text, "text", "requirements_inspect")) is not None:
         return err
     try:
@@ -6143,6 +6077,8 @@ def requirements_inspect_mcp(text: str) -> dict:
 
 def go_mod_inspect_mcp(text: str) -> dict:
     """Inspect go.mod text without network or filesystem access."""
+    from ..exact.manifests import go_mod_inspect as _go_mod_inspect
+
     if (err := _require_str(text, "text", "go_mod_inspect")) is not None:
         return err
     try:
@@ -6162,6 +6098,8 @@ def go_mod_inspect_mcp(text: str) -> dict:
 
 def lockfile_summary_mcp(text: str, kind: str = "auto") -> dict:
     """Produce a shallow summary of a lockfile without full parsing."""
+    from ..exact.manifests import lockfile_summary as _lockfile_summary
+
     if (err := _require_str(text, "text", "lockfile_summary")) is not None:
         return err
     valid_kinds = {
@@ -6202,6 +6140,8 @@ def lockfile_summary_mcp(text: str, kind: str = "auto") -> dict:
 
 def llm_json_output_check_mcp(text: str) -> dict:
     """Detect and diagnose common LLM JSON output issues."""
+    from ..exact.llm_hygiene import llm_json_output_check as _llm_json_output_check
+
     if (err := _require_str(text, "text", "llm_json_output_check")) is not None:
         return err
     try:
@@ -6221,6 +6161,8 @@ def markdown_link_check_lexical_mcp(
     known_paths: list[str] | None = None,
 ) -> dict:
     """Lexical markdown link validation (no network)."""
+    from ..exact.markdown import markdown_link_check_lexical as _markdown_link_check_lexical
+
     if (err := _require_str(text, "text", "markdown_link_check_lexical")) is not None:
         return err
     if known_paths is not None:
@@ -6265,6 +6207,8 @@ def repo_file_inventory_mcp(
     hashes: dict[str, str] | None = None,
 ) -> dict:
     """Analyze file inventory for repo structure signals."""
+    from ..exact.repo_audit import repo_file_inventory as _repo_file_inventory
+
     if not isinstance(paths, list):
         return _error_response(
             "invalid_arguments",

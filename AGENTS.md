@@ -118,7 +118,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 
 ## Constraints
 
-- **Standard library only** — no pip packages in `eggcalc/`. Imports limited to: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`
+- **Standard library only** — no pip packages in `eggcalc/`. Imports limited to: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`, `zlib`, `base64`
 - **`build_single.py` compatibility** — all runtime code must live in one of the six core modules (`units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. `__main__.py` is a thin entry point (not in the manifest). Adding imports outside the allowed set will break the build.
 - **TypedDict over NamedTuple** — the codebase uses `TypedDict` for structured return types. TypedDict classes do NOT support `__slots__`.
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters. Applies to both single-expression and REPL modes.
@@ -160,7 +160,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 
 ## exact/ Module Notes
 
-- `confusables.py` is **auto-generated data only** (~176KB). Don't add code to it. Edit `scripts/generate_confusables.py` instead.
+- `confusables.py` is **auto-generated** (~40KB) with a zlib-compressed base85 payload and lazy `_LazyConfusables` mapping (6565 entries). Data is decoded on first access, not at import time. Don't add code to it. Edit `scripts/generate_confusables.py` instead.
 - `validate.py` enforces `MAX_INPUT_LENGTH = 100_000` on `check_brackets()` and `validate_json()`.
 - `visible_repr()` check order is correct: variation selector (U+FE00-FE0F) **before** combining mark check.
 - `utf8_bytes()` returns `bytes`, not an int count.
@@ -195,6 +195,7 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - `close_compatibility_server()` is exported from `eggcalc.mcp`.
 - `McpServer.diagnostic()` now counts only live (non-closed) sessions.
 - Resource audit: `docs/mcp_resource_limits.md` covers all 77 tools.
+- **Deferred exact imports:** `tools.py` uses local imports for `eggcalc.exact` modules. Implementation modules are imported on first tool invocation, not at `import eggcalc.mcp` time. Schemas remain eagerly available for `tools/list`.
 - **Session lifecycle:** `McpServer` creates one `McpSession(initial_state=UNINITIALIZED)` per connection via `server.create_session()`. The `McpSession` class manages protocol state (UNINITIALIZED → INITIALIZING → READY → CLOSED). `McpSessionState` enum tracks the lifecycle. Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`. Server close transitions all owned sessions to `CLOSED`. `McpSession` has `_owner_id` binding and `_closed` flag; `_check_ready_for_dispatch` uses `.name` comparison for `importlib.reload` safety. `McpSession.close()` calls `_owner_remove_callback(self)` to proactively remove from server's `_sessions` set.
 - **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`. Version negotiation uses `server.config.supported_protocol_versions` when available.
 - **`handle_request(request, session=None)`**: When `session` is `None`, routes through an isolated compatibility `McpServer` for backward compatibility. **Deprecated** — emits `DeprecationWarning`. Callers should pass an explicit `McpSession` instance.
@@ -271,13 +272,13 @@ The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCA
 2. **Wrong python** — `.venv/bin/python` needed for pytest (system python lacks deps).
 3. **Importing from wrong path** — `from eggcalc import ...` works; `from eggcalc.normalize import run` also works. But `evaluate()` from normalize won't handle NL. `import eggcalc.cli` no longer loads `eggcalc.exact.*` implementation modules — exact command handlers are loaded lazily via `importlib.import_module()` only when dispatched.
 4. **build_single.py breakage** — adding imports outside the allowed set or code that can't be concatenated will break the build.
-5. **confusables.py editing** — it's generated data; edit `scripts/generate_confusables.py` instead.
+5. **confusables.py editing** — it's generated data with a compressed payload; edit `scripts/generate_confusables.py` instead.
 6. **`normalize_main` alias** — created by `build_single.py` during assembly, does not exist in source `normalize.py`. Don't reference it in tests.
 7. **Caret (`^`) contract mismatch** — `evaluate("5^3")` returns `6` (XOR), but `evaluate_raw("5^3")` returns `125` (exponentiation). Use `evaluate()` for XOR, `evaluate_raw()` or CLI for exponentiation. Use `xor`/`bitxor` word forms when you need XOR through the full pipeline.
 8. **Floor/mod with incompatible units** — `evaluate_raw("5m % 2s")` raises `EvaluationError`. Floor division and modulo require dimensionally compatible operands.
 9. **MCP handshake before tools** — `main()` creates an UNINITIALIZED session. Clients must send `initialize` then `notifications/initialized` before `tools/list` or `tools/call`. Tool requests before init return `-32600`.
 10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`). Use `McpServer` + `McpSession` for new code.
 11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.
-12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Only `normalize`, `evaluator`, and `units` are loaded eagerly.
+12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Only `normalize`, `evaluator`, and `units` are loaded eagerly. Confusables data is lazy and decoded only on first access.
 13. **`Dimension(angle=True)` is not dimensionless** — Angle is a structural axis, not a compatibility alias for dimensionless. `rad + 1` is rejected.
 14. **`ToolRegistry.tool_names` returns `tuple[str, ...]`** — not `list[str]`. Use `list(registry.tool_names)` if you need a mutable list.

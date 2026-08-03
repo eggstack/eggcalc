@@ -3,12 +3,17 @@
 
 This script downloads the latest confusables.txt from Unicode consortium
 and generates a Python dictionary for use in unicode_tools.
+
+The generated module stores data as a zlib-compressed base85 payload
+that is decoded lazily on first access, reducing import-time allocation.
 """
 
 from __future__ import annotations
 
+import base64
 import re
 import urllib.request
+import zlib
 from datetime import datetime
 from pathlib import Path
 
@@ -139,7 +144,7 @@ def generate_python_file(
     source_version: str | None = None,
     source_date: str | None = None,
 ) -> str:
-    """Generate Python source for confusables.py."""
+    """Generate Python source for confusables.py with compressed payload."""
     lines = [
         '"""',
         "Unicode confusables table.",
@@ -161,23 +166,66 @@ def generate_python_file(
     lines.append("")
     lines.append("from __future__ import annotations")
     lines.append("")
-    lines.append("# Confusables table: codepoint string -> substitution codepoint string(s).")
-    lines.append("# e.g., 'U+0410' (Cyrillic A) -> 'U+0041' (Latin A)")
-    lines.append("# Names are derived at runtime via unicodedata.name().")
+    lines.append("import base64 as _base64")
+    lines.append("import zlib as _zlib")
+    lines.append("from collections.abc import Iterator, Mapping")
     lines.append("")
-    lines.append("CONFUSABLES: dict[str, str] = {")
 
-    # Sort by codepoint for deterministic output
+    # Build compressed payload from sorted codepoint entries
     sorted_items = sorted(confusables.items(), key=lambda x: ord(x[0]))
-
+    data_lines = []
     for source, sub in sorted_items:
         source_cp = f"U+{ord(source):04X}"
         sub_cps = " ".join(f"U+{ord(c):04X}" for c in sub)
-        lines.append(f'    "{source_cp}": "{sub_cps}",')
+        data_lines.append(f"{source_cp}|{sub_cps}")
 
-    lines.append("}")
+    raw = "\n".join(data_lines).encode("utf-8")
+    compressed = zlib.compress(raw, 9)
+    payload = base64.b85encode(compressed).decode("ascii")
+
+    lines.append(f"# Compressed confusables payload ({len(data_lines)} entries, "
+                 f"{len(compressed):,} bytes compressed)")
+    lines.append(f"_PAYLOAD = {payload!r}")
     lines.append("")
-    lines.append("__all__ = [\"CONFUSABLES\"]")
+    lines.append("del _base64, _zlib  # cleanup module namespace")
+    lines.append("")
+    lines.append("")
+    lines.append("class _LazyConfusables(Mapping):")
+    lines.append('    """Lazy mapping that decodes the compressed confusables payload on first use."""')
+    lines.append("")
+    lines.append("    __slots__ = ('_data',)")
+    lines.append("")
+    lines.append("    def _decode(self) -> dict[str, str]:")
+    lines.append("        data = getattr(self, '_data', None)")
+    lines.append("        if data is None:")
+    lines.append("            import base64 as _b64")
+    lines.append("            import zlib as _z")
+    lines.append("")
+    lines.append("            raw = _z.decompress(_b64.b85decode(_PAYLOAD))")
+    lines.append("            data = {}")
+    lines.append("            for line in raw.decode('utf-8').splitlines():")
+    lines.append("                key, _, value = line.partition('|')")
+    lines.append("                data[key] = value")
+    lines.append("            object.__setattr__(self, '_data', data)")
+    lines.append("        return data")
+    lines.append("")
+    lines.append("    def __getitem__(self, key: str) -> str:")
+    lines.append("        return self._decode()[key]")
+    lines.append("")
+    lines.append("    def __iter__(self) -> Iterator[str]:")
+    lines.append("        return iter(self._decode())")
+    lines.append("")
+    lines.append("    def __len__(self) -> int:")
+    lines.append("        return len(self._decode())")
+    lines.append("")
+    lines.append("    def __contains__(self, key: object) -> bool:")
+    lines.append("        return key in self._decode()")
+    lines.append("")
+    lines.append("")
+    lines.append("CONFUSABLES: Mapping[str, str] = _LazyConfusables()")
+    lines.append("")
+    lines.append('__all__ = ["CONFUSABLES"]')
+    lines.append("")  # trailing newline for ruff W292
 
     return "\n".join(lines)
 
@@ -213,6 +261,9 @@ def main() -> None:
     import sys
 
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    # Reload the module to pick up the regenerated file
+    if "eggcalc.exact.confusables" in sys.modules:
+        del sys.modules["eggcalc.exact.confusables"]
     from eggcalc.exact import confusables as conf_module
 
     loaded = conf_module.CONFUSABLES

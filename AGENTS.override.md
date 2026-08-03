@@ -18,7 +18,7 @@ The codebase must work when assembled by `build_single.py` into a single file. A
 Prefixed units like `kN`, `mV`, `mA` map to themselves in `UNIT_ALIASES`. Word forms like `kilonewton` alias to the prefixed form (e.g., `"kilonewton": "kN"`). This is correct behavior - the word form converts to the symbol form which then properly converts.
 
 **exact/ Module File Organization:**
-- `confusables.py` is an auto-generated data file (~176KB, 6580 lines) containing only the CONFUSABLES dict
+- `confusables.py` is an auto-generated file (~40KB) containing a zlib-compressed base85 payload and a lazy `_LazyConfusables` mapping (6565 entries). Data is decoded on first access, not at import time.
 - TypedDict classes are in their logical modules (validate.py, measure.py, unicode_tools.py, etc.), NOT in confusables.py
 - Helper functions like `confusables_count()` should go in `unicode_tools.py`, not `confusables.py`
 - `reverse_confusables()` is implemented, exported, and documented in architecture docs

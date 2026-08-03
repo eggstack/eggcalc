@@ -40,7 +40,7 @@ exact/
 ├── __init__.py            # Public API re-exports
 ├── primitives.py          # UTF-8, codepoints, normalization, invisibles
 ├── unicode_tools.py       # Script detection, confusables
-├── confusables.py         # Homoglyph data (auto-generated, ~6500 lines)
+├── confusables.py         # Homoglyph data (compressed payload, lazy decode)
 ├── measure.py             # Text metrics (words, lines, categories)
 ├── diff.py                # String diffing algorithms
 ├── diff_analysis.py       # Structural analysis of unified diffs and patches
@@ -305,19 +305,11 @@ Returns an empty list if no characters confusable-map to the input.
 
 ## confusables.py — Homoglyph Data
 
-**Auto-generated data file** (~6500 lines, 6565 entries).
+**Auto-generated file** (~40KB) with a zlib-compressed base85 payload and lazy `_LazyConfusables` mapping (6565 entries). Data is decoded on first access, not at import time.
 
 Source: Unicode confusables.txt (UTS #39), version 17.0.0. Regenerated with `scripts/generate_confusables.py`. Do not edit directly.
 
-Data format:
-
-```python
-CONFUSABLES: dict[str, str] = {
-    # codepoint string -> substitution codepoint string(s)
-    "U+0041": "U+0041 U+0045",   # Latin A → Latin A + Latin E (Æ ligature)
-    "U+0030": "U+004F",          # Digit 0 → Latin O
-    ...
-}
+Data format: The file stores a zlib-compressed base85 payload and a `_LazyConfusables` class that decodes it on first access. The `CONFUSABLES` object is a `Mapping[str, str]` with the same key/value semantics as the former eager dict.
 ```
 
 The table maps Unicode codepoint strings (e.g., `"U+0410"` for Cyrillic А) to their confusable substitution sequences. Names are derived at runtime via `unicodedata.name()`.
