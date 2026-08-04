@@ -278,7 +278,7 @@ def _regex_test_worker(
     result_queue: multiprocessing.Queue,
 ) -> None:
     """Run regex test in a child process. Must be top-level for pickling."""
-    from ..exact import regex_test as _regex_test
+    from ..exact.validate import regex_test as _regex_test
 
     try:
         import resource
@@ -313,7 +313,7 @@ def _regex_finditer_worker(
     result_queue: multiprocessing.Queue,
 ) -> None:
     """Run regex finditer in a child process. Must be top-level for pickling."""
-    from ..exact import regex_finditer as _regex_finditer
+    from ..exact.validate import regex_finditer as _regex_finditer
 
     try:
         import resource
@@ -1104,7 +1104,7 @@ def validate_brackets(text: str, pairs: dict[str, str] | None = None) -> dict:
     Returns:
         Success envelope with bracket check result, or error envelope.
     """
-    from ..exact import check_brackets as _check_brackets
+    from ..exact.validate import check_brackets as _check_brackets
 
     if (err := _require_str(text, "text", "validate_brackets")) is not None:
         return err
@@ -1155,7 +1155,7 @@ def validate_json(text: str) -> dict:
     Returns:
         Success envelope with validation result, or error envelope.
     """
-    from ..exact import validate_json as _validate_json
+    from ..exact.validate import validate_json as _validate_json
 
     if (err := _require_str(text, "text", "validate_json")) is not None:
         return err
@@ -1203,7 +1203,7 @@ def validate_toml(text: str, detail: str = "normal") -> dict:
     Returns:
         Success envelope with validation result, or error envelope.
     """
-    from ..exact import validate_toml_text as _validate_toml_text
+    from ..exact.validate import validate_toml_text as _validate_toml_text
 
     if (err := _require_str(text, "text", "validate_toml")) is not None:
         return err
@@ -1264,7 +1264,7 @@ def json_compare(
     Returns:
         Success envelope with comparison result, or error envelope.
     """
-    from ..exact import json_compare as _json_compare
+    from ..exact.validate import json_compare as _json_compare
 
     if (err := _require_str(a, "a", "json_compare")) is not None:
         return err
@@ -1365,7 +1365,7 @@ def validate_regex(
     Returns:
         Success envelope with regex test results, or error envelope.
     """
-    from ..exact import regex_safety_check as _regex_safety_check
+    from ..exact.validate import regex_safety_check as _regex_safety_check
 
     if not isinstance(pattern, str):
         return _error_response(
@@ -1514,7 +1514,7 @@ def json_extract(
     Returns:
         Success envelope with extraction result, or error envelope.
     """
-    from ..exact import json_extract as _json_extract
+    from ..exact.validate import json_extract as _json_extract
 
     if (err := _require_str(text, "text", "json_extract")) is not None:
         return err
@@ -1596,7 +1596,7 @@ def json_shape(
     Returns:
         Success envelope with shape result, or error envelope.
     """
-    from ..exact import json_shape as _json_shape
+    from ..exact.validate import json_shape as _json_shape
 
     if (err := _require_str(text, "text", "json_shape")) is not None:
         return err
@@ -1677,7 +1677,7 @@ def regex_finditer(
     Returns:
         Success envelope with matches result, or error envelope.
     """
-    from ..exact import regex_safety_check as _regex_safety_check
+    from ..exact.validate import regex_safety_check as _regex_safety_check
 
     if not isinstance(text, str):
         return _error_response(
@@ -1813,7 +1813,7 @@ def regex_safety_check(pattern: str) -> dict:
     Returns:
         Success envelope with safety check result, or error envelope.
     """
-    from ..exact import regex_safety_check as _regex_safety_check
+    from ..exact.validate import regex_safety_check as _regex_safety_check
 
     if err := _require_str(pattern, "pattern", "regex_safety_check"):
         return err
@@ -1861,7 +1861,7 @@ def validate_schema_light(text: str, schema: dict, detail: str = "normal") -> di
     Returns:
         Success envelope with validation result, or error envelope.
     """
-    from ..exact import validate_schema_light as _validate_schema_light
+    from ..exact.validate import validate_schema_light as _validate_schema_light
 
     if (err := _require_str(text, "text", "validate_schema_light")) is not None:
         return err
@@ -2326,7 +2326,7 @@ def text_position(
     Returns:
         Success envelope with position result, or error envelope.
     """
-    from ..exact import text_position as _text_position
+    from ..exact.position import text_position as _text_position
 
     if (err := _require_str(text, "text", "text_position")) is not None:
         return err
@@ -3054,7 +3054,7 @@ def glob_match_mcp(
     Returns:
         Success envelope with match result, or error envelope.
     """
-    from ..exact import glob_match as _glob_match
+    from ..exact.glob import glob_match as _glob_match
 
     valid_platforms = {"posix", "windows"}
     if platform not in valid_platforms:
@@ -3146,7 +3146,7 @@ def identifier_inspect_mcp(
     Returns:
         Success envelope with inspection result, or error envelope.
     """
-    from ..exact import identifier_inspect as _identifier_inspect
+    from ..exact.identifier_inspect import identifier_inspect as _identifier_inspect
 
     if not isinstance(identifiers, list):
         return _error_response(
@@ -3205,7 +3205,7 @@ def identifier_inspect_mcp(
         )
 
     try:
-        result = _identifier_inspect(  # type: ignore[operator]
+        result = _identifier_inspect(
             identifiers, language, normalization, casefold, check_confusables
         )
 
@@ -3329,7 +3329,7 @@ def version_compare_mcp(
     Returns:
         Success envelope with comparison result, or error envelope.
     """
-    from ..exact import version_compare as _version_compare
+    from ..exact.validate import version_compare as _version_compare
 
     valid_schemes = {"semver", "loose"}
     if scheme not in valid_schemes:
@@ -3367,7 +3367,7 @@ def toml_shape_mcp(
     Returns:
         Success envelope with shape result, or error envelope.
     """
-    from ..exact import toml_shape as _toml_shape
+    from ..exact.validate import toml_shape as _toml_shape
 
     if (err := _require_str(text, "text", "toml_shape")) is not None:
         return err
@@ -3430,7 +3430,7 @@ def list_dedupe_mcp(
     Returns:
         Success envelope with deduped list, or error envelope.
     """
-    from ..exact import list_dedupe as _list_dedupe
+    from ..exact.validate import list_dedupe as _list_dedupe
 
     if (err := _validate_str_list(items, "items", "list_dedupe")) is not None:
         return err
@@ -3480,7 +3480,7 @@ def list_sort_mcp(
     Returns:
         Success envelope with sorted list, or error envelope.
     """
-    from ..exact import list_sort as _list_sort
+    from ..exact.validate import list_sort as _list_sort
 
     if (err := _validate_str_list(items, "items", "list_sort")) is not None:
         return err
@@ -3981,7 +3981,7 @@ def dotenv_validate_mcp(
     Returns:
         Success envelope with validation result, or error envelope.
     """
-    from ..exact import regex_safety_check as _regex_safety_check
+    from ..exact.validate import regex_safety_check as _regex_safety_check
 
     if (err := _require_str(text, "text", "dotenv_validate")) is not None:
         return err
@@ -4502,7 +4502,7 @@ def identifier_table_inspect_mcp(
     Returns:
         Success envelope with inspection result, or error envelope.
     """
-    from ..exact import identifier_table_inspect as _identifier_table_inspect
+    from ..exact.identifier_inspect import identifier_table_inspect as _identifier_table_inspect
 
     if not isinstance(identifiers, list):
         return _error_response(
@@ -4807,7 +4807,7 @@ def prompt_input_inspect_mcp(
     Returns:
         Success envelope with inspection result, or error envelope.
     """
-    from ..exact import prompt_input_inspect as _prompt_input_inspect
+    from ..exact.inspect_prompt import prompt_input_inspect as _prompt_input_inspect
 
     if (err := _require_str(text, "text", "prompt_input_inspect")) is not None:
         return err
