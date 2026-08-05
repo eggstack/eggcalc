@@ -1,6 +1,6 @@
 # Unit-Aware Function Contracts and Timeout State Parity
 
-Status: implementation handoff  
+Status: implemented  
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `8515579e9e64fcb49a3e5b46ac4f0c47e77d8ff1`  
 Date: 2026-07-31  

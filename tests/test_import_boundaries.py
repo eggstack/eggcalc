@@ -346,3 +346,52 @@ class TestCommandRegistry:
         """)
         result = _run_import_check(code)
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+
+class TestDeferredExactImport:
+    """Regression: deferred exact imports survive Python 3.11 collisions.
+
+    Commit ec7816d changed MCP handler imports from package-level re-exports
+    to explicit implementation submodules after Python 3.11 exposed
+    module/function name collisions. These tests prove the fix holds.
+    """
+
+    def test_mcp_tool_handlers_callable(self):
+        """MCP tool handlers resolve to callables after deferred import."""
+        code = textwrap.dedent("""\
+            import sys
+            # Force clean state
+            for mod in list(sys.modules):
+                if mod.startswith("eggcalc.mcp"):
+                    del sys.modules[mod]
+            from eggcalc.mcp.server import TOOL_HANDLERS
+            # identifier_inspect is one of the handlers that had collisions
+            handler = TOOL_HANDLERS.get("identifier_inspect")
+            assert handler is not None, "identifier_inspect handler not found"
+            assert callable(handler), "identifier_inspect handler not callable"
+            # Validation handler
+            handler2 = TOOL_HANDLERS.get("validate_brackets")
+            assert handler2 is not None, "validate_brackets handler not found"
+            assert callable(handler2), "validate_brackets handler not callable"
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    def test_exact_module_not_loaded_at_mcp_startup(self):
+        """import eggcalc.mcp must not eagerly load exact implementation modules."""
+        code = textwrap.dedent("""\
+            import sys
+            for mod in list(sys.modules):
+                if mod.startswith("eggcalc.mcp"):
+                    del sys.modules[mod]
+            import eggcalc.mcp
+            exact_impls = [
+                m for m in sys.modules
+                if m.startswith("eggcalc.exact.") and m != "eggcalc.exact"
+            ]
+            assert not exact_impls, (
+                f"MCP startup eagerly loaded exact modules: {exact_impls}"
+            )
+        """)
+        result = _run_import_check(code)
+        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

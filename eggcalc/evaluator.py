@@ -147,51 +147,6 @@ _SIDE_EFFECT_FUNCTIONS: frozenset[str] = frozenset(
     }
 )
 
-# Functions that require a dimensionless argument. Calling these with a
-# UnitValue previously silently stripped the unit (e.g. ``fact(5m) -> 120``,
-# ``ceil(3.7m) -> 4``), which is misleading because the unit looks like it
-# participates in the computation. We now reject UnitValue with a unit and
-# raise a clear EvaluationError.
-_DIMENSIONLESS_REQUIRED_FUNCTIONS: frozenset[str] = frozenset(
-    {
-        "abs",
-        "floor",
-        "ceil",
-        "trunc",
-        "round",
-        "sign",
-        "factorial",
-        "fact",
-        "gcd",
-        "lcm",
-        "perm",
-        "comb",
-        "nPr",
-        "nCr",
-        "pow",
-        "expm1",
-        "bin",
-        "hex",
-        "oct",
-        "bitand",
-        "bitor",
-        "bitxor",
-        "bitnot",
-        "bitlshift",
-        "bitrshift",
-        "isprime",
-        "is_prime",
-        "primefactors",
-        "prime_factors",
-        "nextprime",
-        "next_prime",
-        "prevprime",
-        "prev_prime",
-        "randint",
-        "randrange",
-    }
-)
-
 # Functions whose first argument is a variable name (string). The argument
 # is preserved as a raw string even if it collides with a constant or unit
 # name (e.g., setvar("pi", 5) should bind the variable "pi" rather than
@@ -231,17 +186,17 @@ class UnitPolicy(Enum):
     ANGLE_OUTPUT = auto()
     PRESERVE_SINGLE = auto()
     COMPATIBLE_REDUCER = auto()
+    VARIANCE_SQUARED = auto()
+    SIGN_OUTPUT = auto()
     ROOT = auto()
     HYPOT = auto()
     ATAN2 = auto()
-    CUSTOM = auto()
 
 
 @dataclass(frozen=True)
 class FunctionSpec:
-    """Colocated callable and its dimensional policy."""
+    """Dimensional policy for a built-in function."""
 
-    function: Any
     unit_policy: UnitPolicy
 
 
@@ -286,6 +241,51 @@ def _compatible_reducer(name: str, func: Any, args: list[Any]) -> Any:
     raise EvaluationError(
         f"{name}() requires compatible units; received a mix of dimensionless and dimensional arguments"
     )
+
+
+def _variance_squared_reducer(name: str, func: Any, args: list[Any]) -> Any:
+    """Variance-family reducer: result has squared units of the first input."""
+    from .units import power_expression, render_expression
+
+    if not args:
+        return func()
+    has_unit = [isinstance(a, UnitValue) and a.unit is not None for a in args]
+    if not any(has_unit):
+        return func(*args)
+    if all(has_unit):
+        units = [a.unit for a in args]
+        base_unit = units[0]
+        base_uv = args[0]
+        converted_vals: list[float] = []
+        for a in args:
+            try:
+                converted_vals.append(a.convert_to(base_unit).value)
+            except (ValueError, TypeError):
+                raise EvaluationError(
+                    f"{name}() requires compatible units; "
+                    f"received incompatible units '{units[0]}' and '{a.unit}'"
+                )
+        result = func(*converted_vals)
+        # Reject affine temperature variance (cannot represent squared offset units)
+        if base_uv._unit_expr.dimension.is_affine:
+            raise EvaluationError(
+                f"{name}() cannot represent squared affine temperature unit '{base_unit}'"
+            )
+        squared_expr = power_expression(base_uv._unit_expr, 2)
+        squared_unit = render_expression(squared_expr)
+        return UnitValue(result, squared_unit)
+    raise EvaluationError(
+        f"{name}() requires compatible units; received a mix of dimensionless and dimensional arguments"
+    )
+
+
+def _sign_output_dispatch(name: str, func: Any, args: list[Any]) -> Any:
+    """sign(): dimensionless result regardless of input units."""
+    if len(args) != 1:
+        raise EvaluationError(f"{name}() requires exactly 1 argument, got {len(args)}")
+    arg = args[0]
+    val = arg.value if isinstance(arg, UnitValue) else arg
+    return func(val)
 
 
 def _angle_input_dispatch(name: str, func: Any, args: list[Any]) -> Any:
@@ -414,19 +414,19 @@ def _build_function_specs() -> dict[str, FunctionSpec]:
         "cos",
         "tan",
     ):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.ANGLE_INPUT)
+        specs[name] = FunctionSpec(UnitPolicy.ANGLE_INPUT)
     for name in (
         "asin",
         "acos",
         "atan",
     ):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.ANGLE_OUTPUT)
+        specs[name] = FunctionSpec(UnitPolicy.ANGLE_OUTPUT)
     for name in ("sinh", "cosh", "tanh", "asinh", "acosh", "atanh"):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+        specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
     for name in ("log", "ln", "log10", "log2", "log1p", "exp", "expm1"):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+        specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
     for name in ("sign",):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.PRESERVE_SINGLE)
+        specs[name] = FunctionSpec(UnitPolicy.SIGN_OUTPUT)
     for name in (
         "cbrt",
         "pow",
@@ -460,7 +460,7 @@ def _build_function_specs() -> dict[str, FunctionSpec]:
         "expm1",
     ):
         if name not in specs:
-            specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+            specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
     for name in (
         "mean",
         "median",
@@ -468,32 +468,35 @@ def _build_function_specs() -> dict[str, FunctionSpec]:
         "std",
         "std_sample",
         "stds",
+        "sum",
+        "max",
+        "min",
+    ):
+        specs[name] = FunctionSpec(UnitPolicy.COMPATIBLE_REDUCER)
+    for name in (
         "variance",
         "var",
         "variance_sample",
         "vars",
         "var_sample",
-        "sum",
-        "max",
-        "min",
     ):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.COMPATIBLE_REDUCER)
-    specs["sqrt"] = FunctionSpec(funcs["sqrt"], UnitPolicy.ROOT)
-    specs["hypot"] = FunctionSpec(funcs["hypot"], UnitPolicy.HYPOT)
-    specs["atan2"] = FunctionSpec(funcs["atan2"], UnitPolicy.ATAN2)
-    specs["abs"] = FunctionSpec(funcs["abs"], UnitPolicy.PRESERVE_SINGLE)
-    specs["round"] = FunctionSpec(funcs["round"], UnitPolicy.PRESERVE_SINGLE)
-    specs["floor"] = FunctionSpec(funcs["floor"], UnitPolicy.PRESERVE_SINGLE)
-    specs["ceil"] = FunctionSpec(funcs["ceil"], UnitPolicy.PRESERVE_SINGLE)
-    specs["trunc"] = FunctionSpec(funcs["trunc"], UnitPolicy.PRESERVE_SINGLE)
+        specs[name] = FunctionSpec(UnitPolicy.VARIANCE_SQUARED)
+    specs["sqrt"] = FunctionSpec(UnitPolicy.ROOT)
+    specs["hypot"] = FunctionSpec(UnitPolicy.HYPOT)
+    specs["atan2"] = FunctionSpec(UnitPolicy.ATAN2)
+    specs["abs"] = FunctionSpec(UnitPolicy.PRESERVE_SINGLE)
+    specs["round"] = FunctionSpec(UnitPolicy.PRESERVE_SINGLE)
+    specs["floor"] = FunctionSpec(UnitPolicy.PRESERVE_SINGLE)
+    specs["ceil"] = FunctionSpec(UnitPolicy.PRESERVE_SINGLE)
+    specs["trunc"] = FunctionSpec(UnitPolicy.PRESERVE_SINGLE)
     for name in ("clamp", "percentof", "percent_of", "aspercent", "as_percent"):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+        specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
     for name in ("real", "imag", "conj", "conjugate", "phase", "polar", "rect"):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+        specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
     for name in ("degrees", "radians"):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+        specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
     for name in ("random", "randint", "randrange", "uniform", "randn", "gauss", "seed"):
-        specs[name] = FunctionSpec(funcs[name], UnitPolicy.DIMENSIONLESS)
+        specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
     return specs
 
 
@@ -2000,6 +2003,9 @@ def _build_allowed_ast_types() -> frozenset[type[ast.AST]]:
                 allowed.add(type(node))
 
     allowed.add(ast.Expression)
+    # keyword nodes are used for ndigits= in round()
+    if hasattr(ast, "keyword"):
+        allowed.add(ast.keyword)
     for name in dir(ast):
         obj = getattr(ast, name)
         if (
@@ -2127,9 +2133,9 @@ class Evaluator(ast.NodeVisitor):
         # Power and root (complex-aware)
         "sqrt": _sqrt,
         "pow": _safe_pow,
-        # Rounding and absolute — visit_Call rejects UnitValue-with-unit
-        # for these via _DIMENSIONLESS_REQUIRED_FUNCTIONS, so the functions
-        # themselves can stay as plain builtins.
+        # Rounding and absolute — visit_Call enforces dimensionless via
+        # centralized unit-policy dispatch, so the functions themselves
+        # can stay as plain builtins.
         "abs": abs,
         "floor": math.floor,
         "ceil": math.ceil,
@@ -2307,6 +2313,10 @@ class Evaluator(ast.NodeVisitor):
         self._instance_random = random.Random(random_seed)
         # Bind random functions to this instance's generator
         self._bind_instance_random()
+        # Canonical callable baseline: snapshot of built-in callables after
+        # instance-specific binding. Used by visit_Call and _snapshot_evaluator_state
+        # to distinguish canonical built-in functions from user overrides.
+        self._builtin_function_baseline: dict[str, Any] = dict(self.FUNCTIONS)
 
     def _bind_instance_random(self) -> None:
         """Replace class-level random function entries with instance-bound closures."""
@@ -2741,10 +2751,30 @@ class Evaluator(ast.NodeVisitor):
             except (ValueError, TypeError, ZeroDivisionError) as e:
                 raise EvaluationError(str(e)) from None
 
-        policy = spec.unit_policy
-        # Use self.FUNCTIONS[func_name] instead of spec.function to preserve
-        # instance-bound closures (e.g., instance-specific random generators).
+        # Callable identity check: built-in unit policies apply only when
+        # the active callable is the canonical built-in for this evaluator.
+        # Any added or replaced callable is a user callable (dimensionless-only).
         inst_func = self.FUNCTIONS[func_name]
+        baseline_func = self._builtin_function_baseline.get(func_name)
+        is_canonical = inst_func is baseline_func
+
+        if not is_canonical:
+            # User-replaced callable: dimensionless-only, regardless of spec
+            for arg in args:
+                if isinstance(arg, UnitValue) and arg.unit is not None:
+                    raise EvaluationError(
+                        f"Function '{func_name}()' requires a dimensionless "
+                        f"argument, got value with unit '{arg.unit}'"
+                    )
+            plain_args = [a.value if isinstance(a, UnitValue) else a for a in args]
+            try:
+                return inst_func(*plain_args, **kwargs)
+            except OverflowError:
+                raise EvaluationError("Result too large") from None
+            except (ValueError, TypeError, ZeroDivisionError) as e:
+                raise EvaluationError(str(e)) from None
+
+        policy = spec.unit_policy
 
         try:
             if policy is UnitPolicy.DIMENSIONLESS:
@@ -2775,8 +2805,16 @@ class Evaluator(ast.NodeVisitor):
                     arg = args[0]
                     unit = getattr(arg, "unit", None) if isinstance(arg, UnitValue) else None
                     val = arg.value if isinstance(arg, UnitValue) else arg
-                    nd = kwargs.get("ndigits", args[1] if len(args) > 1 else 0)
-                    result = round(cast(float, val), nd)
+                    ndigits_was_omitted = "ndigits" not in kwargs and len(args) < 2
+                    if ndigits_was_omitted:
+                        result = round(cast(float, val))
+                    else:
+                        if "ndigits" in kwargs and len(args) > 1:
+                            raise EvaluationError(
+                                "round() got multiple values for argument 'ndigits'"
+                            )
+                        nd = kwargs.get("ndigits", args[1] if len(args) > 1 else 0)
+                        result = round(cast(float, val), nd)
                     if unit is not None:
                         return UnitValue(result, unit)
                     return result
@@ -2784,6 +2822,12 @@ class Evaluator(ast.NodeVisitor):
 
             elif policy is UnitPolicy.COMPATIBLE_REDUCER:
                 return _compatible_reducer(func_name, inst_func, args)
+
+            elif policy is UnitPolicy.VARIANCE_SQUARED:
+                return _variance_squared_reducer(func_name, inst_func, args)
+
+            elif policy is UnitPolicy.SIGN_OUTPUT:
+                return _sign_output_dispatch(func_name, inst_func, args)
 
             elif policy is UnitPolicy.ROOT:
                 return _sqrt_dispatch(args)
@@ -2952,12 +2996,22 @@ def _snapshot_evaluator_state(ev: Evaluator) -> dict[str, Any]:
     """Create a pickle-safe snapshot of evaluator state for timeout workers.
 
     Returns a plain dict with constants, variables, memory registers, and
-    flags. Arbitrary registered callables that are not built-in functions
-    cause an immediate EvaluationError.
+    flags. Custom registered callables (added names or replaced built-ins)
+    cause an immediate EvaluationError, since arbitrary callables cannot
+    be serialized across process boundaries.
     """
-    # Detect custom (non-built-in) registered functions
-    builtin_funcs = set(Evaluator.FUNCTIONS.keys())
-    custom_names = [name for name in ev.FUNCTIONS if name not in builtin_funcs]
+    # Detect custom (non-built-in) registered functions using callable identity.
+    # A function is custom if:
+    #   - its name is absent from the baseline (added by user), or
+    #   - its name is present but the active callable differs from the baseline
+    #     (replaced by user).
+    custom_names: list[str] = []
+    for name in ev.FUNCTIONS:
+        baseline_func = ev._builtin_function_baseline.get(name)
+        if baseline_func is None:
+            custom_names.append(name)
+        elif ev.FUNCTIONS[name] is not baseline_func:
+            custom_names.append(name)
     if custom_names:
         raise EvaluationError(
             f"evaluate_with_timeout() does not support custom registered "

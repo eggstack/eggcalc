@@ -352,11 +352,10 @@ class TestPreserveSingle:
         assert result.value == -3
         assert result.unit == "m"
 
-    def test_sign_preserves_unit(self):
+    def test_sign_returns_dimensionless(self):
         result = evaluate_raw("sign(-5*m)")
-        assert isinstance(result, UnitValue)
-        assert result.value == -1
-        assert result.unit == "m"
+        assert not isinstance(result, UnitValue)
+        assert result == -1
 
     def test_abs_dimensionless(self):
         assert evaluate("abs(-5)") == 5
@@ -617,3 +616,300 @@ class TestExplicitNegatives:
 
         with pytest.raises(ValueError, match="does not match"):
             register_custom_units({"m": {"fake_time": (1.0, "time")}})
+
+
+# ---------------------------------------------------------------------------
+# Workstream A: Variance squared units
+# ---------------------------------------------------------------------------
+
+
+class TestVarianceSquaredUnits:
+    """Variance functions must return squared units for dimensional input."""
+
+    @pytest.mark.parametrize("func", ["variance", "var"])
+    def test_population_variance_squared_unit(self, func):
+        result = evaluate_raw(f"{func}(1*m, 2*m, 3*m)")
+        assert isinstance(result, UnitValue)
+        assert abs(result.value - 2 / 3) < 1e-10
+        assert result.unit == "m**2"
+
+    @pytest.mark.parametrize("func", ["variance_sample", "vars", "var_sample"])
+    def test_sample_variance_squared_unit(self, func):
+        result = evaluate_raw(f"{func}(1*m, 2*m, 3*m)")
+        assert isinstance(result, UnitValue)
+        assert abs(result.value - 1.0) < 1e-10
+        assert result.unit == "m**2"
+
+    def test_variance_mixed_scale_squared(self):
+        result = evaluate_raw("variance(1*m, 200*cm, 3*m)")
+        assert isinstance(result, UnitValue)
+        assert abs(result.value - 2 / 3) < 1e-10
+        assert result.unit == "m**2"
+
+    def test_variance_ft_squared(self):
+        result = evaluate_raw("variance_sample(1*ft, 2*ft)")
+        assert isinstance(result, UnitValue)
+        assert result.unit == "ft**2"
+
+    def test_std_remains_first_power(self):
+        result = evaluate_raw("std(1*m, 2*m, 3*m)")
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m"
+
+    def test_mean_remains_first_power(self):
+        result = evaluate_raw("mean(1*m, 2*m, 3*m)")
+        assert isinstance(result, UnitValue)
+        assert result.unit == "m"
+
+    def test_variance_dimensionless(self):
+        result = evaluate("variance(1, 2, 3)")
+        assert abs(result - 2 / 3) < 1e-10
+
+    def test_variance_incompatible_units(self):
+        with pytest.raises(EvaluationError, match="compatible"):
+            evaluate_raw("variance(1*m, 1*s)")
+
+    def test_variance_mixed_dimensional_dimensionless(self):
+        with pytest.raises(EvaluationError, match="compatible"):
+            evaluate_raw("variance(1*m, 1)")
+
+    def test_variance_affine_temperature_rejected(self):
+        with pytest.raises(EvaluationError, match="squared affine"):
+            evaluate_raw("variance(10*C, 20*C, 30*C)")
+
+    def test_variance_single_arg(self):
+        with pytest.raises(EvaluationError):
+            evaluate_raw("variance(1*m)")
+
+
+# ---------------------------------------------------------------------------
+# Workstream B: Dimensionless sign
+# ---------------------------------------------------------------------------
+
+
+class TestSignDimensionless:
+    """sign() must always return a dimensionless scalar."""
+
+    def test_sign_with_unit(self):
+        result = evaluate_raw("sign(-5*m)")
+        assert not isinstance(result, UnitValue)
+        assert result == -1
+
+    def test_sign_zero_with_unit(self):
+        result = evaluate_raw("sign(0*m)")
+        assert not isinstance(result, UnitValue)
+        assert result == 0
+
+    def test_sign_positive_with_unit(self):
+        result = evaluate_raw("sign(5*m)")
+        assert not isinstance(result, UnitValue)
+        assert result == 1
+
+    def test_sign_dimensionless(self):
+        assert evaluate("sign(-5)") == -1
+        assert evaluate("sign(0)") == 0
+        assert evaluate("sign(5)") == 1
+
+
+# ---------------------------------------------------------------------------
+# Workstream B: Exact round() return type
+# ---------------------------------------------------------------------------
+
+
+class TestRoundReturnType:
+    """round() must preserve Python's exact return type semantics."""
+
+    def test_round_omitted_ndigits_returns_int(self):
+        result = evaluate("round(3.7)")
+        assert type(result) is int
+        assert result == 4
+
+    def test_round_explicit_zero_ndigits_returns_float(self):
+        result = evaluate("round(3.7, 0)")
+        assert type(result) is float
+        assert result == 4.0
+
+    def test_round_keyword_zero_ndigits_returns_float(self):
+        result = evaluate("round(3.7, ndigits=0)")
+        assert type(result) is float
+        assert result == 4.0
+
+    def test_round_with_ndigits(self):
+        result = evaluate("round(3.14159, 2)")
+        assert result == 3.14
+
+    def test_round_unit_omitted_ndigits(self):
+        result = evaluate_raw("round(3.7*m)")
+        assert isinstance(result, UnitValue)
+        assert type(result.value) is int
+        assert result.value == 4
+        assert result.unit == "m"
+
+    def test_round_unit_explicit_zero_ndigits(self):
+        result = evaluate_raw("round(3.7*m, 0)")
+        assert isinstance(result, UnitValue)
+        assert type(result.value) is float
+        assert result.value == 4.0
+        assert result.unit == "m"
+
+    def test_round_unit_keyword_ndigits(self):
+        result = evaluate_raw("round(3.7*m, ndigits=0)")
+        assert isinstance(result, UnitValue)
+        assert type(result.value) is float
+        assert result.value == 4.0
+
+    def test_duplicate_ndigits_rejected(self):
+        with pytest.raises(EvaluationError):
+            evaluate("round(3.7, 0, ndigits=0)")
+
+
+# ---------------------------------------------------------------------------
+# Workstream C: Callable identity authority
+# ---------------------------------------------------------------------------
+
+
+class TestCallableIdentity:
+    """Built-in unit policies apply only to canonical built-in callables."""
+
+    def test_override_sin_no_angle_policy(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["sin"] = lambda x: x
+        # Custom sin: no angle conversion, just passes through dimensionless
+        assert ev.evaluate("sin(2)") == 2
+
+    def test_override_sin_rejects_dimensional(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["sin"] = lambda x: x
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate("sin(2*m)")
+
+    def test_override_round_no_preserve_policy(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["round"] = lambda x: x
+        # Custom round: dimensionless-only, identity function
+        assert ev.evaluate("round(3.7)") == 3.7
+
+    def test_override_round_rejects_dimensional(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["round"] = lambda x: x
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate("round(3.7*m)")
+
+    def test_override_variance_no_squared_policy(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["variance"] = lambda *args: sum(args) / len(args)
+        # Custom variance: dimensionless-only
+        assert ev.evaluate("variance(1, 2, 3)") == 2.0
+
+    def test_override_variance_rejects_dimensional(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["variance"] = lambda *args: sum(args) / len(args)
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate("variance(1*m, 2*m, 3*m)")
+
+    def test_add_custom_function_dimensionless(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["double"] = lambda x: x * 2
+        result = ev.evaluate("double(5)")
+        assert result == 10
+
+    def test_add_custom_function_rejects_unit(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["double"] = lambda x: x * 2
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate("double(5*m)")
+
+    def test_restore_canonical_sin(self):
+        ev = Evaluator()
+        canonical_sin = ev._builtin_function_baseline["sin"]
+        ev.FUNCTIONS["sin"] = lambda x: x
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate("sin(2*m)")  # custom, rejects dimensional
+        ev.FUNCTIONS["sin"] = canonical_sin
+        assert abs(ev.evaluate("sin(pi/2)") - 1.0) < 1e-10  # canonical, angle policy
+
+    def test_canonical_random_recognized(self):
+        ev = Evaluator(random_seed=1)
+        baseline = ev._builtin_function_baseline
+        assert ev.FUNCTIONS["random"] is baseline["random"]
+        assert ev.FUNCTIONS["randint"] is baseline["randint"]
+
+
+# ---------------------------------------------------------------------------
+# Workstream D: Timeout callable identity rejection
+# ---------------------------------------------------------------------------
+
+
+class TestTimeoutCallableIdentity:
+    """Timeout rejects added and overridden callables before spawning."""
+
+    def test_timeout_rejects_added_function(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["double"] = lambda x: x * 2
+        with pytest.raises(EvaluationError, match="double"):
+            evaluate_with_timeout("1+1", timeout=5.0, _evaluator=ev)
+
+    def test_timeout_rejects_overridden_builtin(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["sin"] = lambda x: x
+        with pytest.raises(EvaluationError, match="sin"):
+            evaluate_with_timeout("1+1", timeout=5.0, _evaluator=ev)
+
+    def test_timeout_accepts_canonical_random(self):
+        ev = Evaluator(random_seed=1)
+        result = evaluate_with_timeout("random()", timeout=5.0, _evaluator=ev)
+        assert isinstance(result, float)
+
+
+# ---------------------------------------------------------------------------
+# Workstream E: Angle algebra bounds
+# ---------------------------------------------------------------------------
+
+
+class TestAngleAlgebraBounds:
+    """Unsupported angle powers and inverse-angle operations must fail clearly."""
+
+    def test_deg_to_zero(self):
+        result = evaluate_raw("deg**0")
+        assert isinstance(result, UnitValue)
+        assert result.unit is None
+
+    def test_deg_to_one(self):
+        result = evaluate_raw("deg**1")
+        assert isinstance(result, UnitValue)
+        assert result.unit == "deg"
+
+    def test_deg_to_two(self):
+        with pytest.raises(EvaluationError):
+            evaluate_raw("deg**2")
+
+    def test_deg_to_neg_one(self):
+        with pytest.raises(EvaluationError):
+            evaluate_raw("deg**-1")
+
+    def test_deg_times_rad(self):
+        with pytest.raises(EvaluationError):
+            evaluate_raw("1/deg")
+
+    def test_deg_times_rad_explicit(self):
+        with pytest.raises(EvaluationError):
+            evaluate_raw("deg*rad")
+
+    def test_deg_div_rad_dimensionless(self):
+        result = evaluate_raw("deg/rad")
+        # Same-dimension division produces dimensionless; evaluator unwraps
+        assert isinstance(result, float)
+        assert abs(result - 0.017453) < 0.001
+
+    def test_deg_per_s_times_s(self):
+        result = evaluate_raw("(30*deg/s) * (2*s)")
+        assert isinstance(result, UnitValue)
+        assert result.unit == "deg"
+
+    def test_deg_per_s_times_rad_per_s(self):
+        with pytest.raises(EvaluationError):
+            evaluate_raw("(deg/s)*(rad/s)")
+
+    def test_sin_deg_per_s(self):
+        with pytest.raises(EvaluationError, match="dimensionless or angle"):
+            evaluate_raw("sin(deg/s)")

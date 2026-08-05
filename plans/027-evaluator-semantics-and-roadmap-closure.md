@@ -1,6 +1,6 @@
 # Evaluator Semantics and Roadmap Closure Pass
 
-Status: implementation handoff  
+Status: implemented  
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `ec7816d65658f17ca3040872201540beaef27bd1`  
 Date: 2026-08-05  

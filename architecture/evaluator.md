@@ -138,7 +138,7 @@ The `visit_Name` lookup order is:
 3. `FUNCTIONS` (rejected as "used without arguments")
 4. Per-instance user variables (`_user_variables`)
 
-The `visit_Call` method handles special cases for `temp()` (temperature unit preservation) and `convert()` (UnitValue passthrough), and rejects `UnitValue`-with-unit arguments for `_DIMENSIONLESS_REQUIRED_FUNCTIONS`.
+The `visit_Call` method handles special cases for `temp()` (temperature unit preservation) and `convert()` (UnitValue passthrough), and enforces unit policies via the centralized `UnitPolicy` dispatcher. User-registered functions default to dimensionless-only behavior.
 
 ## Constants
 
@@ -460,13 +460,17 @@ Every built-in function has an explicit `UnitPolicy` that controls how `UnitValu
 | `DIMENSIONLESS` | Reject `UnitValue` with unit | `log`, `exp`, `gcd`, `factorial`, `clamp` |
 | `ANGLE_INPUT` | Accept dimensionless (radians) or angle `UnitValue`; convert to radians | `sin`, `cos`, `tan` |
 | `ANGLE_OUTPUT` | Accept dimensionless; reject dimensional | `asin`, `acos`, `atan` |
-| `PRESERVE_SINGLE` | Single arg, preserve unit on result | `abs`, `round`, `floor`, `ceil`, `trunc`, `sign` |
+| `PRESERVE_SINGLE` | Single arg, preserve unit on result | `abs`, `round`, `floor`, `ceil`, `trunc` |
+| `SIGN_OUTPUT` | Unwrap magnitude, return dimensionless scalar | `sign` |
 | `COMPATIBLE_REDUCER` | All args dimensionless or all compatible units | `mean`, `min`, `max`, `median`, `std`, `sum` |
+| `VARIANCE_SQUARED` | Like COMPATIBLE_REDUCER but result has squared units | `variance`, `var`, `variance_sample`, `vars`, `var_sample` |
 | `ROOT` | Dimensionless or even-exponent unit; halve exponents | `sqrt` |
 | `HYPOT` | All args dimensionless or all compatible units | `hypot` |
 | `ATAN2` | Both dimensionless or both compatible units | `atan2` |
 
 User-registered functions default to `DIMENSIONLESS` (reject `UnitValue`).
+
+Each evaluator maintains a `_builtin_function_baseline` snapshot of canonical built-in callables. `visit_Call` compares the active callable by identity against this baseline; a canonical callable receives its built-in unit policy, any added or replaced callable defaults to dimensionless-only.
 
 Examples:
 ```python
@@ -475,6 +479,10 @@ evaluate_raw("sin(1*m)")         # → EvaluationError
 evaluate_raw("sqrt(4*m**2)")     # → 2.0 m
 evaluate_raw("sqrt(4*m)")        # → EvaluationError
 evaluate_raw("mean(1*m, 100*cm)") # → 1.0 m
+evaluate_raw("variance(1*m, 2*m, 3*m)") # → 0.666... m**2
+evaluate_raw("sign(-5*m)")       # → -1 (dimensionless)
+evaluate_raw("round(3.7)")       # → 4 (int)
+evaluate_raw("round(3.7, 0)")    # → 4.0 (float)
 evaluate_raw("hypot(3*m, 4*s)")  # → EvaluationError
 evaluate_raw("abs(-5*m)")        # → 5 m
 ```
@@ -487,7 +495,7 @@ evaluate_raw("abs(-5*m)")        # → 5 m
 - Memory registers
 - `allow_random` / `allow_side_effects` flags
 
-Custom registered callables cannot be serialized across process boundaries and cause `evaluate_with_timeout()` to fail immediately with `EvaluationError`. Use `evaluate()` for expressions with custom functions.
+Custom registered callables (added names or replaced built-ins) cannot be serialized across process boundaries and cause `evaluate_with_timeout()` to fail immediately with `EvaluationError`. The detection uses callable identity against `_builtin_function_baseline` to distinguish canonical built-ins from user overrides. Use `evaluate()` for expressions with custom functions.
 
 See [units.md](units.md) for unit conversion details.
 

@@ -109,8 +109,9 @@ class TestDimensionType:
         assert (a * b).angle is True
         # dimensionless × angle = angle (XOR: False != True = True)
         assert (b * a).angle is True
-        # angle × angle = no angle (XOR: True != True = False)
-        assert (a * a).angle is False
+        # angle × angle = error (not representable)
+        with pytest.raises(ValueError, match="Cannot multiply two angle"):
+            a * a
         # angle × length = angle (XOR: True != False = True)
         assert (a * DIM_LENGTH).angle is True
 
@@ -140,11 +141,13 @@ class TestDimensionType:
         a = Dimension(angle=True)
         # angle^1 = angle
         assert (a**1).angle is True
-        # angle^2 = no angle (even exponent)
-        assert (a**2).angle is False
-        # angle^3 = angle (odd exponent)
-        assert (a**3).angle is True
-        # angle^0 = no angle
+        # angle^2 = error (not representable)
+        with pytest.raises(ValueError, match="Cannot raise angle"):
+            a**2
+        # angle^3 = error (not representable)
+        with pytest.raises(ValueError, match="Cannot raise angle"):
+            a**3
+        # angle^0 = dimensionless
         assert (a**0).angle is False
 
     def test_is_affine(self):

@@ -1,6 +1,6 @@
 # Correctness, Simplification, and Footprint Roadmap
 
-Status: implementation handoff  
+Status: completed  
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `8515579e9e64fcb49a3e5b46ac4f0c47e77d8ff1`  
 Date: 2026-07-31  
@@ -384,3 +384,7 @@ This line of work is complete when:
 15. Documentation describes actual CLI flags, constants, supported CI platforms, timeout semantics, and product boundary.
 
 After these conditions are met, stop. Do not use this roadmap as a basis for a new release-evidence cycle, broad utility expansion, symbolic mathematics engine, plugin ecosystem, or packaging rewrite.
+
+## 11. Completion note
+
+All 14 conditions in §10 are satisfied. Plans 023–027 have been implemented. The roadmap is closed.

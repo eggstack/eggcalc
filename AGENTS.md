@@ -64,12 +64,27 @@ Every built-in function has an explicit `UnitPolicy` (defined in `evaluator.py`)
 - **DIMENSIONLESS**: Reject `UnitValue` with unit (`log`, `exp`, `gcd`, `factorial`, etc.)
 - **ANGLE_INPUT**: Accept dimensionless (radians) or angle `UnitValue` with degree conversion (`sin`, `cos`, `tan`)
 - **ANGLE_OUTPUT**: Accept dimensionless, reject dimensional (`asin`, `acos`, `atan`)
-- **PRESERVE_SINGLE**: Single arg, preserve unit on result (`abs`, `round`, `floor`, `ceil`, `trunc`, `sign`)
+- **PRESERVE_SINGLE**: Single arg, preserve unit on result (`abs`, `round`, `floor`, `ceil`, `trunc`)
+- **SIGN_OUTPUT**: Unwrap magnitude, return dimensionless scalar (`sign`)
 - **COMPATIBLE_REDUCER**: All args dimensionless or all compatible units (`mean`, `min`, `max`, `median`, `std`, `sum`)
+- **VARIANCE_SQUARED**: Like COMPATIBLE_REDUCER but result has squared units (`variance`, `var`, `variance_sample`, `vars`, `var_sample`). Rejects affine temperature variance.
 - **ROOT**: Dimensionless or even-exponent unit; halve exponents (`sqrt`)
 - **HYPOT/ATAN2**: Both dimensionless or both compatible units
 
 User-registered functions default to DIMENSIONLESS. Custom callables are rejected by `evaluate_with_timeout()`.
+
+#### Callable identity authority
+
+Each evaluator maintains a `_builtin_function_baseline` snapshot of canonical built-in callables after instance-specific binding. `visit_Call` compares the active callable by identity against this baseline. A canonical callable receives its built-in unit policy; any added or replaced callable defaults to dimensionless-only. This prevents a user replacing `sin` with a custom function from inheriting the built-in `ANGLE_INPUT` policy.
+
+#### Angle algebra bounds
+
+`Dimension.angle: bool` is a structural flag that cannot represent angle exponents other than 0 or 1. Bounded guards reject:
+- angle-bearing dimension raised to any exponent other than 0 or 1
+- multiplying two angle-bearing dimensions (`deg*rad`, `deg**2`)
+- dividing a non-angle dimension by an angle-bearing dimension (`1/deg`)
+
+Supported: `deg**0` (dimensionless), `deg**1` (angle), `deg/rad` (dimensionless), `(deg/s)*s` (angle).
 
 ### Angle conversion
 

@@ -101,10 +101,13 @@ def test_maximum_accepted_input_length_and_first_rejected() -> None:
 
 def test_maximum_atom_count_and_first_rejected_count() -> None:
     """Maximum accepted atom count is MAX_COMPOUND_ATOMS; first rejected is +1."""
-    # Use unique canonicals to avoid exponent normalization
+    # Use unique canonicals to avoid exponent normalization.
+    # Skip angle-bearing units to avoid the angle-multiplication guard.
     from eggcalc.units import UNIT_DEFINITIONS
 
-    canonicals = [spec.canonical for spec in UNIT_DEFINITIONS if not spec.affine]
+    canonicals = [
+        spec.canonical for spec in UNIT_DEFINITIONS if not spec.affine and not spec.dimension.angle
+    ]
     # Use the first MAX_COMPOUND_ATOMS unique canonicals
     ok = "*".join(canonicals[:MAX_COMPOUND_ATOMS])
     parse_unit_expression(ok)

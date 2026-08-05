@@ -233,8 +233,8 @@ class TestAngleInvariants:
     def test_angle_xor_propagation_mul(self):
         a = Dimension(angle=True)
         b = Dimension(angle=True)
-        result = a * b
-        assert result.angle is False  # True XOR True = False
+        with pytest.raises(ValueError, match="Cannot multiply two angle"):
+            a * b
 
     def test_angle_xor_propagation_div(self):
         a = Dimension(length=1, angle=True)
@@ -244,13 +244,13 @@ class TestAngleInvariants:
 
     def test_angle_preserved_on_odd_pow(self):
         a = Dimension(angle=True)
-        result = a**3
-        assert result.angle is True
+        with pytest.raises(ValueError, match="Cannot raise angle"):
+            a**3
 
     def test_angle_lost_on_even_pow(self):
         a = Dimension(angle=True)
-        result = a**2
-        assert result.angle is False
+        with pytest.raises(ValueError, match="Cannot raise angle"):
+            a**2
 
 
 # ---------------------------------------------------------------------------

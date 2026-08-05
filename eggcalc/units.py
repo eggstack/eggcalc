@@ -158,6 +158,11 @@ class Dimension:
     def __mul__(self, other: Dimension) -> Dimension:
         if not isinstance(other, Dimension):
             return NotImplemented
+        if self.angle and other.angle:
+            raise ValueError(
+                "Cannot multiply two angle-bearing dimensions "
+                "(angle**2 or deg*rad is not representable)"
+            )
         return Dimension(
             length=self.length + other.length,
             mass=self.mass + other.mass,
@@ -173,6 +178,11 @@ class Dimension:
     def __truediv__(self, other: Dimension) -> Dimension:
         if not isinstance(other, Dimension):
             return NotImplemented
+        if not self.angle and other.angle:
+            raise ValueError(
+                "Cannot divide a non-angle dimension by an angle-bearing dimension "
+                "(inverse angle is not representable)"
+            )
         return Dimension(
             length=self.length - other.length,
             mass=self.mass - other.mass,
@@ -188,6 +198,15 @@ class Dimension:
     def __pow__(self, n: int) -> Dimension:
         if not isinstance(n, int):
             return NotImplemented
+        if self.angle:
+            if n == 0:
+                return Dimension()
+            if n == 1:
+                return self
+            raise ValueError(
+                f"Cannot raise angle-bearing dimension to power {n} "
+                f"(only 0 and 1 are representable)"
+            )
         return Dimension(
             length=self.length * n,
             mass=self.mass * n,
@@ -197,7 +216,7 @@ class Dimension:
             amount=self.amount * n,
             luminous_intensity=self.luminous_intensity * n,
             information=self.information * n,
-            angle=self.angle if n % 2 != 0 else False,
+            angle=False,
         )
 
     @property
