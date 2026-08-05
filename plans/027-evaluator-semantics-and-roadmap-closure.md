@@ -11,7 +11,7 @@ Depends on: `plans/023-cli-dispatch-and-trust-boundary-correction.md`, `plans/02
 
 Plans 023–026 have substantially landed. CLI mode selection and configuration trust boundaries are corrected, MCP/configuration authority is materially simpler, unit-aware function dispatch exists, timeout evaluation carries evaluator state, and the footprint pass reduced generated artifact size and eager startup allocation while retaining a standard-library-only runtime.
 
-This is one narrow closure pass for the remaining semantic and evidence gaps. It must:
+This is one narrow closure pass for the remaining semantic and verification gaps. It must:
 
 1. correct variance result dimensions;
 2. make `sign()` return a dimensionless result;
@@ -21,7 +21,7 @@ This is one narrow closure pass for the remaining semantic and evidence gaps. It
 6. prevent the boolean angle marker from silently representing unsupported powers or inverse-angle dimensions;
 7. remove transitional unit-policy machinery that no longer has an active role;
 8. verify the deferred exact-import fix on Python 3.11;
-9. update Plans 022–026 to their accurate final statuses and close this roadmap.
+9. update Plans 022–026 to accurate final statuses and close this roadmap.
 
 This plan does not authorize another architectural phase. After these items pass focused tests, `make check`, and `make package-check`, the line of work is closed.
 
@@ -29,39 +29,36 @@ This plan does not authorize another architectural phase. After these items pass
 
 The implementation must preserve:
 
-- the current public calculator, unit conversion, Python library, CLI, exact-tool, MCP, and generated single-file surfaces;
-- all current tool names, profiles, schemas, and protocol versions;
-- runtime standard-library-only operation;
+- the current calculator, unit conversion, Python library, CLI, exact-tool, MCP, and generated single-file surfaces;
+- all current MCP tool names, profiles, schemas, and protocol versions;
+- runtime standard-library-only operation and an empty runtime dependency list;
 - Python `>=3.11` support;
-- the current generated `eggcalc.py` distribution;
-- the current lazy confusables mapping, lazy unit-conversion adapter, and deferred MCP exact imports;
-- the current one-job required CI topology;
-- optional/manual compatibility workflow policy;
+- the generated `eggcalc.py` distribution;
+- the lazy confusables mapping, lazy unit-conversion adapter, and deferred MCP exact imports;
+- the one-job required CI topology and manual-only compatibility workflow policy;
 - manual PyPI publication;
-- ordinary dimensionless behavior of existing mathematical functions;
-- valid direct-angle and angular-velocity examples already covered by Plan 024.
+- ordinary dimensionless behavior of existing functions;
+- valid direct-angle and angular-velocity behavior already covered by Plan 024.
 
 Do not:
 
-- add a runtime or optional runtime dependency;
+- add any runtime dependency;
 - redesign `Dimension` into a general rational-exponent or symbolic dimension system;
-- add a plugin framework or function-policy registration framework;
-- expand the supported function set;
-- remove current product features;
+- add a plugin or function-policy registration framework;
+- expand the supported function or MCP tool set;
+- remove current features;
 - reopen MCP server architecture or configuration design;
-- replace the generated single-file distribution with a zipapp or binary;
+- replace the single-file distribution with a zipapp or binary;
 - add benchmarks, benchmark gates, property-test frameworks, fuzz infrastructure, CI lanes, workflow artifacts, release evidence, automated publication, or GitHub Releases;
-- introduce a second function registry that can drift from `Evaluator.FUNCTIONS`;
+- introduce a second public function registry that can drift from `Evaluator.FUNCTIONS`;
 - retain incorrect dimensional output for compatibility;
-- perform unrelated formatting, documentation, or dependency cleanup.
+- perform unrelated formatting, dependency, or documentation cleanup.
 
 ## 3. Current residual defects
 
-### 3.1 Variance is returned in the input unit instead of the squared unit
+### 3.1 Variance returns the input unit instead of its square
 
-`variance`, `var`, `variance_sample`, `vars`, and `var_sample` currently use the same `COMPATIBLE_REDUCER` handling as `mean`, `median`, standard deviation, `min`, `max`, and `sum`.
-
-That generic reducer converts compatible operands to the first input unit and wraps the numeric result in that same unit. This is correct for mean and standard deviation but incorrect for variance.
+`variance`, `var`, `variance_sample`, `vars`, and `var_sample` currently use the same `COMPATIBLE_REDUCER` handling as mean, standard deviation, minimum, maximum, median, and sum. The reducer converts operands to the first input unit and wraps the numeric result in that same unit. That is correct for mean and standard deviation but incorrect for variance.
 
 Required semantics:
 
@@ -74,15 +71,15 @@ mean(1*m, 2*m, 3*m)            -> UnitValue(..., "m")
 variance(1, 2, 3)               -> ordinary numeric result
 ```
 
-The implementation must give variance a distinct bounded result-unit transform. A small `VARIANCE` policy or one explicit variance-family branch is acceptable. Do not create a generic symbolic result-dimension framework.
+Give the variance family a distinct bounded result-unit transform. A small `VARIANCE` policy or one explicit variance-family branch is acceptable. Do not create a general symbolic result-dimension framework.
 
-Use the existing structural unit expression/power authority to square the first result unit. Do not concatenate strings when the unit engine already provides a validated expression operation.
+Use the existing structural unit expression/power authority to square the first result unit. Do not concatenate unit strings when the validated unit structure can express the result.
 
-Absolute affine temperature variance must not be silently labeled with an ordinary affine temperature unit. If the existing unit engine cannot correctly represent a squared temperature-delta unit through its current public structures, reject that dimensional variance with a clear `EvaluationError`. Do not add a new temperature-delta subsystem in this pass.
+Absolute affine temperature variance must not be mislabeled with an ordinary affine temperature unit. If the current unit model cannot correctly represent squared temperature-delta units, reject dimensional affine variance with a clear `EvaluationError`. Do not add a temperature-delta subsystem in this pass.
 
 ### 3.2 `sign()` incorrectly preserves physical units
 
-The current `PRESERVE_SINGLE` assignment makes results such as the following possible:
+The current `PRESERVE_SINGLE` assignment permits:
 
 ```text
 sign(-5*m) -> -1 m
@@ -97,11 +94,9 @@ sign(5*m)  -> 1
 sign(-5)   -> -1
 ```
 
-The function may inspect a unit-valued magnitude, but it must return the same scalar type/shape that ordinary `sign()` returns and must not wrap that result in `UnitValue`.
+The function may inspect a unit-valued magnitude but must return the ordinary scalar result without `UnitValue` wrapping. Use one explicit policy or branch; do not generalize this into an output-type framework.
 
-Use a small explicit policy or branch. Do not generalize this into an output-type framework.
-
-### 3.3 Omitted `round()` precision is being treated as explicit zero
+### 3.3 Omitted `round()` precision is treated as explicit zero
 
 Python distinguishes:
 
@@ -127,28 +122,26 @@ round(3.7*m, ndigits=0)  -> UnitValue(4.0, "m"), value type float
 Implementation requirements:
 
 - represent omitted `ndigits` with an internal sentinel or argument-count branch, not numeric zero;
-- accept the existing positional form and the newly supported `ndigits=` keyword form;
-- reject duplicate positional-and-keyword `ndigits` in the same manner as an ordinary invalid call;
-- reject a unit-valued `ndigits` control argument as dimensionally invalid;
-- preserve units only on the rounded value, never on the precision control;
-- retain existing error conversion to `EvaluationError`.
+- accept the existing positional form and the supported `ndigits=` keyword form;
+- reject duplicate positional-and-keyword precision;
+- reject unit-valued precision controls;
+- preserve units only on the rounded value;
+- retain normal conversion of call errors to `EvaluationError`.
 
-### 3.4 Built-in-name overrides inherit stale built-in dimensional policies
+### 3.4 Built-in-name overrides inherit stale built-in policies
 
-Unit policy is currently selected by function name while invocation uses the callable currently stored in `self.FUNCTIONS[name]`. A user can replace a built-in name and receive the old built-in policy:
+Policy is selected by function name while invocation uses the callable currently stored in `self.FUNCTIONS[name]`. A user can replace a built-in name and receive the old built-in policy:
 
 ```python
 ev = Evaluator()
 ev.FUNCTIONS["sin"] = custom_callable
 ```
 
-The custom callable can then be treated as angle-aware merely because it occupies the name `sin`.
-
 The governing invariant is:
 
 > A built-in dimensional policy applies only while the active callable is the evaluator instance's canonical built-in callable for that name. Any added or replaced callable is a user callable and defaults to dimensionless-only behavior.
 
-Implement one evaluator-owned canonical callable baseline after instance-specific built-ins have been bound. A suitable small design is:
+Establish one evaluator-owned canonical callable baseline after instance-specific built-ins have been bound. A suitable small design is:
 
 ```python
 self.FUNCTIONS = self.__class__.FUNCTIONS.copy()
@@ -156,31 +149,31 @@ self._bind_instance_random()
 self._builtin_function_baseline = dict(self.FUNCTIONS)
 ```
 
-Equivalent naming is acceptable. The requirements are:
+Equivalent naming is acceptable. Requirements:
 
 - the baseline includes instance-bound random callables after `_bind_instance_random()`;
-- it is private and not exposed as a second public registry;
-- call dispatch determines whether the active callable is canonical by identity against that evaluator's baseline;
-- a canonical callable uses its built-in unit policy;
+- it is private and not a second public registry;
+- dispatch compares the active callable by identity with the evaluator's baseline;
+- a canonical callable receives its built-in unit policy;
 - an added name or replaced callable defaults to dimensionless-only;
-- replacing a callable and later restoring the exact canonical callable restores the built-in policy;
-- instance-bound random functions are not falsely classified as custom;
-- the public `register_function(name, callable)` signature remains unchanged;
-- direct instance mutation remains correctly detected because detection occurs at use/snapshot time rather than only inside `register_function()`.
+- restoring the exact canonical callable restores built-in policy;
+- canonical instance-bound random functions are not falsely classified as custom;
+- `register_function(name, callable)` remains unchanged;
+- direct instance mutation is detected at use time.
 
-Examples:
+Example:
 
 ```python
 ev = Evaluator()
 ev.FUNCTIONS["sin"] = lambda x: x
 
 ev.evaluate("sin(2)")       # allowed
-nev.evaluate("sin(2*m)")     # EvaluationError: custom function is dimensionless-only
+ev.evaluate("sin(2*m)")     # EvaluationError: custom function is dimensionless-only
 ```
 
-Do not infer policy from function names, module names, annotations, signatures, or callable source.
+Do not infer policy from a name, module, annotation, signature, or source code.
 
-### 3.5 Timeout custom-callable detection checks names but not callable identity
+### 3.5 Timeout detection checks names but not callable identity
 
 `_snapshot_evaluator_state()` currently identifies custom functions by names absent from the class-level built-in mapping. An override using an existing built-in name is not detected. Timeout evaluation can therefore run a different callable from ordinary evaluation by reconstructing the original built-in in the child.
 
@@ -188,37 +181,35 @@ Required invariant:
 
 > `evaluate_with_timeout()` must either reconstruct the same supported evaluator behavior or fail before spawning. It must never silently replace an active custom callable with another callable.
 
-Use the evaluator-owned canonical callable baseline from Section 3.4.
-
-Before spawning, identify unsupported callable state as:
+Use the evaluator-owned callable baseline from Section 3.4. Before spawning, unsupported callable state is either:
 
 - a function name absent from the baseline; or
-- a function name present in the baseline whose active callable is not the exact baseline callable.
+- a name present in the baseline whose active callable is not the exact baseline callable.
 
-If either condition exists, raise `EvaluationError` listing the affected names in stable sorted order.
+Raise `EvaluationError` listing affected names in stable sorted order.
 
-Required tests:
+Required cases:
 
 ```python
 ev = Evaluator()
 ev.FUNCTIONS["double"] = lambda x: x * 2
-# timeout rejects "double"
+# timeout rejects added "double"
 
 ev = Evaluator()
 ev.FUNCTIONS["sin"] = lambda x: x
 # timeout rejects overridden "sin"
 
 ev = Evaluator(random_seed=1)
-# timeout snapshot does not falsely reject canonical instance-bound random functions
+# timeout snapshot accepts canonical instance-bound random functions
 ```
 
-The snapshot must continue carrying supported constants, variables, memory values, and evaluator permission flags. Do not attempt to pickle arbitrary callables.
+Continue carrying supported constants, variables, memory values, and evaluator permission flags. Do not pickle arbitrary callables.
 
 ## 4. Workstream A — correct reducer result dimensions
 
 ### A1. Separate variance-family behavior
 
-Inventory the aliases that return variance rather than standard deviation. At minimum inspect:
+Inventory every true variance alias, including at minimum:
 
 ```text
 variance
@@ -228,40 +219,38 @@ vars
 var_sample
 ```
 
-Assign all true variance aliases to the same explicit result-unit behavior.
+Assign those aliases to one explicit squared-result behavior.
 
 Do not change:
 
-- `std`, `std_sample`, and standard-deviation aliases: result unit remains the input unit;
-- `mean`, `median`, `mode`, `min`, `max`, and `sum`: retain their existing compatible-unit behavior;
+- `std`, `std_sample`, and standard-deviation aliases: input unit remains first power;
+- mean, median, mode, min, max, and sum: retain current compatible-unit behavior;
 - dimensionless return values.
 
-### A2. Common-unit conversion
+### A2. Common-unit conversion and result construction
 
 For dimensional inputs:
 
 1. require all values to be dimensional;
-2. require dimensions to be compatible;
+2. require compatible dimensions;
 3. convert all values to the first input's display unit;
 4. calculate variance with the existing numeric callable;
-5. derive the squared structural unit from the first input unit;
+5. derive a squared structural unit from the first input unit;
 6. return `UnitValue(result, squared_unit)`.
 
 Mixed dimensional and dimensionless arguments remain errors.
 
-### A3. Tests
+### A3. Focused tests
 
-Add focused tests that verify both numeric magnitude and exact structural dimension/unit compatibility. Do not assert only `isinstance(UnitValue)`.
-
-Required cases:
+Tests must verify numeric magnitude and exact unit dimension, not only `isinstance(UnitValue)`:
 
 - same-unit population variance;
-- mixed-scale compatible population variance;
+- mixed-scale population variance;
 - sample variance;
-- each variance alias maps to squared units;
-- standard deviation remains first-power unit;
+- every variance alias returns squared units;
+- standard deviation remains first-power;
 - incompatible units fail;
-- mixed dimensional/dimensionless fails;
+- mixed dimensional/dimensionless values fail;
 - dimensionless variance remains numeric;
 - unsupported affine variance fails clearly if not representable.
 
@@ -269,18 +258,16 @@ Required cases:
 
 ### B1. Dimensionless `sign`
 
-Move `sign` out of `PRESERVE_SINGLE`. Add the smallest explicit handling that:
+Move `sign` out of `PRESERVE_SINGLE`. Its handler must:
 
-- unwraps a `UnitValue` magnitude for comparison;
-- returns `-1`, `0`, or `1` without a unit;
-- preserves existing dimensionless behavior;
-- applies ordinary arity validation.
+- unwrap a `UnitValue` magnitude for comparison;
+- return `-1`, `0`, or `1` without a unit;
+- preserve dimensionless behavior;
+- enforce normal arity checks.
 
 ### B2. Exact `round` invocation
 
-Implement omitted-argument detection explicitly.
-
-Conceptual shape:
+Use explicit omitted-argument detection:
 
 ```python
 if ndigits_was_omitted:
@@ -293,51 +280,49 @@ Do not use `kwargs.get("ndigits", 0)` or an equivalent numeric default.
 
 ### B3. Type-sensitive tests
 
-Use `type(result) is int` / `type(result) is float` where the contract depends on type. For unit-valued results, assert the type of `result.value`.
+Use `type(result) is int` and `type(result) is float` where required. For `UnitValue`, assert the type of `result.value`.
 
-Include:
+Cover:
 
-- scalar omitted `ndigits`;
+- scalar omitted precision;
 - scalar positional zero;
 - scalar keyword zero;
-- dimensional omitted `ndigits`;
+- dimensional omitted precision;
 - dimensional positional zero;
 - dimensional keyword zero;
-- duplicate `ndigits` rejection;
-- dimensional `ndigits` rejection.
+- duplicate precision rejection;
+- dimensional precision rejection.
 
 ## 6. Workstream C — make callable identity authoritative
 
 ### C1. Establish the per-evaluator baseline
 
-Capture canonical function identities only after instance-specific binding is complete. Do not compare against `Evaluator.FUNCTIONS` directly for instance-bound random functions.
-
-The baseline must not be mutated when callers mutate `self.FUNCTIONS`.
+Capture canonical function identities only after instance-specific binding. The baseline must not change when `self.FUNCTIONS` is mutated.
 
 ### C2. Dispatch decision
 
-Resolve each function call in this order:
+Resolve calls in this order:
 
 1. obtain the active callable from `self.FUNCTIONS`;
-2. determine whether it is the evaluator's canonical callable for that name;
-3. if canonical, apply the built-in policy;
-4. otherwise, apply the default user-callable policy: dimensionless-only;
-5. invoke the same active callable that was classified.
+2. determine whether it is canonical for that evaluator and name;
+3. apply built-in policy only when canonical;
+4. otherwise apply user-callable dimensionless-only policy;
+5. invoke the same callable that was classified.
 
-The policy decision and callable invocation must refer to the same callable. Avoid time-of-check/time-of-use drift inside one call.
+The policy decision and invocation must refer to the same local callable to avoid check/use drift.
 
 ### C3. Tests
 
-Add tests for overrides of policy-distinct names:
+Add tests for policy-distinct names:
 
-- override `sin`: no angle policy leakage;
-- override `round`: no preserve-unit/keyword special handling leakage;
-- override `variance`: no squared-unit policy leakage;
-- add new `double`: dimensionless-only;
-- restore canonical `sin`: built-in angle policy returns;
-- canonical random functions remain recognized after instance binding.
+- override `sin`: no angle-policy leakage;
+- override `round`: no preserve-unit or keyword-special-case leakage;
+- override `variance`: no squared-unit-policy leakage;
+- add `double`: dimensionless-only;
+- restore canonical `sin`: angle policy returns;
+- canonical random functions remain recognized after binding.
 
-Use public APIs where practical, but include direct instance mutation because it is already supported by current tests and is the path that previously escaped registration-time tracking.
+Use public registration where practical and direct instance mutation where needed to cover the path that escaped registration-time tracking.
 
 ## 7. Workstream D — close timeout parity
 
@@ -345,21 +330,21 @@ Update `_snapshot_evaluator_state()` to use the same callable-identity authority
 
 Acceptance requirements:
 
-- added custom callable fails before process creation;
-- overridden built-in callable fails before process creation;
-- error lists all custom/overridden names in sorted order;
-- canonical built-ins, including instance-bound random functions, do not trigger false positives;
+- added callable fails before process creation;
+- overridden built-in fails before process creation;
+- errors list all affected names in sorted order;
+- canonical built-ins, including bound random functions, are not false positives;
 - constants, variables, memory, `allow_random`, and `allow_side_effects` still propagate;
 - no callable is serialized;
-- no child silently receives a different callable from the parent's active callable set.
+- no child receives behavior different from the parent's active supported callable set.
 
-Use an existing process-spawn mock/counter or a narrowly scoped monkeypatch to prove failure occurs before `Process.start()` if that can be done without brittle implementation coupling.
+Where practical, use a narrow process-start monkeypatch to prove rejection occurs before spawning. Do not create a multiprocessing test framework.
 
 ## 8. Workstream E — bound unsupported angle algebra
 
 ### E1. Preserve supported cases
 
-The following must remain valid:
+These must remain valid:
 
 ```text
 90*deg
@@ -370,23 +355,21 @@ The following must remain valid:
 deg/rad
 ```
 
-Direct angles remain convertible and accepted by `sin`, `cos`, and `tan`. Angular velocity remains a non-angle compound value for trig-input purposes until multiplied by time back to a direct angle.
+Direct angles remain convertible and accepted by trig functions. Angular velocity remains a compound value rejected by trig until multiplied by time back to a direct angle.
 
-### E2. Reject cases the boolean marker cannot faithfully represent
+### E2. Reject cases the boolean marker cannot represent
 
-The current `Dimension.angle: bool` cannot encode angle exponents other than zero or one. Prevent silent parity behavior for unsupported cases.
-
-Required bounded rules:
+`Dimension.angle: bool` cannot encode angle exponents other than zero or one. Add bounded guards:
 
 - angle-bearing dimension raised to `0` -> dimensionless;
 - angle-bearing dimension raised to `1` -> unchanged;
 - angle-bearing dimension raised to any other exponent -> clear error;
-- multiplying two angle-bearing dimensions -> clear error rather than silent angle cancellation;
+- multiplying two angle-bearing dimensions -> clear error;
 - dividing a non-angle dimension by an angle-bearing dimension -> clear error because inverse angle is not representable;
-- dividing angle-bearing by angle-bearing dimensions may produce dimensionless only where the existing structural unit operation can establish complete compatibility/cancellation;
+- dividing angle-bearing by angle-bearing dimensions may produce dimensionless only when current structural operations establish complete compatibility/cancellation;
 - multiplying or dividing one angle-bearing dimension by one non-angle dimension remains supported.
 
-Implement the guard at the narrowest shared structural operation boundary. Do not add an integer angle exponent field, rational dimensions, or symbolic simplifier in this pass.
+Implement at the narrowest shared structural operation boundary. Do not add an angle exponent field, rational dimensions, or symbolic simplifier.
 
 ### E3. Tests
 
@@ -405,69 +388,67 @@ deg/rad            -> dimensionless
 sin(deg/s)         -> error
 ```
 
-Tests must prove the error is intentional and not an incidental parser failure.
+Prove errors are intentional semantic guards, not incidental parser failures.
 
 ## 9. Workstream F — remove transitional policy debris
 
-While implementing Sections 4–8, remove only now-obsolete local machinery.
+While implementing the preceding work, remove only obsolete private machinery:
 
-Review and resolve:
-
-- `_DIMENSIONLESS_REQUIRED_FUNCTIONS`, which should not remain as an unused pre-policy deny-list;
-- `UnitPolicy.CUSTOM`, if it has no active dispatch meaning;
-- `FunctionSpec.function`, which must either participate in the canonical callable authority or be removed;
-- duplicate/unreachable policy assignments such as repeated `expm1` classification;
-- unused helper/imports in `_sqrt_dispatch()`;
-- direct `UnitExpression.__new__` plus `object.__setattr__` construction if the normal validated constructor can express the same result without expanding scope.
+- `_DIMENSIONLESS_REQUIRED_FUNCTIONS`, if unused after centralized policy dispatch;
+- `UnitPolicy.CUSTOM`, if it has no active meaning;
+- `FunctionSpec.function`, which must either participate in callable identity authority or be removed;
+- duplicate policy assignments such as repeated `expm1` classification;
+- unused helpers/imports in `_sqrt_dispatch()`;
+- direct `UnitExpression.__new__` plus `object.__setattr__` construction if the validated constructor can express the same result without expanding scope.
 
 Rules:
 
-- prefer deletion over adding compatibility wrappers for private unused names;
-- do not reorganize the whole evaluator file;
-- do not rename public functions or error classes;
+- prefer deletion over compatibility wrappers for private unused names;
+- do not reorganize the evaluator file wholesale;
+- do not rename public functions or exceptions;
 - do not perform unrelated style cleanup;
-- total policy machinery should become smaller or remain approximately neutral after correctness additions.
+- policy machinery should become smaller or remain approximately neutral after correctness additions.
 
 ## 10. Workstream G — deferred import regression proof
 
-Commit `ec7816d65658f17ca3040872201540beaef27bd1` changed MCP local imports from package-level re-exports to explicit implementation submodules after Python 3.11 exposed module/function name collisions.
+Commit `ec7816d65658f17ca3040872201540beaef27bd1` changed MCP handler imports from package-level re-exports to explicit implementation submodules after Python 3.11 exposed module/function name collisions.
 
-Add one focused regression proof that:
+Add one compact regression proof that:
 
-1. imports same-named `eggcalc.exact` implementation submodules that can populate package attributes;
-2. starts or constructs the MCP tool surface;
+1. imports same-named `eggcalc.exact` submodules that populate package attributes;
+2. constructs or starts the MCP tool surface;
 3. invokes representative affected handlers, including `identifier_inspect` and one validation handler;
-4. confirms the resolved object is callable and the tool returns the expected envelope;
+4. confirms the resolved object is callable and returns the expected envelope;
 5. runs on Python 3.11 through the normal suite.
 
-Prefer a compact parameterized test over one test per import. Do not add an import-audit framework or eager-import inventory gate.
+Prefer one parameterized test. Do not add an import-audit framework or eager-import inventory gate.
 
 The optimization invariant remains:
 
 - `import eggcalc.mcp` and `tools/list` do not eagerly import all exact implementation modules;
-- first tool invocation imports only the required implementation module(s);
+- first invocation imports only required implementation modules;
 - explicit submodule imports avoid package attribute collisions.
 
 ## 11. Documentation and plan-state closure
 
-Update documentation only where behavior changed:
+Update existing documentation only where behavior changed:
 
-- unit-aware function contract table/examples for variance and `sign`;
-- `round()` omitted-versus-explicit precision behavior if documented;
-- angle algebra limitation and supported cases;
-- timeout custom-callable limitation, including built-in-name overrides;
-- private architecture notes if callable identity authority is documented.
+- variance and `sign` in the unit-aware function contract;
+- omitted versus explicit `round` precision if documented;
+- bounded angle algebra limitations;
+- timeout rejection of added and overridden callables;
+- callable identity authority if documented in evaluator architecture.
 
 Do not add a new architecture document.
 
-After implementation and verification, update plan status headers:
+After implementation and successful canonical verification, update status headers:
 
-- `plans/022-correctness-simplification-and-footprint-roadmap.md` -> `Status: completed`;
-- `plans/023-cli-dispatch-and-trust-boundary-correction.md` -> `Status: implemented`;
-- `plans/024-unit-aware-function-contracts-and-timeout-state-parity.md` -> `Status: implemented`;
-- `plans/025-mcp-and-configuration-authority-consolidation.md` remains `Status: implemented`;
-- `plans/026-measured-artifact-and-startup-footprint-reduction.md` -> `Status: implemented`;
-- this plan -> `Status: implemented`.
+- Plan 022 -> `Status: completed`;
+- Plan 023 -> `Status: implemented`;
+- Plan 024 -> `Status: implemented`;
+- Plan 025 remains `Status: implemented`;
+- Plan 026 -> `Status: implemented`;
+- Plan 027 -> `Status: implemented`.
 
 Add a concise completion note to Plan 022 naming the implementation commit(s) for Plans 023–027. Do not create a registry, closure manifest, evidence JSON, benchmark record, or CI artifact.
 
@@ -477,10 +458,10 @@ Expected primary files:
 
 ```text
 eggcalc/evaluator.py
-eggcalc/units.py                         # only if angle guards/unit-power helper belong here
+eggcalc/units.py                         # only if angle/unit-power guards belong here
 tests/test_unit_aware_functions.py
-tests/test_mcp_server.py or one existing MCP-focused test module
-AGENTS.md and/or existing architecture evaluator/unit docs
+an existing MCP-focused test module
+existing evaluator/unit architecture documentation
 plans/022-correctness-simplification-and-footprint-roadmap.md
 plans/023-cli-dispatch-and-trust-boundary-correction.md
 plans/024-unit-aware-function-contracts-and-timeout-state-parity.md
@@ -489,13 +470,13 @@ plans/026-measured-artifact-and-startup-footprint-reduction.md
 plans/027-evaluator-semantics-and-roadmap-closure.md
 ```
 
-Files outside this list may be changed only when directly required for generated single-file parity, generated documentation drift, or an existing focused test location.
+Files outside this list may change only when directly required for generated single-file parity, generated-document drift, or an existing focused test location.
 
-Do not modify CI workflows, release procedures, package dependencies, MCP schemas, tool counts, or release version.
+Do not modify CI workflows, release procedures, dependencies, MCP schemas, tool counts, or package version.
 
 ## 13. Required focused tests
 
-Before the full suite, run the smallest relevant tests covering:
+Before the full suite, run focused tests covering:
 
 1. variance unit exponent and aliases;
 2. standard-deviation unit preservation;
@@ -506,11 +487,9 @@ Before the full suite, run the smallest relevant tests covering:
 7. canonical random callable recognition;
 8. supported and rejected angle algebra;
 9. lazy exact-import module/function collision regression;
-10. package/single-file evaluator parity for the changed expressions.
+10. package/single-file parity for changed expressions.
 
-If single-file parity already has a parameterized expression corpus, extend that corpus rather than creating a second parity harness.
-
-Required single-file examples should include at least:
+If a parameterized single-file parity corpus already exists, extend it rather than creating another harness. Include at least:
 
 ```text
 variance(1*m,2*m,3*m)
@@ -520,72 +499,72 @@ round(3.7*m)
 sin(90*deg)
 ```
 
-Override and timeout tests may remain package-only because arbitrary callable injection is not a CLI/single-file public input surface.
+Override and timeout tests may remain package-only because arbitrary callable injection is not a CLI input surface.
 
 ## 14. Canonical verification
 
-Run, in this order:
+Run, in order:
 
 ```bash
-python -m pytest <focused existing test modules/cases> -q
+python -m pytest <focused existing modules/cases> -q
 make check
 make package-check
 ```
 
-The final verification requirements are:
+Final requirements:
 
 - focused tests pass on Python 3.11;
-- `make check` passes without adding or changing CI lanes;
-- `make package-check` passes for wheel, sdist, installed console entry point, installed MCP smoke, generated single-file CLI, and generated single-file MCP smoke;
+- `make check` passes without CI expansion;
+- `make package-check` passes for wheel, sdist, installed console, installed MCP, generated single-file CLI, and generated single-file MCP surfaces;
 - `build_single.py --validate` passes;
 - generated documentation has no drift;
-- runtime dependency list remains empty;
+- runtime dependencies remain empty;
 - the generated single-file artifact remains functional;
-- no automated publication or release action occurs.
+- no publication or release action occurs.
 
-Do not add a permanent performance test. The Plan 026 optimization is considered retained if the lazy implementations remain in place and no regression requires reverting them. Optional local spot measurements may be recorded in the implementation commit message but are not acceptance gates.
+Do not add a permanent performance test. Plan 026 is retained if its lazy implementations remain and no correctness fix requires reverting them. Optional local spot measurements may be included in a commit message but are not acceptance gates.
 
 ## 15. Negative acceptance criteria
 
-The pass is not complete if any of the following is true:
+The pass is not complete if:
 
-- variance of dimensional input is returned in the unsquared input unit;
-- standard deviation is incorrectly squared;
-- `sign()` returns a `UnitValue`;
-- `round(x)` and `round(x, 0)` have the same return type solely because omitted precision is replaced with zero;
-- a custom callable named `sin`, `round`, or `variance` inherits the built-in unit policy;
-- timeout evaluation silently substitutes a built-in for an overridden callable;
-- canonical instance-bound random functions are falsely rejected as custom;
-- `deg**2`, `1/deg`, or `deg*rad` silently produce representable-looking but incorrect dimensions;
-- valid `deg/s` or `(deg/s)*s` behavior is broken;
-- package-level lazy imports reintroduce module/function collisions;
-- all exact implementation modules are imported during MCP startup;
-- obsolete policy machinery remains unused without an explicit reason;
-- a new runtime dependency is added;
+- dimensional variance retains the unsquared input unit;
+- standard deviation is squared;
+- `sign()` returns `UnitValue`;
+- omitted `round` precision is replaced by numeric zero;
+- a custom callable named `sin`, `round`, or `variance` inherits built-in policy;
+- timeout silently substitutes a built-in for an overridden callable;
+- canonical bound random functions are falsely rejected as custom;
+- `deg**2`, `1/deg`, or `deg*rad` silently produce representable-looking dimensions;
+- valid `deg/s` or `(deg/s)*s` behavior breaks;
+- lazy imports reintroduce module/function collisions;
+- all exact implementation modules load during MCP startup;
+- obsolete policy machinery remains unused without a documented active reason;
+- a runtime dependency is added;
 - CI, release automation, or verification ceremony expands;
-- plans are marked completed before canonical verification succeeds.
+- plans are marked complete before canonical verification succeeds.
 
 ## 16. Final acceptance criteria
 
-This closure pass is complete when all of the following hold:
+This pass is complete when:
 
-1. Population and sample variance return squared units for compatible non-affine dimensional inputs.
+1. Population and sample variance return squared units for compatible non-affine dimensional input.
 2. Mean and standard deviation retain first-power units.
 3. `sign()` always returns a dimensionless scalar.
-4. Omitted and explicit `round()` precision preserve Python's value and type contracts for scalar and unit-valued inputs.
+4. Omitted and explicit `round` precision preserve Python value and type contracts for scalar and unit-valued input.
 5. Each evaluator has one reliable canonical callable identity baseline established after instance binding.
 6. Built-in policies apply only to canonical built-in callables.
 7. Added and overridden callables default to dimensionless-only in ordinary evaluation.
-8. Timeout evaluation rejects added and overridden callables before spawning and never substitutes behavior silently.
-9. Canonical instance-bound random functions remain valid and are not false positives.
-10. Unsupported angle powers and inverse-angle operations fail clearly without redesigning the dimension model.
+8. Timeout rejects added and overridden callables before spawning and never substitutes behavior.
+9. Canonical bound random functions remain valid.
+10. Unsupported angle powers and inverse-angle operations fail clearly without redesigning dimensions.
 11. Existing direct-angle and angular-velocity behavior remains functional.
 12. Transitional policy debris is removed or made actively authoritative.
-13. Deferred MCP imports remain lazy and survive Python 3.11 package/submodule name collisions.
+13. Deferred MCP imports remain lazy and survive Python 3.11 package/submodule collisions.
 14. Focused tests, `make check`, and `make package-check` pass.
-15. Runtime dependencies remain empty and the standard-library-only guarantee is unchanged.
+15. Runtime dependencies remain empty and standard-library-only operation is unchanged.
 16. Required CI remains one Ubuntu/Python 3.11 job and release remains manual.
-17. Plans 022–027 have accurate status headers and Plan 022 records final completion.
+17. Plans 022–027 have accurate statuses and Plan 022 records final completion.
 18. No further corrective plan is required for this roadmap.
 
 ## 17. Handoff sequence
