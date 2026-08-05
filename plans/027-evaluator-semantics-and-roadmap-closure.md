@@ -584,3 +584,9 @@ Implement in this order:
 11. commit the implementation and stop.
 
 Do not create another roadmap, follow-up plan, evidence commit, or release commit unless canonical verification exposes a new concrete product defect outside the acceptance criteria above.
+
+## 18. Completion note
+
+The original Plan 027 implementation is in commit `3b06d2a`; its final
+verified corrective gaps were closed by Plan 028 in commit `53bf2dd`.
+The roadmap is closed.

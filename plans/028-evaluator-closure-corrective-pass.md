@@ -1,6 +1,6 @@
 # Evaluator Closure Corrective Pass
 
-Status: implementation handoff  
+Status: implemented  
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `5d29586c755fa5392bba7afb22acf760d9466605`  
 Date: 2026-08-05  
@@ -572,3 +572,10 @@ Implement in this order:
 12. commit and stop.
 
 Do not open a broader cleanup phase after these criteria pass.
+
+## 17. Completion note
+
+All acceptance criteria are satisfied. Focused tests, `make check`,
+`make package-check`, and explicit single-file validation passed. The
+corrective implementation is committed as `53bf2dd`; no further evaluator
+corrective roadmap is required.
