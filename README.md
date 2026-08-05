@@ -21,21 +21,6 @@ Written in pure Python with no external dependencies, it can be used as a CLI to
 - **Operating systems:** Linux, macOS, Windows
 - All tools and features are fully available on every supported runtime — no reduced capability set
 
-### Migrating from Python 3.10
-
-Python 3.10 reached end-of-life and eggcalc now requires Python 3.11+ for standard-library `tomllib` and `math.cbrt` support. Upgrade your Python before upgrading eggcalc:
-
-```bash
-# Ubuntu/Debian
-sudo apt install python3.11
-
-# macOS (Homebrew)
-brew install python@3.11
-
-# Windows
-winget install Python.Python.3.11
-```
-
 ## Installation
 
 ```bash
