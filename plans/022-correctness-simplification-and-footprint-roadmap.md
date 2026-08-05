@@ -387,4 +387,4 @@ After these conditions are met, stop. Do not use this roadmap as a basis for a n
 
 ## 11. Completion note
 
-All 14 conditions in §10 are satisfied. Plans 023–027 have been implemented. The roadmap is closed.
+All 14 conditions in §10 are satisfied. Plans 023–027 have been implemented in commit `3b06d2a`. The roadmap is closed.

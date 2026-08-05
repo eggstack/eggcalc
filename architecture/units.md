@@ -563,6 +563,24 @@ Angle propagates via XOR in multiplication and division. When multiplying or div
 
 This models the physical intuition that angle is a ratio (length/length) and cancels when like dimensions multiply.
 
+### Angle Algebra Bounds
+
+The `Dimension.angle` boolean flag can only represent angle exponents of 0 or 1. Bounded guards in `__mul__`, `__truediv__`, and `__pow__` reject operations that would require richer representations:
+
+| Operation | Result | Reason |
+|-----------|--------|--------|
+| `deg**0` | dimensionless | Any dimension to the 0th power is dimensionless |
+| `deg**1` | angle | Identity exponent, preserved |
+| `deg**2` | `ValueError` | Angle exponent 2 not representable |
+| `deg**-1` | `ValueError` | Inverse angle not representable |
+| `deg*rad` | `ValueError` | Multiplying two angle-bearing dimensions |
+| `1/deg` | `ValueError` | Dividing non-angle by angle-bearing |
+| `deg/rad` | dimensionless | Angle XOR angle = not angle (cancels) |
+| `(deg/s)*s` | angle | Angle XOR not angle = angle |
+| `(deg/s)*(rad/s)` | `ValueError` | Both angle-bearing |
+
+Supported compound expressions like `30*deg/s` and `(30*deg/s) * (2*s)` continue to work. Trig functions accept direct angles (`90*deg`) but reject angular velocity (`deg/s`).
+
 ## Module Dependencies
 
 ```

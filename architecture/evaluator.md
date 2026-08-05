@@ -497,6 +497,10 @@ evaluate_raw("abs(-5*m)")        # → 5 m
 
 Custom registered callables (added names or replaced built-ins) cannot be serialized across process boundaries and cause `evaluate_with_timeout()` to fail immediately with `EvaluationError`. The detection uses callable identity against `_builtin_function_baseline` to distinguish canonical built-ins from user overrides. Use `evaluate()` for expressions with custom functions.
 
+### Angle Algebra Bounds
+
+The `Dimension.angle` boolean flag supports only exponents of 0 or 1. Operations that would require richer representations (e.g., `deg**2`, `1/deg`, `deg*rad`) raise `ValueError` at the dimension level. Supported forms include `deg**0` (dimensionless), `deg**1` (angle), `deg/rad` (dimensionless), and `(deg/s)*s` (direct angle). See [units.md](units.md) for the full bounds table.
+
 See [units.md](units.md) for unit conversion details.
 
 ## Module Dependencies
