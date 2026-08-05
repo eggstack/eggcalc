@@ -357,22 +357,31 @@ class TestDeferredExactImport:
     """
 
     def test_mcp_tool_handlers_callable(self):
-        """MCP tool handlers resolve to callables after deferred import."""
+        """Collision-prone handlers resolve and execute after deferred import."""
         code = textwrap.dedent("""\
             import sys
             # Force clean state
             for mod in list(sys.modules):
                 if mod.startswith("eggcalc.mcp"):
                     del sys.modules[mod]
+            # Populate package attributes through the same-named implementation
+            # modules that triggered the Python 3.11 collision.
+            import eggcalc.exact.identifier_inspect
+            import eggcalc.exact.validate
             from eggcalc.mcp.server import TOOL_HANDLERS
-            # identifier_inspect is one of the handlers that had collisions
             handler = TOOL_HANDLERS.get("identifier_inspect")
             assert handler is not None, "identifier_inspect handler not found"
             assert callable(handler), "identifier_inspect handler not callable"
-            # Validation handler
             handler2 = TOOL_HANDLERS.get("validate_brackets")
             assert handler2 is not None, "validate_brackets handler not found"
             assert callable(handler2), "validate_brackets handler not callable"
+            identifier_result = handler(["alpha", "beta"], check_confusables=False)
+            brackets_result = handler2("([])")
+            for result in (identifier_result, brackets_result):
+                assert isinstance(result, dict)
+                assert result.get("ok") is True
+                assert result.get("tool")
+                assert "result" in result
         """)
         result = _run_import_check(code)
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

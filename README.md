@@ -98,6 +98,14 @@ result = evaluate("5+3")                     # 8
 
 See [docs/api.md](docs/api.md) for the full API reference including `EggCalcApp`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, custom constants/functions, and performance benchmarks.
 
+Evaluator built-ins preserve their dimensional contracts only while their
+canonical evaluator callables are active. Replacing a built-in name uses the
+generic dimensionless custom-callable rules. Canonical `round()` accepts
+`round(number)`, `round(number, ndigits)`, or the equivalent `ndigits=` form;
+omitted precision returns an `int`, while explicit precision returns a
+`float`. Timeout evaluation rejects added, deleted, or overridden callables
+before starting a worker process.
+
 ## MCP Server
 
 eggcalc runs as an MCP server exposing deterministic tools across 18 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo). All results are deterministic — same input always produces the same output.

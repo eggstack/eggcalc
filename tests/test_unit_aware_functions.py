@@ -12,6 +12,7 @@ import math
 
 import pytest
 
+import eggcalc.evaluator as evaluator_module
 from eggcalc import EvaluationError, UnitValue, evaluate, evaluate_raw, evaluate_with_timeout
 from eggcalc.evaluator import (
     Evaluator,
@@ -762,6 +763,21 @@ class TestRoundReturnType:
         with pytest.raises(EvaluationError):
             evaluate("round(3.7, 0, ndigits=0)")
 
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "round()",
+            "round(ndigits=2)",
+            "round(3.7, 0, 1)",
+            "round(3.7, 1*m)",
+            "round(3.7, ndigits=1*m)",
+            "round(3.7, unexpected=0)",
+        ],
+    )
+    def test_round_rejects_invalid_call_shapes(self, expression):
+        with pytest.raises(EvaluationError):
+            evaluate_raw(expression)
+
 
 # ---------------------------------------------------------------------------
 # Workstream C: Callable identity authority
@@ -794,6 +810,34 @@ class TestCallableIdentity:
         ev.FUNCTIONS["round"] = lambda x: x
         with pytest.raises(EvaluationError, match="dimensionless"):
             ev.evaluate("round(3.7*m)")
+
+    def test_override_round_rejects_canonical_keyword(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["round"] = lambda x: x
+        with pytest.raises(EvaluationError, match="Keyword"):
+            ev.evaluate("round(3.7, ndigits=0)")
+
+    def test_override_convert_does_not_preserve_units(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["convert"] = lambda x, y: (x, y)
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate("convert(1*m, cm)")
+
+    def test_override_temp_does_not_preserve_unit_names(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["temp"] = lambda x, y: (x, y)
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate("temp(1, C)")
+
+    def test_override_setvar_does_not_inherit_canonical_argument_handling(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["setvar"] = lambda x, y: (x, y)
+        with pytest.raises(EvaluationError, match="dimensionless"):
+            ev.evaluate('setvar("name", 1*m)')
+
+    def test_canonical_special_function_rejects_keywords(self):
+        with pytest.raises(EvaluationError, match="Keyword"):
+            evaluate("temp(1, C, unexpected=0)")
 
     def test_override_variance_no_squared_policy(self):
         ev = Evaluator()
@@ -854,6 +898,34 @@ class TestTimeoutCallableIdentity:
         ev.FUNCTIONS["sin"] = lambda x: x
         with pytest.raises(EvaluationError, match="sin"):
             evaluate_with_timeout("1+1", timeout=5.0, _evaluator=ev)
+
+    @pytest.mark.parametrize("change", ["added", "overridden", "deleted"])
+    def test_timeout_callable_rejection_precedes_spawn(self, change, monkeypatch):
+        ev = Evaluator()
+        if change == "added":
+            ev.FUNCTIONS["double"] = lambda x: x * 2
+        elif change == "overridden":
+            ev.FUNCTIONS["sin"] = lambda x: x
+        else:
+            del ev.FUNCTIONS["sin"]
+
+        def fail_if_context_requested():
+            pytest.fail("timeout evaluator attempted to create a process")
+
+        monkeypatch.setattr(
+            evaluator_module, "_get_eval_multiprocessing_context", fail_if_context_requested
+        )
+        with pytest.raises(EvaluationError, match="custom registered"):
+            evaluate_with_timeout("1+1", timeout=5.0, _evaluator=ev)
+
+    def test_timeout_lists_multiple_callable_changes_sorted(self):
+        ev = Evaluator()
+        ev.FUNCTIONS["zeta"] = lambda: 1
+        ev.FUNCTIONS["alpha"] = lambda: 1
+        del ev.FUNCTIONS["sin"]
+        with pytest.raises(EvaluationError) as exc_info:
+            evaluate_with_timeout("1+1", timeout=5.0, _evaluator=ev)
+        assert "alpha, sin, zeta" in str(exc_info.value)
 
     def test_timeout_accepts_canonical_random(self):
         ev = Evaluator(random_seed=1)

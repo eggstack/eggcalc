@@ -656,7 +656,8 @@ try:
     uv = result_val if hasattr(result_val, "value") else None
     result = {
         "ok": True,
-        "value": float(result_val) if uv is None else float(uv.value),
+        "value": result_val if uv is None else uv.value,
+        "value_type": type(result_val).__name__ if uv is None else type(uv.value).__name__,
         "unit": None if uv is None else uv.unit,
     }
 except Exception as exc:
@@ -765,6 +766,13 @@ def test_positive_parity_package_vs_single_file(tmp_path: Path) -> None:
         # Compatible floor division and modulo
         "10 m // 3 m",
         "10 m % 3 m",
+        "variance(1*m,2*m,3*m)",
+        "sign(-5*m)",
+        "round(3.7)",
+        "round(3.7*m)",
+        "round(3.7,0)",
+        "round(3.7*m,0)",
+        "sin(90*deg)",
     ]
     for case in eval_cases:
         pkg = _run_package_probe(_PROBE_EVALUATE, case)
@@ -774,6 +782,7 @@ def test_positive_parity_package_vs_single_file(tmp_path: Path) -> None:
             f"  package: {pkg}\n  single_file: {sf}"
         )
         assert pkg.get("value") == sf.get("value"), f"Eval case {case!r}: value mismatch"
+        assert pkg.get("value_type") == sf.get("value_type"), f"Eval case {case!r}: type mismatch"
         assert pkg.get("unit") == sf.get("unit"), f"Eval case {case!r}: unit mismatch"
 
 

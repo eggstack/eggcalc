@@ -81,7 +81,7 @@ calc "pow(2, 10)"     # 1024
 | `floor(x)` | Floor |
 | `ceil(x)` | Ceiling |
 | `trunc(x)` | Truncate |
-| `round(x, n)` | Round to n decimal places |
+| `round(x)` / `round(x, n)` | Round, preserving Python's omitted/explicit precision types |
 | `sign(x)` | Sign (-1, 0, or 1) |
 
 ```bash
@@ -90,6 +90,11 @@ calc "floor(3.7)"     # 3
 calc "ceil(3.2)"      # 4
 calc "round(3.14159, 2)"  # 3.14
 ```
+
+`round(x)` returns an `int`; supplying `n` or `ndigits=n` returns a `float`
+for scalar input. Unit values preserve their unit and the corresponding value
+type. `ndigits` must be dimensionless, and the evaluator rejects unsupported
+keywords or argument counts.
 
 ## Factorial & Combinatorics
 

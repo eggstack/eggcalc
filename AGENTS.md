@@ -77,6 +77,15 @@ User-registered functions default to DIMENSIONLESS. Custom callables are rejecte
 
 Each evaluator maintains a `_builtin_function_baseline` snapshot of canonical built-in callables after instance-specific binding. `visit_Call` compares the active callable by identity against this baseline. A canonical callable receives its built-in unit policy; any added or replaced callable defaults to dimensionless-only. This prevents a user replacing `sin` with a custom function from inheriting the built-in `ANGLE_INPUT` policy.
 
+Identity is established before all built-in-name-specific argument handling:
+only canonical `temp`, `convert`, variable-management functions, and
+`round` receive their special argument contracts. Canonical `round()` accepts
+one or two positional arguments, or one `ndigits=` keyword with one value
+argument; omitted precision preserves Python's integer return type, explicit
+precision returns a float, and unit-bearing `ndigits` is rejected. Timeout
+state checks reject added, overridden, and deleted callable names in sorted
+order before a worker is spawned.
+
 #### Angle algebra bounds
 
 `Dimension.angle: bool` is a structural flag that cannot represent angle exponents other than 0 or 1. Bounded guards reject:

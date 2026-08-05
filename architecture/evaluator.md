@@ -138,7 +138,13 @@ The `visit_Name` lookup order is:
 3. `FUNCTIONS` (rejected as "used without arguments")
 4. Per-instance user variables (`_user_variables`)
 
-The `visit_Call` method handles special cases for `temp()` (temperature unit preservation) and `convert()` (UnitValue passthrough), and enforces unit policies via the centralized `UnitPolicy` dispatcher. User-registered functions default to dimensionless-only behavior.
+The `visit_Call` method establishes active-callable identity before any
+name-specific handling. Only canonical evaluator-owned `temp()` (temperature
+unit preservation), `convert()` (`UnitValue` passthrough), variable-management
+functions (raw string names), and `round()` keyword handling receive those
+special contracts. Overrides under those names use the generic
+dimensionless-only custom-callable behavior. Unsupported keywords are rejected
+before every call path.
 
 ## Constants
 
@@ -483,6 +489,8 @@ evaluate_raw("variance(1*m, 2*m, 3*m)") # → 0.666... m**2
 evaluate_raw("sign(-5*m)")       # → -1 (dimensionless)
 evaluate_raw("round(3.7)")       # → 4 (int)
 evaluate_raw("round(3.7, 0)")    # → 4.0 (float)
+evaluate_raw("round(3.7*m)")     # → 4 m (UnitValue.value is int)
+evaluate_raw("round(3.7*m, 0)")  # → 4.0 m (UnitValue.value is float)
 evaluate_raw("hypot(3*m, 4*s)")  # → EvaluationError
 evaluate_raw("abs(-5*m)")        # → 5 m
 ```
@@ -495,7 +503,13 @@ evaluate_raw("abs(-5*m)")        # → 5 m
 - Memory registers
 - `allow_random` / `allow_side_effects` flags
 
-Custom registered callables (added names or replaced built-ins) cannot be serialized across process boundaries and cause `evaluate_with_timeout()` to fail immediately with `EvaluationError`. The detection uses callable identity against `_builtin_function_baseline` to distinguish canonical built-ins from user overrides. Use `evaluate()` for expressions with custom functions.
+Custom registered callables (added names, replaced built-ins, or deleted
+built-ins) cannot be serialized across process boundaries and cause
+`evaluate_with_timeout()` to fail immediately with `EvaluationError`, before
+the worker process is created. Changed names are reported deterministically in
+sorted order. The detection uses callable identity against
+`_builtin_function_baseline` to distinguish canonical built-ins from user
+overrides. Use `evaluate()` for expressions with custom functions.
 
 ### Angle Algebra Bounds
 

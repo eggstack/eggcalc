@@ -311,11 +311,6 @@ def _angle_input_dispatch(name: str, func: Any, args: list[Any]) -> Any:
 
 def _sqrt_dispatch(args: list[Any]) -> Any:
     """sqrt: dimensionless or even-exponent dimensional."""
-    from .units import _get_unit_registry
-
-    def _get_reg() -> Any:
-        return _get_unit_registry()
-
     if len(args) != 1:
         raise EvaluationError("sqrt() requires exactly 1 argument")
     arg = args[0]
@@ -343,10 +338,7 @@ def _sqrt_dispatch(args: list[Any]) -> Any:
                     if definition is not None:
                         expected_dimension = expected_dimension * (definition.dimension**exponent)
                         expected_scale *= definition.scale**exponent
-            new_expr = UnitExpression.__new__(UnitExpression)
-            object.__setattr__(new_expr, "factors", new_factors)
-            object.__setattr__(new_expr, "dimension", expected_dimension)
-            object.__setattr__(new_expr, "scale_to_base", expected_scale)
+            new_expr = UnitExpression(new_factors, expected_dimension, expected_scale)
             new_unit = render_expression(new_expr)
             val = _sqrt(arg.value)
             return UnitValue(val, new_unit)
@@ -408,7 +400,6 @@ def _atan2_dispatch(args: list[Any]) -> Any:
 def _build_function_specs() -> dict[str, FunctionSpec]:
     """Build the authoritative function→policy mapping from Evaluator.FUNCTIONS."""
     specs: dict[str, FunctionSpec] = {}
-    funcs = Evaluator.FUNCTIONS
     for name in (
         "sin",
         "cos",
@@ -457,7 +448,6 @@ def _build_function_specs() -> dict[str, FunctionSpec]:
         "bitrshift",
         "randint",
         "randrange",
-        "expm1",
     ):
         if name not in specs:
             specs[name] = FunctionSpec(UnitPolicy.DIMENSIONLESS)
@@ -2667,6 +2657,10 @@ class Evaluator(ast.NodeVisitor):
         if func_name not in self.FUNCTIONS:
             raise EvaluationError(f"Function '{func_name}' is not allowed")
 
+        active_callable = self.FUNCTIONS[func_name]
+        baseline_callable = self._builtin_function_baseline.get(func_name)
+        is_canonical = active_callable is baseline_callable
+
         if not self._allow_random and func_name in _RANDOM_FUNCTIONS:
             raise EvaluationError(
                 f"Function '{func_name}' is non-deterministic and is disabled "
@@ -2678,8 +2672,30 @@ class Evaluator(ast.NodeVisitor):
                 f"disabled in this Evaluator (allow_side_effects=False)"
             )
 
+        # Only canonical round() accepts its one named argument. Every other
+        # callable, including overrides under built-in names, rejects keywords.
+        kwargs: dict[str, Any] = {}
+        if node.keywords:
+            if (
+                is_canonical
+                and func_name == "round"
+                and len(node.keywords) == 1
+                and node.keywords[0].arg == "ndigits"
+            ):
+                kwargs["ndigits"] = self.visit(node.keywords[0].value)
+            else:
+                raise EvaluationError("Keyword arguments are not supported")
+
+        if is_canonical and func_name == "round":
+            if not 1 <= len(node.args) <= 2:
+                raise EvaluationError(
+                    f"round() expected 1 or 2 positional arguments, got {len(node.args)}"
+                )
+            if "ndigits" in kwargs and len(node.args) != 1:
+                raise EvaluationError("round() got multiple values for argument 'ndigits'")
+
         # Special handling for temp function to preserve unit names
-        if func_name == "temp":
+        if is_canonical and func_name == "temp":
             temp_args: list[Any] = []
             for i, arg in enumerate(node.args):
                 result = self.visit(arg)
@@ -2690,23 +2706,23 @@ class Evaluator(ast.NodeVisitor):
                 else:
                     temp_args.append(result)
             try:
-                return self.FUNCTIONS[func_name](*temp_args)
+                return active_callable(*temp_args)
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 
         # Special handling for convert function to preserve UnitValue arguments
-        if func_name == "convert":
+        if is_canonical and func_name == "convert":
             convert_args: list[Any] = []
             for i, arg in enumerate(node.args):
                 result = self.visit(arg)
                 convert_args.append(result)
             try:
-                return self.FUNCTIONS[func_name](*convert_args)
+                return active_callable(*convert_args)
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 
         # Special handling for variable-management functions (setvar/getvar/delvar)
-        if func_name in _STRING_NAME_FUNCTIONS:
+        if is_canonical and func_name in _STRING_NAME_FUNCTIONS:
             name_args: list[Any] = []
             for i, arg in enumerate(node.args):
                 if i == 0 and isinstance(arg, ast.Constant) and isinstance(arg.value, str):
@@ -2714,24 +2730,25 @@ class Evaluator(ast.NodeVisitor):
                 else:
                     name_args.append(self.visit(arg))
             try:
-                return self.FUNCTIONS[func_name](*name_args)
+                return active_callable(*name_args)
             except (TypeError, ValueError) as e:
                 raise EvaluationError(str(e)) from None
 
-        # Keyword argument handling: allow ndigits for round()
-        kwargs: dict[str, Any] = {}
-        if node.keywords:
-            if (
-                func_name == "round"
-                and len(node.keywords) == 1
-                and node.keywords[0].arg == "ndigits"
-            ):
-                kwargs["ndigits"] = self.visit(node.keywords[0].value)
-            else:
-                raise EvaluationError("Keyword arguments are not supported")
-
         # Evaluate arguments
         args: list[Any] = [self.visit(arg) for arg in node.args]
+
+        if is_canonical and func_name == "round":
+            ndigit_args = args[1:]
+            if (
+                ndigit_args
+                and isinstance(ndigit_args[0], UnitValue)
+                and ndigit_args[0].unit is not None
+            ):
+                raise EvaluationError("round() ndigits must be dimensionless")
+            if "ndigits" in kwargs:
+                ndigits = kwargs["ndigits"]
+                if isinstance(ndigits, UnitValue) and ndigits.unit is not None:
+                    raise EvaluationError("round() ndigits must be dimensionless")
 
         # Look up unit policy for this function
         spec = _get_function_specs().get(func_name)
@@ -2754,9 +2771,7 @@ class Evaluator(ast.NodeVisitor):
         # Callable identity check: built-in unit policies apply only when
         # the active callable is the canonical built-in for this evaluator.
         # Any added or replaced callable is a user callable (dimensionless-only).
-        inst_func = self.FUNCTIONS[func_name]
-        baseline_func = self._builtin_function_baseline.get(func_name)
-        is_canonical = inst_func is baseline_func
+        inst_func = active_callable
 
         if not is_canonical:
             # User-replaced callable: dimensionless-only, regardless of spec
@@ -2807,14 +2822,10 @@ class Evaluator(ast.NodeVisitor):
                     val = arg.value if isinstance(arg, UnitValue) else arg
                     ndigits_was_omitted = "ndigits" not in kwargs and len(args) < 2
                     if ndigits_was_omitted:
-                        result = round(cast(float, val))
+                        result = round(cast(Any, val))
                     else:
-                        if "ndigits" in kwargs and len(args) > 1:
-                            raise EvaluationError(
-                                "round() got multiple values for argument 'ndigits'"
-                            )
                         nd = kwargs.get("ndigits", args[1] if len(args) > 1 else 0)
-                        result = round(cast(float, val), nd)
+                        result = round(cast(Any, val), nd)
                     if unit is not None:
                         return UnitValue(result, unit)
                     return result
@@ -3005,17 +3016,19 @@ def _snapshot_evaluator_state(ev: Evaluator) -> dict[str, Any]:
     #   - its name is absent from the baseline (added by user), or
     #   - its name is present but the active callable differs from the baseline
     #     (replaced by user).
-    custom_names: list[str] = []
-    for name in ev.FUNCTIONS:
-        baseline_func = ev._builtin_function_baseline.get(name)
-        if baseline_func is None:
-            custom_names.append(name)
-        elif ev.FUNCTIONS[name] is not baseline_func:
-            custom_names.append(name)
+    baseline_names = set(ev._builtin_function_baseline)
+    active_names = set(ev.FUNCTIONS)
+    custom_names = sorted(
+        name
+        for name in baseline_names | active_names
+        if name not in baseline_names
+        or name not in active_names
+        or ev.FUNCTIONS[name] is not ev._builtin_function_baseline[name]
+    )
     if custom_names:
         raise EvaluationError(
             f"evaluate_with_timeout() does not support custom registered "
-            f"functions: {', '.join(sorted(custom_names))}. "
+            f"functions: {', '.join(custom_names)}. "
             f"Use evaluate() for expressions with custom functions."
         )
 
