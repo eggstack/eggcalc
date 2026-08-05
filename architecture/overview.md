@@ -7,10 +7,21 @@ A natural language math calculator (CLI, library, MCP server) and Unicode text a
 ## Table of Contents
 
 - [What eggcalc Is](#what-eggcalc-is)
+- [Architecture Diagram](#architecture-diagram)
 - [Subsystem Map](#subsystem-map)
 - [Core Calculator Pipeline](#core-calculator-pipeline)
+  - [Two Evaluation Paths](#two-evaluation-paths)
+  - [Caret Semantics](#caret-semantics)
+  - [Normalization Pipeline](#normalization-pipeline)
+  - [Safe AST Evaluation](#safe-ast-evaluation)
+  - [Unit System](#unit-system)
 - [exact/ Text Analysis Package](#exact-text-analysis-package)
+  - [Module Dependency Graph](#module-dependency-graph)
+  - [Capability Categories](#capability-categories)
 - [MCP Server](#mcp-server)
+  - [Tool Categories](#tool-categories-77-tools)
+  - [Profile System](#profile-system-11-profiles)
+  - [Session Lifecycle](#session-lifecycle)
 - [Data Flow](#data-flow)
 - [Entry Points](#entry-points)
 - [Module Dependencies](#module-dependencies)
@@ -29,7 +40,17 @@ eggcalc is a dual-purpose tool:
 1. **Natural Language Calculator** — Accepts math expressions in plain English (`"five plus three"`) or with units (`"30m + 100ft"`) and evaluates them with full unit conversion support.
 2. **Unicode Text Analysis Suite** — Deterministic text processing tools for AI safety, security auditing, and text manipulation, exposed via CLI subcommands and an MCP server.
 
-### Architecture Diagram
+### Key Properties
+
+- **Standard library only** — zero external dependencies in production code
+- **Two distribution paths** — PyPI wheel and single-file `eggcalc.py` (~394KB)
+- **Thread-safe** — `McpServer` owns isolated evaluator, config, registry, executor per connection
+- **Bounded concurrency** — child process spawns controlled by `BoundedSemaphore`
+- **Lazy loading** — `exact/` modules imported on first use, not at startup
+
+---
+
+## Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -67,7 +88,7 @@ eggcalc is a dual-purpose tool:
 
 The codebase is organized into three subsystems plus supporting infrastructure.
 
-### Core Calculator (4 modules)
+### Core Calculator (6 modules)
 
 | Module | Role | Key Exports |
 |--------|------|-------------|
@@ -75,8 +96,12 @@ The codebase is organized into three subsystems plus supporting infrastructure.
 | [`evaluator.py`](evaluator.md) | AST parsing, safe math evaluation, `EggCalcApp` | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()` |
 | [`normalize.py`](normalize.md) | NL tokenization, number words, expression normalization | `run()`, `normalize_text()`, `normalize_expression()` |
 | [`cli.py`](cli.md) | CLI dispatch: argparse, REPL, text commands, help | `main()`, `print_help()` |
+| [`capabilities.py`](capabilities.md) | Runtime capability detection | `detect_capabilities()`, `RuntimeCapabilities` |
+| [`_protocol.py`] | MCP protocol version constants | `SUPPORTED_PROTOCOL_VERSIONS` |
 
 ### exact/ — Unicode Text Analysis Package (25 modules)
+
+All deterministic, side-effect-free text analysis primitives. No external deps.
 
 | Module | Role | Key Exports |
 |--------|------|-------------|
@@ -168,6 +193,8 @@ Multi-stage pipeline that converts natural language to Python syntax:
 | Phrase stripping | Remove filler words | `"what's"` → `""` |
 | Unit parsing | Number + unit detection | `"30m"` → `30*m` |
 | Parenthesization | Implicit precedence | `"2 + 3 * 4"` → correct grouping |
+
+See [normalize.md](normalize.md) for the full 30-step pipeline.
 
 ### Safe AST Evaluation (evaluator.py)
 
@@ -289,9 +316,7 @@ The MCP server exposes eggcalc's text analysis tools to AI agents via a stdio-ba
 | Manifest | 4 | `manifest_inspect`, `requirements_inspect` |
 | Repo | 1 | `repo_inventory` |
 
-### Profile System
-
-11 tool profiles control which tools are available:
+### Profile System (11 profiles)
 
 | Profile | Purpose |
 |---------|---------|
@@ -532,6 +557,9 @@ The codebase establishes explicit ownership of mutable state:
 
 Multiple `McpServer` instances can coexist safely with different configs, registries, and evaluator policies. Two `McpSession` instances on one server do not share cancellation or lifecycle state.
 
+See [mutable_state_inventory.md](mutable_state_inventory.md) for a complete inventory of all mutable process-global state.
+See [authority_inventory.md](authority_inventory.md) for the single authoritative source of every registry, constant, and contract.
+
 ---
 
 ## Deep Dive Index
@@ -571,10 +599,15 @@ Each component has a dedicated architecture document. Use this index to navigate
 | tools.py | [mcp.md](mcp.md#toolspy) | Tool implementations, error handling, input validation |
 | server.py | [mcp.md](mcp.md#serverpy) | stdio JSON-RPC, ThreadPoolExecutor, profile selection |
 
-### Supporting Documentation
+### Build & Distribution
+
+| Component | Document | What It Covers |
+|-----------|----------|----------------|
+| build system | [build.md](build.md) | build_single.py, MODULE_MANIFEST, assembly, install.py |
+
+### Cross-Cutting Concerns
 
 | Document | What It Covers |
 |----------|----------------|
 | [authority_inventory.md](authority_inventory.md) | Single authoritative source for every major registry/constant/contract |
 | [mutable_state_inventory.md](mutable_state_inventory.md) | Inventory of all mutable process-global state |
-| [review_plan.md](review_plan.md) | Architecture review plan (completed 2026-05-29) |
