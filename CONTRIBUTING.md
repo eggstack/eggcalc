@@ -94,15 +94,22 @@ Run `make check` to run all of them at once.
 ```
 eggcalc/
 ├── eggcalc/           # Main package
-│   ├── __init__.py    # Package exports
+│   ├── __init__.py    # Package exports (lazy CLI re-exports via PEP 562)
 │   ├── __main__.py    # CLI entry point
+│   ├── _version.py    # Version source of truth
+│   ├── _protocol.py   # MCP protocol version constants
+│   ├── cli.py         # CLI dispatch, REPL, text commands
+│   ├── capabilities.py # Runtime capability detection
 │   ├── evaluator.py   # AST-based evaluator
 │   ├── normalize.py   # Expression normalization
-│   └── units.py       # Unit definitions
+│   ├── units.py       # Unit definitions, conversions
+│   ├── exact/         # Text analysis: Unicode, confusables, diffs, validation
+│   └── mcp/           # MCP server: schemas, tools, server
 ├── tests/             # Test suite
 ├── benchmarks/        # Performance benchmarks
-├── docs/              # User documentation
+├── docs/              # User documentation (MkDocs)
 ├── architecture/      # Developer documentation
+├── .skills/           # Agent task guides
 └── pyproject.toml     # Project config
 ```
 

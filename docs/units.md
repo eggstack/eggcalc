@@ -105,7 +105,7 @@ eggcalc supports unit conversions across multiple categories.
 | `C` | Celsius |
 | `F` | Fahrenheit |
 | `K` | Kelvin |
-| `R` | Rankine |
+| `Ra` | Rankine |
 
 ## Pressure
 

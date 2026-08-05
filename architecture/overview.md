@@ -43,7 +43,7 @@ eggcalc is a dual-purpose tool:
 ### Key Properties
 
 - **Standard library only** — zero external dependencies in production code
-- **Two distribution paths** — PyPI wheel and single-file `eggcalc.py` (~394KB)
+- **Two distribution paths** — PyPI wheel and single-file `eggcalc.py` (~1.4MB)
 - **Thread-safe** — `McpServer` owns isolated evaluator, config, registry, executor per connection
 - **Bounded concurrency** — child process spawns controlled by `BoundedSemaphore`
 - **Lazy loading** — `exact/` modules imported on first use, not at startup
@@ -498,7 +498,7 @@ For detailed build system documentation, see [build.md](build.md).
 
 ### build_single.py
 
-Assembles all modules into a single `eggcalc.py` file (~394KB) for portability.
+Assembles all modules into a single `eggcalc.py` file (~1.4MB) for portability.
 
 | Module Group | Modules |
 |-------------|---------|
@@ -595,9 +595,9 @@ Each component has a dedicated architecture document. Use this index to navigate
 | Component | Document | What It Covers |
 |-----------|----------|----------------|
 | mcp/ (overview) | [mcp.md](mcp.md) | Server architecture, tool schemas, profiles, JSON-RPC protocol |
-| schemas.py | [mcp.md](mcp.md#schemaspy) | 77 tool definitions, 11 profiles, schema detail levels |
-| tools.py | [mcp.md](mcp.md#toolspy) | Tool implementations, error handling, input validation |
-| server.py | [mcp.md](mcp.md#serverpy) | stdio JSON-RPC, ThreadPoolExecutor, profile selection |
+| schemas.py | [mcp.md](mcp.md#schemaspy--tool-schemas) | 77 tool definitions, 11 profiles, schema detail levels |
+| tools.py | [mcp.md](mcp.md#toolspy--tool-implementations) | Tool implementations, error handling, input validation |
+| server.py | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) | stdio JSON-RPC, ThreadPoolExecutor, profile selection |
 
 ### Build & Distribution
 

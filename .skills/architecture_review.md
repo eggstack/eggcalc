@@ -75,7 +75,7 @@ For each module, examine:
 - Data structure field mismatches (verify against actual code)
 - Parameter name alignment (docs sometimes use different names than code)
 
-**Note:** The architecture review has been completed. All module reviews were performed and findings incorporated into the documentation. Test count: 4311 (as of 2026-07-29).
+**Note:** The architecture review has been completed. All module reviews were performed and findings incorporated into the documentation. Test count: 4481 (as of 2026-08-05).
 
 ## Architecture Review Findings (2026-05-28 through 2026-05-29)
 
@@ -88,7 +88,7 @@ The architecture review identified issues across all modules. **All 35 actionabl
 - All items resolved
 
 ## Architecture Files Location
-- `architecture/` - Module-level documentation (15 module docs + overview)
+- `architecture/` - Module-level documentation (20 docs including overview, authority_inventory, mutable_state_inventory)
 - `docs/exact.md` - exact/ module documentation
 
 ## Documentation Maintenance
