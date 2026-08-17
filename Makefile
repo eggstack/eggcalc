@@ -1,5 +1,8 @@
 .PHONY: help install dev test test-cov lint format format-check typecheck docs-check check clean build package-check release-check publish hooks
 
+VENV_BIN ?= .venv/bin
+PYTHON ?= $(VENV_BIN)/python
+
 help:
 	@echo "eggcalc - Development Commands"
 	@echo ""
@@ -30,33 +33,33 @@ dev:
 	pip install -e ".[dev]"
 
 test:
-	pytest tests/ -v
+	$(PYTHON) -m pytest tests/ -v
 
 test-cov:
-	pytest tests/ --cov=eggcalc --cov-report=term-missing --cov-report=html
+	$(PYTHON) -m pytest tests/ --cov=eggcalc --cov-report=term-missing --cov-report=html
 
 lint:
-	ruff check eggcalc tests
+	$(VENV_BIN)/ruff check eggcalc tests
 
 format:
-	black eggcalc tests
+	$(VENV_BIN)/black eggcalc tests
 
 format-check:
-	black --check eggcalc tests
+	$(VENV_BIN)/black --check eggcalc tests
 
 typecheck:
-	mypy eggcalc --ignore-missing-imports
-	mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
+	$(VENV_BIN)/mypy eggcalc --ignore-missing-imports
+	$(VENV_BIN)/mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
 
 generate-docs:
 	python3 scripts/generate_mcp_docs.py
 
 docs-check:
-	python3 scripts/generate_mcp_docs.py --check
+	$(PYTHON) scripts/generate_mcp_docs.py --check
 
 check: lint format-check typecheck docs-check
-	python build_single.py --validate
-	python -m pytest tests/ -v
+	$(PYTHON) build_single.py --validate
+	$(PYTHON) -m pytest tests/ -v
 	@echo "All checks passed!"
 
 clean:

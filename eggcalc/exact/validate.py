@@ -368,6 +368,9 @@ def validate_toml_text(text: str) -> ValidateTomlResult:
     Raises:
         ValueError: If input exceeds MAX_INPUT_LENGTH.
     """
+    if len(text) > MAX_INPUT_LENGTH:
+        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+
     try:
         import tomllib
     except ImportError:
@@ -381,9 +384,6 @@ def validate_toml_text(text: str) -> ValidateTomlResult:
             top_level_keys=None,
             tables=None,
         )
-
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
 
     try:
         parsed = tomllib.loads(text)
@@ -1757,8 +1757,9 @@ def _build_found_result(value: Any, pointer: str, max_output_chars: int) -> Json
     """Build a found result for a value."""
     if isinstance(value, dict):
         child_keys = list(value.keys())
-        preview = json.dumps(value, ensure_ascii=False)[:max_output_chars]
-        truncated = len(json.dumps(value, ensure_ascii=False)) > max_output_chars
+        serialized = json.dumps(value, ensure_ascii=False)
+        preview = serialized[:max_output_chars]
+        truncated = len(serialized) > max_output_chars
         return JsonExtractResult(
             valid_json=True,
             found=True,
@@ -1778,8 +1779,9 @@ def _build_found_result(value: Any, pointer: str, max_output_chars: int) -> Json
             summary=f"Object with {len(child_keys)} keys" + (" (truncated)" if truncated else ""),
         )
     elif isinstance(value, list):
-        preview = json.dumps(value, ensure_ascii=False)[:max_output_chars]
-        truncated = len(json.dumps(value, ensure_ascii=False)) > max_output_chars
+        serialized = json.dumps(value, ensure_ascii=False)
+        preview = serialized[:max_output_chars]
+        truncated = len(serialized) > max_output_chars
         return JsonExtractResult(
             valid_json=True,
             found=True,

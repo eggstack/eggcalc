@@ -498,3 +498,7 @@ diff --git a/b.py b/b.py
     def test_oversized_patch(self):
         result = unified_diff_validate("x" * 300_000)
         assert result["parse_ok"] is False
+
+    def test_oversized_conflict_marker_input_is_bounded(self):
+        result = patch_conflict_markers_inspect("x" * 300_000)
+        assert result["total_markers"] == 0

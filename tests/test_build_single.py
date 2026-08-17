@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import filecmp
+import importlib.util
 import os
 import subprocess
 import sys
@@ -111,6 +112,32 @@ class TestBuildSingleFile:
             text=True,
         )
         assert result.returncode != 0
+
+    @pytest.mark.skipif(
+        os.name == "nt", reason="dynamic single-file imports cannot spawn on Windows"
+    )
+    def test_json_and_regex_mcp_wrappers_execute(self, single_file_path):
+        """Renamed MCP wrappers must call exact implementations in the build."""
+        spec = importlib.util.spec_from_file_location("eggcalc_single_smoke", single_file_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        try:
+            spec.loader.exec_module(module)
+            calls = [
+                module._mcp_validate_json('{"a": 1}'),
+                module._mcp_json_compare('{"a": 1}', '{"a": 1}'),
+                module._mcp_json_extract('{"a": 1}', "/a"),
+                module._mcp_json_shape('{"a": 1}'),
+                module._mcp_regex_finditer("a", "a"),
+                module._mcp_regex_safety_check("a+"),
+                module._mcp_validate_schema_light('{"a": 1}', {"type": "object"}),
+                module._mcp_json_canonicalize('{"b": 2, "a": 1}'),
+                module._mcp_json_query('{"a": 1}', "/a"),
+            ]
+            assert all(result.get("ok") is True for result in calls)
+        finally:
+            sys.modules.pop(spec.name, None)
 
     def test_matches_package_mode(self, single_file_path):
         """Results should match package-mode for a set of expressions."""

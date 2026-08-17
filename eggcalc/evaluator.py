@@ -752,12 +752,12 @@ def _clear_global_cache() -> None:
     from a prior configuration are treated as stale.
     """
     global _cache_bytes, _config_generation
-    _config_generation += 1
     cache = globals().get("_cache")
     cache_lock = globals().get("_cache_lock")
     if cache is None or cache_lock is None:
         return
     with cache_lock:
+        _config_generation += 1
         cache.clear()
         _cache_bytes = 0
 
@@ -909,12 +909,13 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
         # to avoid float overflow (e.g., pow(5.0, 500) overflows but 5**500 is exact)
         # Only apply when base is an exact integer (5.0, not 5.1) to avoid truncation.
         if (
-            isinstance(base, float)
-            and isinstance(exp, int)
+            isinstance(base, (int, float))
+            and isinstance(exp, (int, float))
+            and (isinstance(exp, int) or exp.is_integer())
             and abs(exp) > 300
-            and base.is_integer()
+            and (not isinstance(base, float) or base.is_integer())
         ):
-            result = pow(int(base), exp)
+            result = pow(int(base), int(exp))
         else:
             result = pow(base, exp)
     except ZeroDivisionError:
@@ -1150,9 +1151,15 @@ def _phase(z: complex) -> float:
     return cmath.phase(z)
 
 
-def _polar(z: complex) -> tuple[float, float]:
-    """Return polar coordinates (r, phi) of a complex number."""
-    return cmath.polar(z)
+def _polar(*args: Any) -> tuple[float, float]:
+    """Return polar coordinates from a complex value or ``(r, phi)``."""
+    if len(args) == 1:
+        if not isinstance(args[0], complex):
+            raise EvaluationError("polar() requires a complex number or two scalar arguments")
+        return cmath.polar(args[0])
+    if len(args) == 2:
+        return _polar_from_coords(args[0], args[1])
+    raise EvaluationError("polar() requires 1 or 2 arguments")
 
 
 def _polar_from_coords(r: float, phi: float) -> tuple[float, float]:
@@ -2166,7 +2173,7 @@ class Evaluator(ast.NodeVisitor):
         "conj": _conj,
         "conjugate": _conj,
         "phase": _phase,
-        "polar": _polar_from_coords,
+        "polar": _polar,
         "rect": _rect,
         # Base conversion
         "bin": _to_bin,
@@ -3197,7 +3204,11 @@ def evaluate_with_timeout(
             f"Could not acquire spawn slot after {_EVAL_SPAWN_ACQUIRE_TIMEOUT}s "
             f"(all {_MAX_CONCURRENT_EVAL_SPAWNS} slots busy)"
         )
-    permit = _EvalSpawnPermit(_EVAL_SPAWN_SEMAPHORE)
+    try:
+        permit = _EvalSpawnPermit(_EVAL_SPAWN_SEMAPHORE)
+    except BaseException:
+        _EVAL_SPAWN_SEMAPHORE.release()
+        raise
     with permit:
         try:
             proc = ctx.Process(  # type: ignore[attr-defined]

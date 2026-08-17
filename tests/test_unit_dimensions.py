@@ -612,3 +612,30 @@ class TestDuplicateAliasRejection:
             )
         )
         assert "test_no_conflict" in reg.all_aliases
+
+
+class TestUnitValueSafety:
+    """UnitValue instances remain safe to use as hashed values."""
+
+    def test_unit_value_is_immutable(self):
+        value = UnitValue(5, "m")
+        with pytest.raises(AttributeError):
+            value.value = 10
+        with pytest.raises(AttributeError):
+            value.unit = "s"
+
+    @pytest.mark.parametrize(
+        "operation",
+        [
+            lambda: UnitValue(100, "C") * UnitValue(2),
+            lambda: UnitValue(2) * UnitValue(100, "C"),
+            lambda: UnitValue(100, "C") / UnitValue(2),
+        ],
+    )
+    def test_affine_scalar_arithmetic_is_rejected(self, operation):
+        with pytest.raises(ValueError, match="Affine"):
+            operation()
+
+    def test_cross_scale_temperature_addition_is_rejected(self):
+        with pytest.raises(ValueError, match="different scales"):
+            UnitValue(10, "C") + UnitValue(10, "F")

@@ -39,6 +39,16 @@ _SPAWN_SEMAPHORE = multiprocessing.BoundedSemaphore(MAX_CONCURRENT_SPAWNED)
 _SPAWN_ACQUIRE_TIMEOUT = 10  # seconds to wait for a spawn slot before failing
 
 
+def _get_process_context() -> Any:
+    """Return a worker context that can execute from the single-file build."""
+    if globals().get("EGGCALC_SINGLE_FILE") and __name__ != "__main__":
+        try:
+            return multiprocessing.get_context("fork")
+        except ValueError:
+            pass
+    return multiprocessing.get_context("spawn")
+
+
 class _SpawnPermit:
     """RAII permit for an acquired spawn slot.
 
@@ -1451,7 +1461,7 @@ def validate_regex(
             tool="validate_regex",
         )
 
-    ctx = multiprocessing.get_context("spawn")
+    ctx = _get_process_context()
     queue: multiprocessing.Queue = ctx.Queue()
     proc: Any = None
     # RAII permit for the spawn slot. Acquire (with timeout) returns a guard
@@ -1753,7 +1763,7 @@ def regex_finditer(
         )
 
     # Run regex in a subprocess with timeout to prevent ReDoS from hanging server
-    ctx = multiprocessing.get_context("spawn")
+    ctx = _get_process_context()
     queue: multiprocessing.Queue = ctx.Queue()
     proc: Any = None
     # RAII permit: use _try_acquire_spawn_permit + context manager so that
@@ -4049,7 +4059,7 @@ def dotenv_validate_mcp(
     # hanging the server. The heuristic _regex_safety_check above filters
     # most dangerous patterns, but a missed pattern could still hang the
     # main process without this isolation.
-    ctx = multiprocessing.get_context("spawn")
+    ctx = _get_process_context()
     queue: multiprocessing.Queue = ctx.Queue()
     proc: Any = None
     # RAII permit for the spawn slot. Use the non-raising try variant so we

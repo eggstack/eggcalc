@@ -992,5 +992,34 @@ class TestNumberWordSubstringBoundary:
         assert code == 0
 
 
+class TestBugReport202608:
+    """Regression coverage for the August 2026 bug report."""
+
+    @pytest.mark.parametrize(
+        ("expression", "expected"),
+        [
+            ("5,000", 5000),
+            ("5 + 3 # comment", 8),
+            ("5\u200b+\u200d3", 8),
+            ("5\u20133", 2),
+            ("5\u20143", 2),
+            ("5 bit and 3", 1),
+            ("2 squared", 4),
+            ("point 5", 0.5),
+            ("5. point 3", 5.3),
+            ("1_000 + 2", 1002),
+        ],
+    )
+    def test_normalization_edge_cases(self, expression, expected):
+        result, code, *_ = _run(expression)
+        assert code == 0
+        assert result == expected
+
+    def test_leading_zero_integer_is_rejected(self):
+        result, code, *_ = _run("007")
+        assert result is None
+        assert code != 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

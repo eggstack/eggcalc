@@ -444,11 +444,13 @@ def _build_config() -> tuple[dict, dict]:
         "stripped_chars": re.compile(
             f"({'|'.join([re.escape(p) if not (p.startswith(_wb) or _wb in p) else p for p in sorted(STRIPPED_PHRASES, key=len, reverse=True)])})"
         ),
-        "int": re.compile(r"^[-+]?[0-9]\d*$"),
+        "int": re.compile(r"^[-+]?(?:0|[1-9](?:_?\d)*)$"),
         # Float regex accepts a trailing decimal point ("5." -> 5.0) so
         # users can write Python-style shorthand. Both ".5" and "5." are
         # accepted; "5." is normalized to "5.0" before evaluation.
-        "float": re.compile(r"^[-+]?(?:[0-9]\d*(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$"),
+        "float": re.compile(
+            r"^[-+]?(?:(?:\d(?:_?\d)*)?\.(?:\d(?:_?\d)*)?|" r"\d(?:_?\d)*[eE][-+]?\d(?:_?\d)*)$"
+        ),
         "valid_operations": re.compile(
             f"^({'|'.join([re.escape(s) for s in symbols] + [re.escape(f) for f in FUNCTION_MAPPINGS.values()] + [re.escape(c) for c in CONSTANT_WORDS.keys()])}){{1}}$"
         ),
@@ -1408,6 +1410,13 @@ def _normalize_postfix_unit_power_words(expression: str) -> str:
     """
     unit_alt = _UNIT_NAMES_ALTERNATION
 
+    expression = re.sub(
+        r"(?<![A-Za-z0-9_.])(?P<number>\d+(?:\.\d+)?)\s+" r"(?P<power>squared|cubed)\b",
+        lambda m: f"{m.group('number')}**{'2' if m.group('power').lower() == 'squared' else '3'}",
+        expression,
+        flags=re.IGNORECASE,
+    )
+
     def _replace(m: re.Match[str]) -> str:
         exponent = "2" if m.group("power").lower() == "squared" else "3"
         return _canonical_power_unit(m.group("unit"), exponent)
@@ -1887,6 +1896,15 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     expression = expression.replace("\u00d7", "*")  # × → *
     expression = expression.replace("\u00f7", "/")  # ÷ → /
     expression = expression.replace("\u2212", "-")  # − → -
+    expression = expression.replace("\u2013", "-")  # en dash → -
+    expression = expression.replace("\u2014", "-")  # em dash → -
+    expression = re.sub(r"[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff\u00ad]", "", expression)
+    expression = re.sub(r"#.*$", "", expression, flags=re.MULTILINE)
+    expression = re.sub(
+        r"(?<![\w.])(\d{1,3}(?:,\d{3})+)(?![\w.])",
+        lambda m: m.group(1).replace(",", ""),
+        expression,
+    )
 
     # Replace multi-word function names before whitespace removal collapses them
     # e.g., "square root" -> "sqrt", "cube root" -> "cbrt"
@@ -1952,9 +1970,6 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     expression = _MULTI_WORD_PATTERN.sub(
         lambda m: _MULTI_WORD_PATTERN_LOOKUP[m.group(0).lower()], expression
     )
-
-    # Strip "and" as a filler word in NL number expressions
-    expression = re.sub(r"\band\b", "", expression, flags=re.IGNORECASE)
 
     # Handle short-form power phrases BEFORE individual word replacement so
     # that "2 to the 10" doesn't become "2 TO 10". Long forms like
@@ -2065,6 +2080,14 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression = re.sub(
             r"\b" + re.escape(word) + r"\b", replacement, expression, flags=re.IGNORECASE
         )
+
+    # Strip "and" only after multi-word operators such as "bit and" have
+    # been replaced. This preserves both number filler and bitwise syntax.
+    expression = re.sub(r"\band\b", "", expression, flags=re.IGNORECASE)
+
+    # Handle a point after a trailing decimal and a leading point phrase.
+    expression = re.sub(r"(\d+\.)\s*point\s*(\d)", r"\1\2", expression, flags=re.IGNORECASE)
+    expression = re.sub(r"(?<![\w.])point\s*(\d)", r"0.\1", expression, flags=re.IGNORECASE)
 
     # Handle "point" as decimal separator: only when preceded by a digit or ')'
     # This avoids ".5" at expression start while still allowing "5 point 3" -> "5.3"

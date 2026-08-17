@@ -11,6 +11,7 @@ import enum
 import inspect
 import json
 import logging
+import math
 import multiprocessing
 import os
 import sys
@@ -39,14 +40,6 @@ from .schemas import (
     compact_schema,
     normal_schema,
 )
-
-# Flag set the first time handle_request() runs to ensure MCP-safe defaults
-# are configured (allow_random=False, allow_side_effects=False). We do this
-# at first use, not at module import, so importing the MCP module for any
-# reason (e.g. tests of unrelated CLI code that transitively imports the
-# schema) does not globally disable random/setvar.
-_mcp_defaults_configured: bool = False
-_mcp_defaults_lock = threading.Lock()
 from .tools import (
     _sanitize_error,
     canonicalize_text_mcp,
@@ -1608,7 +1601,7 @@ class McpSession:
     notifications with lifecycle enforcement.
     """
 
-    def __init__(self, *, initial_state: McpSessionState = McpSessionState.READY):
+    def __init__(self, *, initial_state: McpSessionState = McpSessionState.UNINITIALIZED):
         self.state = initial_state
         self.negotiated_version: str | None = None
         self.requested_version: str | None = None
@@ -2254,7 +2247,11 @@ def _validate_arguments(handler: Any, arguments: dict[str, Any]) -> str | None:
 
     # Check for missing required arguments (no default)
     for name, param in params.items():
-        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+        if param.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
             continue
         if param.default is inspect.Parameter.empty and name not in arguments:
             return f"Missing required argument: {name}"
@@ -2597,7 +2594,9 @@ def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None)
     # Determine profile-visible tools (server-aware)
     try:
         if server is not None:
-            default_profile = profile_filter or server.config.profile
+            default_profile = (
+                profile_filter if profile_filter is not None else server.config.profile
+            )
             profile_tools = set(server.registry.get_profile_tools(default_profile))
         else:
             profile_tools = set(get_profile_tools(profile_filter))
@@ -2688,13 +2687,10 @@ def _handle_list_profiles(
         available_profiles = (
             ("full", *profile_names) if "full" not in profile_names else profile_names
         )
-        profiles_info = {
-            name: {
-                "tools": server.registry.get_profile_tools(name),
-                "tool_count": len(server.registry.get_profile_tools(name)),
-            }
-            for name in available_profiles
-        }
+        profiles_info = {}
+        for name in available_profiles:
+            profile_tools = server.registry.get_profile_tools(name)
+            profiles_info[name] = {"tools": profile_tools, "tool_count": len(profile_tools)}
     else:
         active = get_active_profile()
         available_profiles = tuple(PROFILE_NAMES)
@@ -2719,7 +2715,6 @@ def _handle_list_profiles(
 
 _compat_server: McpServer | None = None
 _compat_server_lock = threading.Lock()
-_compat_server_config_gen: int = 0
 
 
 def _invalidate_compat_server() -> None:
@@ -2841,7 +2836,10 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict[str,
         compat = _get_compat_server()
         compat_session = McpSession(initial_state=McpSessionState.READY)
         compat_session._bind_owner(compat)
-        return compat.handle_request(request, session=compat_session)
+        try:
+            return compat.handle_request(request, session=compat_session)
+        finally:
+            compat_session.close()
 
     # Explicit session: route through the session's owner server.
     try:
@@ -2896,7 +2894,8 @@ def main() -> int:
                 while request_times and request_times[0] < now - window:
                     request_times.popleft()
 
-                if len(request_times) >= config.max_requests_per_second:
+                request_limit = math.ceil(config.max_requests_per_second)
+                if len(request_times) >= request_limit:
                     response = _invalid_request_error(
                         request.get("id") if isinstance(request, dict) else None,
                         f"Rate limit exceeded: max {config.max_requests_per_second} requests per second",

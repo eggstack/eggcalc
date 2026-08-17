@@ -184,6 +184,9 @@ def _classify_path(path: str) -> str:
     basename = os.path.basename(path)
     _, ext = os.path.splitext(basename)
 
+    if basename in _CONFIG_FILENAMES and basename != ".env":
+        return "config"
+
     if basename.startswith(".") and basename.count(".") == 1 and not ext:
         return "hidden"
 
@@ -196,7 +199,7 @@ def _classify_path(path: str) -> str:
             return "test"
         return "source"
 
-    if basename in _CONFIG_FILENAMES or basename.startswith("."):
+    if basename.startswith("."):
         return "config"
 
     if ext in _DOC_EXTENSIONS:

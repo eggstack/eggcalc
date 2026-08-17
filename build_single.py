@@ -189,6 +189,7 @@ Or make executable: chmod +x eggcalc.py && ./eggcalc.py "five plus two"
 
 import sys
 import os
+EGGCALC_SINGLE_FILE = True
 
 '''
 
@@ -241,8 +242,13 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     for i, line in enumerate(lines):
         if i == 0 and '"""' in line:
             in_docstring = True
+            if line.count('"""') >= 2:
+                in_docstring = False
+                start_idx = i + 1
+                break
+            continue
         if in_docstring:
-            if '"""' in line and i > 0:
+            if '"""' in line:
                 in_docstring = False
                 start_idx = i + 1
                 break
@@ -655,6 +661,36 @@ def get_module_code(module_name: str) -> tuple[str, list[str], list[str]]:
     return code, imports, exact_import_globals
 
 
+# MCP wrappers that are renamed while assembling the single-file build
+# because the exact package defines the same public helper names.
+MCP_CONFLICT_FUNCTIONS = (
+    "text_equal",
+    "text_replace_check",
+    "line_range_extract",
+    "line_range_compare",
+    "text_window",
+    "list_compare",
+    "shell_split",
+    "shell_quote_join",
+    "path_normalize",
+    "escape_text",
+    "unescape_text",
+    "text_hash",
+    "text_transform",
+    "text_position",
+    "identifier_analyze",
+    "validate_json",
+    "json_compare",
+    "json_extract",
+    "json_shape",
+    "regex_finditer",
+    "regex_safety_check",
+    "validate_schema_light",
+    "json_canonicalize",
+    "json_query",
+)
+
+
 def build_single_file(output_path: str | None = None) -> str:
     """Combine all eggcalc modules into a single file."""
     version = get_version()
@@ -670,39 +706,6 @@ def build_single_file(output_path: str | None = None) -> str:
     all_module_code: list[str] = []
     all_exact_globals: list[str] = []
 
-    # MCP server - rename functions that conflict with exact module names
-    MCP_CONFLICT_FUNCTIONS = [
-        "text_equal",
-        "text_replace_check",
-        "line_range_extract",
-        "line_range_compare",
-        "text_window",
-        "list_compare",
-        "shell_split",
-        "shell_quote_join",
-        "argv_compare",
-        "dotenv_validate",
-        "ini_validate",
-        "markdown_structure",
-        "code_fence_extract",
-        "patch_apply_check",
-        "patch_summary",
-        "path_analyze",
-        "path_normalize",
-        "path_compare",
-        "path_scope_check",
-        "escape_text",
-        "unescape_text",
-        "text_hash",
-        "text_transform",
-        "text_fingerprint",
-        "text_position",
-        "identifier_analyze",
-        "identifier_inspect",
-        "glob_match",
-        "unicode_policy_check",
-        "canonicalize_text",
-    ]
     ordered_specs = _topological_sort(MODULE_MANIFEST)
     emitted_groups: set[str] = set()
     for spec in ordered_specs:
@@ -1226,17 +1229,9 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
             "list_compare",
             "shell_split",
             "shell_quote_join",
-            "argv_compare",
         }
-    } | {
+    } | set(MCP_CONFLICT_FUNCTIONS) | {
         "text_equal",
-        "validate_json",
-        "json_compare",
-        "json_extract",
-        "json_shape",
-        "regex_finditer",
-        "regex_safety_check",
-        "validate_schema_light",
         "list_compare",
         "text_transform",
         "text_position",
@@ -1246,8 +1241,6 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
         "path_normalize",
         "identifier_analyze",
         "text_window",
-        "json_canonicalize",
-        "json_query",
         "text_replace_check",
         "line_range_extract",
         "line_range_compare",

@@ -2949,6 +2949,8 @@ class UnitValue:
     when adding or subtracting values with compatible units.
     """
 
+    __slots__ = ("value", "unit", "_unit_expr", "_display_unit", "_initialized")
+
     @staticmethod
     def _check_overflow(result: Numeric) -> None:
         """Raise OverflowError if result is not finite or exceeds limits."""
@@ -2976,6 +2978,15 @@ class UnitValue:
                 raise ValueError(f"UnitValue does not support non-finite values: {value}")
         elif isinstance(value, float) and not math.isfinite(value):
             raise ValueError(f"UnitValue does not support non-finite values: {value}")
+        object.__setattr__(self, "_initialized", True)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if getattr(self, "_initialized", False):
+            raise AttributeError("UnitValue is immutable")
+        object.__setattr__(self, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("UnitValue is immutable")
 
     def __repr__(self) -> str:
         if self.unit:
@@ -3007,16 +3018,19 @@ class UnitValue:
         if isinstance(other, UnitValue):
             if not are_units_compatible(self.unit, other.unit):
                 raise ValueError(f"Cannot add incompatible units: {self.unit} + {other.unit}")
+            if (
+                self._unit_expr.dimension.is_affine
+                and other._unit_expr.dimension.is_affine
+                and self._unit_expr.factors != other._unit_expr.factors
+            ):
+                raise ValueError(
+                    "Cannot add/subtract absolute temperatures across different scales"
+                )
             if self.unit == other.unit:
                 result = self.value + other.value
                 out_unit = self.unit
-            elif other.unit is None:
-                result = self.value + other.value
-                out_unit = self.unit
-            elif self.unit is None:
-                result = self.value + other.value
-                out_unit = other.unit
             else:
+                assert self.unit is not None
                 converted = other.convert_to(self.unit)
                 result = self.value + converted.value
                 out_unit = self.unit
@@ -3041,13 +3055,8 @@ class UnitValue:
             if self.unit == other.unit:
                 result = self.value - other.value
                 out_unit = self.unit
-            elif other.unit is None:
-                result = self.value - other.value
-                out_unit = self.unit
-            elif self.unit is None:
-                result = self.value - other.value
-                out_unit = other.unit
             else:
+                assert self.unit is not None
                 converted = other.convert_to(self.unit)
                 result = self.value - converted.value
                 out_unit = self.unit
@@ -3071,9 +3080,11 @@ class UnitValue:
 
     def __mul__(self, other: Numeric | UnitValue) -> UnitValue:
         if isinstance(other, UnitValue):
+            if (self.unit and self._unit_expr.dimension.is_affine) or (
+                other.unit and other._unit_expr.dimension.is_affine
+            ):
+                raise ValueError("Affine units cannot participate in multiplication")
             if self.unit and other.unit:
-                if self._unit_expr.dimension.is_affine or other._unit_expr.dimension.is_affine:
-                    raise ValueError("Affine units cannot participate in multiplication")
                 left, right = _align_compatible_units(self, other)
                 result = left.value * right.value
                 assert left._unit_expr is not None and right._unit_expr is not None
@@ -3095,9 +3106,11 @@ class UnitValue:
         if isinstance(other, UnitValue):
             if other.value == 0:
                 raise ZeroDivisionError("Cannot divide UnitValue by zero")
+            if (self.unit and self._unit_expr.dimension.is_affine) or (
+                other.unit and other._unit_expr.dimension.is_affine
+            ):
+                raise ValueError("Affine units cannot participate in division")
             if self.unit and other.unit:
-                if self._unit_expr.dimension.is_affine or other._unit_expr.dimension.is_affine:
-                    raise ValueError("Affine units cannot participate in division")
                 left, right = _align_compatible_units(self, other)
                 if left.unit == right.unit:
                     result = left.value / right.value

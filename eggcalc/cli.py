@@ -780,11 +780,10 @@ def maybe_load_cli_config() -> None:
 
     if os.environ.get("EGGCALC_NO_CONFIG", ""):
         return
-    try:
-        from eggcalc.evaluator import load_user_config
-    except (ImportError, ModuleNotFoundError):
-        pass  # single-file mode: load_user_config is a module-level global
-    load_user_config()
+    loader = globals().get("load_user_config")
+    if loader is None:
+        loader = __import__("eggcalc.evaluator", fromlist=["load_user_config"]).load_user_config
+    loader()
 
 
 def main() -> int:

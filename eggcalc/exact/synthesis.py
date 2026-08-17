@@ -281,6 +281,7 @@ def _detect_special_sequences(s: str) -> dict[str, int]:
         elif 0x1F1E6 <= cp <= 0x1F1FF:
             if i + 1 < n and 0x1F1E6 <= ord(s[i + 1]) <= 0x1F1FF:
                 result["regional_indicator_pairs"] += 1
+                i += 1
         elif 0x1F3FB <= cp <= 0x1F3FF:
             result["emoji_modifiers"] += 1
         i += 1
@@ -1144,8 +1145,6 @@ def list_compare(
 
     near_matches: list[ListCompareNearMatch] = []
     seen_pairs: set[tuple[str, str]] = set()
-    seen_a_positions: set[int] = set()
-
     if include_near_matches and near_match_threshold > 0:
         for i, (a_item, a_t) in enumerate(zip(a, a_transformed, strict=True)):
             for j, b_t in enumerate(b_transformed):

@@ -543,6 +543,17 @@ def patch_conflict_markers_inspect(
             locations=[],
         )
 
+    if len(text) > MAX_PATCH_LENGTH:
+        return PatchConflictMarkersResult(
+            total_markers=0,
+            conflict_starts=0,
+            conflict_separators=0,
+            conflict_ends=0,
+            imbalanced=False,
+            nested=False,
+            locations=[],
+        )
+
     starts = list(_CONFLICT_START.finditer(text))
     seps = list(_CONFLICT_SEP.finditer(text))
     ends = list(_CONFLICT_END.finditer(text))
