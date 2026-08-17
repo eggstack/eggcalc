@@ -1,5 +1,11 @@
 # eggcalc
 
+[![PyPI](https://img.shields.io/pypi/v/eggcalc)](https://pypi.org/project/eggcalc/)
+[![Python](https://img.shields.io/pypi/pyversions/eggcalc)](https://pypi.org/project/eggcalc/)
+[![License](https://img.shields.io/pypi/l/eggcalc)](https://github.com/eggstack/eggcalc/blob/main/LICENSE)
+[![CI](https://github.com/eggstack/eggcalc/actions/workflows/ci.yml/badge.svg)](https://github.com/eggstack/eggcalc/actions/workflows/ci.yml)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/eggcalc?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/eggcalc)
+
 CLI calculator accepting natural language and unit conversion. Standard library only.
 
 Install with `pip install eggcalc` and run it like `calc 2 meters plus 2ft`. It is spacing-tolerant and normalizes operator-adjacent spacing before parsing, including unit forms like `30 km / h in mph`, `5 in in cm`, and spaced unit products like `5 N m` or `5 m s`.
