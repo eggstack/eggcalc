@@ -59,41 +59,15 @@ evaluate_raw("5m % 2s")   # → EvaluationError (incompatible dimensions)
 
 ### Unit-aware function contracts
 
-Every built-in function has an explicit `UnitPolicy` (defined in `evaluator.py`). The centralized dispatcher in `visit_Call` enforces these policies:
-
-- **DIMENSIONLESS**: Reject `UnitValue` with unit (`log`, `exp`, `gcd`, `factorial`, etc.)
-- **ANGLE_INPUT**: Accept dimensionless (radians) or angle `UnitValue` with degree conversion (`sin`, `cos`, `tan`)
-- **ANGLE_OUTPUT**: Accept dimensionless, reject dimensional (`asin`, `acos`, `atan`)
-- **PRESERVE_SINGLE**: Single arg, preserve unit on result (`abs`, `round`, `floor`, `ceil`, `trunc`)
-- **SIGN_OUTPUT**: Unwrap magnitude, return dimensionless scalar (`sign`)
-- **COMPATIBLE_REDUCER**: All args dimensionless or all compatible units (`mean`, `min`, `max`, `median`, `std`, `sum`)
-- **VARIANCE_SQUARED**: Like COMPATIBLE_REDUCER but result has squared units (`variance`, `var`, `variance_sample`, `vars`, `var_sample`). Rejects affine temperature variance.
-- **ROOT**: Dimensionless or even-exponent unit; halve exponents (`sqrt`)
-- **HYPOT/ATAN2**: Both dimensionless or both compatible units
-
-User-registered functions default to DIMENSIONLESS. Custom callables are rejected by `evaluate_with_timeout()`.
+Every built-in function has a `UnitPolicy` (defined in `evaluator.py`, enforced in `visit_Call`). Key policies: `DIMENSIONLESS` (log, exp, gcd, factorial), `ANGLE_INPUT` (sin, cos, tan — accepts angle UnitValue with degree conversion), `ANGLE_OUTPUT` (asin, acos, atan), `PRESERVE_SINGLE` (abs, round, floor, ceil), `COMPATIBLE_REDUCER` (mean, min, max, sum), `ROOT` (sqrt), `HYPOT/ATAN2`. User-registered functions default to DIMENSIONLESS. See `architecture/evaluator.md` for full policy list.
 
 #### Callable identity authority
 
-Each evaluator maintains a `_builtin_function_baseline` snapshot of canonical built-in callables after instance-specific binding. `visit_Call` compares the active callable by identity against this baseline. A canonical callable receives its built-in unit policy; any added or replaced callable defaults to dimensionless-only. This prevents a user replacing `sin` with a custom function from inheriting the built-in `ANGLE_INPUT` policy.
-
-Identity is established before all built-in-name-specific argument handling:
-only canonical `temp`, `convert`, variable-management functions, and
-`round` receive their special argument contracts. Canonical `round()` accepts
-one or two positional arguments, or one `ndigits=` keyword with one value
-argument; omitted precision preserves Python's integer return type, explicit
-precision returns a float, and unit-bearing `ndigits` is rejected. Timeout
-state checks reject added, overridden, and deleted callable names in sorted
-order before a worker is spawned.
+Each evaluator snapshots canonical built-in callables in `_builtin_function_baseline`. `visit_Call` compares the active callable by identity — a canonical callable gets its built-in unit policy; any added or replaced callable defaults to dimensionless-only. Canonical `round()` accepts one or two positional args, or `ndigits=` keyword; omitted precision returns `int`, explicit precision returns `float`.
 
 #### Angle algebra bounds
 
-`Dimension.angle: bool` is a structural flag that cannot represent angle exponents other than 0 or 1. Bounded guards reject:
-- angle-bearing dimension raised to any exponent other than 0 or 1
-- multiplying two angle-bearing dimensions (`deg*rad`, `deg**2`)
-- dividing a non-angle dimension by an angle-bearing dimension (`1/deg`)
-
-Supported: `deg**0` (dimensionless), `deg**1` (angle), `deg/rad` (dimensionless), `(deg/s)*s` (angle).
+`Dimension.angle: bool` is a structural flag — cannot represent angle exponents other than 0 or 1. Guards reject: angle raised to exponent ≠ 0 or 1, multiplying two angle dimensions, dividing a non-angle by an angle. See `architecture/units.md` for supported patterns.
 
 ### Angle conversion
 
@@ -207,43 +181,14 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 
 ## MCP Server
 
-- 77 tools across 18 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo).
-- Tool names unified via `TOOL_SCHEMAS` in `schemas.py` and `server.py`.
-- `MAX_TEXT_LENGTH` enforced on `math_eval`.
-- `MAX_PAIRWISE_ITEMS` (1,000) caps O(N²) work in `identifier_inspect`, `identifier_table_inspect`, and `list_compare` (near-match mode).
-- Case-insensitive tool matching with suggestions for unknown tools.
-- `mcp_main` is defined in `server.py:2936`.
+- 77 tools across 18 categories. Tool names unified via `TOOL_SCHEMAS` in `schemas.py` and `server.py`.
 - 11 tool profiles: `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
-- Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Tools outside active profile rejected at `tools/call` with JSON-RPC `-32602`. Per-request `profile` param overrides in `tools/list`.
-- `full` profile uses `llm_exposure != "hidden"` filter (not `TOOL_PROFILES["full"]`). `EGGCALC_MCP_SCHEMA_DETAIL` controls schema verbosity (compact/normal/full).
-- `close_compatibility_server()` is exported from `eggcalc.mcp`.
-- `McpServer.diagnostic()` now counts only live (non-closed) sessions.
-- Resource audit: `docs/mcp_resource_limits.md` covers all 77 tools.
+- Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Per-request `profile` param overrides in `tools/list`.
+- `mcp_main` is defined in `server.py:2936`.
+- **Session lifecycle:** Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`.
+- **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`.
 - **Deferred exact imports:** `tools.py` uses local imports for `eggcalc.exact` modules. Implementation modules are imported on first tool invocation, not at `import eggcalc.mcp` time. Schemas remain eagerly available for `tools/list`.
-- **Session lifecycle:** `McpServer` creates one `McpSession(initial_state=UNINITIALIZED)` per connection via `server.create_session()`. The `McpSession` class manages protocol state (UNINITIALIZED → INITIALIZING → READY → CLOSED). `McpSessionState` enum tracks the lifecycle. Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`. Server close transitions all owned sessions to `CLOSED`. `McpSession` has `_owner_id` binding and `_closed` flag; `_check_ready_for_dispatch` uses `.name` comparison for `importlib.reload` safety. `McpSession.close()` calls `_owner_remove_callback(self)` to proactively remove from server's `_sessions` set.
-- **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`. Version negotiation uses `server.config.supported_protocol_versions` when available.
-- **`handle_request(request, session=None)`**: When `session` is `None`, routes through an isolated compatibility `McpServer` for backward compatibility. **Deprecated** — emits `DeprecationWarning`. Callers should pass an explicit `McpSession` instance.
-- **`main()`**: Creates one `McpServer` per connection, which owns a `McpSession` for lifecycle management.
-- **Centralized error helpers:** `_jsonrpc_error()`, `_parse_error()`, `_method_not_found()`, `_invalid_params()`, `_internal_error()` in server.py.
-- **`ConfigSnapshot`**: Deeply immutable — fields are `MappingProxyType`, has `to_dict()` method. `policy` field is `EvaluationPolicy | str` (backward compatible).
-- **`ConfigManager.replace()`**: Validates generation is strictly increasing; stale/decreasing generations raise `ValueError`. `replace_validated()` uses manager-assigned monotonic generations and validates input through `parse_config_snapshot()`.
-- **`ConfigError` / `parse_config_snapshot()`**: Configuration parsing with type/semantics validation before snapshot construction. Validates constant types (int/float/str/bool), function callability, unit names, and policy values. `parse_config_snapshot()` rejects non-empty custom units. `parse_config_candidate()` delegates to `parse_config_snapshot()` for validation.
-- **`McpServer.activate_snapshot()`**: Atomically pushes snapshot constants and functions to the server's evaluator. On failure, rolls back to prior evaluator state.
-- **Schema validation:** `SUPPORTED_SCHEMA_KEYWORDS` frozenset defines which JSON Schema keywords the validator supports. `tests/test_mcp_schema_lint.py` walks all `TOOL_SCHEMAS` and fails on unsupported keywords.
-- **Session-aware test helpers:** `ready_session()` and `session_request(session, method, params, request_id)` in `tests/test_mcp_server.py`.
-- `McpServerConfig` frozen dataclass for immutable server configuration (profile, limits, timeouts, protocol versions)
-- `McpServer` class owns config, `ToolRegistry`, `ToolExecutor`, evaluator instance, `ConfigManager`, and session creation
-- `ToolRegistry` wraps tool handlers, schemas, metadata, and profiles with lookup methods; internal dicts are `MappingProxyType` via `freeze_owned()` for recursive immutability, nested schemas use `MappingProxyType`, profiles use tuples, `tool_names` returns `tuple[str, ...]`, `get_schema()` returns deep copy via `thaw_owned()`; has `is_tool_visible(name, profile)` method. Validates: duplicate handlers, unsupported `llm_exposure` values, empty profile names.
-- `freeze_owned()` and `thaw_owned()` utility functions for recursive immutability conversion of nested containers (`Mapping`→`MappingProxyType`, `list`→`tuple`, `set`→`frozenset` and back). `thaw_owned()` recursively converts both frozen and mutable containers to mutable equivalents.
-- `EvaluationPolicy` enum (`DEFAULT`, `STRICT`, `PERMISSIVE`) for server evaluation configuration. `PERMISSIVE` is a compatibility alias for `DEFAULT`; `_effective_policy()` normalizes them.
-- `ConfigCandidate` frozen dataclass for validated configuration before snapshot construction. `RuntimeContext` frozen dataclass pairing a `ConfigSnapshot` with its `Evaluator` instance.
-- `ToolExecutor` owns thread pool, validation, timeout, cancellation, and cleanup; has closed-state sealing preventing pool recreation after `close()`; has three counters: `_total_inflight`, `_queued_count`, `_active_count` with worker-wrapper lifecycle transitions.
-- **Evaluator binding:** `ToolExecutor` stores the server evaluator and sets `_server_evaluator` ContextVar via `_run_handler_in_thread()`. `evaluate_raw()` and `evaluate_with_timeout()` check this ContextVar, so `math_eval` uses the server's evaluator policy (allow_random, allow_side_effects) instead of the global default. `Evaluator` has instance-owned `_instance_random` generator via `random_seed` parameter.
-- **Timeout accounting:** `call_tool()` uses `Future.add_done_callback()` to release `_total_inflight` only when the future truly completes (not on caller timeout). Timed-out-but-still-running handlers continue consuming capacity until they finish.
-- `ConfigSnapshot` / `ConfigManager` for atomic configuration replacement with generation tracking
-- `create_evaluator()` factory for isolated evaluator instances (avoids mutating global `_mcp_mode`)
-- `McpServer.handle_request(request, session)` replaces module-level `handle_request()` for new code
-- Sessionless `handle_request(session=None)` emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`).
+- `McpServerConfig` is a frozen dataclass. `ConfigSnapshot` fields are deeply immutable (`MappingProxyType`). See `architecture/mcp.md` for full session lifecycle, evaluator binding, timeout accounting, and config management details.
 
 ## Architecture Docs
 
@@ -253,23 +198,14 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 |-----|--------|
 | `overview.md` | System architecture, data flow, module map |
 | `normalize.md` | NL tokenization pipeline |
-| `evaluator.md` | AST parsing, math functions, constants |
+| `evaluator.md` | AST parsing, math functions, constants, unit policies |
 | `units.md` | Unit definitions, conversions, UnitValue, UnitSpec, UnitExpression |
 | `cli.md` | CLI entry, options, text subcommands |
 | `api.md` | Public Python API surface |
-| `capabilities.md` | Runtime capability detection, RuntimeCapabilities |
-| `exact.md` | exact/ package (Unicode, text analysis) |
-| `mcp.md` | MCP server, tool schemas, profiles |
+| `mcp.md` | MCP server, tool schemas, profiles, session lifecycle |
 | `build.md` | build_single.py, MODULE_MANIFEST, single-file assembly |
-| `primitives.md` | UTF-8, codepoints, invisible chars |
-| `unicode_tools.md` | Script detection, confusables |
-| `measure.md` | Text metrics (lines, words, chars) |
-| `diff.md` | String diffing algorithms |
-| `validate.md` | Bracket/JSON/regex validation |
-| `synthesis.md` | Higher-level text analysis |
-| `confusables.md` | Auto-generated homoglyph data |
+| `exact.md` | exact/ package (Unicode, text analysis) |
 | `authority_inventory.md` | Single authoritative source for every major registry/constant/contract |
-| `mutable_state_inventory.md` | Inventory of all mutable process-global state |
 
 ## Config Loading Safety
 
@@ -283,8 +219,6 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 | MCP server | Handled by `McpServerConfig.from_environment()` and `main()` | `EGGCALC_NO_CONFIG=1` set in `main()` setup |
 
 Library APIs (`evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`) do **not** load cwd-local config by default. Set `EGGCALC_LOAD_CONFIG=1` to enable lazy config loading, or call `load_user_config()` explicitly.
-
-The `load_user_config()` function checks two guards: `_mcp_mode` flag and `EGGCALC_NO_CONFIG` env var. Both early-return paths set `_config_loaded = True` to prevent re-entry.
 
 **Do not** add import-time config loading back to `__init__.py`. Library import must remain side-effect-free.
 
