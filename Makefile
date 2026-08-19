@@ -1,7 +1,7 @@
 .PHONY: help install dev test test-cov lint format format-check typecheck docs-check check clean build package-check release-check publish hooks
 
 VENV_BIN ?= .venv/bin
-PYTHON ?= $(VENV_BIN)/python
+PYTHON ?= $(if $(wildcard $(VENV_BIN)/python),$(VENV_BIN)/python,python)
 
 help:
 	@echo "eggcalc - Development Commands"
@@ -39,17 +39,17 @@ test-cov:
 	$(PYTHON) -m pytest tests/ --cov=eggcalc --cov-report=term-missing --cov-report=html
 
 lint:
-	$(VENV_BIN)/ruff check eggcalc tests
+	$(PYTHON) -m ruff check eggcalc tests
 
 format:
-	$(VENV_BIN)/black eggcalc tests
+	$(PYTHON) -m black eggcalc tests
 
 format-check:
-	$(VENV_BIN)/black --check eggcalc tests
+	$(PYTHON) -m black --check eggcalc tests
 
 typecheck:
-	$(VENV_BIN)/mypy eggcalc --ignore-missing-imports
-	$(VENV_BIN)/mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
+	$(PYTHON) -m mypy eggcalc --ignore-missing-imports
+	$(PYTHON) -m mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
 
 generate-docs:
 	python3 scripts/generate_mcp_docs.py
