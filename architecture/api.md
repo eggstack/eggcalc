@@ -20,7 +20,7 @@
 `__init__.py` re-exports all public functionality from the eggcalc package.
 
 ```python
-__version__ = "1.1.4"
+__version__ = "1.1.9"
 __author__ = "David Bowman"
 ```
 

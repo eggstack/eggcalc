@@ -581,7 +581,7 @@ Each component has a dedicated architecture document. Use this index to navigate
 
 | Component | Document | What It Covers |
 |-----------|----------|----------------|
-| exact/ (overview) | [exact.md](exact.md) | Package-level architecture, all 25 submodule APIs |
+| exact/ (overview) | [exact.md](exact.md) | Package-level architecture, all 26 submodule APIs |
 | primitives.py | [primitives.md](primitives.md) | UTF-8 bytes, codepoints, Unicode normalization, invisible chars |
 | unicode_tools.py | [unicode_tools.md](unicode_tools.md) | Script detection, confusable identification, mixed scripts |
 | confusables.py | [confusables.md](confusables.md) | Auto-generated homoglyph data (compressed, lazy decode) |

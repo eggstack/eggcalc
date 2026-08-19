@@ -1,6 +1,6 @@
 # evaluator.py — AST-Based Expression Evaluation
 
-3456 lines. Provides a **secure** way to evaluate mathematical expressions without using `eval()`. Uses Python's `ast` module to parse and evaluate expressions safely.
+3472 lines. Provides a **secure** way to evaluate mathematical expressions without using `eval()`. Uses Python's `ast` module to parse and evaluate expressions safely.
 
 ## Table of Contents
 

@@ -12,7 +12,7 @@
 
 ## Entry Point
 
-`__main__.py` is a bootstrap module that imports `main()` from `normalize.py` and delegates all CLI parsing and execution to it:
+`__main__.py` is a bootstrap module that imports `main()` from `cli.py` and delegates all CLI parsing and execution to it:
 
 ```bash
 python -m eggcalc "five plus two"
@@ -22,7 +22,7 @@ It adjusts `sys.path` to ensure the parent of the `eggcalc` package directory is
 
 ## Main Function
 
-`main()` in `normalize.py` handles all CLI parsing and execution. When assembled into a single file by `build_single.py`, it is aliased as `normalize_main()` to avoid conflict with the MCP server's `main()` function.
+`main()` in `cli.py` handles all CLI parsing and execution. When assembled into a single file by `build_single.py`, it is aliased as `normalize_main()` to avoid conflict with the MCP server's `main()` function.
 
 ### Dispatch order and trust boundary
 

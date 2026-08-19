@@ -102,51 +102,71 @@ def test_overflow():
 ## Test File Structure
 ```
 tests/
-├── conftest.py                      # Shared fixtures
-├── test_build_single.py             # Build script tests
-├── test_bugs_2026_07_regressions.py # Regression tests for 2026-07 bugs
-├── test_cargo_inspect.py            # Cargo.toml inspection tests
-├── test_cli_text.py                 # CLI text tools tests
-├── test_clicalc.py                  # Core functional tests
-├── test_config_loading.py           # Config loading tests
-├── test_config_validation.py        # dotenv/INI validation tests
-├── test_diff_analysis.py            # Diff analysis tests
-├── test_exact.py                    # Exact module tests
-├── test_golden_fixtures.py          # Golden fixture tests
-├── test_identifier_table.py         # Identifier table inspection tests
-├── test_install.py                  # Install script tests
-├── test_line_range.py               # Line range extract/compare tests
-├── test_manifest_inspect.py         # Manifest inspection tests
-├── test_markdown_tools.py           # Markdown structure tests
-├── test_math_edge_cases.py          # Math edge case tests
-├── test_math_identities.py          # Mathematical laws verification
-├── test_mcp_env_limits.py           # MCP environment limits tests
-├── test_mcp_resource_bounds.py      # MCP resource bounds tests
-├── test_mcp_server.py               # MCP server integration tests
-├── test_mcp_stdio_smoke.py          # MCP stdio smoke tests
-├── test_mcp_tools_new.py            # MCP integration tests for new tools
-├── test_normalize.py                # Normalization tests
-├── test_patch_tools.py              # Patch apply/summary tools tests
-├── test_path_compare.py             # Path comparison tests
-├── test_path_scope.py               # Path scope check tests
-├── test_path_windows_normalize.py   # Path Windows normalization tests
-├── test_phase5_tools.py             # Phase 5 tools tests
+├── conftest.py                        # Shared fixtures
+├── test_bugs_2026_07_regressions.py   # Regression tests for 2026-07 bugs
+├── test_bugs_2026_08.py               # Regression tests for 2026-08 bugs
+├── test_build_manifest_graph.py       # Build manifest graph tests
+├── test_build_single.py               # Build script tests
+├── test_calculator_operator_semantics.py # Operator semantics tests
+├── test_cargo_inspect.py              # Cargo.toml inspection tests
+├── test_cli_compatibility.py          # CLI compatibility tests
+├── test_cli_text.py                   # CLI text tools tests
+├── test_clicalc.py                    # Core functional tests
+├── test_command_parity.py             # Command parity tests
+├── test_config_loading.py             # Config loading tests
+├── test_config_validation.py          # dotenv/INI validation tests
+├── test_diff_analysis.py              # Diff analysis tests
+├── test_documentation.py              # Documentation tests
+├── test_exact.py                      # Exact module tests
+├── test_final_mcp_authority_closure.py # MCP authority closure tests
+├── test_final_unit_authority.py       # Unit authority closure tests
+├── test_final_unit_expression.py      # Unit expression closure tests
+├── test_golden_fixtures.py            # Golden fixture tests
+├── test_identifier_table.py           # Identifier table inspection tests
+├── test_import_boundaries.py          # Import boundary tests
+├── test_inspection_comprehensive.py   # Comprehensive inspection tests
+├── test_install.py                    # Install script tests
+├── test_line_range.py                 # Line range extract/compare tests
+├── test_manifest_inspect.py           # Manifest inspection tests
+├── test_markdown_tools.py             # Markdown structure tests
+├── test_math_edge_cases.py            # Math edge case tests
+├── test_math_identities.py            # Mathematical laws verification
+├── test_mcp_env_limits.py             # MCP environment limits tests
+├── test_mcp_resource_bounds.py        # MCP resource bounds tests
+├── test_mcp_schema_lint.py            # MCP schema lint tests
+├── test_mcp_server.py                 # MCP server integration tests
+├── test_mcp_stdio_smoke.py            # MCP stdio smoke tests
+├── test_mcp_tools_new.py              # MCP integration tests for new tools
+├── test_normalize.py                  # Normalization tests
+├── test_patch_tools.py                # Patch apply/summary tools tests
+├── test_path_compare.py               # Path comparison tests
+├── test_path_scope.py                 # Path scope check tests
+├── test_path_windows_normalize.py     # Path Windows normalization tests
+├── test_phase5_tools.py               # Phase 5 tools tests
 ├── test_production_review_2026_07_b.py # Production review tests
-├── test_prompt_inspect.py           # Prompt injection detection tests
-├── test_repl_and_cli.py             # REPL and CLI integration tests
-├── test_security_fuzz.py            # Security/fuzz tests
-├── test_shell_tools.py              # Shell split/quote/compare tests
-├── test_text_replace_check.py       # Text replacement check tests
-├── test_tokenization.py             # Tokenization edge cases
-├── test_tool_inventory.py           # Tool registry consistency tests
-├── test_unicode_policy.py           # Unicode policy/canonicalization tests
-├── test_unit_namespace.py           # Unit namespace tests
-├── test_version_constraint.py       # Version constraint tests
-└── fixtures/                        # Test fixtures directory
+├── test_prompt_inspect.py             # Prompt injection detection tests
+├── test_release5_isolation.py         # Release 5 isolation tests
+├── test_repl_and_cli.py               # REPL and CLI integration tests
+├── test_runtime_capabilities.py       # Runtime capability tests
+├── test_security_fuzz.py              # Security/fuzz tests
+├── test_shell_tools.py                # Shell split/quote/compare tests
+├── test_text_replace_check.py         # Text replacement check tests
+├── test_tokenization.py               # Tokenization edge cases
+├── test_tool_inventory.py             # Tool registry consistency tests
+├── test_typed_consumer.py             # Typed consumer API tests
+├── test_types.py                      # Type checking tests
+├── test_unicode_policy.py             # Unicode policy/canonicalization tests
+├── test_unit_aware_functions.py       # Unit-aware function tests
+├── test_unit_definitions.py           # Unit definition tests
+├── test_unit_dimensions.py            # Unit dimension tests
+├── test_unit_family_invariants.py     # Unit family invariant tests
+├── test_unit_namespace.py             # Unit namespace tests
+├── test_version_constraint.py         # Version constraint tests
+└── fixtures/                          # Test fixtures directory
 ```
 
 ## Current Test Count
-- 4481 tests pass (as of 2026-08-05)
+- 4525 tests pass (as of 2026-08-19)
 - All must continue to pass
 
 ## Common Issues When Testing

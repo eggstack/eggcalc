@@ -372,7 +372,7 @@ print(is_unit("xyz"))   # False
 # List all supported units
 from eggcalc import get_all_units
 units = get_all_units()
-print(f"Total units supported: {len(units)}")  # ~150
+print(f"Total units supported: {len(units)}")  # ~500
 
 # Temperature conversion requires temp(value, from_unit, to_unit)
 result = evaluate_raw("temp(100, C, F)")

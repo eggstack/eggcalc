@@ -1482,7 +1482,7 @@ Math and unit conversion tools (4 tools). For agents focused on calculations and
 
 ### `default`
 
-General-purpose coding-agent tools (25 tools). The `default` profile is a curated subset for typical coding workflows.
+General-purpose coding-agent tools (26 tools). The `default` profile is a curated subset for typical coding workflows.
 
 See [tool_inventory.md](tool_inventory.md) for the complete profile membership tables.
 

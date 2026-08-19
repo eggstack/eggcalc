@@ -184,7 +184,7 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - 77 tools across 18 categories. Tool names unified via `TOOL_SCHEMAS` in `schemas.py` and `server.py`.
 - 11 tool profiles: `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
 - Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Per-request `profile` param overrides in `tools/list`.
-- `mcp_main` is defined in `server.py:2936`.
+- `mcp_main` is defined in `server.py:2935`.
 - **Session lifecycle:** Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`.
 - **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`.
 - **Deferred exact imports:** `tools.py` uses local imports for `eggcalc.exact` modules. Implementation modules are imported on first tool invocation, not at `import eggcalc.mcp` time. Schemas remain eagerly available for `tools/list`.

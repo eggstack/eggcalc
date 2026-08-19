@@ -405,7 +405,7 @@ Tool requests before initialization return `-32600` ("Server not initialized"). 
 
 ### Protocol Version Negotiation
 
-Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")` with `LATEST_SUPPORTED_PROTOCOL_VERSION = "2025-11-25"`. The `initialize` handler inspects the client's `protocolVersion`:
+Supported versions are defined in `eggcalc/_protocol.py` (imported by `server.py`): `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")` with `LATEST_SUPPORTED_PROTOCOL_VERSION = "2025-11-25"`. The `initialize` handler inspects the client's `protocolVersion`:
 
 - If the client requests a supported version, the server responds with that version.
 - If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version.

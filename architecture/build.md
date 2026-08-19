@@ -17,8 +17,8 @@ eggcalc has two distribution paths:
 
 | Path | Output | Use Case |
 |------|--------|----------|
-| **PyPI package** | `eggcalc-1.1.8-py3-none-any.whl` | Standard `pip install eggcalc` |
-| **Single-file** | `eggcalc.py` (~394KB) | Portable, zero-install distribution |
+| **PyPI package** | `eggcalc-1.1.9-py3-none-any.whl` | Standard `pip install eggcalc` |
+| **Single-file** | `eggcalc.py` (~1.4MB) | Portable, zero-install distribution |
 
 Both are validated by `make check` and `make package-check`.
 

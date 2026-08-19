@@ -9,7 +9,7 @@ Guide agents on keeping documentation accurate and up-to-date across the codebas
 |----------|---------|----------------|
 | `AGENTS.md` | Agent-facing conventions and quick reference | Any convention change |
 | `README.md` | User-facing project overview and API reference | Feature/usage changes |
-| `architecture/*.md` | Module-level developer docs | Code changes to any module |
+| `architecture/*.md` | Module-level developer docs (38 files) | Code changes to any module |
 | `docs/*.md` | User documentation (MkDocs site) | Feature/usage/API changes |
 | `.skills/*.md` | Agent task guides | Workflow or tooling changes |
 
@@ -26,6 +26,7 @@ When updating code, always check if documentation needs updating:
 7. **Unit categories** — Check `architecture/units.md` and `docs/units.md`
 8. **Constants** — Check `architecture/evaluator.md` and `docs/constants.md`
 9. **Version** — Update in `eggcalc/_version.py` and `docs/installation.md`
+10. **Profile counts** — Update tool counts per profile in `docs/mcp.md` and `architecture/mcp.md`
 
 ## Common Documentation Issues
 

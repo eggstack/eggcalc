@@ -5,12 +5,6 @@ Guide agents implementing fixes and features across the codebase.
 
 ## Key Conventions
 
-### Branching Strategy
-When implementing multiple fixes in parallel:
-- Create separate branches for each logical unit of work
-- Never commit directly to main
-- Merge completed branches via PR after review
-
 ### Testing API Selection
 Critical distinction between `evaluate()` and `run()`:
 
@@ -67,7 +61,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `eggcalc/_protocol.py` - MCP protocol version constants
 - `eggcalc/__main__.py` - Thin entry point (not in build manifest)
 
-#### exact/ modules (25 submodules, always separate)
+#### exact/ modules (26 submodules, always separate)
 - `primitives.py` - UTF-8, codepoints, visible_repr
 - `unicode_tools.py` - Script detection, confusables (forward and reverse)
 - `confusables.py` - Auto-generated data file (CONFUSABLES dict only)

@@ -30,7 +30,6 @@ ruff → black --check → build_single.py → python eggcalc.py "5+3" (smoke) �
 ```
 - `make check` runs all of the above (lint + format-check + typecheck + docs-check + full test suite)
 - `docs-check` runs `python scripts/generate_mcp_docs.py --check` to verify generated docs aren't stale
-- mypy only runs on Python 3.12
 - All checks must pass before merge
 
 ## Commands Reference
@@ -73,7 +72,7 @@ When releasing a new version:
 - **Standard library only** — no pip packages in `eggcalc/`
 - **Python >=3.11** — CI tests 3.11–3.14
 - **build_single.py compatibility** — all runtime code must be in core modules, exact/, or mcp/
-- **Import limits** — only these are allowed: `argparse`, `os`, `sys`, `re`, `math`, `ast`, `functools`, `typing`, `stat`, `shutil`, `subprocess`, `traceback`, `cmath`, `contextvars`, `logging`, `multiprocessing`, `threading`, `random`, `queue`, `collections.abc`
+- **Import limits** — core modules use: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. `exact/` and `mcp/` packages may use additional stdlib modules (e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`).
 
 ## Common Build Issues
 

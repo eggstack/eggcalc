@@ -72,9 +72,9 @@ def tool_name(expression: str) -> dict:
 
 ## Testing MCP Tools
 ```bash
-# Run MCP-specific tests
-python3 -m pytest tests/test_mcp_server.py -v
+# Run MCP-specific tests (use venv python)
+.venv/bin/python -m pytest tests/test_mcp_server.py -v
 
 # Test server manually via stdio
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' | python3 -m eggcalc --mcp
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' | .venv/bin/python -m eggcalc --mcp
 ```
