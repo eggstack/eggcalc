@@ -1362,6 +1362,18 @@ def text_window(
                 i += 1
                 continue
             break
+    if codepoint_index > 0 and codepoint_index < n:
+        from .primitives import _is_extend_char
+
+        target_cp = ord(text[codepoint_index])
+        if _is_extend_char(text[codepoint_index]):
+            grapheme_idx -= 1
+        elif target_cp == 0x200D:
+            grapheme_idx -= 1
+        elif 0x1F1E6 <= target_cp <= 0x1F1FF:
+            prev_cp = ord(text[codepoint_index - 1])
+            if 0x1F1E6 <= prev_cp <= 0x1F1FF:
+                grapheme_idx -= 1
     grapheme_index = grapheme_idx
 
     line_text = _get_line_text(text, line_num, 1)

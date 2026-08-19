@@ -943,8 +943,8 @@ class TestAngleAlgebraBounds:
 
     def test_deg_to_zero(self):
         result = evaluate_raw("deg**0")
-        assert isinstance(result, UnitValue)
-        assert result.unit is None
+        assert isinstance(result, (int, float))
+        assert result == 1
 
     def test_deg_to_one(self):
         result = evaluate_raw("deg**1")

@@ -2343,7 +2343,23 @@ def regex_safety_check(pattern: str) -> RegexSafetyResult:
         )
 
     ambiguous_dot = re.compile(r'\.\*')
+    in_char_class = False
     for match in ambiguous_dot.finditer(pattern):
+        start = match.start()
+        depth = 0
+        k = 0
+        while k < start:
+            c = pattern[k]
+            if c == "\\" and k + 1 < start:
+                k += 2
+                continue
+            if c == "[":
+                depth += 1
+            elif c == "]" and depth > 0:
+                depth -= 1
+            k += 1
+        if depth > 0:
+            continue
         span = list(match.span())
         findings.append(
             RegexSafetyFinding(

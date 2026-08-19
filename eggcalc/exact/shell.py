@@ -64,23 +64,37 @@ MAX_INPUT_LENGTH = 100_000
 MAX_LIST_ITEMS = 10_000
 
 
+def _char_outside_quotes(raw: str, ch: str) -> bool:
+    """Return True if character ch appears in raw outside any quoted region."""
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(raw):
+        c = raw[i]
+        if c == "\\" and i + 1 < len(raw) and not in_single:
+            i += 2
+            continue
+        if c == "'" and not in_double:
+            in_single = not in_single
+        elif c == '"' and not in_single:
+            in_double = not in_double
+        elif not in_single and not in_double and c == ch:
+            return True
+        i += 1
+    return False
+
+
 def _detect_features(argv: list[str], raw: str) -> ShellFeatures:
     """Detect risky lexical features in parsed argv and raw string."""
-    joined = " ".join(argv)
-
-    has_pipe = any(c in _PIPE_CHARS for c in joined)
-    has_redirection = any(c in _REDIRECTION_CHARS for c in joined)
+    has_pipe = _char_outside_quotes(raw, "|")
+    has_redirection = _char_outside_quotes(raw, ">") or _char_outside_quotes(raw, "<")
 
     has_command_substitution = bool(_COMMAND_SUB_PATTERN.search(raw))
     has_variable_expansion = bool(_VARIABLE_PATTERN.search(raw))
 
     has_glob_pattern = any(any(c in _GLOB_CHARS for c in token) for token in argv)
 
-    has_control_operator = False
-    for op in _CONTROL_OPERATORS:
-        if op in joined:
-            has_control_operator = True
-            break
+    has_control_operator = _char_outside_quotes(raw, ";") or _char_outside_quotes(raw, "&")
 
     return ShellFeatures(
         has_pipe=has_pipe,

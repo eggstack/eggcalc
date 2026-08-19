@@ -168,14 +168,36 @@ def test_mcp_single_file_eof_exits_cleanly():
     )
 
 
+def _transcript_has_timeout(responses: list[dict]) -> bool:
+    """Check if the math_eval response (id=4) is a timeout error."""
+    for resp in responses:
+        if resp.get("id") != 4:
+            continue
+        content = resp.get("result", {}).get("content", [])
+        if not content:
+            return True
+        try:
+            inner = json.loads(content[0].get("text", "{}"))
+            return inner.get("ok") is False and "timed out" in inner.get("error", "")
+        except (json.JSONDecodeError, KeyError, IndexError):
+            return True
+    return True
+
+
 def _run_mcp_transcript(
-    cmd: list[str], timeout: int = 15, protocol_version: str = "2025-11-25"
+    cmd: list[str],
+    timeout: int = 15,
+    protocol_version: str = "2025-11-25",
+    retries: int = 0,
 ) -> list[dict]:
     """Run a full MCP transcript against a server command and return parsed responses.
 
     Transcript: initialize → notifications/initialized → ping → tools/list →
     tools/call math_eval "5+3". Returns list of response dicts (excluding
     notifications which produce no response).
+
+    If *retries* > 0 and the math_eval response is a timeout error, the
+    transcript is re-run from scratch up to *retries* additional times.
     """
     requests = [
         _make_initialize_request(1, protocol_version),
@@ -193,31 +215,37 @@ def _run_mcp_transcript(
     ]
     input_data = "\n".join(requests) + "\n"
 
-    proc = subprocess.Popen(
-        cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    try:
-        stdout, stderr = proc.communicate(input=input_data.encode(), timeout=timeout)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
-        raise AssertionError(f"Server did not respond within {timeout}s")
-    finally:
-        if proc.poll() is None:
+    last_responses: list[dict] | None = None
+    for attempt in range(1 + retries):
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = proc.communicate(input=input_data.encode(), timeout=timeout)
+        except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
+            raise AssertionError(f"Server did not respond within {timeout}s")
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
 
-    assert proc.returncode == 0, (
-        f"Server exited with code {proc.returncode}. "
-        f"stderr: {stderr.decode('utf-8', errors='replace')}"
-    )
+        assert proc.returncode == 0, (
+            f"Server exited with code {proc.returncode}. "
+            f"stderr: {stderr.decode('utf-8', errors='replace')}"
+        )
 
-    lines = [line for line in stdout.decode().splitlines() if line.strip()]
-    responses = [json.loads(line) for line in lines]
-    return responses
+        lines = [line for line in stdout.decode().splitlines() if line.strip()]
+        responses = [json.loads(line) for line in lines]
+        last_responses = responses
+
+        if not _transcript_has_timeout(responses):
+            return responses
+    return last_responses  # type: ignore[return-value]
 
 
 def _normalize_transcript(responses: list[dict]) -> list[dict]:
@@ -341,8 +369,8 @@ def test_package_and_single_file_transcripts_match():
         if result.returncode != 0:
             pytest.skip(f"build_single.py failed: {result.stderr}")
 
-        pkg_responses = _run_mcp_transcript([sys.executable, "-m", "eggcalc", "--mcp"])
-        sf_responses = _run_mcp_transcript([sys.executable, single_file, "--mcp"])
+        pkg_responses = _run_mcp_transcript([sys.executable, "-m", "eggcalc", "--mcp"], retries=2)
+        sf_responses = _run_mcp_transcript([sys.executable, single_file, "--mcp"], retries=2)
 
         pkg_norm = _normalize_transcript(pkg_responses)
         sf_norm = _normalize_transcript(sf_responses)

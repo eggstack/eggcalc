@@ -719,15 +719,17 @@ def detect_newline_style(s: str) -> str:
         "CRLF", "LF", "CR", or "mixed" if multiple styles found.
     """
     has_crlf = "\r\n" in s
-    has_lf = "\n" in s and not has_crlf
-    has_cr = "\r" in s and not has_crlf and not has_lf
+    bare_lf = any(c == "\n" and (i == 0 or s[i - 1] != "\r") for i, c in enumerate(s))
+    bare_cr = any(c == "\r" and (i + 1 >= len(s) or s[i + 1] != "\n") for i, c in enumerate(s))
 
-    if has_crlf and (has_lf or has_cr):
+    if has_crlf and (bare_lf or bare_cr):
+        return "mixed"
+    if bare_lf and bare_cr:
         return "mixed"
     if has_crlf:
         return "CRLF"
-    if has_lf:
+    if bare_lf:
         return "LF"
-    if has_cr:
+    if bare_cr:
         return "CR"
     return "LF"

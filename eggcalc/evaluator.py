@@ -1261,7 +1261,7 @@ def _bitlshift_safe(a: int, b: int) -> int:
     # Pre-check: a << b would have ~a.bit_length() + b bits, which
     # corresponds to roughly (a.bit_length() + b) * log10(2) digits. Bail
     # before computing so we don't allocate huge ints in the worker.
-    if a.bit_length() + b > MAX_RESULT_DIGITS * 3:
+    if a.bit_length() + b > MAX_RESULT_DIGITS / math.log10(2):
         raise EvaluationError(
             f"Left shift would produce an integer with more than " f"{MAX_RESULT_DIGITS} digits"
         )
@@ -2558,7 +2558,12 @@ class Evaluator(ast.NodeVisitor):
                 if op_class is ast.Mod:
                     return left % right if isinstance(left, UnitValue) else right.__rmod__(left)
                 if op_class is ast.Pow and isinstance(left, UnitValue):
-                    return left**right
+                    powered = left**right
+                    return (
+                        powered.value
+                        if isinstance(powered, UnitValue) and powered.unit is None
+                        else powered
+                    )
             except (TypeError, ValueError, ZeroDivisionError) as exc:
                 raise EvaluationError(str(exc)) from exc
 
