@@ -110,26 +110,26 @@ All deterministic, side-effect-free text analysis primitives. No external deps.
 | [`confusables.py`](confusables.md) | Auto-generated homoglyph data (compressed payload, 6565 entries, lazy decode) | `CONFUSABLES` lazy mapping |
 | [`measure.py`](measure.md) | Text metrics: line, word, character category counts | `line_metrics()`, `word_metrics()`, `char_category_metrics()` |
 | [`diff.py`](diff.md) | String diffing: first diff, Levenshtein, LCS, diff spans | `first_diff()`, `levenshtein_distance()`, `diff_spans()` |
-| `diff_analysis.py` | Structural analysis of unified diffs and patches | `diff_touched_paths()`, `diff_hunk_ranges()`, `unified_diff_validate()` |
+| [`diff_analysis.py`](diff_analysis.md) | Structural analysis of unified diffs and patches | `diff_touched_paths()`, `diff_hunk_ranges()`, `unified_diff_validate()` |
 | [`validate.py`](validate.md) | Bracket/JSON/TOML/regex validation, version comparison | `check_brackets()`, `validate_json()`, `regex_test()`, `json_compare()` |
 | [`synthesis.py`](synthesis.md) | Higher-level text analysis combining primitives | `measure_text()`, `inspect_text()`, `explain_diff()`, `list_compare()` |
-| `transform.py` | Text escaping, hashing, fingerprinting | `escape_text()`, `text_hash()`, `text_fingerprint()` |
-| `identifier.py` | Identifier naming convention analysis | `identifier_analyze()` |
-| `identifier_inspect.py` | Identifier collision detection | `identifier_inspect()`, `identifier_table_inspect()` |
-| `position.py` | Text position (line/column) conversion | `text_position()` |
-| `glob.py` | Glob pattern matching | `glob_match()` |
-| `config.py` | .env and INI file validation | `dotenv_validate()`, `ini_validate()` |
-| `patch.py` | Unified diff parsing and simulation | `patch_apply_check()`, `patch_summary()` |
-| `path_tools.py` | Path comparison and scoping | `path_compare()`, `path_scope_check()` |
-| `inspect_prompt.py` | Hidden char/ANSI/instruction detection | `prompt_input_inspect()` |
-| `markdown.py` | Markdown structure analysis and link checking | `markdown_structure()`, `code_fence_extract()` |
-| `shell.py` | Shell command parsing and argv comparison | `shell_split()`, `shell_quote_join()`, `argv_compare()` |
-| `unicode_policy.py` | Named Unicode safety policies | `unicode_policy_check()`, `canonicalize_text()` |
-| `cargo.py` | Cargo.toml inspection | `cargo_toml_inspect()` |
-| `version.py` | Semver/cargo constraint checking | `check_version_constraint()`, `parse_version()` |
-| `llm_hygiene.py` | LLM JSON output hygiene detection | `llm_json_output_check()` |
-| `repo_audit.py` | Repository file inventory analysis | `repo_file_inventory()` |
-| `manifests.py` | Manifest/package inspection (pyproject, package.json, etc.) | `pyproject_inspect()`, `requirements_inspect()` |
+| [`transform.py`](transform.md) | Text escaping, hashing, fingerprinting | `escape_text()`, `text_hash()`, `text_fingerprint()` |
+| [`identifier.py`](identifier.md) | Identifier naming convention analysis | `identifier_analyze()` |
+| [`identifier_inspect.py`](identifier_inspect.md) | Identifier collision detection | `identifier_inspect()`, `identifier_table_inspect()` |
+| [`position.py`](primitives.md) | Text position (line/column) conversion | `text_position()` |
+| [`glob.py`](glob.md) | Glob pattern matching | `glob_match()` |
+| [`config.py`](config.md) | .env and INI file validation | `dotenv_validate()`, `ini_validate()` |
+| [`patch.py`](patch.md) | Unified diff parsing and simulation | `patch_apply_check()`, `patch_summary()` |
+| [`path_tools.py`](path_tools.md) | Path comparison and scoping | `path_compare()`, `path_scope_check()` |
+| [`inspect_prompt.py`](inspect_prompt.md) | Hidden char/ANSI/instruction detection | `prompt_input_inspect()` |
+| [`markdown.py`](markdown.md) | Markdown structure analysis and link checking | `markdown_structure()`, `code_fence_extract()` |
+| [`shell.py`](shell.md) | Shell command parsing and argv comparison | `shell_split()`, `shell_quote_join()`, `argv_compare()` |
+| [`unicode_policy.py`](unicode_policy.md) | Named Unicode safety policies | `unicode_policy_check()`, `canonicalize_text()` |
+| [`cargo.py`](cargo.md) | Cargo.toml inspection | `cargo_toml_inspect()` |
+| [`version.py`](version.md) | Semver/cargo constraint checking | `check_version_constraint()`, `parse_version()` |
+| [`llm_hygiene.py`](llm_hygiene.md) | LLM JSON output hygiene detection | `llm_json_output_check()` |
+| [`repo_audit.py`](repo_audit.md) | Repository file inventory analysis | `repo_file_inventory()` |
+| [`manifests.py`](manifests.md) | Manifest/package inspection (pyproject, package.json, etc.) | `pyproject_inspect()`, `requirements_inspect()` |
 
 ### mcp/ — Model Context Protocol Server (3 modules)
 
@@ -276,16 +276,16 @@ primitives.py          ← foundation (no exact/ deps)
 
 | Category | Modules | Purpose |
 |----------|---------|---------|
-| **Unicode Primitives** | primitives, unicode_tools, confusables, unicode_policy | Codepoint analysis, script detection, confusable identification, safety policies |
-| **Text Metrics** | measure, synthesis (partial) | Line/word/char counts, character category breakdowns |
-| **String Comparison** | diff, diff_analysis | First diff location, Levenshtein distance, LCS, unified diff parsing |
-| **Format Validation** | validate, config | JSON/TOML/bracket/regex validation, .env/INI checking |
-| **Text Transform** | transform, position | Escaping, hashing, fingerprinting, line/column conversion |
-| **Code Analysis** | identifier, identifier_inspect, markdown, patch | Naming conventions, collision detection, markdown structure, patch simulation |
-| **Shell & Path** | shell, path_tools, glob | Command parsing, argv comparison, path normalization, glob matching |
-| **Package Inspection** | manifests, cargo, version | pyproject/package.json/requirements inspection, Cargo.toml parsing, semver checking |
-| **Security & Safety** | inspect_prompt, llm_hygiene, repo_audit | Prompt injection detection, LLM output hygiene, repository inventory |
-| **Higher-Level** | synthesis | Combines primitives into composite analyses (measure_text, inspect_text, etc.) |
+| **Unicode Primitives** | [primitives](primitives.md), [unicode_tools](unicode_tools.md), [confusables](confusables.md), [unicode_policy](unicode_policy.md) | Codepoint analysis, script detection, confusable identification, safety policies |
+| **Text Metrics** | [measure](measure.md), [synthesis](synthesis.md) (partial) | Line/word/char counts, character category breakdowns |
+| **String Comparison** | [diff](diff.md), [diff_analysis](diff_analysis.md) | First diff location, Levenshtein distance, LCS, unified diff parsing |
+| **Format Validation** | [validate](validate.md), [config](config.md) | JSON/TOML/bracket/regex validation, .env/INI checking |
+| **Text Transform** | [transform](transform.md), position (in [primitives](primitives.md)) | Escaping, hashing, fingerprinting, line/column conversion |
+| **Code Analysis** | [identifier](identifier.md), [identifier_inspect](identifier_inspect.md), [markdown](markdown.md), [patch](patch.md) | Naming conventions, collision detection, markdown structure, patch simulation |
+| **Shell & Path** | [shell](shell.md), [path_tools](path_tools.md), [glob](glob.md) | Command parsing, argv comparison, path normalization, glob matching |
+| **Package Inspection** | [manifests](manifests.md), [cargo](cargo.md), [version](version.md) | pyproject/package.json/requirements inspection, Cargo.toml parsing, semver checking |
+| **Security & Safety** | [inspect_prompt](inspect_prompt.md), [llm_hygiene](llm_hygiene.md), [repo_audit](repo_audit.md) | Prompt injection detection, LLM output hygiene, repository inventory |
+| **Higher-Level** | [synthesis](synthesis.md) | Combines primitives into composite analyses (measure_text, inspect_text, etc.) |
 
 ---
 
@@ -587,8 +587,26 @@ Each component has a dedicated architecture document. Use this index to navigate
 | confusables.py | [confusables.md](confusables.md) | Auto-generated homoglyph data (compressed, lazy decode) |
 | measure.py | [measure.md](measure.md) | Text metrics: line, word, character category counts |
 | diff.py | [diff.md](diff.md) | String diffing: first diff, common prefix/suffix, Levenshtein distance |
+| diff_analysis.py | [diff_analysis.md](diff_analysis.md) | Structural analysis of unified diffs and patches |
 | validate.py | [validate.md](validate.md) | Bracket checking, JSON/TOML validation, regex safety |
 | synthesis.py | [synthesis.md](synthesis.md) | Higher-level text analysis, inspection, comparison |
+| transform.py | [transform.md](transform.md) | Text escaping, hashing, fingerprinting, normalization |
+| identifier.py | [identifier.md](identifier.md) | Identifier naming convention analysis |
+| identifier_inspect.py | [identifier_inspect.md](identifier_inspect.md) | Identifier collision and confusable detection |
+| position.py | [primitives.md](primitives.md#position-conversion) | Text position (line/column) conversion (in primitives) |
+| glob.py | [glob.md](glob.md) | Glob pattern matching |
+| config.py | [config.md](config.md) | .env and INI file validation |
+| patch.py | [patch.md](patch.md) | Unified diff parsing and simulation |
+| path_tools.py | [path_tools.md](path_tools.md) | Path lexical analysis and normalization |
+| inspect_prompt.py | [inspect_prompt.md](inspect_prompt.md) | Prompt injection detection (hidden chars, ANSI, instructions) |
+| markdown.py | [markdown.md](markdown.md) | Markdown structure analysis and code fence extraction |
+| shell.py | [shell.md](shell.md) | Shell command parsing and argv comparison |
+| unicode_policy.py | [unicode_policy.md](unicode_policy.md) | Named Unicode safety policies and canonicalization |
+| cargo.py | [cargo.md](cargo.md) | Cargo.toml inspection |
+| version.py | [version.md](version.md) | Semver/cargo version constraint checking |
+| llm_hygiene.py | [llm_hygiene.md](llm_hygiene.md) | LLM JSON output hygiene detection |
+| repo_audit.py | [repo_audit.md](repo_audit.md) | Repository file inventory analysis |
+| manifests.py | [manifests.md](manifests.md) | pyproject.toml, package.json, requirements.txt inspection |
 
 ### mcp/ — Model Context Protocol Server
 
