@@ -1783,19 +1783,10 @@ class TestEvaluatorEdgeCases:
             pytest.fail("OverflowError leaked from _check_result_size")
 
     def test_negative_kelvin_converts(self):
-        """-1K in C converts to -274.15C (calculator doesn't enforce physical constraints)."""
-        import sys
-        from io import StringIO
-
-        captured = StringIO()
-        old_stdout = sys.stdout
-        sys.stdout = captured
-        try:
-            run("-1K in C", NORMALIZE, PATTERNS)
-        finally:
-            sys.stdout = old_stdout
-        output = captured.getvalue()
-        assert "-274.15" in output
+        """Temperatures below absolute zero are rejected."""
+        result, exit_code = run("-1K in C", NORMALIZE, PATTERNS)
+        assert result is None
+        assert exit_code == 1
 
     def test_unit_mismatch_error(self):
         """30m + 100gal should produce an error about incompatible units."""

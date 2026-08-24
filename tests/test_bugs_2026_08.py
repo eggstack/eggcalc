@@ -2,17 +2,21 @@
 
 import math
 import unicodedata
+from unittest.mock import patch
 
 import pytest
 
-from eggcalc import evaluate
+from eggcalc import EvaluationError, evaluate, evaluate_raw
+from eggcalc.cli import _cli_text_command, _CommandStatus, _run_repl, run_cli
 from eggcalc.evaluator import _polar, _safe_pow
 from eggcalc.exact.primitives import detect_newline_style
 from eggcalc.exact.repo_audit import _classify_path
 from eggcalc.exact.shell import shell_split
 from eggcalc.exact.synthesis import _detect_special_sequences, text_window
-from eggcalc.exact.validate import regex_safety_check
-from eggcalc.mcp.server import McpSession, McpSessionState
+from eggcalc.exact.validate import _check_pattern_complexity, regex_safety_check, validate_json
+from eggcalc.mcp.server import McpServer, McpSession, McpSessionState, handle_request
+from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_text
+from eggcalc.units import UnitValue, convert_temperature
 
 
 def test_safe_pow_accepts_integral_float_exponents():
@@ -139,3 +143,109 @@ class TestUnitPowerZeroUnwraps:
         result = evaluate("kg ** 0")
         assert isinstance(result, (int, float))
         assert result == 1
+
+
+def test_alternation_overlap_is_rejected_for_quantified_groups():
+    safe, message = _check_pattern_complexity("(a|a)+b")
+    assert safe is False
+    assert "alternation" in message.lower()
+
+
+@pytest.mark.parametrize("expression", ["10**400 * m", "(1e308*m) * 2"])
+def test_unit_overflow_is_wrapped_as_evaluation_error(expression):
+    with pytest.raises(EvaluationError):
+        evaluate_raw(expression)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        lambda: UnitValue(100, "C") * 2,
+        lambda: UnitValue(100, "C") / 2,
+        lambda: UnitValue(100, "C") // 2,
+        lambda: UnitValue(100, "C") % 2,
+        lambda: 2 / UnitValue(0, "C"),
+    ],
+)
+def test_affine_scalar_operations_are_rejected(operation):
+    with pytest.raises(ValueError, match="Affine"):
+        operation()
+
+
+@pytest.mark.parametrize(
+    "expression,expected",
+    [("2 xor 3 xor 4", 5), ("5!5!", 14400), ("3 squared 4", 36), ("3 cubed 5", 135)],
+)
+def test_normalization_preserves_chained_operator_meaning(expression, expected):
+    assert evaluate_raw(expression) == expected
+
+
+def test_multiword_reserved_operator_is_rejected():
+    with pytest.raises(ValueError, match="not in"):
+        normalize_text("5 not in 10", NORMALIZE, PATTERNS)
+
+
+def test_temperature_below_absolute_zero_is_rejected():
+    with pytest.raises(ValueError, match="absolute zero"):
+        UnitValue(-1, "K").convert_to("C")
+    with pytest.raises(ValueError, match="absolute zero"):
+        convert_temperature(-1, "K", "C")
+
+
+def test_compact_units_are_case_insensitive_for_multi_character_symbols():
+    assert evaluate_raw("100Ft").unit == "ft"
+
+
+def test_validate_json_uses_json_type_names():
+    assert [validate_json(value)["type"] for value in ["null", "true", "42", "3.14"]] == [
+        "null",
+        "boolean",
+        "integer",
+        "number",
+    ]
+
+
+def test_mcp_server_rejects_non_object_requests():
+    server = McpServer()
+    try:
+        response = server.handle_request(42)
+    finally:
+        server.close()
+    assert response["error"]["code"] == -32600
+
+
+def test_mcp_ping_notification_has_no_response():
+    server = McpServer()
+    try:
+        session = server.create_session(McpSessionState.READY)
+        response = server.handle_request({"jsonrpc": "2.0", "method": "ping"}, session=session)
+    finally:
+        server.close()
+    assert response is None
+
+
+def test_cli_reports_lazy_handler_import_errors(capsys, monkeypatch):
+    def broken_handler(_name):
+        raise ImportError("broken exact module")
+
+    monkeypatch.setattr("eggcalc.cli._get_handler", broken_handler)
+    assert _cli_text_command("inspect hello") is _CommandStatus.ERROR
+    assert "Unable to load text command" in capsys.readouterr().err
+
+
+def test_cli_quiet_suppresses_expression_in_json(capsys):
+    result, exit_code = run_cli("5+3", "json", quiet=True)
+    assert result == 8
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert '"expression"' not in output
+
+
+def test_repl_reports_unrecognized_input(capsys):
+    with patch("builtins.input", side_effect=["hello world", EOFError]):
+        assert _run_repl() == 0
+    assert "Error:" in capsys.readouterr().err
+
+
+def test_compatibility_ping_notification_has_no_response():
+    assert handle_request({"jsonrpc": "2.0", "method": "ping"}) is None

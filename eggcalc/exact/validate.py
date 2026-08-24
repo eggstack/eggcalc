@@ -317,6 +317,18 @@ def validate_json(s: str) -> ValidateJsonResult:
         elif isinstance(parsed, list):
             type_str = "array"
             keys = None
+        elif parsed is None:
+            type_str = "null"
+            keys = None
+        elif isinstance(parsed, bool):
+            type_str = "boolean"
+            keys = None
+        elif isinstance(parsed, int):
+            type_str = "integer"
+            keys = None
+        elif isinstance(parsed, float):
+            type_str = "number"
+            keys = None
         else:
             type_str = type(parsed).__name__
             keys = None
@@ -748,8 +760,78 @@ def _check_pattern_complexity(pattern: str) -> tuple[bool, str | None]:
     in_char_class = False
     # Per-group state: whether a quantifier was seen directly in this group's content
     group_stack: list[bool] = []
+    group_starts: list[int] = []
+    group_alternations: list[bool] = []
     # Whether the immediately-preceding group had a quantifier in its content
     prev_group_had_quantifier = False
+
+    def _has_overlapping_branch_prefixes(content: str) -> bool:
+        """Return whether top-level alternation branches can share a prefix."""
+        branches: list[str] = []
+        branch_start = 0
+        depth = 0
+        in_class = False
+        j = 0
+        while j < len(content):
+            current = content[j]
+            if current == "\\":
+                j += 2
+                continue
+            if current == "[":
+                in_class = True
+            elif current == "]":
+                in_class = False
+            elif not in_class and current == "(":
+                depth += 1
+            elif not in_class and current == ")":
+                depth -= 1
+            elif not in_class and depth == 0 and current == "|":
+                branches.append(content[branch_start:j])
+                branch_start = j + 1
+            j += 1
+        if not branches:
+            return False
+        branches.append(content[branch_start:])
+
+        prefixes: list[str | None] = []
+        for branch in branches:
+            j = 0
+            while j < len(branch) and branch[j] in "^$":
+                j += 1
+            if j >= len(branch):
+                prefixes.append(None)
+            elif branch[j] == "\\":
+                escaped = branch[j + 1] if j + 1 < len(branch) else ""
+                prefixes.append(escaped if escaped in ".^$\\|()[]{}+*?" else None)
+            elif branch[j] == "[":
+                end = branch.find("]", j + 1)
+                if end < 0 or branch[j + 1 : end].startswith("^"):
+                    prefixes.append(None)
+                else:
+                    prefixes.append("[" + branch[j + 1 : end] + "]")
+            elif branch[j] == "." or branch[j] == "(":
+                prefixes.append(None)
+            else:
+                prefixes.append(branch[j])
+
+        if any(prefix is None for prefix in prefixes):
+            return True
+        for left_index, left in enumerate(prefixes):
+            for right in prefixes[left_index + 1 :]:
+                if left == right:
+                    return True
+                if isinstance(left, str) and isinstance(right, str):
+                    left_chars = set(left[1:-1]) if left.startswith("[") else {left}
+                    right_chars = set(right[1:-1]) if right.startswith("[") else {right}
+                    if left_chars & right_chars:
+                        return True
+        return False
+
+    def _is_quantifier_at(index: int) -> bool:
+        if index >= len(pattern) or pattern[index] in "+*?":
+            return index < len(pattern)
+        return pattern[index] == "{" and index + 1 < len(pattern) and pattern[index + 1].isdigit()
+
     i = 0
 
     while i < len(pattern):
@@ -771,6 +853,12 @@ def _check_pattern_complexity(pattern: str) -> tuple[bool, str | None]:
             nesting_depth += 1
             max_nesting = max(max_nesting, nesting_depth)
             group_stack.append(False)
+            group_starts.append(i)
+            group_alternations.append(False)
+            prev_group_had_quantifier = False
+        elif char == '|' and not in_char_class:
+            if group_alternations:
+                group_alternations[-1] = True
             prev_group_had_quantifier = False
         elif char == ')' and not in_char_class:
             nesting_depth -= 1
@@ -778,6 +866,13 @@ def _check_pattern_complexity(pattern: str) -> tuple[bool, str | None]:
                 return False, f"Unmatched closing '{char}' at position {i}"
             if group_stack:
                 inner_had_quantifier = group_stack.pop()
+                group_start = group_starts.pop()
+                has_alternation = group_alternations.pop()
+                if has_alternation and _is_quantifier_at(i + 1):
+                    if _has_overlapping_branch_prefixes(pattern[group_start + 1 : i]):
+                        return False, (
+                            f"Overlapping alternation in quantified group detected at position {i}"
+                        )
                 # OR the inner group's state into the parent group
                 if group_stack:
                     group_stack[-1] = group_stack[-1] or inner_had_quantifier

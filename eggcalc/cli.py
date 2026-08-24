@@ -216,6 +216,7 @@ def _reset_handler_cache() -> None:
 def run_cli(
     expression: str,
     output_format: str = "plain",
+    quiet: bool = False,
 ) -> tuple[Any, int]:
     """Process a single expression: normalize, evaluate, and print result.
 
@@ -235,6 +236,8 @@ def run_cli(
     if exit_code != 0:
         if exit_code == 2:
             print(joined, file=sys.stderr)
+        else:
+            print(f"Error: Unable to normalize expression: {original}", file=sys.stderr)
         return None, exit_code
 
     try:
@@ -243,7 +246,10 @@ def run_cli(
         if output_format == "json":
             import json
 
-            print(json.dumps({"expression": joined, "result": display}))
+            output = {"result": display}
+            if not quiet:
+                output["expression"] = joined
+            print(json.dumps(output))
         else:
             print(display)
         return result, 0
@@ -456,7 +462,11 @@ def _cli_text_command(
         return _CommandStatus.ERROR
 
     handler_name = spec["handler"]
-    handler = _get_handler(handler_name)
+    try:
+        handler = _get_handler(handler_name)
+    except ImportError as e:
+        print(f"Error: Unable to load text command '{cmd}': {e}", file=sys.stderr)
+        return _CommandStatus.ERROR
 
     if cmd == "inspect":
         text = " ".join(parts[1:])
@@ -819,7 +829,9 @@ def main() -> int:
         "--usage", action="store_true", help="Show full usage information and examples"
     )
     parser.add_argument("-v", "--version", action="store_true", help="Show version information")
-    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress expression in output")
+    parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Suppress expression in JSON output"
+    )
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -885,6 +897,9 @@ def main() -> int:
         return mcp_main()
 
     if args.version:
+        if args.expression or args.single_expr:
+            print("Error: --version cannot be combined with an expression", file=sys.stderr)
+            return 2
         print(f"eggcalc {eggcalc.__version__}")
         return 0
 
@@ -920,5 +935,5 @@ def main() -> int:
     # Not a recognized text command — treat as calculator expression.
     maybe_load_cli_config()
     output_format = "json" if args.json else "plain"
-    _, exit_code = run_cli(expression, output_format)
+    _, exit_code = run_cli(expression, output_format, quiet=args.quiet)
     return exit_code

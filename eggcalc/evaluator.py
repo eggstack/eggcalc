@@ -2564,7 +2564,7 @@ class Evaluator(ast.NodeVisitor):
                         if isinstance(powered, UnitValue) and powered.unit is None
                         else powered
                     )
-            except (TypeError, ValueError, ZeroDivisionError) as exc:
+            except (TypeError, ValueError, ZeroDivisionError, OverflowError) as exc:
                 raise EvaluationError(str(exc)) from exc
 
         try:

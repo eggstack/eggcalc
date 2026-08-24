@@ -855,7 +855,6 @@ class TestUnitSpacingProbes:
             ("30 mph in kilometers per hour", "km/h", 48.28032),
             ("30 meters per second in feet per second", "ft/s", 98.42519685039369),
             ("30 feet per second in meters per second", "m/s", 9.144),
-            ("-1 kelvin in celsius", "C", -274.15),
         ],
     )
     def test_unit_conversion_word_forms(self, expr, expected_unit, expected_value):
@@ -868,6 +867,11 @@ class TestUnitSpacingProbes:
         assert isinstance(result, UnitValue)
         assert result.value == pytest.approx(expected_value)
         assert result.unit == expected_unit
+
+    def test_temperature_below_absolute_zero_is_rejected(self):
+        _result, code, _out, err = _run("-1 kelvin in celsius")
+        assert code == 1
+        assert "absolute zero" in err.lower()
 
     @pytest.mark.parametrize("expr", ["2 ft/s in m/s", "2 ft / s in m / s", "2ft/s in m / s"])
     def test_foot_per_second_conversion_spacing(self, expr):

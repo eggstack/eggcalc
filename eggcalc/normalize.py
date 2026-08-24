@@ -1161,7 +1161,9 @@ def _should_split_number_sequence(token: str) -> bool:
 # patterns and raises a clear error (e.g., "5 not 6" -> SyntaxError rather than
 # the silent "5~6" that would be produced by naive word substitution).
 _BINARY_WORD_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\))\s+" r"(not|in|to|as|into)\s+" r"(\d+(?:\.\d+)?)\b",
+    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\))\s+"
+    r"(not\s+in|not|in|to|as|into)\s+"
+    r"(\d+(?:\.\d+)?)\b",
     flags=re.IGNORECASE,
 )
 
@@ -1411,6 +1413,12 @@ def _normalize_postfix_unit_power_words(expression: str) -> str:
     unit_alt = _UNIT_NAMES_ALTERNATION
 
     expression = re.sub(
+        r"(?<![A-Za-z0-9_.])(?P<number>\d+(?:\.\d+)?)\s+" r"(?P<power>squared|cubed)\b(?=\s+\d)",
+        lambda m: f"{m.group('number')}**{'2' if m.group('power').lower() == 'squared' else '3'}*",
+        expression,
+        flags=re.IGNORECASE,
+    )
+    expression = re.sub(
         r"(?<![A-Za-z0-9_.])(?P<number>\d+(?:\.\d+)?)\s+" r"(?P<power>squared|cubed)\b",
         lambda m: f"{m.group('number')}**{'2' if m.group('power').lower() == 'squared' else '3'}",
         expression,
@@ -1487,7 +1495,7 @@ def _normalize_xor_word_to_bitxor_call(expression: str) -> str:
     everything to the right up to the next top-level operator boundary
     (or end of string) becomes the right operand.
     """
-    xor_re = re.compile(r"\b(?:xor|XOR|bitxor|bit\s+xor)\b", re.IGNORECASE)
+    xor_re = re.compile(r"\b(?:xor|XOR|bit\s+xor|bitxor(?!\s*\())\b", re.IGNORECASE)
     # Operators / boundaries that terminate an operand at the top level.
     _BOUNDARY_CHARS = set("+-*/%&|<>=!~,")
 
@@ -1501,7 +1509,7 @@ def _normalize_xor_word_to_bitxor_call(expression: str) -> str:
                 depth += 1
             elif ch == "(":
                 if depth == 0:
-                    break
+                    return i
                 depth -= 1
             elif depth == 0 and ch in _BOUNDARY_CHARS:
                 break
@@ -1523,24 +1531,27 @@ def _normalize_xor_word_to_bitxor_call(expression: str) -> str:
                 depth -= 1
             elif depth == 0 and ch in _BOUNDARY_CHARS:
                 break
+            elif depth == 0 and ch.isspace():
+                next_word = i + 1
+                while next_word < n and expression[next_word].isspace():
+                    next_word += 1
+                if xor_re.match(expression, next_word):
+                    break
             i += 1
         return i
 
-    result: list[str] = []
-    last_end = 0
-    for m in xor_re.finditer(expression):
+    while True:
+        m = xor_re.search(expression)
+        if m is None:
+            break
         left_start = _scan_left(m.start())
         right_end = _scan_right(m.end())
         left = expression[left_start : m.start()].strip()
         right = expression[m.end() : right_end].strip()
-        # Trim trailing whitespace (already handled by strip).
         if not left or not right:
-            continue
-        result.append(expression[last_end:left_start])
-        result.append(f"bitxor({left},{right})")
-        last_end = right_end
-    result.append(expression[last_end:])
-    return "".join(result)
+            break
+        expression = expression[:left_start] + f"bitxor({left},{right})" + expression[right_end:]
+    return expression
 
 
 def _rewrite_calculator_caret(expression: str) -> str:
@@ -2448,6 +2459,8 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
             expression,
         )
 
+    expression = re.sub(r"(?<=\))(?=factorial\()", "*", expression)
+
     return expression
 
 
@@ -2695,7 +2708,14 @@ def _preprocess_units(expression: str) -> str:
                 # Check for unit using pre-computed sorted list
                 found_unit = False
                 for unit in units:
-                    if remaining.startswith(unit):
+                    matched_unit = remaining.startswith(unit)
+                    if (
+                        not matched_unit
+                        and len(unit) > 1
+                        and remaining[: len(unit)].lower() == unit.lower()
+                    ):
+                        matched_unit = True
+                    if matched_unit:
                         # Word boundary check: next char after unit must not be alphanumeric
                         end_pos = len(unit)
                         if end_pos < len(remaining) and remaining[end_pos].isalnum():

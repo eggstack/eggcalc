@@ -7539,9 +7539,7 @@ class TestJSONRPCIdValidation:
                 "method": "ping",
             }
         )
-        assert "result" in response
-        # Response should include id from request (None via .get("id"))
-        assert "id" in response
+        assert response is None
 
     def test_oversized_id_rejected(self):
         """String id exceeding MAX_REQUEST_ID_LENGTH is rejected."""

@@ -95,7 +95,10 @@ class TestRoundTripConversions:
     )
     def test_temperature_round_trip(self, from_u: str, to_u: str):
         """Temperature conversions must be exactly round-trippable."""
-        for value in [0.0, 273.15, 100.0, -40.0, 98.6]:
+        values = [0.0, 273.15, 100.0, 98.6]
+        if from_u != "K":
+            values.append(-40.0)
+        for value in values:
             result = convert_temperature(value, from_u, to_u)
             round_trip = convert_temperature(result, to_u, from_u)
             assert round_trip == pytest.approx(value, abs=1e-10), (

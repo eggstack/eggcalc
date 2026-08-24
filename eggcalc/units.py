@@ -3094,12 +3094,18 @@ class UnitValue:
                 result = self.value * other.value
                 unit = self.unit or other.unit
         else:
+            if self.unit and self._unit_expr.dimension.is_affine:
+                raise ValueError("Affine units cannot participate in multiplication")
             result = self.value * other
             unit = self.unit
         UnitValue._check_overflow(result)
         return UnitValue(result, unit)
 
     def __rmul__(self, other: Numeric | UnitValue) -> UnitValue:
+        if not isinstance(other, UnitValue):
+            result = self.value * other
+            UnitValue._check_overflow(result)
+            return UnitValue(result, self.unit)
         return self.__mul__(other)
 
     def __truediv__(self, other: Numeric | UnitValue) -> UnitValue:
@@ -3133,6 +3139,8 @@ class UnitValue:
         else:
             if other == 0:
                 raise ZeroDivisionError("Cannot divide UnitValue by zero")
+            if self.unit and self._unit_expr.dimension.is_affine:
+                raise ValueError("Affine units cannot participate in division")
             result = self.value / other
             unit = self.unit
         UnitValue._check_overflow(result)
@@ -3155,6 +3163,8 @@ class UnitValue:
             return UnitValue(result, None)
         if other == 0:
             raise ZeroDivisionError("Cannot divide UnitValue by zero")
+        if self.unit and self._unit_expr.dimension.is_affine:
+            raise ValueError("Affine units cannot participate in floor division")
         result = self.value // other  # type: ignore[operator]
         UnitValue._check_overflow(result)
         return UnitValue(result, self.unit)
@@ -3187,6 +3197,8 @@ class UnitValue:
             return UnitValue(result, None)
         if other == 0:
             raise ZeroDivisionError("Cannot mod UnitValue by zero")
+        if self.unit and self._unit_expr.dimension.is_affine:
+            raise ValueError("Affine units cannot participate in modulo")
         result = self.value % other  # type: ignore[operator]
         UnitValue._check_overflow(result)
         return UnitValue(result, self.unit)
@@ -3206,6 +3218,8 @@ class UnitValue:
         if isinstance(other, UnitValue):
             return other.__truediv__(self)
         if self.unit:
+            if self._unit_expr.dimension.is_affine:
+                raise ValueError("Affine units cannot participate in division")
             if self.value == 0:
                 raise ZeroDivisionError("Cannot divide by zero UnitValue")
             assert self._unit_expr is not None
@@ -3274,13 +3288,18 @@ class UnitValue:
             raise ValueError(f"Cannot convert incompatible units: {self.unit} -> {target_unit}")
         source_definition = _single_definition(source)
         target_definition = _single_definition(target)
+        converted: float | complex
         if (
             source_definition is not None
             and target_definition is not None
             and (source_definition.affine or target_definition.affine)
         ):
             base_value = self.value * source_definition.scale + source_definition.offset
-            converted = (base_value - target_definition.offset) / target_definition.scale
+            if isinstance(base_value, complex):
+                raise ValueError("Temperature value must be real")
+            if base_value < 0:
+                raise ValueError("Temperature cannot be below absolute zero")
+            converted = float(base_value - target_definition.offset) / target_definition.scale
         else:
             if source.dimension.is_affine:
                 raise ValueError("Affine units must be standalone temperature units")
@@ -3679,6 +3698,8 @@ def convert_temperature(value: float, from_unit: str, to_unit: str) -> float:  #
     if source.dimension != target.dimension:
         raise ValueError(f"Cannot convert temperature from {from_unit} to {to_unit}")
     base_value = value * source_definition.scale + source_definition.offset
+    if base_value < 0:
+        raise ValueError("Temperature cannot be below absolute zero")
     result = (base_value - target_definition.offset) / target_definition.scale
     if not math.isfinite(result):
         raise ValueError("Temperature conversion result is not finite")

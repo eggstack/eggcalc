@@ -11,7 +11,6 @@ import enum
 import inspect
 import json
 import logging
-import math
 import multiprocessing
 import os
 import sys
@@ -1670,6 +1669,8 @@ class McpSession:
             self._handle_cancelled(request, server=server)
             return None
         elif method == "ping":
+            if "id" not in request:
+                return None
             return {"jsonrpc": "2.0", "id": request_id, "result": {}}
         elif method == "tools/list":
             if server is None:
@@ -1999,6 +2000,9 @@ class McpServer:
         """
         if self._closed:
             return _invalid_request(None, "Server is closed")
+
+        if not isinstance(request, dict):
+            return _invalid_request(None, "Invalid Request: expected JSON object")
 
         # Validate request ID length using server config
         if isinstance(request, dict):
@@ -2860,8 +2864,10 @@ def main() -> int:
     config = McpServerConfig.from_environment()
     server = McpServer(config=config)
     session = server.create_session(McpSessionState.UNINITIALIZED)
-    request_times: deque[float] = deque()
-    window = 1.0  # sliding window in seconds
+    rate = config.max_requests_per_second
+    rate_capacity = max(1.0, rate)
+    rate_tokens = rate_capacity
+    last_refill = time.monotonic()
     try:
         for line in sys.stdin:
             try:
@@ -2869,17 +2875,12 @@ def main() -> int:
                 if not line:
                     continue
 
-                response: dict[str, Any] | None = None
+                response: Any = None
                 if len(line.encode('utf-8')) > config.max_request_bytes:
                     response = _parse_error(
                         None,
                         f"Request exceeds maximum size of {config.max_request_bytes} bytes",
                     )
-                    print(json.dumps(response), flush=True)
-                    continue
-
-                if line.startswith('['):
-                    response = _invalid_request_error(None, "Batch requests are not supported")
                     print(json.dumps(response), flush=True)
                     continue
 
@@ -2891,11 +2892,9 @@ def main() -> int:
                     continue
 
                 now = time.monotonic()
-                while request_times and request_times[0] < now - window:
-                    request_times.popleft()
-
-                request_limit = math.ceil(config.max_requests_per_second)
-                if len(request_times) >= request_limit:
+                rate_tokens = min(rate_capacity, rate_tokens + (now - last_refill) * rate)
+                last_refill = now
+                if rate_tokens < 1:
                     response = _invalid_request_error(
                         request.get("id") if isinstance(request, dict) else None,
                         f"Rate limit exceeded: max {config.max_requests_per_second} requests per second",
@@ -2903,7 +2902,18 @@ def main() -> int:
                     print(json.dumps(response), flush=True)
                     continue
 
-                request_times.append(now)
+                rate_tokens -= 1
+
+                if isinstance(request, list):
+                    if not request:
+                        response = _invalid_request_error(None, "Invalid Request: empty batch")
+                    else:
+                        response = [
+                            _invalid_request_error(None, "Batch requests are not supported")
+                            for _ in request
+                        ]
+                    print(json.dumps(response), flush=True)
+                    continue
 
                 try:
                     response = server.handle_request(request, session=session)
