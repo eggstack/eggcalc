@@ -3157,7 +3157,9 @@ class UnitValue:
                     raise ValueError("Affine units cannot participate in floor division")
                 quotient = _floor_divide_quantities(self, other)
                 UnitValue._check_overflow(quotient)
-                return UnitValue(quotient, None)
+                # A dimensionless divisor leaves the dividend's unit intact
+                # (consistent with __truediv__ and __mod__).
+                return UnitValue(quotient, None if other.unit else self.unit)
             result = self.value // other.value  # type: ignore[operator]
             UnitValue._check_overflow(result)
             return UnitValue(result, None)

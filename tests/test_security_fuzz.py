@@ -532,8 +532,9 @@ class TestUnicodeFuzzing:
             try:
                 result = evaluate_raw(test_input)
                 assert result is not None
-            except (EvaluationError, SyntaxError):
-                pass  # Expected
+            except (EvaluationError, SyntaxError, ValueError):
+                pass  # Expected: includes intentional normalization
+                # rejections such as ambiguous juxtaposed numbers.
             except Exception as e:
                 pytest.fail(
                     f"Unexpected exception for input {test_input!r}: " f"{type(e).__name__}: {e}"

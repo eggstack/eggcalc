@@ -1178,19 +1178,19 @@ class TestCompoundUnitPipeline:
         assert abs(result.value - 198.4251968503937) < 1e-6
 
     def test_unit_power_suffix(self):
-        """5m ** 2 applies power to unit only (m2)."""
+        """5m ** 2 applies power to unit only (m**2)."""
         result, code = run("5m ** 2", NORMALIZE, PATTERNS)
         assert code == 0
         assert isinstance(result, UnitValue)
-        assert result.unit == "m2"
+        assert result.unit == "m**2"
         assert abs(result.value - 5.0) < 1e-10
 
     def test_unit_power_suffix_three(self):
-        """3m ** 3 applies power to unit only (m3)."""
+        """3m ** 3 applies power to unit only (m**3)."""
         result, code = run("3m ** 3", NORMALIZE, PATTERNS)
         assert code == 0
         assert isinstance(result, UnitValue)
-        assert result.unit == "m3"
+        assert result.unit == "m**3"
         assert abs(result.value - 3.0) < 1e-10
 
     def test_unit_division_different_units(self):
@@ -1242,11 +1242,11 @@ class TestCompoundUnitPipeline:
         assert abs(result.value - 15.0) < 1e-10
 
     def test_unit_power_of_kilometer(self):
-        """2km ** 2 applies power to unit only (km2)."""
+        """2km ** 2 applies power to unit only (km**2)."""
         result, code = run("2km ** 2", NORMALIZE, PATTERNS)
         assert code == 0
         assert isinstance(result, UnitValue)
-        assert result.unit == "km2"
+        assert result.unit == "km**2"
         assert abs(result.value - 2.0) < 1e-10
 
 

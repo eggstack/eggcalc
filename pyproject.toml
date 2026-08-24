@@ -71,6 +71,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Fail (with a thread dump) instead of hanging forever if a single test blocks.
+faulthandler_timeout = 300
 
 [tool.black]
 line-length = 100

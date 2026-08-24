@@ -605,7 +605,7 @@ class TestOperatorSpacing:
     def test_unit_caret_exponent_spacing(self, expr):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
-        assert normalized == "5*m2"
+        assert normalized == "5*m**2"
         result, code, _out, _err = _run(expr)
         assert code == 0
         assert isinstance(result, UnitValue)
@@ -616,7 +616,7 @@ class TestOperatorSpacing:
     def test_postfix_unit_squared_word_spacing(self, expr):
         normalized, code = normalize_expression(expr, NORMALIZE, PATTERNS)
         assert code == 0
-        assert normalized == "5*m2"
+        assert normalized == "5*m**2"
         result, code, _out, _err = _run(expr)
         assert code == 0
         assert isinstance(result, UnitValue)

@@ -772,6 +772,32 @@ def apply_math_functions(
             or prev.lower() in UNIT_ALIASES
         )
 
+    def _is_convert_target_unit(output_tokens: list, input_tokens: list, index: int) -> bool:
+        """Return True when a unit/function collision is the target of convert(...).
+
+        A target unit appears directly after "," inside an unclosed convert(
+        call (e.g., "min" in tokens ['convert', '(', '1', '*', 'h', ',', 'min',
+        ')']). Without this guard it would be rewritten to an empty call
+        ('min()') because neither the source-suffix nor the IN/TO guards apply.
+        """
+        token = input_tokens[index]
+        if token not in UNIT_ALIASES and token.lower() not in UNIT_ALIASES:
+            return False
+        if index + 1 < len(input_tokens) and input_tokens[index + 1] == "(":
+            return False
+        if not output_tokens or output_tokens[-1] != ",":
+            return False
+        depth = 0
+        for j in range(len(output_tokens) - 2, -1, -1):
+            tok = output_tokens[j]
+            if tok == ")":
+                depth += 1
+            elif tok == "(":
+                if depth == 0:
+                    return j > 0 and output_tokens[j - 1] == "convert"
+                depth -= 1
+        return False
+
     output_tokens: list[str] = []
     i = 0
     while i < len(tokens):
@@ -781,6 +807,11 @@ def apply_math_functions(
             func_name = operators["functions"][token]
 
             if _is_unit_suffix_context(output_tokens, tokens, i):
+                output_tokens.append(token)
+                i += 1
+                continue
+
+            if _is_convert_target_unit(output_tokens, tokens, i):
                 output_tokens.append(token)
                 i += 1
                 continue
@@ -1393,22 +1424,22 @@ def _normalize_spelled_unit_conversions(expression: str) -> str:
 
 
 def _canonical_power_unit(unit: str, exponent: str) -> str:
+    """Return the canonical spelling of a powered unit.
+
+    The explicit ``base**exponent`` form is preferred over the compact
+    registered alias (``m2``) so that every power path renders identically
+    (e.g., "5 m squared" and "5 m ** 2" both yield ``m**2``).
+    """
     canonical = UNIT_ALIASES.get(unit, UNIT_ALIASES.get(unit.lower(), unit))
-    return (
-        UNIT_ALIASES.get(f"{canonical}^{exponent}")
-        or UNIT_ALIASES.get(f"{unit}^{exponent}")
-        or UNIT_ALIASES.get(f"{unit.lower()}^{exponent}")
-        or UNIT_ALIASES.get(f"{canonical}{exponent}")
-        or f"{canonical}**{exponent}"
-    )
+    return f"{canonical}**{exponent}"
 
 
 def _normalize_postfix_unit_power_words(expression: str) -> str:
     """Normalize postfix unit power words like ``m squared`` and ``cm cubed``.
 
     Prefix forms such as ``square meters`` are already handled by UNIT_ALIASES
-    after whitespace removal. This covers the common postfix phrasing while
-    preserving the established shorthand meaning: ``5 m squared`` is ``5*m2``.
+    after whitespace removal. This covers the common postfix phrasing:
+    ``5 m squared`` is ``5*m**2``.
     """
     unit_alt = _UNIT_NAMES_ALTERNATION
 
@@ -1618,6 +1649,33 @@ def _rewrite_calculator_caret(expression: str) -> str:
         i += 1
 
     return "".join(out)
+
+
+# Ordinal words understood by the nth-root phrase handler ("third root of 8").
+_ORDINAL_ROOT_WORDS: dict[str, str] = {
+    "first": "1",
+    "second": "2",
+    "third": "3",
+    "fourth": "4",
+    "fifth": "5",
+    "sixth": "6",
+    "seventh": "7",
+    "eighth": "8",
+    "ninth": "9",
+    "tenth": "10",
+    "eleventh": "11",
+    "twelfth": "12",
+}
+
+# Matches "<ordinal> root of <radicand>" where the radicand is a number,
+# a name (e.g. pi), or a parenthesized expression.
+_NTH_ROOT_PATTERN = re.compile(
+    r"\b(?:(?:the)\s+)?"
+    r"(?:(?P<word>first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)"
+    r"|(?P<num>\d+(?:\.\d+)?)(?:st|nd|rd|th))\s+root\s+of\s+"
+    r"(?P<radicand>\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[A-Za-z_]\w*|\((?:[^()]|\([^()]*\))*\))",
+    flags=re.IGNORECASE,
+)
 
 
 # Module-level multi-word function name mappings (constant, no need to recreate each call)
@@ -1917,6 +1975,26 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression,
     )
 
+    # Reject juxtaposed bare digit groups ("5 5", "1 000"): the user never
+    # typed an operator between them, so silently summing them yields a
+    # plausible-looking wrong answer. Space-separated digits remain valid as
+    # arguments of a named function ("gcd 12 18", "mean of 1 2 3") or inside
+    # parentheses; those contexts are exempt.
+    for _m in re.finditer(r"(?<![\w.])\d+(?:\s+\d+)+", expression):
+        _prefix = expression[: _m.start()].rstrip()
+        if _prefix.endswith("("):
+            continue
+        _prev_word = re.search(r"([A-Za-z_]\w*)$", _prefix)
+        if _prev_word and (
+            _prev_word.group(1).lower() in operators["functions"]
+            or _prev_word.group(1).lower() == "of"
+        ):
+            continue
+        raise ValueError(
+            f"Ambiguous juxtaposed numbers {_m.group(0)!r}: insert an operator "
+            "(e.g. '+') between them or remove the extra spaces"
+        )
+
     # Replace multi-word function names before whitespace removal collapses them
     # e.g., "square root" -> "sqrt", "cube root" -> "cbrt"
     for phrase, replacement in sorted(
@@ -1925,6 +2003,16 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression = re.sub(
             r"\b" + re.escape(phrase) + r"\b", replacement, expression, flags=re.IGNORECASE
         )
+
+    # Rewrite nth-root phrases ("the 3rd root of 27", "fourth root of 81")
+    # into explicit exponentiation so they don't collapse into an invalid
+    # identifier during whitespace removal. Must run before word replacement
+    # turns "of" into "*".
+    def _nth_root_replace(m: re.Match[str]) -> str:
+        n = m.group("word") and _ORDINAL_ROOT_WORDS[m.group("word").lower()] or m.group("num")
+        return f"({m.group('radicand')}**(1/{n}))"
+
+    expression = _NTH_ROOT_PATTERN.sub(_nth_root_replace, expression)
 
     # Accept compact single-argument function forms promised by the parser
     # comments, e.g. "sin30" -> "sin 30" and "2sqrt9" -> "2sqrt 9".
@@ -2723,6 +2811,19 @@ def _preprocess_units(expression: str) -> str:
                         # Emit the canonical form (e.g., "in" -> "inch") so
                         # the evaluator doesn't depend on the alias ordering.
                         canonical = UNIT_ALIASES.get(unit, unit)
+                        # When the matched text is itself a power-form alias
+                        # ("m**2", "m^2"), emit the explicit ``base**exp``
+                        # spelling so every power path renders identically
+                        # (matching "5 m ** 2" -> "m**2").
+                        power_alias = re.fullmatch(r"([A-Za-z]+)(?:\^|\*\*)(\d+)", unit)
+                        if power_alias:
+                            base = UNIT_ALIASES.get(
+                                power_alias.group(1),
+                                UNIT_ALIASES.get(
+                                    power_alias.group(1).lower(), power_alias.group(1)
+                                ),
+                            )
+                            canonical = f"{base}**{power_alias.group(2)}"
                         # If the next non-whitespace token is "**", the unit
                         # is being exponentiated. Wrap "<num>*<unit>" in
                         # parens so the unit participates in the exponent,
@@ -3028,8 +3129,11 @@ def _handle_unit_conversion_from_tokens(tokens: list) -> list:
                 to_token = tokens[to_idx]
                 to_unit_normalized = None
 
+                # A bare-number source ("2 TO tenth") must match its target
+                # exactly: a loose suffix match would claim ordinal words like
+                # "tenth" (ends with 'h' -> hours) and produce silent garbage.
                 for unit2 in _UNITS_BY_LENGTH:
-                    if to_token == unit2 or to_token.endswith(unit2):
+                    if to_token == unit2 or (not bare_number and to_token.endswith(unit2)):
                         to_unit_normalized = UNIT_ALIASES.get(unit2, unit2)
                         break
                 if to_unit_normalized is None and to_token.lower() in _LOWERCASE_TEMP_UNITS:
