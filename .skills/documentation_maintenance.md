@@ -37,9 +37,8 @@ Line counts drift as code evolves. Update these locations:
 - Individual `architecture/<module>.md` file headers
 
 ### Stale Test Count
-Run `pytest --co -q | tail -1` to get current count, then update:
+Run `pytest --co -q | tail -1` to get the current count. Prefer stating counts with an as-of date or pointing at the live command:
 - `.skills/testing.md` Current Test Count section
-- `.skills/architecture_review.md` Note section
 
 ### TypedDict Changes
 When modifying TypedDict classes in `exact/`:
@@ -59,8 +58,8 @@ When adding/removing MCP tools:
 
 1. **Never cite line numbers for code that changes frequently** — use function/class names instead
 2. **Always verify TypedDict fields against actual code** — fields are often renamed
-3. **Check that example code actually works** — run snippets before documenting
-4. **Keep performance numbers in one place** —prefer `docs/api.md` as source of truth
+3. **Check that example code actually works** — run snippets before documenting them; never trust pre-existing output comments
+4. **Keep performance numbers in one place** — prefer `docs/api.md` as the source of truth, with a machine-dependence caveat
 5. **Use `file:line` references only for stable landmarks** — class definitions, constants
 
 ## When to Prune Documentation

@@ -121,7 +121,7 @@ input → normalization inserts * before units, detects "in <unit>" conversion
 
 ### 3. Direct AST evaluation (`evaluate("5+3")`)
 
-Skips normalization entirely — `evaluator.evaluate()` parses valid Python math syntax directly. Fastest path (~17x); rejects natural language and unit suffixes.
+Skips normalization entirely — `evaluator.evaluate()` parses valid Python math syntax directly. Fastest path (roughly an order of magnitude faster than `evaluate_raw()` on typical expressions; exact ratio is machine-dependent). Rejects natural language and unit suffixes.
 
 ### 4. MCP tool call (`tools/call`)
 
@@ -173,8 +173,8 @@ All functions are deterministic, side-effect-free, and independently testable. N
 | `measure.py` | 265 | Line, word, character-category metrics | [measure.md](measure.md) |
 | `diff.py` | 258 | First diff, common prefix/suffix, Levenshtein, LCS, diff spans | [diff.md](diff.md) |
 | `diff_analysis.py` | 736 | Structural analysis of unified diffs: touched paths, hunk ranges, headers, conflict markers | [diff_analysis.md](diff_analysis.md) |
-| `validate.py` | 1,602 | Bracket/JSON/TOML/regex validation, JSON shape/extract/compare, list sort/dedupe, version compare | [validate.md](validate.md) |
-| `synthesis.py` | 1,630 | **High-level orchestrator**: composes primitives into composite analyses | [synthesis.md](synthesis.md) |
+| `validate.py` | 3,053 | Bracket/JSON/TOML/regex validation, JSON shape/extract/compare, list sort/dedupe, version compare | [validate.md](validate.md) |
+| `synthesis.py` | 1,982 | **High-level orchestrator**: composes primitives into composite analyses | [synthesis.md](synthesis.md) |
 | `transform.py` | 712 | Escaping/unescaping (JSON, Python, Rust, shell, regex, markdown, HTML, URL), hashing, fingerprinting | [transform.md](transform.md) |
 | `identifier.py` | 308 | Naming convention classification and cross-language validity | [identifier.md](identifier.md) |
 | `identifier_inspect.py` | 756 | Identifier collision detection (confusables, casefold, mixed scripts, keywords) | [identifier_inspect.md](identifier_inspect.md) |
@@ -192,7 +192,7 @@ All functions are deterministic, side-effect-free, and independently testable. N
 | `llm_hygiene.py` | 326 | LLM JSON output diagnosis (fences, prose, trailing commas, BOM, …) | [llm_hygiene.md](llm_hygiene.md) |
 | `manifests.py` | 868 | Manifest inspection: pyproject.toml, package.json, requirements.txt, go.mod, lockfiles; shared `_Finding` TypedDict | [manifests.md](manifests.md) |
 | `repo_audit.py` | 422 | Repository file inventory, language signals, vendor/generated detection | [repo_audit.md](repo_audit.md) |
-| `__init__.py` | 473 | Fully lazy public API: zero implementation imports at import time; 167-name `__all__` resolved via a 189-entry PEP 562 map | [exact.md](exact.md#exact__init__py--public-api) |
+| `__init__.py` | 473 | Fully lazy public API: zero implementation imports at import time; 197-name `__all__` resolved via a matching 197-entry `_LAZY_IMPORTS` map | [exact.md](exact.md#exact__init__py--public-api) |
 
 *(Package-level doc: [exact.md](exact.md).)*
 
@@ -240,9 +240,9 @@ Multi-stage pipeline converting natural language to Python syntax:
 | Stage | Description | Example |
 |-------|-------------|---------|
 | Filler removal | Strip conversational noise | `"what's"` → removed |
-| Number words | Words → digits (35 base words + ~200 multi-word compounds) | `"twenty one"` → `"21"` |
-| Operator conversion | Words → symbols (16 operator groups) | `"plus"` → `+`, `"of"` → `*` |
-| Function mapping | NL names → canonical calls (78 mappings) | `"square root"` → `sqrt` |
+| Number words | Words → digits (40 base entries + ~12,700 derived multi-word forms) | `"twenty one"` → `"21"` |
+| Operator conversion | Words → symbols (15 operator keys) | `"plus"` → `+`, `"of"` → `*` |
+| Function mapping | NL names → canonical calls (128 mappings + 20 multi-word names) | `"square root"` → `sqrt` |
 | Constant recognition | Physical constant names | `"avogadro"` → `na` |
 | Unit preprocessing | Insert implicit multiplication, canonicalize | `"30m"` → `30*m` |
 | XOR handling | `xor`/`bitxor` → `bitxor(...)` calls | `"5 xor 3"` → `bitxor(5, 3)` |
@@ -268,7 +268,7 @@ Parses with Python's `ast` module — **never `eval()`** — and walks the tree 
 | Primes | `isprime`, `primefactors`, `nextprime`, `prevprime` |
 | Random (gated) | `random`, `randint`, `randn`, `gauss`, `seed` — disabled in MCP mode |
 | Memory / variables | `M`, `M+`, `MR`, `MC`; `setvar`, `getvar`, `listvars` |
-| Constants (~60+) | `pi`, `e`, `tau`, `i`, `c`, `h`, `na`, `k`, `G`, `R`, … |
+| Constants (55) | `pi`, `e`, `tau`, `i`, `c`, `h`, `na`, `k`, `G`, `R`, … |
 
 DoS limits: `MAX_INPUT_LENGTH = 10_000`, `MAX_NESTING_DEPTH = 100`, `MAX_AST_NODES = 10_000`, `MAX_EXPONENT = 10_000`, `MAX_FACTORIAL = 1_000`, `MAX_SHIFT_COUNT = 50_000`, `MAX_RESULT_VALUE = 1e308`. Timeout evaluation runs in child processes bounded by a semaphore (4 concurrent spawns).
 
@@ -445,10 +445,10 @@ mcp/server.py ──► schemas, tools, evaluator, capabilities
 | `UNIT_DEFINITIONS` | units.py | Tuple of 150 `UnitSpec` — authoritative unit registry source |
 | `UNIT_ALIASES` / `UNIT_CATEGORIES` | units.py | Alias → canonical (~508) and alias → category maps |
 | `UNIT_CONVERSIONS` / `TEMPERATURE_CONVERSIONS` | units.py | Lazily-populated pairwise factor / affine-rule dicts |
-| `NUMBER_WORDS` / `OPERATOR_CONVERSIONS` / `FUNCTION_MAPPINGS` / `CONSTANT_WORDS` | normalize.py | NL lookup tables (35 base words, 16 operator groups, 78 function aliases) |
+| `NUMBER_WORDS` / `OPERATOR_CONVERSIONS` / `FUNCTION_MAPPINGS` / `CONSTANT_WORDS` | normalize.py | NL lookup tables (40 number entries, 15 operator keys, 128 function aliases, 20 constant word groups; `_MULTI_WORD_FUNCTIONS` adds 20 multi-word names) |
 | `NORMALIZE` / `PATTERNS` | normalize.py | Mutable config dicts rebuilt under a lock on config change |
 | `Memory` | evaluator.py | Thread-safe memory registers (≤1,000 named registers) |
-| `Evaluator` | evaluator.py | `ast.NodeVisitor` implementation; class-level `CONSTANTS` (~60+) and `FUNCTIONS` (~90+); per-instance variables (≤1,000) |
+| `Evaluator` | evaluator.py | `ast.NodeVisitor` implementation; class-level `CONSTANTS` (55) and `FUNCTIONS` (104); per-instance variables (≤1,000) |
 | `UnitPolicy` / `FunctionSpec` | evaluator.py | Dimensional contract enum (10 members) + frozen wrapper |
 | `TimeoutError` (custom) | evaluator.py | Raised by `evaluate_with_timeout()` |
 | `EggCalcApp` | evaluator.py | Thread-safe app wrapper: instance-local evaluator + LRU cache |

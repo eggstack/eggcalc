@@ -113,7 +113,7 @@ Note: `^` maps to an empty word-form list. Calculator caret rewriting (`_rewrite
 
 ### `FUNCTION_MAPPINGS`
 
-Maps function name variants to canonical names. Contains 79 entries covering:
+Maps function name variants to canonical names. Contains 128 entries (plus 20 multi-word names in `_MULTI_WORD_FUNCTIONS`, replaced before whitespace removal) covering:
 
 - Trigonometric: `sine`→`sin`, `cosine`→`cos`, `tangent`→`tan`, `arcsine`→`asin`, `arccosine`→`acos`, `arctangent`→`atan`
 - Hyperbolic: `hyperbolic sine`→`sinh`, `hyperbolic cosine`→`cosh`, `hyperbolic tangent`→`tanh`, `arcsinh`→`asinh`, `arccosh`→`acosh`, `arctanh`→`atanh`

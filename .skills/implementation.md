@@ -61,14 +61,14 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `eggcalc/_protocol.py` - MCP protocol version constants
 - `eggcalc/__main__.py` - Thin entry point (not in build manifest)
 
-#### exact/ modules (26 submodules, always separate)
-- `primitives.py` - UTF-8, codepoints, visible_repr
+#### exact/ modules (25 implementation submodules + `__init__.py`, always separate)
+- `primitives.py` - UTF-8, codepoints, visible_repr (CodepointInfo is a NamedTuple with an `idx` field)
 - `unicode_tools.py` - Script detection, confusables (forward and reverse)
 - `confusables.py` - Auto-generated data file (CONFUSABLES dict only)
 - `diff.py` - Levenshtein, diff_spans, `__all__` exports
 - `diff_analysis.py` - Diff analysis and classification
 - `measure.py` - Line/word metrics
-- `validate.py` - Bracket/JSON/regex validation with input limits
+- `validate.py` - Bracket/JSON/TOML/regex validation with input limits
 - `synthesis.py` - Text comparison/explanation
 - `unicode_policy.py` - Unicode canonicalization policies
 - `identifier.py` - Identifier table inspection
@@ -87,12 +87,15 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `manifests.py` - Manifest inspection tools
 - `llm_hygiene.py` - LLM hygiene analysis
 - `repo_audit.py` - Repository audit tools
-- `__init__.py` - Package exports
+- `__init__.py` - Fully lazy package exports (`_LAZY_IMPORTS` map + PEP 562)
+
+### Result-Type Convention
+All exact/ public functions return TypedDicts — plain `dict`s at runtime. Use key access (`result["equal"]`), never attribute access. See AGENTS.md Common Pitfalls #15.
 
 ### Always Run Tests
 After any change:
 ```bash
-.venv/bin/python build_single.py && .venv/bin/python -m pytest tests/ -x -q
+make check   # lint, format-check, typecheck, docs-check, build validation, full pytest suite
 ```
 
 ### Build Single File Notes

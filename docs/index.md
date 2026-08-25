@@ -20,7 +20,7 @@ evaluate_raw("what is pi times two")  # 6.283...
 
 ### `evaluate()` - Pre-Normalized Math Only
 
-Use this when you control the input format and want maximum performance (~15x faster):
+Use this when you control the input format and want maximum performance (skips normalization entirely):
 
 ```python
 from eggcalc import evaluate

@@ -79,7 +79,7 @@ from eggcalc import evaluate_raw, evaluate
 result = evaluate_raw("five plus three")    # 8
 result = evaluate_raw("30m + 100ft")        # 60.48 m
 
-# Fast path (pre-normalized expressions only, ~17x faster)
+# Fast path (pre-normalized expressions only; skips the full pipeline)
 result = evaluate("5+3")                     # 8
 ```
 

@@ -25,12 +25,14 @@ Assembles `eggcalc/` into a single portable `eggcalc.py`. The build script:
 ```
 
 ## CI Pipeline Order
+
+`make check` runs, in order:
 ```
-ruff → black --check → build_single.py → python eggcalc.py "5+3" (smoke) → pytest → mypy
+ruff → black --check → mypy (package + strict consumer) → docs-check → build_single.py --validate → pytest
 ```
-- `make check` runs all of the above (lint + format-check + typecheck + docs-check + full test suite)
 - `docs-check` runs `python scripts/generate_mcp_docs.py --check` to verify generated docs aren't stale
-- All checks must pass before merge
+- `make package-check` builds the wheel/sdist and runs `twine check` plus installed-wheel and single-file smoke tests
+- CI runs `make check` then `make package-check`; all checks must pass before merge
 
 ## Commands Reference
 
@@ -61,16 +63,15 @@ python install.py --install
 ## Version Bumping
 
 When releasing a new version:
-1. Update version in `pyproject.toml` (via `eggcalc/_version.py`)
-2. Update `__version__` in `eggcalc/_version.py`
-3. Update `docs/installation.md` version examples
-4. Add entry to `docs/changelog.md`
-5. Run full test suite to verify
+1. Update `__version__` in `eggcalc/_version.py` (single source of truth; `pyproject.toml` reads it dynamically)
+2. Add an entry to `CHANGELOG.md`
+3. Update the version example in `docs/installation.md`
+4. Run `make release-check` to verify
 
 ## Constraints
 
 - **Standard library only** — no pip packages in `eggcalc/`
-- **Python >=3.11** — CI tests 3.11–3.14
+- **Python >=3.11** — required CI uses 3.11; optional compatibility workflow tests 3.14 and Windows
 - **build_single.py compatibility** — all runtime code must be in core modules, exact/, or mcp/
 - **Import limits** — core modules use: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. `exact/` and `mcp/` packages may use additional stdlib modules (e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`).
 
@@ -79,4 +80,6 @@ When releasing a new version:
 1. **Import outside allowed set** — will break `build_single.py`. Check allowed imports above.
 2. **Aliased imports** — synthesis.py uses `count_graphemes as _count_graphemes`. Build script must de-alias these.
 3. **Name conflicts** — `main()` and `mcp_main()` are renamed by build script. Don't reference `normalize_main` in source tests.
-4. **Circular imports** — Core modules import each other in specific order: normalize → evaluator → units
+4. **Module order** — the manifest declares dependencies; `validate_build_manifest()` rejects cycles, unknown deps, and unreachable modules. Run `python3 build_single.py --validate` before assembling.
+
+See `architecture/build.md` for manifest details and assembly transforms.

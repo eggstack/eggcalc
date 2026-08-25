@@ -250,9 +250,9 @@ calc "60mi / h"            # 60 mi/h
 **Understanding unit handling:**
 
 ```bash
-# Numbers directly followed by units get multiplied
-calc "30m"                 # 30*m (30 meters)
-calc "5km"                 # 5*km (5 kilometers)
+# Numbers directly followed by units are treated as quantities
+calc "30m"                 # 30 m (30 meters)
+calc "5km"                 # 5 km (5 kilometers)
 
 # During arithmetic, incompatible units are converted to match
 calc "30m + 100ft"         # 60.48 m
@@ -369,10 +369,10 @@ print(is_unit("m"))     # True
 print(is_unit("kg"))    # True
 print(is_unit("xyz"))   # False
 
-# List all supported units
+# List all supported units (returns alias strings)
 from eggcalc import get_all_units
 units = get_all_units()
-print(f"Total units supported: {len(units)}")  # ~500
+print(f"Total unit aliases: {len(units)}")  # 508 aliases covering 150 canonical units
 
 # Temperature conversion requires temp(value, from_unit, to_unit)
 result = evaluate_raw("temp(100, C, F)")

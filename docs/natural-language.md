@@ -67,7 +67,7 @@ calc "thirty two"            # 32
 calc "ninety nine"           # 99
 ```
 
-### Ones + Scale → Multiply or Add
+### Ones + Scale → Multiply
 
 "one hundred fifty" → 1 * 100 + 50 → 150
 
@@ -76,12 +76,14 @@ calc "one hundred fifty"    # 150
 calc "two hundred"           # 200
 ```
 
-### Scale + Scale → Multiply
+### Scale + Scale → Addition
 
-"million billion" → 1,000,000 × 1,000,000,000 → 1×10¹⁵
+Adjacent scale words combine additively once converted:
+
+"million billion" → 1,000,000 + 1,000,000,000 → 1,001,000,000
 
 ```bash
-calc "million billion"       # 1e+15
+calc "million billion"       # 1001000000
 ```
 
 ### Multiple Scales
@@ -123,7 +125,7 @@ calc "one point five"        # 1.5
 calc "twenty point seven five"  # 20.175
 ```
 
-**How it works:** "point" creates a decimal point in the current accumulated number. "three point one four" becomes "3.1.4" which evaluates to 3.14.
+**How it works:** "point" inserts a decimal point into the number being built. "three point one four" becomes "3.14", "twenty point seven five" becomes "20.75".
 
 ## Stripped Phrases
 
@@ -201,40 +203,36 @@ calc "sqrt(144)"          # 12
 calc "abs(-5)"            # 5
 ```
 
-**"of" pattern:** The "of" pattern works for some functions:
+**"of" pattern:** The "of" pattern works for simple `function of number` forms:
 
 ```bash
 calc "square root of 16"  # 4
-calc "logarithm of e"     # 1
 calc "sine of pi"         # ~0
 ```
 
-However, for complex expressions, parentheses are more reliable:
+However, the "of" pattern only supports a bare number or constant after it — parenthesized sub-expressions fail. For anything complex, use function-call syntax:
 
 ```bash
 # Prefer this
 calc "sqrt(16)"           # 4
+calc "log10(100 * 10)"    # 3.0
 
-# Over this (may have edge cases)
-calc "square root of 16"  # 4
+# Not supported: "square root of (two to the power of six)"
 ```
 
 ## Parentheses
 
-Use "open" and "close" or actual parentheses:
+Use actual parentheses for grouping:
 
 ```bash
-calc "open five plus three close times two"
-# 16
-
 calc "(five plus three) times two"
 # 16
 
-calc "open two close to the power of open three plus one close close"
-# 16
+calc "(five plus three) times (two plus one)"
+# 24
 ```
 
-**Why "open/close":** In interactive mode, you might want to type natural language. "open" and "close" map to `(` and `)`.
+**Tip:** Parenthesized symbols are the reliable form. Natural-language grouping words ("open", "close") are **not** recognized, so prefer `( ... )` in expressions that mix functions and groups.
 
 ## Negative Numbers
 
@@ -336,7 +334,7 @@ calc "square root of one hundred forty four"
 # 12
 ```
 
-**Warning:** "one hundred forty four" parses as "100 + 44" = 144, not as the number 144. For the number 144, say "one hundred forty-four" (hyphenated) or just "one forty four".
+Compound number phrases are recognized and converted directly: "one hundred forty four" → 144.
 
 ### With Units
 
@@ -347,21 +345,21 @@ calc "thirty meters plus one hundred feet"
 calc "five kilometers in miles"
 # 3.107 mi
 
-calc "one hundred pounds minus ten ounces"
-# 99.375 lb
+calc "two hours plus thirty minutes"
+# 2.5 h
 ```
 
 ### With Functions
 
 ```bash
-calc "sine of thirty degrees"
+calc "sin(pi/6)"
 # 0.5
 
-calc "sqrt of (two to the power of six)"
+calc "sqrt(64)"
 # 8.0
 
-calc "log of (one hundred times ten)"
-# 6.0
+calc "log10(one thousand)"
+# 3.0
 ```
 
 ## See Also

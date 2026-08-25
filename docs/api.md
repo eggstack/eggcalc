@@ -7,7 +7,7 @@ eggcalc provides several evaluation functions with different trade-offs. Choose 
 | Use Case | Function | Why |
 |----------|----------|-----|
 | User input (forms, chat) | `evaluate_raw()` | Handles natural language, spaces, units |
-| Pre-normalized input (you control format) | `evaluate()` | ~15x faster, skips normalization, no config loading |
+| Pre-normalized input (you control format) | `evaluate()` | Skips normalization entirely; no config loading |
 | Repeated queries (webapps) | `evaluate_cached()` | LRU cache, O(1) after first call |
 | Untrusted input | `evaluate_with_timeout()` | Timeout protection against DoS |
 | Async frameworks (FastAPI) | `evaluate_async()` | Runs in thread pool |
@@ -110,10 +110,10 @@ custom evaluator changes are visible to subsequent cached evaluations.
 ```python
 from eggcalc import evaluate_cached
 
-# First call: ~155 μs (compute + cache)
+# First call: full pipeline cost (compute + cache)
 result = evaluate_cached("five plus three")
 
-# Subsequent calls: ~0.1 μs (cache hit)
+# Subsequent calls: cache hit, orders of magnitude cheaper
 result = evaluate_cached("five plus three")
 ```
 
@@ -376,12 +376,18 @@ print(f"Max nesting depth: {MAX_NESTING_DEPTH}")
 
 ## Performance Notes
 
+Ballpark figures measured on CPython 3.12 (Linux); absolute numbers vary by
+hardware and expression, but relative ordering holds:
+
 | Function | Speed (typical) | Notes |
 |----------|-----------------|-------|
-| `evaluate()` | ~10 μs/eval | Fastest, requires pre-normalized input |
-| `evaluate_raw()` | ~155 μs/eval | Full pipeline, natural language support |
-| `evaluate_cached()` | ~0.1 μs/eval (cached) | First call same as evaluate_raw |
-| `EggCalcApp.calculate()` | ~0.3 μs/eval (cached) | Instance-level caching |
+| `evaluate()` | ~25 μs/eval | Fastest, requires pre-normalized input |
+| `evaluate_raw()` | ~2 ms/eval | Full pipeline, natural language support |
+| `evaluate_cached()` | ~60 μs/eval (cached) | First call same as evaluate_raw |
+| `EggCalcApp.calculate()` | ~50 μs/eval (cached) | Instance-level caching |
 | `evaluate_async()` | Same as evaluate_raw | Runs in thread pool |
+
+The direct `evaluate()` path skips normalization entirely, which is where
+almost all of the pipeline cost lives.
 
 **For maximum performance with user input**: Cache parsed results using `evaluate_cached()` or `EggCalcApp`.

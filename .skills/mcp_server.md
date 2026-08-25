@@ -75,6 +75,7 @@ def tool_name(expression: str) -> dict:
 # Run MCP-specific tests (use venv python)
 .venv/bin/python -m pytest tests/test_mcp_server.py -v
 
-# Test server manually via stdio
+# Test server manually via stdio (initialize handshake first — tool calls
+# before initialize + notifications/initialized are rejected with -32600)
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' | .venv/bin/python -m eggcalc --mcp
 ```

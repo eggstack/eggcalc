@@ -2,7 +2,7 @@
 
 ## What This Is
 
-`eggcalc` — a natural language math calculator (CLI, library, MCP server). Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file. Also see `AGENTS.override.md` for session-specific overrides (takes precedence over this file) and `.skills/*.md` for per-domain agent guides (testing, implementation, MCP server, releases).
+`eggcalc` — a natural language math calculator (CLI, library, MCP server). Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file. Also see `AGENTS.override.md` for session-specific overrides (takes precedence over this file) and `.skills/*.md` for per-domain agent guides (testing, implementation, MCP server, build & release, architecture review, documentation maintenance).
 
 ## Critical: Two Evaluation Paths
 
@@ -21,7 +21,7 @@ run("five plus three", NORMALIZE, PATTERNS)  # → (8, 0); also prints "8" to st
 run("30m + 100ft", NORMALIZE, PATTERNS)      # → (60.48 m, 0); prints too
 evaluate("5+3")                              # → 8
 evaluate("5 + 3")                            # → 8 (spaces are tolerated)
-evaluate("five plus three")                  # → raises SyntaxError
+evaluate("five plus three")                  # → raises EvaluationError (invalid syntax)
 ```
 
 The public API wraps these differently:
@@ -192,11 +192,11 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 
 ## Architecture Docs
 
-The `architecture/` directory has module-level developer docs. Start with `architecture/overview.md` for data flow and module dependencies.
+The `architecture/` directory has module-level developer docs (38 files — every module in the codebase has a dedicated deep dive). Start with `architecture/overview.md` for the data flow, verified module map, and the full Deep Dive Index; the table below covers the highest-traffic docs.
 
 | Doc | Covers |
 |-----|--------|
-| `overview.md` | System architecture, data flow, module map |
+| `overview.md` | System architecture, data flow, module map, Deep Dive Index for all 38 docs |
 | `normalize.md` | NL tokenization pipeline |
 | `evaluator.md` | AST parsing, math functions, constants, unit policies |
 | `units.md` | Unit definitions, conversions, UnitValue, UnitSpec, UnitExpression |
@@ -206,6 +206,8 @@ The `architecture/` directory has module-level developer docs. Start with `archi
 | `build.md` | build_single.py, MODULE_MANIFEST, single-file assembly |
 | `exact.md` | exact/ package (Unicode, text analysis) |
 | `authority_inventory.md` | Single authoritative source for every major registry/constant/contract |
+
+Historical records: `plans/*.md` are archived roadmap/evidence documents from past releases — read-only reference, not active work.
 
 ## Config Loading Safety
 
@@ -240,3 +242,4 @@ Library APIs (`evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evalua
 12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Eagerly loaded: `_version`, `_protocol`, `normalize`, `evaluator`, `units`, `capabilities`. Confusables data is lazy and decoded only on first access.
 13. **`Dimension(angle=True)` is not dimensionless** — Angle is a structural axis, not a compatibility alias for dimensionless. `rad + 1` is rejected.
 14. **`ToolRegistry.tool_names` returns `tuple[str, ...]`** — not `list[str]`. Use `list(registry.tool_names)` if you need a mutable list.
+15. **exact/ results are plain dicts** — synthesis/validate/measure/etc. return `TypedDict`s, which are ordinary `dict`s at runtime. Attribute access (`result.equal`) raises `AttributeError`; use key access (`result["equal"]`). Exception: `codepoints()` items are `CodepointInfo` named tuples (`cp.idx`, not `cp.index`).

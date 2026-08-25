@@ -34,6 +34,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ToolRegistry.get_schema()` returns deep copy to prevent nested mutation
 - 27 new tests covering registry nested mutation, config deep immutability, random isolation determinism, executor cancellation, concurrent session close/dispatch, config activation path, and config parsing
 
+### Fixed
+
+Calculator and normalization:
+- Reject ambiguous juxtaposed digit input (`5 5`, `1 000`) instead of silently summing; function arguments and multi-word numbers are unaffected
+- Bare-number conversions no longer claim ordinal words (`two to the tenth` no longer yields `2 h`); conversion targets must match unit names exactly
+- `convert()` keeps target units intact on function-name collisions (`1 hour in minutes` no longer hits empty `min()`)
+- Powered units render uniformly as `base**exp` across parse paths (`5m^2`, `5m**2`, and `5 m squared` all match `5 m ** 2`)
+- Nth-root phrases supported (`the 3rd root of 27` → `3`)
+- `UnitValue.__floordiv__` preserves the dividend unit when the divisor is a dimensionless `UnitValue`
+
+MCP server and tools:
+- `ToolExecutor` shutdown wait is bounded (reaper thread + timeout)
+- `_cleanup_orphaned_processes()` is wired into `McpServer.close()` and `atexit`; still-alive orphans stay tracked
+- `structured_data_compare` reads the shape type from `result["shape"]["type"]` so `TYPE_MISMATCH` can fire
+- `regex_safety_check` derives severity from the top-level risk and uses `len(pattern)` for `pattern_length`
+
+CLI:
+- REPL no longer swallows `SystemExit` (SIGTERM during evaluation)
+- `normalize.run()` honors `show_expression` in JSON output
+
+Testing:
+- pytest `faulthandler_timeout` hang guard added
+
 ## [1.2.0] - 2026-07-16
 
 ### Fixed

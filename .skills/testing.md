@@ -73,7 +73,7 @@ result = uv1 + uv2
 ### Testing Error Cases
 ```python
 import pytest
-from eggcalc import evaluate
+from eggcalc import evaluate, EvaluationError
 
 def test_invalid_expression():
     with pytest.raises(EvaluationError):
@@ -97,6 +97,9 @@ def test_overflow():
 
 # With verbose output
 .venv/bin/python -m pytest tests/ -v
+
+# Full correctness gate (lint + format-check + typecheck + docs-check + build validation + tests)
+make check
 ```
 
 ## Test File Structure
@@ -105,9 +108,11 @@ tests/
 ├── conftest.py                        # Shared fixtures
 ├── test_bugs_2026_07_regressions.py   # Regression tests for 2026-07 bugs
 ├── test_bugs_2026_08.py               # Regression tests for 2026-08 bugs
+├── test_bugs_2026_08_audit.py         # Regression tests for 2026-08 audit findings
+├── test_bugs_2026_08_followup.py      # Follow-up regression tests for 2026-08 audit
 ├── test_build_manifest_graph.py       # Build manifest graph tests
 ├── test_build_single.py               # Build script tests
-├── test_calculator_operator_semantics.py # Operator semantics tests
+├── test_calculator_operator_semantics.py # Operator semantics tests (caret, floor/mod)
 ├── test_cargo_inspect.py              # Cargo.toml inspection tests
 ├── test_cli_compatibility.py          # CLI compatibility tests
 ├── test_cli_text.py                   # CLI text tools tests
@@ -162,15 +167,17 @@ tests/
 ├── test_unit_family_invariants.py     # Unit family invariant tests
 ├── test_unit_namespace.py             # Unit namespace tests
 ├── test_version_constraint.py         # Version constraint tests
+├── typing/consumer.py                 # External typed-consumer API surface (mypy --strict)
 └── fixtures/                          # Test fixtures directory
 ```
 
 ## Current Test Count
-- 4525 tests pass (as of 2026-08-19)
+- Run `pytest --co -q | tail -1` for the live count; ~4,600+ tests as of 2026-08-25
 - All must continue to pass
 
 ## Common Issues When Testing
-1. Using `evaluate()` for NL input → KeyError or parse errors
+1. Using `evaluate()` for NL input → `EvaluationError` (invalid syntax)
 2. Using `evaluate()` for unit expressions → fails to recognize units
 3. Forgetting to extract `.value` from `UnitValue` for numeric comparisons
 4. Not accounting for floating-point precision in comparisons (use `pytest.approx`)
+5. Attribute access on exact/ results → `AttributeError` (TypedDicts are plain dicts; use key access)

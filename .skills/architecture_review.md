@@ -19,7 +19,7 @@ cat architecture/<module>.md
 # Read corresponding implementation
 cat eggcalc/<module>.py
 
-# List all architecture docs
+# List all architecture docs (38 files; overview.md has the Deep Dive Index)
 ls architecture/
 ```
 
@@ -36,8 +36,9 @@ For each module, examine:
 
 ### 3. Verification Steps
 - Use `grep` to find specific function definitions
-- Use `python3 -c "from module import function"` to verify exports
+- Use `.venv/bin/python -c "from module import function"` to verify exports (system python may lack the package installed)
 - Check `__all__` lists for public API consistency
+- Run examples from docs — do not trust doc output comments; execute them
 - Run tests to verify functionality
 
 ### 4. Important Notes
@@ -48,48 +49,23 @@ For each module, examine:
 
 ### 5. Known Code Patterns
 - TypedDict classes don't support `__slots__` (ignored by Python)
+- exact/ functions return TypedDicts — plain dicts at runtime; attribute access fails
 - `_get_script_heuristic()` is cached with `@lru_cache`
 - CONFUSABLES dict has `reverse_confusables()` for reverse lookups
 - `unicode_normalization_only` classification is valid and reachable in `text_equal()`/`explain_diff()`, but NOT in `list_compare()` near_matches (removed as dead code)
 - `MAX_INPUT_LENGTH = 100_000` enforced in validate.py and MCP tools
 
-## Common Issues Found in This Codebase
+## Documentation/Code Inconsistencies to Watch For
 
-**These issues were identified during architecture review and have been resolved:**
-
-1. **Combine consecutive numbers** - `split_at_operators` now properly handles whitespace-separated number words
-2. **TypedDict `__slots__`** - Removed from all TypedDict classes (they don't support `__slots__`)
-3. **Missing exports in exact/__init__.py** - `unicode_scripts`, `confusables_count`, `longest_common_subsequence` now exported
-4. **Text classification order** - `_classify_difference()` checks NFC equality before casefold equality
-5. **MCP response consistency** - `math_eval` returns direct result dict
-6. **Temperature conversion crash** - Now raises descriptive ValueError
-7. **list_compare() dead code** - Removed unreachable `unicode_normalization_only` loop
-8. **Float regex pipe bug** - Fixed `[-|+]?` to `[-+]?`
-9. **Duplicate constants table entries** - Fixed (removed duplicate `G` entry)
-10. **UnitValue methods undocumented** - Now documented (`__str__`, `__format__`, `__eq__`, `__hash__`, etc.)
-
-**Documentation/Code inconsistencies to watch for:**
-
-- TypedDict vs NamedTuple mismatches (code uses TypedDict throughout)
-- Missing function aliases (check `mcp_main = main` at server.py:2935)
-- Data structure field mismatches (verify against actual code)
-- Parameter name alignment (docs sometimes use different names than code)
-
-**Note:** The architecture review has been completed. All module reviews were performed and findings incorporated into the documentation. Test count: 4525 (as of 2026-08-19).
-
-## Architecture Review Findings (2026-05-28 through 2026-05-29)
-
-The architecture review identified issues across all modules. **All 35 actionable items implemented/fixed.**
-
-### Review Process Notes
-- All modules reviewed with improvement plans generated
-- Complete findings consolidated in architecture documentation
-- 35 actionable items across 5 waves implemented and verified
-- All items resolved
+- TypedDict vs NamedTuple mismatches (code uses TypedDict throughout; exception: `CodepointInfo` in primitives.py is a NamedTuple with an `idx` field)
+- Stale line counts in module tables (`wc -l eggcalc/<module>.py` to verify)
+- Stale registry counts (unit definitions, tool counts, profile sizes, lookup-table sizes — measure them, don't estimate)
+- Example output comments that were never executed (run every snippet before documenting it)
+- Missing function aliases (e.g., `mcp_main = main` at the end of server.py)
 
 ## Architecture Files Location
-- `architecture/` - Module-level documentation (20 docs including overview, authority_inventory, mutable_state_inventory)
-- `docs/exact.md` - exact/ module documentation
+- `architecture/` - Module-level documentation (38 docs including overview, authority_inventory, mutable_state_inventory)
+- `docs/exact.md` - User-facing exact/ module documentation
 
 ## Documentation Maintenance
 When updating code:
@@ -97,3 +73,5 @@ When updating code:
 2. Ensure `build_single.py` still works (code must be in core modules)
 3. Run all tests to verify no regressions
 4. Update AGENTS.md if new conventions are introduced
+
+See `.skills/documentation_maintenance.md` for the full update checklist.

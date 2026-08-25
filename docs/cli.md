@@ -33,17 +33,22 @@ When you pipe input, the same full pipeline is used.
 | Option | Description |
 |--------|-------------|
 | `-h`, `--help` | Show help message with operators, units, and examples |
+| `--usage` | Show full usage information and examples |
 | `-v`, `--version` | Show version information |
-| `-e`, `--expression` | Evaluate a single expression (quiet mode by default) |
-| `-q`, `--quiet` | Suppress expression in output (alias for `-e`) |
-| `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
-| `--json` | Output result and normalized expression as JSON |
+| `-e`, `--expression <expr>` | Evaluate a single expression (quiet mode by default) |
+| `-q`, `--quiet` | Suppress the expression field in JSON output |
+| `--verbose` | Accepted for compatibility; plain output remains result-only |
+| `--json` | Output result (and normalized expression unless `-q`) as JSON |
 | `-i`, `--interactive` | Start interactive REPL mode |
+| `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
 | `--mcp` | Run as MCP server for math, text, and validation tools |
+| `--mcp-profile <name>` | MCP tool profile (default: `full`, or `EGGCALC_MCP_PROFILE` env var) |
+| `--mcp-schema-detail {compact,normal,full}` | MCP schema detail level |
+| `--capabilities` | Show runtime capabilities as JSON and exit |
 
 ### Option Details
 
-**`-e` vs `-q`**: Both produce quiet output, but `-e` explicitly marks the input as an expression to evaluate. Use `-e` when piping or providing a single expression.
+**`-e` vs `-q`**: `-e` evaluates a single expression with quiet output. `-q` only affects `--json` output — it suppresses the `"expression"` field so the JSON contains the result only.
 
 **`-s` (show)**: Accepted for compatibility. Plain output is always the result only.
 
@@ -74,13 +79,16 @@ calc -e "5 + 3"
 
 ### Show Expression
 
-The `-s` flag is reserved for future use. Currently, output is always the result only.
+The `-s` flag is accepted for compatibility with other calculators. Plain output is always the result only.
 
 ### JSON Output
 
 ```bash
 calc --json "5 + 3"
 # {"result": 8, "expression": "5+3"}
+
+calc --json -q "5 + 3"
+# {"result": 8}
 ```
 
 ### Interactive Mode <!-- cli.md:96 -->
