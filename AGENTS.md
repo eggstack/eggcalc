@@ -2,7 +2,7 @@
 
 ## What This Is
 
-`eggcalc` — a natural language math calculator (CLI, library, MCP server). Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file. Also see `AGENTS.override.md` for session-specific overrides (takes precedence over this file).
+`eggcalc` — a natural language math calculator (CLI, library, MCP server). Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file. Also see `AGENTS.override.md` for session-specific overrides (takes precedence over this file) and `.skills/*.md` for per-domain agent guides (testing, implementation, MCP server, releases).
 
 ## Critical: Two Evaluation Paths
 
@@ -14,11 +14,11 @@ This is the #1 source of mistakes. The codebase has two distinct entry points:
 | `evaluate_raw(expr)` | NL + units + math | User-facing expressions (`"five plus three"`, `"30m + 100ft"`) |
 | `run(expr, NORMALIZE, PATTERNS)` | CLI-compatible normalization path | Lower-level helper for NL/unit normalization and evaluation |
 
-`run()` normalizes NL/units first, then calls `evaluate()` internally. `evaluate()` parses directly via Python AST — it **rejects** natural language and unit suffixes.
+`run()` normalizes NL/units first, then calls `evaluate()` internally. It is a CLI helper: it **prints** the result (or error) to stdout/stderr and returns `(result, exit_code)` — result is `None` on failure. `evaluate()` parses directly via Python AST — it **rejects** natural language and unit suffixes.
 
 ```python
-run("five plus three", NORMALIZE, PATTERNS)  # → 8
-run("30m + 100ft", NORMALIZE, PATTERNS)      # → 60.48 m
+run("five plus three", NORMALIZE, PATTERNS)  # → (8, 0); also prints "8" to stdout
+run("30m + 100ft", NORMALIZE, PATTERNS)      # → (60.48 m, 0); prints too
 evaluate("5+3")                              # → 8
 evaluate("5 + 3")                            # → 8 (spaces are tolerated)
 evaluate("five plus three")                  # → raises SyntaxError
@@ -184,7 +184,7 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - 77 tools across 18 categories. Tool names unified via `TOOL_SCHEMAS` in `schemas.py` and `server.py`.
 - 11 tool profiles: `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
 - Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Per-request `profile` param overrides in `tools/list`.
-- `mcp_main` is defined in `server.py:2935`.
+- `mcp_main` is an alias for `main` in `server.py`.
 - **Session lifecycle:** Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`.
 - **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`.
 - **Deferred exact imports:** `tools.py` uses local imports for `eggcalc.exact` modules. Implementation modules are imported on first tool invocation, not at `import eggcalc.mcp` time. Schemas remain eagerly available for `tools/list`.
@@ -237,6 +237,6 @@ Library APIs (`evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evalua
 9. **MCP handshake before tools** — `main()` creates an UNINITIALIZED session. Clients must send `initialize` then `notifications/initialized` before `tools/list` or `tools/call`. Tool requests before init return `-32600`.
 10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`). Use `McpServer` + `McpSession` for new code.
 11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.
-12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Only `normalize`, `evaluator`, and `units` are loaded eagerly. Confusables data is lazy and decoded only on first access.
+12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Eagerly loaded: `_version`, `_protocol`, `normalize`, `evaluator`, `units`, `capabilities`. Confusables data is lazy and decoded only on first access.
 13. **`Dimension(angle=True)` is not dimensionless** — Angle is a structural axis, not a compatibility alias for dimensionless. `rad + 1` is rejected.
 14. **`ToolRegistry.tool_names` returns `tuple[str, ...]`** — not `list[str]`. Use `list(registry.tool_names)` if you need a mutable list.
