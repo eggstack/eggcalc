@@ -317,6 +317,8 @@ NUMBER_WORDS: dict[str, list[str]] = {
     "1000000000000000000": ["quintillion"],
     "0.5": ["half"],
     "0.25": ["quarter"],
+    "0.1": ["tenth"],
+    "0.01": ["hundredth"],
     "0.001": ["thousandth"],
     "0.000001": ["millionth"],
     "0.000000001": ["billionth"],
@@ -868,6 +870,28 @@ def apply_math_functions(
                         output_tokens.append(")")
                         i += 1
                         continue
+                    # Postfix form after a parenthesized group: "(3+2) factorial"
+                    # -> "factorial((3+2))". Wrap the balanced trailing group.
+                    if output_tokens and output_tokens[-1] == ")":
+                        depth = 0
+                        open_idx = -1
+                        for j in range(len(output_tokens) - 1, -1, -1):
+                            if output_tokens[j] == ")":
+                                depth += 1
+                            elif output_tokens[j] == "(":
+                                depth -= 1
+                                if depth == 0:
+                                    open_idx = j
+                                    break
+                        if open_idx >= 0:
+                            group = output_tokens[open_idx:]
+                            del output_tokens[open_idx:]
+                            output_tokens.append(func_name)
+                            output_tokens.append("(")
+                            output_tokens.extend(group)
+                            output_tokens.append(")")
+                            i += 1
+                            continue
 
             output_tokens.append(func_name)
             next_token = tokens[i + 1] if i + 1 < len(tokens) else None
@@ -1195,9 +1219,11 @@ def _should_split_number_sequence(token: str) -> bool:
 
 # Module-level binary-word validation. Detects <value> not/in/to/as/into <value>
 # patterns and raises a clear error (e.g., "5 not 6" -> SyntaxError rather than
-# the silent "5~6" that would be produced by naive word substitution).
+# the silent "5~6" that would be produced by naive word substitution). The left
+# value may end in a unit identifier ("5 m in 3 s") — such inputs would
+# otherwise fuse into invalid names like "mIN3".
 _BINARY_WORD_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\))\s+"
+    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\)|\d*[A-Za-z_]\w*)\s+"
     r"(not\s+in|not|in|to|as|into)\s+"
     r"(\d+(?:\.\d+)?)\b",
     flags=re.IGNORECASE,
@@ -1872,6 +1898,8 @@ _MULTI_WORD_NUMBERS["one quarter"] = "0.25"
 _MULTI_WORD_NUMBERS["one third"] = "0.3333333333333333"
 _MULTI_WORD_NUMBERS["two thirds"] = "0.6666666666666666"
 _MULTI_WORD_NUMBERS["three quarters"] = "0.75"
+_MULTI_WORD_NUMBERS["one tenth"] = "0.1"
+_MULTI_WORD_NUMBERS["one hundredth"] = "0.01"
 
 # Dedupe by value, keeping the most natural form. The builder above produces
 # many alternate phrases for the same number (e.g. ``"ninety ten"`` and
@@ -1924,6 +1952,25 @@ for _val, _words in NUMBER_WORDS.items():
         _ALL_NUMBER_WORDS_FLAT[_word] = _val
 _SORTED_ALL_NUMBER_WORDS: list[tuple[str, str]] = sorted(
     _ALL_NUMBER_WORDS_FLAT.items(), key=lambda x: len(x[0]), reverse=True
+)
+
+# Ordinal fraction words that double as spelled exponents in power phrases
+# ("two to the tenth"); resolved cardinally by _ORDINAL_EXPONENT_PATTERN
+# before generic fraction mapping applies.
+_ORDINAL_FRACTION_WORDS = frozenset({"tenth", "hundredth", "thousandth", "millionth", "billionth"})
+
+# Cardinal exponent value for each ordinal fraction word, used to resolve
+# power phrases like "two to the tenth" -> 2**10 before fraction mapping.
+_ORDINAL_FRACTION_EXPONENTS = {
+    "tenth": "10",
+    "hundredth": "100",
+    "thousandth": "1000",
+    "millionth": "1000000",
+    "billionth": "1000000000",
+}
+_ORDINAL_EXPONENT_PATTERN = re.compile(
+    r"\bto\s+the\s+(" + "|".join(sorted(_ORDINAL_FRACTION_WORDS, key=len, reverse=True)) + r")\b",
+    flags=re.IGNORECASE,
 )
 
 # Long filler phrases (>10 chars) for stripping
@@ -2116,6 +2163,15 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
             flags=re.IGNORECASE,
         )
 
+    # Power phrases with spelled ordinal exponents ("two to the tenth"):
+    # resolve the ordinal to its cardinal exponent value BEFORE generic
+    # number-word replacement maps it to a fraction (0.1), which would
+    # silently yield a tiny-exponent result instead of the intended power.
+    expression = _ORDINAL_EXPONENT_PATTERN.sub(
+        lambda m: f"to the {_ORDINAL_FRACTION_EXPONENTS[m.group(1).lower()]}",
+        expression,
+    )
+
     # Replace single number words with digits BEFORE _join_number_parts runs
     # This ensures unrecognized number words are converted to digits for the fallback path.
     # Compound numbers like "twenty one" are already resolved by _MULTI_WORD_NUMBERS above.
@@ -2191,6 +2247,9 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
 
     # Handle a point after a trailing decimal and a leading point phrase.
     expression = re.sub(r"(\d+\.)\s*point\s*(\d)", r"\1\2", expression, flags=re.IGNORECASE)
+    # Number already containing a decimal ("0.5 point 3", "10.5 point 3"):
+    # just drop "point" so the trailing digit extends the fraction.
+    expression = re.sub(r"\b(\d+\.\d+)\s*point\s*(\d)", r"\1\2", expression, flags=re.IGNORECASE)
     expression = re.sub(r"(?<![\w.])point\s*(\d)", r"0.\1", expression, flags=re.IGNORECASE)
 
     # Handle "point" as decimal separator: only when preceded by a digit or ')'
@@ -2587,6 +2646,11 @@ def _join_number_parts(expression: str) -> str:
     if len(tokens) <= 1:
         return expression
 
+    # Spaced scientific-notation tokens ("5 e3") and plain numbers used to
+    # validate the merge (no existing exponent, no trailing dot).
+    _EXPONENT_TOKEN_RE = re.compile(r"[eE][+-]?\d+")
+    _PLAIN_NUMBER_RE = re.compile(r"[+-]?(?:\d+(?:\.\d+)?|\.\d+)")
+
     # When users space only one side of an operator ("20 *20", "20/ 20"),
     # shell-style whitespace splitting leaves tokens like "*20" or "20/".
     # Treat those as operator+number, not opaque text that triggers implicit
@@ -2734,6 +2798,17 @@ def _join_number_parts(expression: str) -> str:
         elif _is_digit_token(token):
             if prev_kind == "other" and not _is_unit_token(token):
                 result.append("*")
+            # Merge spaced scientific notation: "5 e3" -> "5e3". A bare
+            # exponent token only fuses when it directly follows a plain
+            # (exponent-free) number; a lone "e" stays Euler's constant.
+            if (
+                current_number_seq
+                and _EXPONENT_TOKEN_RE.fullmatch(token)
+                and _PLAIN_NUMBER_RE.fullmatch(current_number_seq[-1])
+            ):
+                current_number_seq[-1] += token
+                prev_kind = "num"
+                continue
             current_number_seq.append(token)
             prev_kind = "num"
         else:

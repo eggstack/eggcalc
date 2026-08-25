@@ -302,7 +302,7 @@ def markdown_structure(
     )
 
 
-def _fingerprint(content: str) -> str:
+def _markdown_fingerprint(content: str) -> str:
     """Compute SHA-256 fingerprint of content."""
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -359,7 +359,7 @@ def code_fence_extract(
             elif current_fence_char == fence_char and current_fence_len >= fence_len:
                 # Closing fence
                 content_text = "\n".join(fence_content_lines)
-                fp = _fingerprint(content_text)
+                fp = _markdown_fingerprint(content_text)
 
                 # Apply language filter
                 if language is None or fence_lang.lower() == language.lower():
@@ -385,7 +385,7 @@ def code_fence_extract(
     # Handle unclosed fences
     if in_fence:
         content_text = "\n".join(fence_content_lines)
-        fp = _fingerprint(content_text)
+        fp = _markdown_fingerprint(content_text)
 
         unclosed_fences.append(
             {

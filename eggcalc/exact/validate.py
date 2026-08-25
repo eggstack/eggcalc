@@ -1202,7 +1202,11 @@ def regex_replace_preview(
 
 
 def _get_json_type(value: Any) -> str:
-    """Get type string for a JSON value."""
+    """Get type string for a JSON value.
+
+    Uses JSON Schema type vocabulary so outputs agree with
+    :func:`_get_type_name` ("number" for both ints and floats).
+    """
     if value is None:
         return "null"
     elif isinstance(value, bool):
@@ -1210,7 +1214,7 @@ def _get_json_type(value: Any) -> str:
     elif isinstance(value, int):
         return "integer"
     elif isinstance(value, float):
-        return "float"
+        return "number"
     elif isinstance(value, str):
         return "string"
     elif isinstance(value, list):

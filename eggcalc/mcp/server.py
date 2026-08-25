@@ -1214,12 +1214,17 @@ class ToolExecutor:
                 )
         # Release any QUEUED reservations that were cancelled by
         # cancel_futures=True before the worker wrapper could run.
+        # ACTIVE reservations are intentionally left in the set: their
+        # handlers are still running and will release them through the
+        # normal path, keeping len(_reservations) == _total_inflight
+        # (and the other accounting invariants) true throughout shutdown.
         with self._accounting_lock:
             for res in list(self._reservations):
                 if res.state == ReservationState.QUEUED:
                     res.state = ReservationState.RELEASED
                     self._queued_count -= 1
                     self._total_inflight -= 1
+                    self._reservations.discard(res)
             abandoned = sum(1 for res in self._reservations if res.state == ReservationState.ACTIVE)
             if abandoned:
                 logging.warning(
@@ -1227,7 +1232,6 @@ class ToolExecutor:
                     "counters settle when their handlers finish",
                     abandoned,
                 )
-            self._reservations.clear()
 
     @property
     def active_workers(self) -> int:
@@ -1271,13 +1275,18 @@ class EvaluationPolicy(enum.Enum):
 def _deep_freeze(value: Any) -> Any:
     """Recursively freeze JSON-like structures for deep immutability.
 
-    Dicts become ``MappingProxyType`` and lists become tuples; leaves
-    (scalars, callables) pass through unchanged.
+    Dicts become ``MappingProxyType``, lists become tuples, tuples are
+    recursed into, and sets become frozensets; leaves (scalars,
+    callables) pass through unchanged.
     """
     if isinstance(value, dict):
         return MappingProxyType({key: _deep_freeze(val) for key, val in value.items()})
     if isinstance(value, list):
         return tuple(_deep_freeze(val) for val in value)
+    if isinstance(value, tuple):
+        return tuple(_deep_freeze(val) for val in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(_deep_freeze(val) for val in value)
     return value
 
 
@@ -2055,41 +2064,79 @@ class McpServer:
         Captures the active RuntimeContext before queue admission so the
         request has one stable semantic context from validation through
         execution, even if a new configuration publishes while it is queued.
+
+        Validation mirrors the module-level handle_request shim: JSON-RPC
+        version, id type/length, and method presence/type are enforced here
+        so direct library calls get the same protocol conformance as the
+        stdin loop.
         """
         if self._closed:
+            # Notifications never receive responses; otherwise echo the id
+            # when it is detectable so clients can correlate the error.
+            if isinstance(request, dict):
+                if "id" not in request:
+                    return None
+                return _invalid_request(request.get("id"), "Server is closed")
             return _invalid_request(None, "Server is closed")
 
         if not isinstance(request, dict):
             return _invalid_request(None, "Invalid Request: expected JSON object")
 
+        # Validate JSON-RPC version.
+        jsonrpc_version = request.get("jsonrpc")
+        if jsonrpc_version != "2.0":
+            return _invalid_request(
+                request.get("id"),
+                f"Invalid Request: jsonrpc must be '2.0', got '{jsonrpc_version}'",
+            )
+
         # Validate request ID type and length using server config.
         # Shares one validator with the module-level handle_request so
         # both paths agree (reject bool, accept str/int/float/null).
-        if isinstance(request, dict):
-            request_id = request.get("id")
-            if request_id is not None:
-                id_error = _invalid_jsonrpc_id_reason(request_id)
-                if id_error is not None:
-                    return _invalid_request(None, f"Invalid Request: {id_error}")
-                id_str = str(request_id)
-                if len(id_str) > self._config.max_request_id_length:
-                    return _invalid_request(
-                        None,
-                        f"Invalid Request: 'id' exceeds maximum length of {self._config.max_request_id_length}",
-                    )
+        request_id = request.get("id")
+        # Explicit null id on a request is rejected: requests must have a
+        # non-null string or integer id.  Notifications omit "id" entirely.
+        if "id" in request and request_id is None and "method" in request:
+            return _invalid_request(
+                None,
+                "Invalid Request: 'id' must be a string or integer, not null",
+            )
+        if request_id is not None:
+            id_error = _invalid_jsonrpc_id_reason(request_id)
+            if id_error is not None:
+                return _invalid_request(None, f"Invalid Request: {id_error}")
+            id_str = str(request_id)
+            if len(id_str) > self._config.max_request_id_length:
+                return _invalid_request(
+                    None,
+                    f"Invalid Request: 'id' exceeds maximum length of {self._config.max_request_id_length}",
+                )
+
+        # Missing or non-string method is an Invalid Request (-32600),
+        # not a method-not-found dispatch failure.
+        if "method" not in request:
+            return _invalid_request(request_id, "Invalid Request: missing 'method'")
+        if not isinstance(request["method"], str):
+            return _invalid_request(
+                request.get("id"),
+                "Invalid Request: 'method' must be a string",
+            )
 
         if session is None:
             session = self.create_session()
         elif session._closed:
-            return _invalid_request(None, "Session is closed")
+            # Notifications never receive responses, even on closed sessions.
+            if "id" not in request:
+                return None
+            return _invalid_request(request_id, "Session is closed")
         elif session._owner_ref is None:
-            return _invalid_request(None, "Session is not bound to a server")
+            return _invalid_request(request_id, "Session is not bound to a server")
         else:
             owner = session._owner_ref()
             if owner is None:
-                return _invalid_request(None, "Session owner is unavailable")
+                return _invalid_request(request_id, "Session owner is unavailable")
             if owner is not self:
-                return _invalid_request(None, "Session belongs to another server")
+                return _invalid_request(request_id, "Session belongs to another server")
 
         # Capture one immutable context before dispatch.
         context = self._runtime_context

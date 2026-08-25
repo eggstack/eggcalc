@@ -113,7 +113,7 @@ _SCRIPT_RANGES: list[tuple[int, int, str]] = [
 ]
 
 
-def _get_script_heuristic(char: str) -> str:
+def _identifier_script_heuristic(char: str) -> str:
     """Determine script for a character using heuristic detection."""
     codepoint = ord(char)
 
@@ -132,7 +132,7 @@ def _normalize_nfc(text: str) -> str:
     return unicodedata.normalize("NFC", text)
 
 
-def _casefold(text: str) -> str:
+def _identifier_casefold(text: str) -> str:
     """Casefold text for case-insensitive comparison."""
     return text.casefold()
 
@@ -192,7 +192,7 @@ def _get_scripts(text: str) -> list[str]:
     """Get list of Unicode scripts used in text."""
     scripts: set[str] = set()
     for char in text:
-        script = _get_script_heuristic(char)
+        script = _identifier_script_heuristic(char)
         if script not in ("Common", "Inherited", "Unknown", "Other"):
             scripts.add(script)
     return sorted(list(scripts))
@@ -287,6 +287,9 @@ def identifier_inspect(
             for j, b_raw in enumerate(identifiers):
                 if i >= j:
                     continue
+                # Identical raw entries are duplicates, not collisions.
+                if a_raw == b_raw:
+                    continue
 
                 a_norm = normalized_ids[i]
                 b_norm = normalized_ids[j]
@@ -342,7 +345,7 @@ def identifier_inspect(
     if casefold:
         casefold_map: dict[str, list[str]] = {}
         for i, (raw, norm) in enumerate(zip(identifiers, normalized_ids)):
-            cf_key = _casefold(norm)
+            cf_key = _identifier_casefold(norm)
             if cf_key not in casefold_map:
                 casefold_map[cf_key] = []
             casefold_map[cf_key].append(raw)
@@ -351,6 +354,8 @@ def identifier_inspect(
             if len(items) > 1:
                 for i in range(len(items)):
                     for j in range(i + 1, len(items)):
+                        if items[i] == items[j]:
+                            continue
                         pair = (
                             (items[i], items[j]) if items[i] <= items[j] else (items[j], items[i])
                         )
@@ -375,6 +380,8 @@ def identifier_inspect(
             if len(items) > 1:
                 for i in range(len(items)):
                     for j in range(i + 1, len(items)):
+                        if items[i] == items[j]:
+                            continue
                         pair = (
                             (items[i], items[j]) if items[i] <= items[j] else (items[j], items[i])
                         )

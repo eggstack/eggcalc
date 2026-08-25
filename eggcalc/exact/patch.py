@@ -86,7 +86,7 @@ class PatchSummaryResult(TypedDict):
     findings: list[str]
 
 
-def _detect_newline_style(text: str) -> str:
+def _patch_detect_newline_style(text: str) -> str:
     """Detect newline style in text."""
     crlf_count = text.count("\r\n")
     lf_count = text.count("\n") - crlf_count
@@ -263,7 +263,7 @@ def _lines_to_text(lines: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _normalize_line(line: str) -> str:
+def _patch_normalize_line(line: str) -> str:
     """Normalize a diff line for comparison (strip CRLF)."""
     return line.rstrip("\r")
 
@@ -279,7 +279,7 @@ def _strip_line_prefix(line: str) -> str:
     return line
 
 
-def _fingerprint(text: str) -> str:
+def _patch_fingerprint(text: str) -> str:
     """Compute SHA-256 fingerprint of text."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -309,7 +309,7 @@ def _apply_hunk(
     expected_context: list[str] = []
 
     for hline in hunk["lines"]:
-        normalized = _normalize_line(hline)
+        normalized = _patch_normalize_line(hline)
         if normalized.startswith(" ") or normalized.startswith("-"):
             expected_context.append(_strip_line_prefix(normalized))
 
@@ -331,10 +331,10 @@ def _apply_hunk(
         )
 
     for idx, (expected, actual) in enumerate(zip(expected_context, actual_context, strict=False)):
-        if strict and _normalize_line(expected) != _normalize_line(actual):
+        if strict and _patch_normalize_line(expected) != _patch_normalize_line(actual):
             return None, (
                 f"Context mismatch at line {hunk['old_start'] + idx}: "
-                f"expected {_normalize_line(expected)!r}, got {_normalize_line(actual)!r}"
+                f"expected {_patch_normalize_line(expected)!r}, got {_patch_normalize_line(actual)!r}"
             )
 
     new_lines: list[str] = []
@@ -342,7 +342,7 @@ def _apply_hunk(
     hunk_idx = 0
 
     while hunk_idx < len(hunk["lines"]):
-        hline = _normalize_line(hunk["lines"][hunk_idx])
+        hline = _patch_normalize_line(hunk["lines"][hunk_idx])
         if hline.startswith(" "):
             if new_idx < len(original_lines):
                 new_lines.append(original_lines[new_idx])
@@ -404,8 +404,8 @@ def patch_apply_check(
             hunks_failed=0,
             failed_hunks=[],
             affected_line_ranges=[],
-            newline_style_before=_detect_newline_style(original_text),
-            newline_style_after=_detect_newline_style(original_text),
+            newline_style_before=_patch_detect_newline_style(original_text),
+            newline_style_after=_patch_detect_newline_style(original_text),
             result_fingerprint="",
             result_text=None,
             findings=[f"Original text exceeds maximum length of {MAX_ORIGINAL_LENGTH}"],
@@ -420,14 +420,14 @@ def patch_apply_check(
             hunks_failed=0,
             failed_hunks=[],
             affected_line_ranges=[],
-            newline_style_before=_detect_newline_style(original_text),
-            newline_style_after=_detect_newline_style(original_text),
+            newline_style_before=_patch_detect_newline_style(original_text),
+            newline_style_after=_patch_detect_newline_style(original_text),
             result_fingerprint="",
             result_text=None,
             findings=[f"Patch text exceeds maximum length of {MAX_PATCH_LENGTH}"],
         )
 
-    newline_before = _detect_newline_style(original_text)
+    newline_before = _patch_detect_newline_style(original_text)
 
     parse_result = parse_unified_diff(patch_text)
     if not parse_result["ok"]:
@@ -463,7 +463,7 @@ def patch_apply_check(
             affected_line_ranges=[],
             newline_style_before=newline_before,
             newline_style_after=newline_before,
-            result_fingerprint=_fingerprint(original_text),
+            result_fingerprint=_patch_fingerprint(original_text),
             result_text=original_text if return_result_text else None,
             findings=["No hunks found in patch"],
         )
@@ -486,9 +486,10 @@ def patch_apply_check(
         else:
             hunks_failed += 1
             expected_ctx = [
-                _strip_line_prefix(_normalize_line(line))
+                _strip_line_prefix(_patch_normalize_line(line))
                 for line in hunk["lines"]
-                if _normalize_line(line).startswith(" ") or _normalize_line(line).startswith("-")
+                if _patch_normalize_line(line).startswith(" ")
+                or _patch_normalize_line(line).startswith("-")
             ]
             actual_end = min(hunk["old_start"] - 1 + hunk["old_count"], len(current_lines))
             actual_ctx = (
@@ -510,13 +511,13 @@ def patch_apply_check(
 
     applies = hunks_failed == 0
     result_text = _lines_to_text(current_lines) if return_result_text else None
-    newline_after = _detect_newline_style(result_text or original_text)
+    newline_after = _patch_detect_newline_style(result_text or original_text)
 
     if hunks_failed > 0:
         findings.append(f"{hunks_failed} of {hunks_total} hunks failed to apply")
 
     result_fingerprint = (
-        _fingerprint(result_text or original_text) if return_result_fingerprint else ""
+        _patch_fingerprint(result_text or original_text) if return_result_fingerprint else ""
     )
 
     return PatchApplyCheckResult(
@@ -603,7 +604,7 @@ def patch_summary(patch_text: str) -> PatchSummaryResult:
             hunk_deletions = 0
 
             for hline in hunk["lines"]:
-                normalized = _normalize_line(hline)
+                normalized = _patch_normalize_line(hline)
                 if normalized.startswith("+"):
                     hunk_additions += 1
                 elif normalized.startswith("-"):

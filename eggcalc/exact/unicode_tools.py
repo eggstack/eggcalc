@@ -83,7 +83,7 @@ _SCRIPT_RANGES: list[tuple[int, int, str]] = [
 
 
 @functools.lru_cache(maxsize=128)
-def _get_script_heuristic(char: str) -> str:
+def _unicode_script_heuristic(char: str) -> str:
     """Determine script for a character using unicodedata.script() with fallback.
 
     Tries unicodedata.script() first (available in Python 3.14+), falling back
@@ -145,7 +145,7 @@ def unicode_script(char: str) -> str:
     if len(char) != 1:
         raise ValueError("char must be a single character")
 
-    return _get_script_heuristic(char)
+    return _unicode_script_heuristic(char)
 
 
 def unicode_scripts(s: str) -> list[str]:
@@ -157,7 +157,7 @@ def unicode_scripts(s: str) -> list[str]:
     Returns:
         List of script names for each character.
     """
-    return [_get_script_heuristic(char) for char in s]
+    return [_unicode_script_heuristic(char) for char in s]
 
 
 def detect_mixed_scripts(s: str) -> MixedScriptsResult:
@@ -179,7 +179,7 @@ def detect_mixed_scripts(s: str) -> MixedScriptsResult:
     scripts: set[str] = set()
 
     for index, char in enumerate(s):
-        script = _get_script_heuristic(char)
+        script = _unicode_script_heuristic(char)
         if script not in ("Common", "Inherited", "Other"):
             scripts.add(script)
             codepoint_str = f"U+{ord(char):04X}"

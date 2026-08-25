@@ -56,7 +56,7 @@ def _split_path_windows(path: str) -> list[str]:
     return [p for p in parts if p]
 
 
-def _casefold(s: str) -> str:
+def _glob_casefold(s: str) -> str:
     """Casefold string for case-insensitive comparison."""
     return s.casefold()
 
@@ -78,8 +78,8 @@ def _fnmatch_segment(pattern: str, segment: str, case_sensitive: bool = True) ->
         True if segment matches pattern.
     """
     if not case_sensitive:
-        pattern = _casefold(pattern)
-        segment = _casefold(segment)
+        pattern = _glob_casefold(pattern)
+        segment = _glob_casefold(segment)
 
     return re.match(_fnmatch_to_regex(pattern), segment) is not None
 

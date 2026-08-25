@@ -245,12 +245,8 @@ def text_transform(
         elif op_lower == "strip_final_newline":
             if current_text.endswith("\n"):
                 stripped = current_text[:-1]
-                if stripped.endswith("\n"):
-                    stripped2 = stripped
-                else:
-                    stripped2 = stripped
-                if stripped2 != current_text:
-                    current_text = stripped2
+                if stripped != current_text:
+                    current_text = stripped
                     operations_applied.append("strip_final_newline")
 
         elif op_lower == "remove_zero_width":
@@ -690,13 +686,14 @@ def text_fingerprint(
 
     is_nfc = unicodedata.is_normalized("NFC", text)
 
-    newline_style = "LF"
-    if "\r\n" in text:
-        newline_style = "CRLF"
-    elif "\r" in text and "\n" not in text:
-        newline_style = "CR"
-    elif "\n" not in text:
+    # Delegate to the authoritative detector so mixed line endings are
+    # labeled "mixed" instead of being misreported as "CRLF".
+    if "\n" not in text and "\r" not in text:
         newline_style = "none"
+    else:
+        from .primitives import detect_newline_style
+
+        newline_style = detect_newline_style(text)
 
     return TextFingerprintResult(
         sha256=sha256_hash,

@@ -46,7 +46,7 @@ class CharCategoryMetrics(TypedDict):
     combining_marks: int
 
 
-def _detect_newline_style(s: str) -> str:
+def _measure_detect_newline_style(s: str) -> str:
     """Detect the newline style used in the string."""
     has_crlf = "\r\n" in s
     standalone_cr = s.count("\r") - s.count("\r\n")
@@ -95,7 +95,7 @@ def line_metrics(s: str) -> LineMetrics:
     ends_with_newline = s.endswith("\n") or s.endswith("\r") or s.endswith("\r\n")
 
     # Detect newline style
-    newline_style = _detect_newline_style(s)
+    newline_style = _measure_detect_newline_style(s)
 
     # Analyze each line
     nonempty_lines = 0

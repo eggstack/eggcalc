@@ -899,7 +899,11 @@ def main() -> int:
         if args.mcp_profile:
             from eggcalc.mcp.server import set_active_profile
 
-            set_active_profile(args.mcp_profile)
+            try:
+                set_active_profile(args.mcp_profile)
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                return 2
         if args.mcp_schema_detail:
             from eggcalc.mcp.server import set_schema_detail
 

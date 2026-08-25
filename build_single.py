@@ -1272,7 +1272,7 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
             "main",
         }
     )
-    symbols: dict[str, str] = {}
+    symbols: dict[str, tuple[str, str]] = {}
     for spec in manifest:
         if not spec.include_single_file:
             continue
@@ -1284,13 +1284,18 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 name = node.name
-                if name in symbols and symbols[name] == spec.name:
+                source_key = ast.dump(node)
+                if name in symbols and symbols[name][0] == spec.name:
                     continue
-                if name in symbols and name not in allowlisted and not name.startswith("_"):
-                    errors.append(
-                        f"Duplicate generated global {name!r}: {symbols[name]} and {spec.name}"
-                    )
-                symbols[name] = spec.name
+                if name in symbols:
+                    first_module, first_source = symbols[name]
+                    if name not in allowlisted and (
+                        not name.startswith("_") or first_source != source_key
+                    ):
+                        errors.append(
+                            f"Duplicate generated global {name!r}: {first_module} and {spec.name}"
+                        )
+                symbols[name] = (spec.name, source_key)
 
     return errors
 

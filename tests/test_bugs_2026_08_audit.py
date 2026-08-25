@@ -33,13 +33,21 @@ class TestOrdinalPowerPhrases:
 
     @pytest.mark.parametrize(
         "expr",
-        ["two to the tenth", "two to the third", "five to the fourth"],
+        ["two to the third", "five to the fourth"],
     )
     def test_ordinal_power_phrase_does_not_convert(self, expr):
         from eggcalc.evaluator import EvaluationError, evaluate_raw
 
         with pytest.raises(EvaluationError):
             evaluate_raw(expr)
+
+    def test_spelled_ordinal_power_phrase_matches_digit_form(self):
+        # 2026-08-25 audit B4 added "tenth"/"hundredth" as number words;
+        # power phrases resolve the ordinal to its cardinal exponent
+        # ("two to the tenth" -> 2**10), matching the digit form.
+        from eggcalc.evaluator import evaluate_raw
+
+        assert evaluate_raw("two to the tenth") == evaluate_raw("two to the 10") == 1024
 
     def test_digit_power_phrase_still_works(self):
         from eggcalc.evaluator import evaluate_raw

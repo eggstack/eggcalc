@@ -144,9 +144,14 @@ _CONFLICT_SEP = re.compile(r"^=======$", re.MULTILINE)
 _CONFLICT_END = re.compile(r"^>>>>>>>", re.MULTILINE)
 
 
-def _normalize_line(line: str) -> str:
-    """Strip trailing whitespace for classification."""
-    return line.rstrip()
+def _diff_normalize_line(line: str) -> str:
+    """Normalize a diff line for classification.
+
+    Strips only trailing carriage returns. Trailing whitespace must be
+    preserved: a blank context line ``" "`` would otherwise collapse to
+    ``""`` and vanish from line-count classification.
+    """
+    return line.rstrip("\r")
 
 
 def diff_touched_paths(patch_text: str, max_files: int = 100) -> DiffTouchedPathsResult:
@@ -342,7 +347,7 @@ def diff_hunk_ranges(patch_text: str, max_files: int = 100) -> DiffHunkRangesRes
             context = 0
 
             for hline in hunk["lines"]:
-                normalized = _normalize_line(hline)
+                normalized = _diff_normalize_line(hline)
                 if normalized.startswith("+"):
                     added += 1
                 elif normalized.startswith("-"):
@@ -659,9 +664,9 @@ def unified_diff_validate(
 
             if check_line_counts:
                 total_lines = len(hunk["lines"])
-                deleted = sum(1 for l in hunk["lines"] if _normalize_line(l).startswith("-"))
-                context = sum(1 for l in hunk["lines"] if _normalize_line(l).startswith(" "))
-                added = sum(1 for l in hunk["lines"] if _normalize_line(l).startswith("+"))
+                deleted = sum(1 for l in hunk["lines"] if _diff_normalize_line(l).startswith("-"))
+                context = sum(1 for l in hunk["lines"] if _diff_normalize_line(l).startswith(" "))
+                added = sum(1 for l in hunk["lines"] if _diff_normalize_line(l).startswith("+"))
                 # Warn if body has more lines than header declares
                 if old_c > 0 and (deleted + context) > old_c:
                     warnings.append(
