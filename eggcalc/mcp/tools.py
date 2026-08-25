@@ -1838,14 +1838,19 @@ def regex_safety_check(pattern: str) -> dict:
     try:
         result = _regex_safety_check(pattern)
 
+        # RegexSafetyResult carries a single top-level risk rating; map it
+        # to the findings severity (findings themselves have no severity).
+        severity = {"low": "info", "medium": "warn", "high": "error"}.get(
+            result.get("risk", "low"), "warn"
+        )
         findings: list[dict] = []
         for risk in result.get("findings", []):
             findings.append(
                 {
                     "code": risk.get("kind", "UNKNOWN_RISK").upper(),
-                    "severity": risk.get("severity", "warn"),
+                    "severity": severity,
                     "message": risk.get("message", risk.get("kind", "Unknown risk")),
-                    "details": {"pattern_length": result.get("pattern_length", len(pattern))},
+                    "details": {"pattern_length": len(pattern)},
                 }
             )
 
@@ -5961,14 +5966,14 @@ def structured_data_compare(
             shape_b = sb.get("result", {})
             subresults["shape_a"] = shape_a
             subresults["shape_b"] = shape_b
-            if shape_a.get("type") != shape_b.get("type"):
+            type_a = shape_a.get("shape", {}).get("type")
+            type_b = shape_b.get("shape", {}).get("type")
+            if type_a != type_b:
                 all_findings.append(
                     {
                         "code": "TYPE_MISMATCH",
                         "severity": "warn",
-                        "message": (
-                            f"Type mismatch: a={shape_a.get('type')}, " f"b={shape_b.get('type')}"
-                        ),
+                        "message": f"Type mismatch: a={type_a}, b={type_b}",
                     }
                 )
     except Exception:

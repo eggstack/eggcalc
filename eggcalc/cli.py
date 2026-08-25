@@ -334,7 +334,10 @@ def _run_repl() -> int:
 
         try:
             result, exit_code = run_cli(line, "plain")
-        except (KeyboardInterrupt, SystemExit):
+        except SystemExit:
+            # SystemExit carries SIGTERM-driven shutdown; never swallow it.
+            raise
+        except KeyboardInterrupt:
             print()
             continue
         except Exception:

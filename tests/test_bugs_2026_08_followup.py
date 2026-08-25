@@ -264,7 +264,7 @@ class TestLazyHandlerErrorMapping:
 
 
 # ---------------------------------------------------------------------------
-# §2.8: REPL survives stray BaseExceptions from evaluation
+# §2.8: REPL survives stray exceptions from evaluation; SystemExit propagates
 # ---------------------------------------------------------------------------
 class TestReplCrashProofing:
     def _run_repl_script(self, injected: str) -> subprocess.CompletedProcess:
@@ -288,11 +288,16 @@ class TestReplCrashProofing:
             input="1+1\n2+2\nquit\n",
         )
 
-    @pytest.mark.parametrize("exc", ["raise SystemExit(3)", "raise RuntimeError('boom')"])
-    def test_repl_continues_after_injected_exception(self, exc):
-        result = self._run_repl_script(exc)
+    def test_repl_continues_after_runtime_error(self):
+        result = self._run_repl_script("raise RuntimeError('boom')")
         assert result.returncode == 0, result.stderr
         assert "SURVIVED 2" in result.stdout
+
+    def test_repl_propagates_systemexit(self):
+        # SystemExit carries SIGTERM-driven shutdown and must not be swallowed.
+        result = self._run_repl_script("raise SystemExit(3)")
+        assert result.returncode == 3
+        assert "SURVIVED" not in result.stdout
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +321,49 @@ class TestDeadOrphanApiRemoved:
         diag = server.diagnostic()
         assert diag["orphan_count"] == len(mcp_server._orphaned_processes)
         server.close()
+
+
+# ---------------------------------------------------------------------------
+# §3.1b: orphaned-process cleanup is wired up and reaps correctly
+# ---------------------------------------------------------------------------
+class TestOrphanCleanupWired:
+    def test_mcp_server_close_invokes_orphan_cleanup(self, monkeypatch):
+        from eggcalc.mcp import server as mcp_server
+        from eggcalc.mcp.server import McpServer
+
+        calls = []
+        monkeypatch.setattr(
+            mcp_server,
+            "_cleanup_orphaned_processes",
+            lambda: calls.append(True),
+        )
+        server = McpServer()
+        server.close()
+        assert calls == [True]
+
+    def test_cleanup_keeps_still_alive_processes_tracked(self):
+        from unittest.mock import MagicMock
+
+        from eggcalc.mcp import server as mcp_server
+
+        survivor = MagicMock()
+        survivor.is_alive.return_value = True
+        finished = MagicMock()
+        finished.is_alive.return_value = False
+        with mcp_server._orphaned_lock:
+            mcp_server._orphaned_processes.add(survivor)
+            mcp_server._orphaned_processes.add(finished)
+        try:
+            mcp_server._cleanup_orphaned_processes()
+            # Processes that survive kill stay tracked for a later pass;
+            # finished processes are reaped.
+            with mcp_server._orphaned_lock:
+                assert survivor in mcp_server._orphaned_processes
+                assert finished not in mcp_server._orphaned_processes
+        finally:
+            with mcp_server._orphaned_lock:
+                mcp_server._orphaned_processes.discard(survivor)
+                mcp_server._orphaned_processes.discard(finished)
 
 
 # ---------------------------------------------------------------------------

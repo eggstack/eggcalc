@@ -324,8 +324,12 @@ class TestToolExecutor:
     def test_executor_call_tool_timeout(self):
         executor = self._make_executor(max_tool_timeout_seconds=1)
 
+        release = threading.Event()
+
         def _slow(**kw):
-            time.sleep(10)
+            # Event-based stub: blocks until released, never pinning a
+            # worker longer than the test allows.
+            release.wait(timeout=10)
 
         handler = lambda **kw: None
         schema = {"inputSchema": {"type": "object", "properties": {}}}
@@ -336,11 +340,15 @@ class TestToolExecutor:
             profiles={"custom": ["slow_tool", "_dummy"]},
         )
         executor_slow = ToolExecutor(McpServerConfig(max_tool_timeout_seconds=1), registry)
-        result = executor_slow.call_tool("slow_tool", {}, request_id="t1")
-        assert result["id"] == "t1"
-        assert "result" in result
-        inner = result["result"]["content"][0]["text"]
-        assert "timeout" in inner.lower() or result["result"].get("isError") is True
+        try:
+            result = executor_slow.call_tool("slow_tool", {}, request_id="t1")
+            assert result["id"] == "t1"
+            assert "result" in result
+            inner = result["result"]["content"][0]["text"]
+            assert "timeout" in inner.lower() or result["result"].get("isError") is True
+        finally:
+            release.set()
+            executor_slow.close()
 
     def test_executor_call_tool_unknown(self):
         executor = self._make_executor()
@@ -1076,30 +1084,38 @@ class TestConcurrencyStress:
 
     def test_repeated_timeout_does_not_exhaust_workers(self):
         """Repeated timeouts should not leave permanently blocked workers."""
+        # Event-based stub: handlers block until released instead of
+        # sleeping, so timed-out workers can be drained deterministically.
+        release = threading.Event()
         cfg = McpServerConfig(max_tool_timeout_seconds=1, max_tool_workers=2)
         reg = ToolRegistry(
-            handlers={"always_slow": lambda **kw: time.sleep(100)},
+            handlers={"always_slow": lambda **kw: release.wait(timeout=30)},
             schemas={"always_slow": {"inputSchema": {"type": "object", "properties": {}}}},
             metadata={"always_slow": {}},
             profiles={"custom": ["always_slow"]},
         )
         executor = ToolExecutor(cfg, reg)
-        for i in range(5):
-            result = executor.call_tool("always_slow", {}, request_id=f"t{i}")
-            assert result["id"] == f"t{i}"
-        # After timeouts, a fast tool should still work
-        fast_reg = ToolRegistry(
-            handlers={"fast": lambda **kw: {"ok": True}},
-            schemas={"fast": {"inputSchema": {"type": "object", "properties": {}}}},
-            metadata={"fast": {}},
-            profiles={"custom": ["fast"]},
-        )
-        fast_exec = ToolExecutor(McpServerConfig(max_tool_timeout_seconds=5), fast_reg)
-        result = fast_exec.call_tool("fast", {}, request_id="f1")
-        assert result["id"] == "f1"
-        assert "result" in result
-        executor.close()
-        fast_exec.close()
+        try:
+            for i in range(5):
+                result = executor.call_tool("always_slow", {}, request_id=f"t{i}")
+                assert result["id"] == f"t{i}"
+            # After timeouts, a fast tool should still work
+            fast_reg = ToolRegistry(
+                handlers={"fast": lambda **kw: {"ok": True}},
+                schemas={"fast": {"inputSchema": {"type": "object", "properties": {}}}},
+                metadata={"fast": {}},
+                profiles={"custom": ["fast"]},
+            )
+            fast_exec = ToolExecutor(McpServerConfig(max_tool_timeout_seconds=5), fast_reg)
+            try:
+                result = fast_exec.call_tool("fast", {}, request_id="f1")
+                assert result["id"] == "f1"
+                assert "result" in result
+            finally:
+                fast_exec.close()
+        finally:
+            release.set()
+            executor.close()
 
     def test_multiple_sessions_concurrent_init(self):
         """Simultaneous initialization of many sessions."""

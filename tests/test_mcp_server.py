@@ -5005,7 +5005,11 @@ class TestResponseEnvelope:
         assert content["ok"] is True
         assert "findings" in content
         assert len(content["findings"]) > 0
-        assert content["findings"][0]["severity"] in ("warn", "error")
+        # (a+)+b is high risk → severity must be "error", not a flat "warn"
+        assert content["result"]["risk"] == "high"
+        for finding in content["findings"]:
+            assert finding["severity"] == "error"
+            assert finding["details"]["pattern_length"] == len("(a+)+b")
         assert content["machine_code"] == "REGEX_UNSAFE"
 
     def test_regex_safety_check_no_findings_for_safe(self):
@@ -9105,6 +9109,19 @@ class TestStructuredDataCompare:
         assert result["ok"] is True
         content = result["result"]
         assert content["equal"] is True
+
+    def test_type_mismatch_object_vs_array(self):
+        """Object-vs-array comparison emits a TYPE_MISMATCH finding."""
+        from eggcalc.mcp.tools import structured_data_compare
+
+        result = structured_data_compare('{"a": 1}', "[1]")
+        assert result["ok"] is True
+        codes = [f["code"] for f in result["result"]["findings"]]
+        assert "TYPE_MISMATCH" in codes
+        mismatch = next(f for f in result["result"]["findings"] if f["code"] == "TYPE_MISMATCH")
+        assert mismatch["severity"] == "warn"
+        assert "object" in mismatch["message"]
+        assert "array" in mismatch["message"]
 
 
 class TestProfileSnapshots:

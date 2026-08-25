@@ -3282,7 +3282,12 @@ def run(
         if output_format == "json":
             import json
 
-            print(json.dumps({"expression": joined, "result": display}))
+            payload = (
+                {"expression": joined, "result": display}
+                if show_expression
+                else {"result": display}
+            )
+            print(json.dumps(payload))
         else:
             print(display)
         return result, 0

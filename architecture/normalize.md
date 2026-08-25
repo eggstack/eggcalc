@@ -334,13 +334,18 @@ Full pipeline: normalize input, then evaluate. Prints result to stdout.
 - `operators`: Normalization config dict
 - `patterns`: Compiled regex patterns
 - `output_format`: `"plain"` or `"json"` — controls output format
-- `show_expression`: Accepted for compatibility; plain output remains result-only
+- `show_expression`: When False, JSON output omits the `"expression"` key; plain output remains result-only
 
 **Returns:** `(result, exit_code)` where result is the evaluated value or `None` on error.
 
 **JSON output format:**
 ```json
 {"expression": "<normalized>", "result": "<display>"}
+```
+
+With `show_expression=False`:
+```json
+{"result": "<display>"}
 ```
 
 **Error handling:**

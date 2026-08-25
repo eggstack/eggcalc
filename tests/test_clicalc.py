@@ -165,6 +165,26 @@ class TestNormalize:
         _, exit_code = normalize_expression("   ", NORMALIZE, PATTERNS)
         assert exit_code != 0
 
+    def test_json_output_honors_show_expression(self, capsys):
+        """show_expression=False omits the expression key from JSON output."""
+        import json as _json
+
+        run("five plus three", NORMALIZE, PATTERNS, output_format="json")
+        payload = _json.loads(capsys.readouterr().out)
+        assert payload["expression"]
+        assert payload["result"] == "8"
+
+        run(
+            "five plus three",
+            NORMALIZE,
+            PATTERNS,
+            output_format="json",
+            show_expression=False,
+        )
+        payload = _json.loads(capsys.readouterr().out)
+        assert "expression" not in payload
+        assert payload["result"] == "8"
+
 
 class TestCLI:
     """Tests for CLI functionality."""

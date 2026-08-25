@@ -7,6 +7,7 @@ and measurement tools to agents.
 
 from __future__ import annotations
 
+import atexit
 import enum
 import inspect
 import json
@@ -383,53 +384,68 @@ _orphaned_lock = threading.Lock()
 
 def _cleanup_orphaned_processes() -> None:
     """Terminate any orphaned child processes that survived their handler's cleanup."""
-    with _orphaned_lock:
-        # Also check evaluator and regex tool orphan sets
-        try:
-            from ..evaluator import (
-                _orphaned_eval_lock,
-                _orphaned_eval_order,
-                _orphaned_eval_processes,
-            )
+    # Adopt orphans tracked by the evaluator and regex tool paths.
+    try:
+        from ..evaluator import (
+            _orphaned_eval_lock,
+            _orphaned_eval_order,
+            _orphaned_eval_processes,
+        )
 
-            with _orphaned_eval_lock:
+        with _orphaned_eval_lock:
+            with _orphaned_lock:
                 _orphaned_processes.update(_orphaned_eval_processes)
-                _orphaned_eval_processes.clear()
-                _orphaned_eval_order.clear()
-        except Exception:
-            pass
-        try:
-            from .tools import (
-                _orphaned_regex_lock,
-                _orphaned_regex_order,
-                _orphaned_regex_processes,
-            )
+            _orphaned_eval_processes.clear()
+            _orphaned_eval_order.clear()
+    except Exception:
+        pass
+    try:
+        from .tools import (
+            _orphaned_regex_lock,
+            _orphaned_regex_order,
+            _orphaned_regex_processes,
+        )
 
-            with _orphaned_regex_lock:
+        with _orphaned_regex_lock:
+            with _orphaned_lock:
                 _orphaned_processes.update(_orphaned_regex_processes)
-                _orphaned_regex_processes.clear()
-                _orphaned_regex_order.clear()
-        except Exception:
-            pass
-        stale = [p for p in _orphaned_processes if p.is_alive()]
-        for proc in stale:
-            try:
-                proc.terminate()
-                proc.join(timeout=1)
-            except Exception:
-                pass
-            if proc.is_alive():
+            _orphaned_regex_processes.clear()
+            _orphaned_regex_order.clear()
+    except Exception:
+        pass
+    # Iterate over a snapshot; never hold the lock across blocking joins.
+    with _orphaned_lock:
+        snapshot = list(_orphaned_processes)
+    for proc in snapshot:
+        try:
+            if not proc.is_alive():
                 try:
-                    proc.kill()
-                    proc.join(timeout=1)
+                    proc.close()
                 except Exception:
                     pass
-            try:
-                proc.close()
-            except Exception:
-                pass
-            _orphaned_processes.discard(proc)
-            logging.debug("Cleaned up orphaned MCP child process pid=%s", proc.pid)
+                with _orphaned_lock:
+                    _orphaned_processes.discard(proc)
+                logging.debug("Reaped finished orphaned child process pid=%s", proc.pid)
+                continue
+            proc.terminate()
+            proc.join(timeout=1)
+            if proc.is_alive():
+                proc.kill()
+                proc.join(timeout=1)
+            if not proc.is_alive():
+                try:
+                    proc.close()
+                except Exception:
+                    pass
+                with _orphaned_lock:
+                    _orphaned_processes.discard(proc)
+                logging.debug("Cleaned up orphaned child process pid=%s", proc.pid)
+            # Still alive after terminate+kill: remain tracked for a later pass.
+        except Exception:
+            pass
+
+
+atexit.register(_cleanup_orphaned_processes)
 
 
 def _tracked_orphan_count() -> int:
@@ -1172,17 +1188,30 @@ class ToolExecutor:
         }
 
     def close(self) -> None:
-        """Shut down the thread pool and clean up orphaned processes.
+        """Shut down the thread pool, cancelling queued futures.
 
-        Cancels queued futures, waits for active work to finish, and
-        releases any queued reservations that were cancelled before
-        the worker wrapper could run.
+        The wait for active work is bounded: a handler that already overran
+        its timeout cannot be cancelled and may never finish, so shutdown
+        gives up after one timeout period instead of blocking forever.
         """
         with self._lock:
             self._closed = True
-            if self._executor is not None:
-                self._executor.shutdown(wait=True, cancel_futures=True)
-                self._executor = None
+            executor = self._executor
+            self._executor = None
+        if executor is not None:
+            shutdown_done = threading.Event()
+
+            def _shutdown() -> None:
+                executor.shutdown(wait=True, cancel_futures=True)
+                shutdown_done.set()
+
+            reaper = threading.Thread(target=_shutdown, name="mcp-tool-shutdown", daemon=True)
+            reaper.start()
+            if not shutdown_done.wait(timeout=self._config.max_tool_timeout_seconds):
+                logging.warning(
+                    "ToolExecutor shutdown exceeded %ss; abandoning still-running handlers",
+                    self._config.max_tool_timeout_seconds,
+                )
         # Release any QUEUED reservations that were cancelled by
         # cancel_futures=True before the worker wrapper could run.
         with self._accounting_lock:
@@ -1191,6 +1220,13 @@ class ToolExecutor:
                     res.state = ReservationState.RELEASED
                     self._queued_count -= 1
                     self._total_inflight -= 1
+            abandoned = sum(1 for res in self._reservations if res.state == ReservationState.ACTIVE)
+            if abandoned:
+                logging.warning(
+                    "ToolExecutor closed with %d abandoned active reservation(s); "
+                    "counters settle when their handlers finish",
+                    abandoned,
+                )
             self._reservations.clear()
 
     @property
@@ -2066,6 +2102,7 @@ class McpServer:
                 return
             self._closed = True
         self._executor.close()
+        _cleanup_orphaned_processes()
         # Snapshot and clear sessions under the lock, then close each one.
         # session.close() may call back into _remove_session, so we must not
         # hold _sessions_lock during those calls.
