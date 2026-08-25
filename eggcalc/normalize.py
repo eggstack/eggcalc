@@ -55,6 +55,11 @@ _DECIMAL_NUMBER_TOKEN_RE = (
 # Pre-computed sorted units list for performance (avoid re-sorting each call)
 _UNITS_BY_LENGTH: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
 
+# Signed-integer exponent following "**" after a matched unit
+# ("m**4", "m ** -2", "m^2" post caret-rewrite). Used to bind the exponent
+# to the unit instead of the "<num>*<unit>" product.
+_UNIT_POWER_EXPONENT_RE: re.Pattern[str] = re.compile(r"\*\*\s*([+-]?\d+)")
+
 # Regex alternation for matching any known unit name (for "in"/"into" disambiguation)
 _UNIT_NAMES_ALTERNATION: str = "|".join(
     re.escape(u) for u in sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
@@ -2202,7 +2207,18 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression = re.sub(r"(\d+\.\d*)\s+(\d)", lambda m: m.group(1) + m.group(2), expression)
 
     # Strip short filler phrases after word-to-operator conversion
-    expression = patterns["stripped_chars"].sub("", expression)
+    stripped = patterns["stripped_chars"].sub("", expression)
+
+    if stripped != expression:
+        # Phrase removal can strand a leading operator: "what is a of five"
+        # strips "what is"/"a", then "of" becomes "*" leaving "*5". Drop any
+        # leading operator that cannot start an expression ("-" and "+" are
+        # valid unary signs and are kept). Only applied when stripping
+        # actually removed something, so raw symbolic input like "^ 3"
+        # keeps its existing error behavior.
+        expression = re.sub(r"^\s*(?:\*\*|//|<<|>>|[*/%&|^])\s*", "", stripped)
+    else:
+        expression = stripped
 
     # Handle compound unit conversions after stripping
     # e.g., "60mi/h in m/s" -> "convert(60*mi/h,m/s)"
@@ -2577,8 +2593,9 @@ def _join_number_parts(expression: str) -> str:
     # multiplication. Keep compact expressions ("20*20") untouched because the
     # later split_at_operators pass already handles them.
     expanded_tokens: list[str] = []
+    # Shared operator tokenizer for both boundary splitting and internal
+    # splitting of operator-only tokens.
     operator_split_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^])")
-    boundary_operator_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^])")
 
     def _split_boundary_operators(token: str) -> list[str]:
         """Split operators attached at token edges without tokenizing internals.
@@ -2590,7 +2607,7 @@ def _join_number_parts(expression: str) -> str:
         parts: list[str] = []
         rest = token
         while rest:
-            match = boundary_operator_re.match(rest)
+            match = operator_split_re.match(rest)
             if match and match.end() < len(rest):
                 parts.append(match.group(1))
                 rest = rest[match.end() :]
@@ -2617,7 +2634,7 @@ def _join_number_parts(expression: str) -> str:
     for token in tokens:
         if not re.search(r"[A-Za-z_()]", token) and operator_split_re.search(token):
             expanded_tokens.extend(part for part in operator_split_re.split(token) if part)
-        elif re.search(r"[A-Za-z_()]", token) and boundary_operator_re.search(token):
+        elif re.search(r"[A-Za-z_()]", token) and operator_split_re.search(token):
             expanded_tokens.extend(_split_boundary_operators(token))
         else:
             expanded_tokens.append(token)
@@ -2824,31 +2841,33 @@ def _preprocess_units(expression: str) -> str:
                                 ),
                             )
                             canonical = f"{base}**{power_alias.group(2)}"
-                        # If the next non-whitespace token is "**", the unit
-                        # is being exponentiated. Wrap "<num>*<unit>" in
-                        # parens so the unit participates in the exponent,
-                        # not the base: "5m ** 2" -> "(5*m)**2" = 25 m**2.
-                        # Without the parens, "5*m**2" parses as
-                        # "5*(m**2)" and the unit's own value (1) makes
-                        # the multiplication a no-op.
+                        # If a signed-integer exponent follows the unit, bind
+                        # it to the unit: "<num>*(<unit>**exp)". This matches
+                        # the registered power aliases ("m**2") so every
+                        # exponent takes the same "power binds the unit"
+                        # path: "5m**4" -> 5*(m**4) = 5 m**4, and spacing
+                        # never changes meaning ("5 m** -2" == "5m**-2").
                         k = i + len(unit)
                         while k < len(expression) and expression[k].isspace():
                             k += 1
-                        if (
-                            k + 1 < len(expression)
-                            and expression[k] == "*"
-                            and expression[k + 1] == "*"
-                        ):
-                            result.append("(")
+                        exponent_match = (
+                            _UNIT_POWER_EXPONENT_RE.match(expression, k)
+                            if k < len(expression) and expression.startswith("**", k)
+                            else None
+                        )
+                        if exponent_match is not None:
                             result.append(num)
-                            result.append("*")
+                            result.append("*(")
                             result.append(canonical)
+                            result.append("**")
+                            result.append(exponent_match.group(1))
                             result.append(")")
+                            i = exponent_match.end()
                         else:
                             result.append(num)
                             result.append("*")
                             result.append(canonical)
-                        i += len(unit)
+                            i += len(unit)
                         found_unit = True
                         break
                 # Handle lowercase temperature units (f, c, k)
@@ -2861,27 +2880,29 @@ def _preprocess_units(expression: str) -> str:
                         is_hex = len(result) >= 2 and result[-1] in ("x", "X") and result[-2] == "0"
                         if not is_hex:
                             temp_canonical = _LOWERCASE_TEMP_UNITS[first_char.lower()]
-                            # If followed by "**", wrap "<num>*<unit>" in
-                            # parens so the unit participates in the
-                            # exponent: "5c ** 2" -> "(5*C)**2" = 25 C**2.
+                            # A signed-integer exponent binds to the unit,
+                            # mirroring the general unit path above.
                             k = i + 1
                             while k < len(expression) and expression[k].isspace():
                                 k += 1
-                            if (
-                                k + 1 < len(expression)
-                                and expression[k] == "*"
-                                and expression[k + 1] == "*"
-                            ):
-                                result.append("(")
+                            temp_exponent = (
+                                _UNIT_POWER_EXPONENT_RE.match(expression, k)
+                                if k < len(expression) and expression.startswith("**", k)
+                                else None
+                            )
+                            if temp_exponent is not None:
                                 result.append(num)
-                                result.append("*")
+                                result.append("*(")
                                 result.append(temp_canonical)
+                                result.append("**")
+                                result.append(temp_exponent.group(1))
                                 result.append(")")
+                                i = temp_exponent.end()
                             else:
                                 result.append(num)
                                 result.append("*")
                                 result.append(temp_canonical)
-                            i += 1
+                                i += 1
                             found_unit = True
                 if not found_unit:
                     result.append(num)

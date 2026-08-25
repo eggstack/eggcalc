@@ -7485,7 +7485,9 @@ class TestHandleCallToolErrors:
 class TestJSONRPCIdValidation:
     """Test JSON-RPC id type validation in handle_request."""
 
-    def test_float_id_rejected(self):
+    def test_float_id_accepted(self):
+        # JSON-RPC 2.0 ids may be Numbers; fractional floats are legal
+        # (discouraged by the spec, but not invalid).
         response = handle_request(
             {
                 "jsonrpc": "2.0",
@@ -7493,9 +7495,8 @@ class TestJSONRPCIdValidation:
                 "method": "ping",
             }
         )
-        assert "error" in response
-        assert response["error"]["code"] == -32600
-        assert "id" in response["error"]["message"]
+        assert "result" in response
+        assert response["id"] == 1.5
 
     def test_integer_id_accepted(self):
         response = handle_request(

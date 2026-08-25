@@ -1023,13 +1023,6 @@ class TestEnhancedDiagnostics:
         assert executor.active_workers == 0
         executor.close()
 
-    def test_executor_orphan_count_property(self):
-        cfg = McpServerConfig()
-        reg = ToolRegistry()
-        executor = ToolExecutor(cfg, reg)
-        assert executor.orphan_count == 0
-        executor.close()
-
 
 # ---------------------------------------------------------------------------
 # TestConfigGeneration (Workstream G)

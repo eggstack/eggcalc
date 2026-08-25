@@ -11,6 +11,7 @@ import enum
 import inspect
 import json
 import logging
+import math
 import multiprocessing
 import os
 import sys
@@ -431,6 +432,12 @@ def _cleanup_orphaned_processes() -> None:
             logging.debug("Cleaned up orphaned MCP child process pid=%s", proc.pid)
 
 
+def _tracked_orphan_count() -> int:
+    """Number of child processes currently held for defensive orphan cleanup."""
+    with _orphaned_lock:
+        return len(_orphaned_processes)
+
+
 def _invalid_request(request_id: Any, message: str) -> dict[str, Any]:
     """Build JSON-RPC invalid request/params error."""
     return {
@@ -444,6 +451,26 @@ def _invalid_request(request_id: Any, message: str) -> dict[str, Any]:
 
 
 _invalid_request_error = _invalid_request
+
+
+def _invalid_jsonrpc_id_reason(request_id: Any) -> str | None:
+    """Return an error message when *request_id* is not a legal JSON-RPC id.
+
+    Legal ids per JSON-RPC 2.0 are strings, numbers, or null. ``bool`` is
+    rejected explicitly even though it subclasses ``int`` (JSON ``true``
+    is not a valid id), and non-finite floats are rejected because they
+    have no JSON representation. ``None`` means "absent or null" and is
+    left for callers to interpret.
+    """
+    if request_id is None:
+        return None
+    if isinstance(request_id, bool):
+        return "'id' must be a string, number, or null"
+    if isinstance(request_id, float) and not math.isfinite(request_id):
+        return "'id' must be a string, number, or null"
+    if not isinstance(request_id, (str, int, float)):
+        return "'id' must be a string, number, or null"
+    return None
 
 
 def _jsonrpc_error(request_id: Any, code: int, message: str) -> dict[str, Any]:
@@ -837,8 +864,6 @@ class ToolExecutor:
         self._evaluator = evaluator
         self._executor: ThreadPoolExecutor | None = None
         self._lock = threading.Lock()
-        self._orphaned: set[multiprocessing.Process] = set()
-        self._orphan_lock = threading.Lock()
         # Unified accounting: one lock, one reservation per request.
         self._accounting_lock = threading.Lock()
         self._total_inflight = 0
@@ -1167,28 +1192,6 @@ class ToolExecutor:
                     self._queued_count -= 1
                     self._total_inflight -= 1
             self._reservations.clear()
-        self._cleanup_orphans()
-
-    def _cleanup_orphans(self) -> None:
-        with self._orphan_lock:
-            for proc in list(self._orphaned):
-                if proc.is_alive():
-                    try:
-                        proc.terminate()
-                        proc.join(timeout=1)
-                    except Exception:
-                        pass
-                    if proc.is_alive():
-                        try:
-                            proc.kill()
-                            proc.join(timeout=1)
-                        except Exception:
-                            pass
-                    try:
-                        proc.close()
-                    except Exception:
-                        pass
-            self._orphaned.clear()
 
     @property
     def active_workers(self) -> int:
@@ -1201,12 +1204,6 @@ class ToolExecutor:
         """Number of accepted futures that have not started executing."""
         with self._accounting_lock:
             return self._queued_count
-
-    @property
-    def orphan_count(self) -> int:
-        """Number of tracked orphaned processes."""
-        with self._orphan_lock:
-            return len(self._orphaned)
 
     @property
     def pending_count(self) -> int:
@@ -1235,13 +1232,38 @@ class EvaluationPolicy(enum.Enum):
     PERMISSIVE = "permissive"
 
 
+def _deep_freeze(value: Any) -> Any:
+    """Recursively freeze JSON-like structures for deep immutability.
+
+    Dicts become ``MappingProxyType`` and lists become tuples; leaves
+    (scalars, callables) pass through unchanged.
+    """
+    if isinstance(value, dict):
+        return MappingProxyType({key: _deep_freeze(val) for key, val in value.items()})
+    if isinstance(value, list):
+        return tuple(_deep_freeze(val) for val in value)
+    return value
+
+
+def _to_plain(value: Any) -> Any:
+    """Inverse of :func:`_deep_freeze`: rebuild plain dicts/lists."""
+    if isinstance(value, dict):
+        return {key: _to_plain(val) for key, val in value.items()}
+    if isinstance(value, Mapping):
+        return {key: _to_plain(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_plain(val) for val in value]
+    return value
+
+
 @_dataclass(frozen=True)
 class ConfigSnapshot:
     """Deeply immutable configuration snapshot for atomic replacement.
 
     Dict fields are defensively deep-copied on construction and stored
     as ``MappingProxyType`` so callers cannot mutate the snapshot through
-    constructor inputs or returned field values.
+    constructor inputs or returned field values. Nested dicts/lists are
+    frozen recursively so the structure is immutable at every level.
     """
 
     generation: int = 0
@@ -1253,9 +1275,9 @@ class ConfigSnapshot:
     def __post_init__(self) -> None:
         # Deep copy mutable defaults to prevent external mutation, then
         # wrap in MappingProxyType for deep immutability.
-        object.__setattr__(self, 'constants', MappingProxyType(dict(self.constants)))
-        object.__setattr__(self, 'functions', MappingProxyType(dict(self.functions)))
-        object.__setattr__(self, 'units', MappingProxyType(dict(self.units)))
+        object.__setattr__(self, "constants", MappingProxyType(dict(_deep_freeze(self.constants))))
+        object.__setattr__(self, "functions", MappingProxyType(dict(_deep_freeze(self.functions))))
+        object.__setattr__(self, "units", MappingProxyType(dict(_deep_freeze(self.units))))
         # Accept str for backward compatibility, converting to EvaluationPolicy.
         # Also handle EvaluationPolicy instances from reloaded modules (different class).
         policy_value: object = self.policy
@@ -1282,9 +1304,9 @@ class ConfigSnapshot:
         policy_val = self.policy.value if isinstance(self.policy, EvaluationPolicy) else self.policy
         return {
             "generation": self.generation,
-            "constants": dict(self.constants),
+            "constants": _to_plain(self.constants),
             "functions": {k: getattr(v, "__name__", str(v)) for k, v in self.functions.items()},
-            "units": dict(self.units),
+            "units": _to_plain(self.units),
             "policy": policy_val,
         }
 
@@ -2004,10 +2026,15 @@ class McpServer:
         if not isinstance(request, dict):
             return _invalid_request(None, "Invalid Request: expected JSON object")
 
-        # Validate request ID length using server config
+        # Validate request ID type and length using server config.
+        # Shares one validator with the module-level handle_request so
+        # both paths agree (reject bool, accept str/int/float/null).
         if isinstance(request, dict):
             request_id = request.get("id")
             if request_id is not None:
+                id_error = _invalid_jsonrpc_id_reason(request_id)
+                if id_error is not None:
+                    return _invalid_request(None, f"Invalid Request: {id_error}")
                 id_str = str(request_id)
                 if len(id_str) > self._config.max_request_id_length:
                     return _invalid_request(
@@ -2148,7 +2175,7 @@ class McpServer:
             "pending_count": self._executor.queued_count,
             "total_inflight": self._executor.total_inflight,
             "max_tool_timeout": self._config.max_tool_timeout_seconds,
-            "orphan_count": self._executor.orphan_count,
+            "orphan_count": _tracked_orphan_count(),
             "session_count": live_sessions,
             "config_units_count": len(config_snap.units),
             "closed": self._closed,
@@ -2803,11 +2830,13 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict[str,
             "Invalid Request: 'id' must be a string or integer, not null",
         )
     if request_id is not None:
-        # bool is a subclass of int in Python, so exclude it explicitly
-        if not isinstance(request_id, (str, int)) or isinstance(request_id, bool):
+        # Shared validator: bool is a subclass of int in Python, so exclude
+        # it explicitly; floats are legal JSON-RPC (Number) ids.
+        id_error = _invalid_jsonrpc_id_reason(request_id)
+        if id_error is not None:
             return _invalid_request(
                 None,
-                "Invalid Request: 'id' must be a string, integer, or null",
+                f"Invalid Request: {id_error}",
             )
         id_str = str(request_id)
         if len(id_str) > MAX_REQUEST_ID_LENGTH:

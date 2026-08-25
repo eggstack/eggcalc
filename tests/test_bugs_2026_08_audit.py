@@ -161,6 +161,10 @@ class TestPowerUnitRenderingConsistency:
 
         r = evaluate_raw(expr)
         assert str(r).split()[1] == "m**2"
+        # "(5m)^2" powers the quantity (25); bare "<num><unit>**2" binds
+        # the power to the unit and leaves the value untouched.
+        expected_value = 25 if expr == "(5m)^2" else 5
+        assert r.value == expected_value
 
     def test_cubed_renders_m_cubed(self):
         from eggcalc.evaluator import evaluate_raw

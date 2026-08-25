@@ -341,6 +341,11 @@ def _advance_grapheme(s: str, i: int, n: int) -> int:
 
     i += 1  # Move past base character
 
+    # ZWJ sequences (GB11) only continue a cluster when the base is an
+    # Extended_Pictographic. Without this guard, "a" + ZWJ + emoji would
+    # incorrectly merge into one cluster.
+    pictographic_base = _is_extended_pictographic(s[i - 1])
+
     # Process Extend characters and ZWJ sequences (GB9, GB11)
     while i < n:
         cp = ord(s[i])
@@ -352,7 +357,7 @@ def _advance_grapheme(s: str, i: int, n: int) -> int:
 
         # GB11: Emoji ZWJ sequences
         # Pattern: Extended_Pictographic (ZWJ Extend*)* ZWJ Extended_Pictographic
-        if cp == 0x200D:  # ZWJ
+        if cp == 0x200D and pictographic_base:  # ZWJ
             i += 1  # Skip ZWJ
             # If next is pictographic, consume it as part of this grapheme
             if i < n and _is_extended_pictographic(s[i]):
@@ -426,7 +431,7 @@ def _is_extended_pictographic(char: str) -> bool:
     """
     cp = ord(char)
     if (
-        0x1F300 <= cp <= 0x1F9FF  # Emoticons, Transport, Symbols and Pictographs Extended-A
+        0x1F300 <= cp <= 0x1FAFF  # Emoticons, Transport, Symbols and Pictographs Extended-A
         or 0x2600 <= cp <= 0x26FF  # Misc symbols
         or 0x2700 <= cp <= 0x27BF
     ):  # Dingbats

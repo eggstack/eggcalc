@@ -455,7 +455,7 @@ result.unit       # → "m"
 result.convert_to("ft")  # → UnitValue(198.5, "ft")
 ```
 
-The evaluator supports compound units in division and multiplication (e.g., `5m / 2s` → `2.5 m/s`), unit exponentiation (`5m ** 2` → `25.0 m**2`), and temperature conversions (with offset math). Cross-scale temperature addition is rejected; subtraction produces a delta.
+The evaluator supports compound units in division and multiplication (e.g., `5m / 2s` → `2.5 m/s`), unit exponentiation (`5m ** 2` → `5 m**2`; `(5m)**2` → `25.0 m**2`), and temperature conversions (with offset math). Cross-scale temperature addition is rejected; subtraction produces a delta.
 
 ### Unit-Aware Function Contracts
 

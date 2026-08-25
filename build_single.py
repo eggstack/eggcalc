@@ -708,6 +708,11 @@ def build_single_file(output_path: str | None = None) -> str:
 
     ordered_specs = _topological_sort(MODULE_MANIFEST)
     emitted_groups: set[str] = set()
+    # Each conflict function must be renamed exactly once across all MCP
+    # modules. The rename relies on first-match string replace, so a stray
+    # extra definition (e.g., a doc example) would be renamed silently —
+    # count occurrences and fail loudly instead.
+    mcp_rename_counts: dict[str, int] = dict.fromkeys(MCP_CONFLICT_FUNCTIONS, 0)
     for spec in ordered_specs:
         if not spec.include_single_file:
             continue
@@ -718,11 +723,26 @@ def build_single_file(output_path: str | None = None) -> str:
         all_exact_globals.extend(exact_globals)
         if spec.group == "mcp":
             for fn_name in MCP_CONFLICT_FUNCTIONS:
-                code = code.replace(f"def {fn_name}(", f"def _mcp_{fn_name}(", 1)
-                code = code.replace(f'"{fn_name}": {fn_name},', f'"{fn_name}": _mcp_{fn_name},')
+                def_count = code.count(f"def {fn_name}(")
+                if def_count > 1:
+                    raise ValueError(
+                        f"Found {def_count} 'def {fn_name}(' definitions in "
+                        f"{spec.path}; MCP rename step would be ambiguous"
+                    )
+                if def_count == 1:
+                    code = code.replace(f"def {fn_name}(", f"def _mcp_{fn_name}(", 1)
+                    code = code.replace(f'"{fn_name}": {fn_name},', f'"{fn_name}": _mcp_{fn_name},')
+                    mcp_rename_counts[fn_name] += 1
         all_module_code.append(f"\n# === {spec.path} ===\n")
         all_module_code.append(code)
         all_imports.extend(imports)
+
+    missing_renames = [fn for fn, n in mcp_rename_counts.items() if n != 1]
+    if missing_renames:
+        raise ValueError(
+            "MCP conflict functions must be defined exactly once across the "
+            f"mcp modules, got {missing_renames}"
+        )
 
     # Deduplicate imports while preserving order
     seen: set[str] = set()
@@ -1218,36 +1238,40 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
 
     # 10. Detect duplicate top-level definitions. Wrapper renames are the
     # explicit allowlist for the intentionally colliding MCP/exact symbols.
-    allowlisted = {
-        f"_mcp_{name}"
-        for name in {
+    allowlisted = (
+        {
+            f"_mcp_{name}"
+            for name in {
+                "text_equal",
+                "text_replace_check",
+                "line_range_extract",
+                "line_range_compare",
+                "text_window",
+                "list_compare",
+                "shell_split",
+                "shell_quote_join",
+            }
+        }
+        | set(MCP_CONFLICT_FUNCTIONS)
+        | {
             "text_equal",
+            "list_compare",
+            "text_transform",
+            "text_position",
+            "escape_text",
+            "unescape_text",
+            "text_hash",
+            "path_normalize",
+            "identifier_analyze",
+            "text_window",
             "text_replace_check",
             "line_range_extract",
             "line_range_compare",
-            "text_window",
-            "list_compare",
             "shell_split",
             "shell_quote_join",
+            "main",
         }
-    } | set(MCP_CONFLICT_FUNCTIONS) | {
-        "text_equal",
-        "list_compare",
-        "text_transform",
-        "text_position",
-        "escape_text",
-        "unescape_text",
-        "text_hash",
-        "path_normalize",
-        "identifier_analyze",
-        "text_window",
-        "text_replace_check",
-        "line_range_extract",
-        "line_range_compare",
-        "shell_split",
-        "shell_quote_join",
-        "main",
-    }
+    )
     symbols: dict[str, str] = {}
     for spec in manifest:
         if not spec.include_single_file:

@@ -151,7 +151,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 - Prefixed units (`kN`, `mV`, `mA`) map to themselves in `UNIT_ALIASES`. Word forms (`kilonewton`) alias to the prefixed symbol.
 - Temperature conversions use offset math (not multiplicative factors). Fahrenheit and Rankine use `scale_to_base=5/9` with correct unit-to-base offsets (F: 255.3722222222222, Ra: 0.0). Kelvin is the base unit (scale=1, offset=0). Celsius uses scale=1, offset=273.15.
 - Gas constant is `r`/`R` (8.314...). Rankine is `Ra`/`rankine`/`°R`. The `r`/`R` identifiers are **not** Rankine.
-- `5m ** 2` → `25.0 m**2` (power binds the unit). `5m / 2s` → `25.0 m/s` (denominator is wrapped in parens by the preprocessor).
+- `5m ** 2` → `5 m**2` (power binds the unit; `(5m)**2` → `25.0 m**2`). `5m / 2s` → `2.5 m/s` (denominator is wrapped in parens by the preprocessor).
 - British spellings (`metre`/`metres`, `litre`/`litres`) are included in aliases.
 - `UnitSpec` is a frozen dataclass for declarative unit specifications (canonical name, aliases, dimension, scale/offset factors, category). `UNIT_DEFINITIONS` is a tuple of 150+ `UnitSpec` entries.
 - `UnitExpression` is a frozen dataclass for structural compound units (factors as `(unit, exponent)` tuples, dimension, scale). `parse_unit_expression()` parses `"m/s"` → `UnitExpression` with bounded parsing. Duplicate factors are merged and the normalized exponent is validated against `MAX_ABS_UNIT_EXPONENT` (16) after merging.

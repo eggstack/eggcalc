@@ -2997,6 +2997,10 @@ class UnitValue:
         return self.__repr__()
 
     def __format__(self, format_spec: str) -> str:
+        if not format_spec:
+            # Empty spec matches __str__/__repr__ (int-collapse + .15g) so
+            # f-string output agrees with print output.
+            return self.__repr__()
         if self.unit:
             return f"{self.value:{format_spec}} {self.unit}"
         return f"{self.value:{format_spec}}"
@@ -3302,6 +3306,11 @@ class UnitValue:
             if base_value < 0:
                 raise ValueError("Temperature cannot be below absolute zero")
             converted = float(base_value - target_definition.offset) / target_definition.scale
+            # Snap near-integer results the same way convert_temperature
+            # does, so offset arithmetic FP noise (100C -> 211.999...F)
+            # does not leak into the stored value.
+            if math.isclose(converted, round(converted), rel_tol=0.0, abs_tol=1e-12):
+                converted = float(round(converted))
         else:
             if source.dimension.is_affine:
                 raise ValueError("Affine units must be standalone temperature units")

@@ -198,7 +198,12 @@ def _get_handler(name: str) -> Any:
                 import importlib
 
                 mod = importlib.import_module(module_path)
-                handler = getattr(mod, symbol)
+                try:
+                    handler = getattr(mod, symbol)
+                except AttributeError as e:
+                    # Surface as ImportError so dispatch prints the friendly
+                    # "Unable to load text command" message instead of crashing.
+                    raise ImportError(f"module {module_path!r} has no attribute {symbol!r}") from e
                 _handler_cache[name] = handler
                 return handler
     handler = globals().get(name)
@@ -329,8 +334,12 @@ def _run_repl() -> int:
 
         try:
             result, exit_code = run_cli(line, "plain")
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, SystemExit):
             print()
+            continue
+        except Exception:
+            # The REPL must survive any handler crash; run_cli normally
+            # catches Exception itself, this is a defensive backstop.
             continue
 
         if exit_code == 0 and result is not None:
