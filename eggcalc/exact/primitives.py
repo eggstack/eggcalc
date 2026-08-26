@@ -543,7 +543,6 @@ def codepoint_index_to_byte_offset(s: str, codepoint_index: int) -> int:
     if codepoint_index < 0 or codepoint_index > len(s):
         raise ValueError(f"Codepoint index {codepoint_index} out of range (0-{len(s)})")
 
-    encoded = s.encode("utf-8")
     decoded_pos = 0
     byte_pos = 0
     for char in s:
@@ -612,8 +611,6 @@ def line_column_to_codepoint_index(
 
     current_line = 1
     current_column = 1
-    codepoint_index = 0
-
     for i, char in enumerate(s):
         if current_line == target_line:
             if current_column == target_column:

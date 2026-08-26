@@ -150,6 +150,11 @@ _SIDE_EFFECT_FUNCTIONS: frozenset[str] = frozenset(
     }
 )
 
+_UNCACHEABLE_CALL_RE = re.compile(
+    rf"(?<![A-Za-z0-9_])(?:{'|'.join(re.escape(name) for name in _RANDOM_FUNCTIONS | _SIDE_EFFECT_FUNCTIONS)})\s*\(",
+    re.IGNORECASE,
+)
+
 # Functions whose first argument is a variable name (string). The argument
 # is preserved as a raw string even if it collides with a constant or unit
 # name (e.g., setvar("pi", 5) should bind the variable "pi" rather than
@@ -192,6 +197,7 @@ class UnitPolicy(Enum):
     VARIANCE_SQUARED = auto()
     SIGN_OUTPUT = auto()
     ROOT = auto()
+    CUBE_ROOT = auto()
     HYPOT = auto()
     ATAN2 = auto()
 
@@ -312,43 +318,105 @@ def _angle_input_dispatch(name: str, func: Any, args: list[Any]) -> Any:
     return func(arg)
 
 
-def _sqrt_dispatch(args: list[Any]) -> Any:
-    """sqrt: dimensionless or even-exponent dimensional."""
+def _root_dimension(dimension: Any, degree: int) -> Any | None:
+    """Return an integer-exponent root dimension, if representable."""
+    from .units import Dimension
+
+    if dimension.angle:
+        return None
+    components = (
+        dimension.length,
+        dimension.mass,
+        dimension.time,
+        dimension.current,
+        dimension.temperature,
+        dimension.amount,
+        dimension.luminous_intensity,
+        dimension.information,
+    )
+    if any(component % degree for component in components):
+        return None
+    return Dimension(
+        length=dimension.length // degree,
+        mass=dimension.mass // degree,
+        time=dimension.time // degree,
+        current=dimension.current // degree,
+        temperature=dimension.temperature // degree,
+        amount=dimension.amount // degree,
+        luminous_intensity=dimension.luminous_intensity // degree,
+        information=dimension.information // degree,
+    )
+
+
+def _root_unit_expression(expr: Any, degree: int, name: str) -> Any:
+    """Build a representable structural unit expression root."""
+    from .units import UnitExpression, _get_unit_registry
+
+    registry = _get_unit_registry()
+    if registry is None:
+        raise EvaluationError("Unit registry is unavailable")
+    expected_dimension = _root_dimension(expr.dimension, degree)
+    if expected_dimension is None:
+        raise EvaluationError(f"{name}() cannot represent the root of unit with integer exponents")
+
+    new_factors: list[tuple[str, int]] = []
+    for canonical, exponent in expr.factors:
+        definition = registry.by_canonical(canonical)
+        if definition is None:
+            raise EvaluationError(f"Unknown canonical unit: '{canonical}'")
+        if exponent % degree == 0:
+            new_factors.append((canonical, exponent // degree))
+            continue
+
+        root_dimension = _root_dimension(definition.dimension, degree)
+        if root_dimension is None:
+            raise EvaluationError(
+                f"{name}() cannot represent the root of unit with integer exponents"
+            )
+        root_name = canonical[:-1] if canonical.endswith(str(degree)) else ""
+        if root_name == "in":
+            root_name = "inch"
+        root_definition = registry.by_canonical(root_name)
+        if root_definition is not None and (
+            root_definition.affine or root_definition.dimension != root_dimension
+        ):
+            root_definition = None
+        if root_definition is None:
+            raise EvaluationError(f"{name}() cannot represent the root of unit '{canonical}'")
+        new_factors.append((root_definition.canonical, exponent))
+
+    scale = 1.0
+    for canonical, exponent in new_factors:
+        definition = registry.by_canonical(canonical)
+        assert definition is not None
+        scale *= definition.scale**exponent
+    return UnitExpression(tuple(new_factors), expected_dimension, scale)
+
+
+def _root_dispatch(args: list[Any], degree: int, func: Any, name: str) -> Any:
+    """Apply a dimensional integer-exponent root or a scalar root."""
     if len(args) != 1:
-        raise EvaluationError("sqrt() requires exactly 1 argument")
+        raise EvaluationError(f"{name}() requires exactly 1 argument")
     arg = args[0]
     if isinstance(arg, UnitValue):
         if arg.unit is None:
-            return _sqrt(arg.value)
-        expr = arg._unit_expr
-        all_even = all(e % 2 == 0 for _, e in expr.factors)
-        if all_even:
-            from .units import (
-                DIM_DIMENSIONLESS,
-                UnitExpression,
-                _get_unit_registry,
-                render_expression,
-            )
+            return func(arg.value)
+        from .units import render_expression
 
-            new_factors = tuple((u, e // 2) for u, e in expr.factors)
-            # Compute the expected dimension and scale from halved factors
-            registry = _get_unit_registry()
-            expected_dimension = DIM_DIMENSIONLESS
-            expected_scale = 1.0
-            for canonical, exponent in new_factors:
-                if registry is not None:
-                    definition = registry.by_canonical(canonical)
-                    if definition is not None:
-                        expected_dimension = expected_dimension * (definition.dimension**exponent)
-                        expected_scale *= definition.scale**exponent
-            new_expr = UnitExpression(new_factors, expected_dimension, expected_scale)
-            new_unit = render_expression(new_expr)
-            val = _sqrt(arg.value)
-            return UnitValue(val, new_unit)
-        raise EvaluationError(
-            f"sqrt() cannot represent the square root of unit '{arg.unit}' with integer exponents"
-        )
-    return _sqrt(arg)
+        new_expr = _root_unit_expression(arg._unit_expr, degree, name)
+        new_unit = render_expression(new_expr)
+        return UnitValue(func(arg.value), new_unit)
+    return func(arg)
+
+
+def _sqrt_dispatch(args: list[Any]) -> Any:
+    """sqrt: dimensionless or representable even-exponent dimensional."""
+    return _root_dispatch(args, 2, _sqrt, "sqrt")
+
+
+def _cbrt_dispatch(args: list[Any]) -> Any:
+    """cbrt: dimensionless or representable three-exponent dimensional."""
+    return _root_dispatch(args, 3, _cbrt, "cbrt")
 
 
 def _hypot_dispatch(args: list[Any]) -> Any:
@@ -422,7 +490,6 @@ def _build_function_specs() -> dict[str, FunctionSpec]:
     for name in ("sign",):
         specs[name] = FunctionSpec(UnitPolicy.SIGN_OUTPUT)
     for name in (
-        "cbrt",
         "pow",
         "factorial",
         "fact",
@@ -475,6 +542,7 @@ def _build_function_specs() -> dict[str, FunctionSpec]:
     ):
         specs[name] = FunctionSpec(UnitPolicy.VARIANCE_SQUARED)
     specs["sqrt"] = FunctionSpec(UnitPolicy.ROOT)
+    specs["cbrt"] = FunctionSpec(UnitPolicy.CUBE_ROOT)
     specs["hypot"] = FunctionSpec(UnitPolicy.HYPOT)
     specs["atan2"] = FunctionSpec(UnitPolicy.ATAN2)
     specs["abs"] = FunctionSpec(UnitPolicy.PRESERVE_SINGLE)
@@ -831,12 +899,7 @@ def _normalize_and_evaluate_uncached(expression: str) -> Any:
 
 def _expression_bypasses_cache(expression: str) -> bool:
     """Return True for expressions whose calls must execute every time."""
-    uncacheable = _RANDOM_FUNCTIONS | _SIDE_EFFECT_FUNCTIONS
-    return any(
-        re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}\s*\(", expression, re.IGNORECASE)
-        is not None
-        for name in uncacheable
-    )
+    return _UNCACHEABLE_CALL_RE.search(expression) is not None
 
 
 def evaluate_cached(expression: str) -> Any:
@@ -1055,31 +1118,12 @@ def _to_oct(x: int) -> str:
     return oct(x)
 
 
-_TEMP_UNIT_FLOAT_MAP: dict[float, str] = {
-    1.0: "K",
-}
-
-
-def _temp(value: float, from_unit: float | str, to_unit: float | str) -> float:
+def _temp(value: float, from_unit: str, to_unit: str) -> float:
     """Convert temperature between units."""
+    if not isinstance(from_unit, str) or not isinstance(to_unit, str):
+        raise EvaluationError("Temperature units must be unit name strings (e.g., 'C', 'K', 'F')")
     try:
-        if isinstance(from_unit, float):
-            mapped = _TEMP_UNIT_FLOAT_MAP.get(from_unit)
-            if mapped is None:
-                raise EvaluationError(
-                    f"Unrecognized temperature unit value: {from_unit}. "
-                    f"Expected a unit name string (e.g., 'C', 'K', 'F') or a known constant."
-                )
-            from_unit = mapped
-        if isinstance(to_unit, float):
-            mapped = _TEMP_UNIT_FLOAT_MAP.get(to_unit)
-            if mapped is None:
-                raise EvaluationError(
-                    f"Unrecognized temperature unit value: {to_unit}. "
-                    f"Expected a unit name string (e.g., 'C', 'K', 'F') or a known constant."
-                )
-            to_unit = mapped
-        return convert_temperature(value, str(from_unit), str(to_unit))
+        return convert_temperature(value, from_unit, to_unit)
     except (TypeError, ValueError) as e:
         raise EvaluationError(str(e)) from None
 
@@ -2883,6 +2927,9 @@ class Evaluator(ast.NodeVisitor):
             elif policy is UnitPolicy.ROOT:
                 return _sqrt_dispatch(args)
 
+            elif policy is UnitPolicy.CUBE_ROOT:
+                return _cbrt_dispatch(args)
+
             elif policy is UnitPolicy.HYPOT:
                 return _hypot_dispatch(args)
 
@@ -3295,6 +3342,17 @@ def evaluate_with_timeout(
                         while len(_orphaned_eval_order) > MAX_ORPHANED_PROCESSES:
                             oldest = _orphaned_eval_order.pop(0)
                             _orphaned_eval_processes.discard(oldest)
+                            try:
+                                if oldest.is_alive():
+                                    oldest.terminate()
+                                    oldest.join(timeout=1)
+                                if oldest.is_alive():
+                                    oldest.kill()
+                                    oldest.join(timeout=1)
+                                if not oldest.is_alive():
+                                    oldest.close()
+                            except Exception:
+                                pass
                 try:
                     proc.close()
                 except Exception:

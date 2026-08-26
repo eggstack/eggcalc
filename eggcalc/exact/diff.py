@@ -197,28 +197,35 @@ def longest_common_subsequence(a: str, b: str, max_len: int = MAX_LEVENSHTEIN_LE
     if len(a) > max_len or len(b) > max_len:
         raise ValueError(f"Input strings too long ({len(a)}, {len(b)}); max {max_len}")
 
-    m, n = len(a), len(b)
-    dp = [[0] * (n + 1) for _ in range(m + 1)]
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
-            if a[i - 1] == b[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1] + 1
-            else:
-                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
-    lcs_len = dp[m][n]
-    result = []
-    i, j = m, n
-    while i > 0 and j > 0:
-        if a[i - 1] == b[j - 1]:
-            result.append(a[i - 1])
-            i -= 1
-            j -= 1
-        elif dp[i - 1][j] > dp[i][j - 1]:
-            i -= 1
-        else:
-            j -= 1
+    def _lengths(left: str, right: str) -> list[int]:
+        previous = [0] * (len(right) + 1)
+        for left_char in left:
+            current = [0]
+            for j, right_char in enumerate(right, 1):
+                if left_char == right_char:
+                    current.append(previous[j - 1] + 1)
+                else:
+                    current.append(max(previous[j], current[-1]))
+            previous = current
+        return previous
 
-    return "".join(reversed(result))
+    def _hirschberg(left: str, right: str) -> str:
+        if not left or not right:
+            return ""
+        if len(left) == 1:
+            return left if left in right else ""
+        midpoint = len(left) // 2
+        left_lengths = _lengths(left[:midpoint], right)
+        right_lengths = _lengths(left[midpoint:][::-1], right[::-1])
+        split = max(
+            range(len(right) + 1),
+            key=lambda index: (left_lengths[index] + right_lengths[len(right) - index], index),
+        )
+        return _hirschberg(left[:midpoint], right[:split]) + _hirschberg(
+            left[midpoint:], right[split:]
+        )
+
+    return _hirschberg(a, b)
 
 
 def diff_spans(a: str, b: str, max_diffs: int = 50) -> list[DiffSpan]:

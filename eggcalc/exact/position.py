@@ -85,7 +85,6 @@ def _get_line_col(
         elif codepoint_index > len(text):
             codepoint_index = len(text)
 
-    line_start = 0
     line_num = 0
     current_col = 0
 
@@ -96,13 +95,11 @@ def _get_line_col(
         if char == "\n":
             line_num += 1
             current_col = 0
-            line_start = i + 1
         elif char == "\r":
             if i + 1 < len(text) and text[i + 1] == "\n":
                 continue
             line_num += 1
             current_col = 0
-            line_start = i + 1
         else:
             current_col += 1
 
@@ -377,7 +374,6 @@ def text_position(
             )
         if line < line_base or (line > line_base and line >= line_base + len(text.splitlines())):
             max_line = line_base + len(text.splitlines()) - 1
-            actual_lines = len(text.splitlines()) if text else 1
             if line < line_base:
                 return TextPositionResult(
                     valid=False,

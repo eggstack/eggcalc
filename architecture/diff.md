@@ -148,7 +148,7 @@ Find the longest common subsequence of two strings.
 
 **Raises:** `ValueError` if either string exceeds `max_len`.
 
-**Algorithm:** Standard O(mn) DP table with backtrack reconstruction. Returns empty string for empty inputs before checking length limits.
+**Algorithm:** Hirschberg's O(mn)-time, O(min(m,n))-space divide-and-conquer reconstruction. Returns empty string for empty inputs before checking length limits.
 
 ### `diff_spans(a: str, b: str, max_diffs: int = 50) -> list[DiffSpan]`
 

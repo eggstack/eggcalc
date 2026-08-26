@@ -470,7 +470,8 @@ Every built-in function has an explicit `UnitPolicy` that controls how `UnitValu
 | `SIGN_OUTPUT` | Unwrap magnitude, return dimensionless scalar | `sign` |
 | `COMPATIBLE_REDUCER` | All args dimensionless or all compatible units | `mean`, `min`, `max`, `median`, `std`, `sum` |
 | `VARIANCE_SQUARED` | Like COMPATIBLE_REDUCER but result has squared units | `variance`, `var`, `variance_sample`, `vars`, `var_sample` |
-| `ROOT` | Dimensionless or even-exponent unit; halve exponents | `sqrt` |
+| `ROOT` | Dimensionless or representable even-exponent unit; halve exponents | `sqrt` |
+| `CUBE_ROOT` | Dimensionless or representable three-exponent unit; divide exponents by three | `cbrt` |
 | `HYPOT` | All args dimensionless or all compatible units | `hypot` |
 | `ATAN2` | Both dimensionless or both compatible units | `atan2` |
 

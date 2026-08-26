@@ -54,6 +54,12 @@ _DECIMAL_NUMBER_TOKEN_RE = (
 
 # Pre-computed sorted units list for performance (avoid re-sorting each call)
 _UNITS_BY_LENGTH: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
+_UNIT_NUMBER_RE = re.compile(
+    rf"^([+-]?{_DECIMAL_NUMBER_TOKEN_RE})(?:{'|'.join(re.escape(u) for u in _UNITS_BY_LENGTH)})$"
+)
+_VALID_EVAL_TOKEN_RE = re.compile(
+    r"^[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?(?:[*/][a-zA-Z]+(?:/[a-zA-Z]+)*)*$"
+)
 
 # Signed-integer exponent following "**" after a matched unit
 # ("m**4", "m ** -2", "m^2" post caret-rewrite). Used to bind the exponent
@@ -75,7 +81,7 @@ def _is_best_case_variant(input_text: str, unit: str) -> bool:
     for alias in UNIT_ALIASES:
         if len(alias) != len(unit) or alias.lower() != lowered:
             continue
-        agreement = sum(a == b for a, b in zip(input_text, alias))
+        agreement = sum(a == b for a, b in zip(input_text[: len(alias)], alias))
         key = (-agreement, alias)
         if best_key is None or key < best_key:
             best_key = key
@@ -83,10 +89,23 @@ def _is_best_case_variant(input_text: str, unit: str) -> bool:
     return best_alias == unit
 
 
+def _case_variant_alias(input_text: str) -> str | None:
+    """Return the best known alias for a case-insensitive unit spelling."""
+    lowered = input_text.lower()
+    candidates = [
+        alias
+        for alias in UNIT_ALIASES
+        if len(alias) == len(input_text) and alias.lower() == lowered
+    ]
+    if not candidates:
+        return None
+    return min(
+        candidates, key=lambda alias: (-sum(a == b for a, b in zip(input_text, alias)), alias)
+    )
+
+
 # Regex alternation for matching any known unit name (for "in"/"into" disambiguation)
-_UNIT_NAMES_ALTERNATION: str = "|".join(
-    re.escape(u) for u in sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
-)
+_UNIT_NAMES_ALTERNATION: str = "|".join(re.escape(u) for u in _UNITS_BY_LENGTH)
 
 # Lowercase temperature abbreviations that should map to canonical uppercase forms
 _LOWERCASE_TEMP_UNITS: dict[str, str] = {"f": "F", "c": "C", "k": "K"}
@@ -614,16 +633,14 @@ def check_if_number(token: str) -> dict:
     if patterns["float"].match(cleaned):
         return {"bool": True, "converted": float(cleaned), "type": type(token)}
 
-    # Check if it's a number with unit (use pre-computed sorted list)
-    for unit in _UNITS_BY_LENGTH:
-        if cleaned.endswith(unit):
-            num_part = cleaned[: -len(unit)]
-            if num_part:
-                try:
-                    val = float(num_part)
-                    return {"bool": True, "converted": val, "type": type(token)}
-                except ValueError:
-                    pass
+    # Check if it's a number with unit.
+    unit_number_match = _UNIT_NUMBER_RE.fullmatch(cleaned)
+    if unit_number_match:
+        return {
+            "bool": True,
+            "converted": float(unit_number_match.group(1)),
+            "type": type(token),
+        }
 
     # Check lowercase temperature units (e.g., "5f", "5c", "5k") that are not
     # in UNIT_ALIASES but are handled by _preprocess_units via _LOWERCASE_TEMP_UNITS.
@@ -676,10 +693,7 @@ def validate_for_eval(tokens: list, patterns: Mapping[str, Pattern[str]]) -> boo
                         # (e.g., '1*m' from "1 in m" unit conversion)
                         # Pattern: number (int/float/scientific) followed by
                         # optional operator-unit pairs like *m, /s, *m/s
-                        if re.match(
-                            r"^[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?(?:[*/][a-zA-Z]+(?:/[a-zA-Z]+)*)*$",
-                            check_token,
-                        ):
+                        if _VALID_EVAL_TOKEN_RE.match(check_token):
                             continue
                         # Allow unary minus before function names (e.g., "-sqrt")
                         if check_token.startswith("-") and check_token[1:] in _IMPLICIT_MUL_FUNCS:
@@ -2881,8 +2895,6 @@ def _preprocess_units(expression: str) -> str:
     i = 0
     depth = 0
     units = _UNITS_BY_LENGTH  # Use pre-computed list
-    prefixes = _UNIT_PREFIXES  # Use pre-computed prefix set
-
     while i < len(expression):
         char = expression[i]
 
@@ -2937,7 +2949,7 @@ def _preprocess_units(expression: str) -> str:
                         not matched_unit
                         and len(unit) > 1
                         and remaining[: len(unit)].lower() == unit.lower()
-                        and _is_best_case_variant(remaining, unit)
+                        and _is_best_case_variant(remaining[: len(unit)], unit)
                     ):
                         matched_unit = True
                     if matched_unit:
@@ -3044,7 +3056,8 @@ def _preprocess_units(expression: str) -> str:
             best_end = i
             while j < len(expression) and expression[j].isalpha():
                 candidate = expression[i : j + 1]
-                if candidate in UNIT_ALIASES or candidate.lower() in UNIT_ALIASES:
+                case_alias = _case_variant_alias(candidate)
+                if candidate in UNIT_ALIASES or candidate.lower() in UNIT_ALIASES or case_alias:
                     unit_tok = candidate
                     best_end = j + 1
                     j += 1
@@ -3066,9 +3079,13 @@ def _preprocess_units(expression: str) -> str:
                         result.append(expression[i])
                         i += 1
                 else:
-                    canonical = UNIT_ALIASES.get(
-                        unit_tok, UNIT_ALIASES.get(unit_tok.lower(), unit_tok)
+                    unit_canonical: str | None = UNIT_ALIASES.get(
+                        unit_tok, UNIT_ALIASES.get(unit_tok.lower())
                     )
+                    if unit_canonical is None:
+                        alias = _case_variant_alias(unit_tok)
+                        unit_canonical = UNIT_ALIASES[alias] if alias is not None else unit_tok
+                    canonical = unit_canonical
                     result.append(canonical)
                     i = best_end
             else:
@@ -3209,7 +3226,12 @@ def _handle_unit_conversion_from_tokens(tokens: list) -> list:
         num_part = None
         advance = 1  # How many tokens to skip after the conversion
         for unit in _UNITS_BY_LENGTH:
-            if token.endswith(unit):
+            unit_suffix = token[-len(unit) :]
+            if token.endswith(unit) or (
+                len(unit) > 1
+                and unit_suffix.lower() == unit.lower()
+                and _is_best_case_variant(unit_suffix, unit)
+            ):
                 num_part = token[: -len(unit)]
                 if num_part and num_part[-1].isdigit():
                     from_unit = unit

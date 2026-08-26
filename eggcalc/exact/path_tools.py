@@ -467,8 +467,6 @@ def path_compare(
     if platform not in ("posix", "windows"):
         platform = "posix"
 
-    sep = "/" if platform == "posix" else "\\"
-
     def _normalize_path(p: str) -> str:
         result = p
         if normalize_separators:
@@ -535,8 +533,6 @@ def path_scope_check(
 
     if platform not in ("posix", "windows"):
         platform = "posix"
-
-    sep = "/" if platform == "posix" else "\\"
 
     def _pre_normalize(p: str) -> str:
         result = p

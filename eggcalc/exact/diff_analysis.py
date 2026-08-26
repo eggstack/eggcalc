@@ -408,7 +408,6 @@ def diff_file_headers(patch_text: str, max_files: int = 100) -> DiffFileHeadersR
         return DiffFileHeadersResult(parse_ok=False, error=pr["error"], files=[])
 
     git_line_re = re.compile(r"^diff --git\s+(.+)\s+(.+)$")
-    index_line_re = re.compile(r"^index\s+(\S+)")
     rename_from_re = re.compile(r"^rename from\s+(.+)$")
     rename_to_re = re.compile(r"^rename to\s+(.+)$")
     copy_from_re = re.compile(r"^copy from\s+(.+)$")

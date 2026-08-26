@@ -556,7 +556,6 @@ def markdown_link_check_lexical(
 
         for m in _INLINE_LINK_RE.finditer(line):
             total_links += 1
-            link_text = m.group(1)
             target = m.group(2)
             is_image = line[m.start() : m.start() + 1] == "!"
 
@@ -598,8 +597,6 @@ def markdown_link_check_lexical(
 
         for m in _REFERENCE_LINK_RE.finditer(line):
             total_links += 1
-            link_text = m.group(1)
-            ref = m.group(2)
             is_image = line[m.start() : m.start() + 1] == "!"
 
             if is_image:

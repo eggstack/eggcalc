@@ -864,7 +864,6 @@ def inspect_text(
 
     limits_applied_info: list[str] = []
     total_invisibles_omitted = len(all_invisibles) - len(invisibles)
-    total_bidi_omitted = len(bidi_controls) - len([b for b in bidi_controls if b in warnings])
     total_confusables_omitted = len(all_confusables) - len(confusables)
     if total_invisibles_omitted > 0:
         limits_applied_info.append(f"invisibles_omitted={total_invisibles_omitted}")
@@ -1648,7 +1647,6 @@ def text_replace_check(
         changed_text = text
 
     # Compute fingerprints
-    before_fp = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
     after_fp = hashlib.sha256(changed_text.encode("utf-8")).hexdigest()[:16]
 
     # Newline style detection
@@ -1923,9 +1921,6 @@ def line_range_compare(
 
     left_lines = _extract_lines(left_text)
     right_lines = _extract_lines(right_text)
-
-    total_left = len(left_lines) or 1
-    total_right = len(right_lines) or 1
 
     # Clamp to available range
     start_1based = start_line + (1 - line_base)

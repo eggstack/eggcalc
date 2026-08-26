@@ -501,6 +501,10 @@ class TestDiff:
         assert longest_common_subsequence("abc", "abc") == "abc"
         assert longest_common_subsequence("abc", "def") == ""
 
+    def test_longest_common_subsequence_handles_large_inputs(self):
+        value = longest_common_subsequence("ab" * 750, "ba" * 750)
+        assert len(value) == 1499
+
 
 class TestValidate:
     """Tests for validation primitives."""

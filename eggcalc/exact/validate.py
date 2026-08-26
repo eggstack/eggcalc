@@ -1521,7 +1521,6 @@ def json_compare(
                         break
                 if len_a != len_b:
                     type_match = False
-                    longer = a_key_order if len_a > len_b else b_key_order
                     diffs.append(
                         JsonCompareDiff(
                             path=path,
@@ -2478,7 +2477,6 @@ def regex_safety_check(pattern: str) -> RegexSafetyResult:
         )
 
     ambiguous_dot = re.compile(r'\.\*')
-    in_char_class = False
     for match in ambiguous_dot.finditer(pattern):
         start = match.start()
         depth = 0

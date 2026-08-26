@@ -1828,6 +1828,12 @@ class TestEvaluatorEdgeCases:
         with pytest.raises(EvaluationError):
             evaluate("temp(0)")
 
+    def test_temp_requires_named_units(self):
+        from eggcalc.evaluator import _temp
+
+        with pytest.raises(EvaluationError, match="unit name strings"):
+            _temp(0, 0.0, "C")
+
     def test_convert_wrong_args_error(self):
         """convert(5) should produce EvaluationError, not raw TypeError."""
         with pytest.raises(EvaluationError):

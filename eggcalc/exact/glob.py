@@ -159,8 +159,6 @@ def _match_double_star(
     if next_pattern_idx >= len(pattern_parts):
         return True, next_pattern_idx, len(path_parts)
 
-    next_pattern = pattern_parts[next_pattern_idx]
-
     path_idx = p_idx
     while path_idx <= len(path_parts):
         remaining_pattern = pattern_parts[next_pattern_idx:]

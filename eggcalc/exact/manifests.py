@@ -845,7 +845,6 @@ def lockfile_summary(text: str, kind: str = "auto") -> LockfileSummaryResult:
     elif detected == "composer":
         try:
             data = json.loads(text)
-            content = data.get("content-hash", "")
             pkgs = data.get("packages", data.get("packages-dev", []))
             approx_count = len(pkgs) if isinstance(pkgs, list) else 0
         except (json.JSONDecodeError, ValueError):

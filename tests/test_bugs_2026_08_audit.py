@@ -188,6 +188,35 @@ class TestPowerUnitRenderingConsistency:
         assert r.unit == "m2"
 
 
+class TestDimensionalRoots:
+    """Compact area and volume aliases retain their structural roots."""
+
+    @pytest.mark.parametrize(
+        ("expr", "expected_value", "expected_unit"),
+        [
+            ("sqrt(9*m2)", 3, "m"),
+            ("sqrt(9*cm2)", 3, "cm"),
+            ("sqrt(4*ft2)", 2, "ft"),
+            ("cbrt(8*m3)", 2, "m"),
+            ("cbrt(8*cm3)", 2, "cm"),
+            ("cbrt(8*ft3)", 2, "ft"),
+        ],
+    )
+    def test_compact_unit_roots(self, expr, expected_value, expected_unit):
+        from eggcalc.evaluator import evaluate_raw
+
+        result = evaluate_raw(expr)
+        assert result.value == pytest.approx(expected_value)
+        assert result.unit == expected_unit
+
+    def test_multi_character_unit_case_matching_uses_local_text(self):
+        from eggcalc.evaluator import evaluate_raw
+
+        assert evaluate_raw("100ml in L").value == pytest.approx(0.1)
+        assert evaluate_raw("100ML in L").value == pytest.approx(0.1)
+        assert evaluate_raw("100mw").unit == "mW"
+
+
 # ---------------------------------------------------------------------------
 # B6: nth-root phrases evaluate instead of collapsing into identifiers.
 # ---------------------------------------------------------------------------
