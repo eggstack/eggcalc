@@ -18,7 +18,7 @@ import os
 import random
 import re
 import threading
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from enum import Enum, auto
 from queue import Empty as _QueueEmpty
@@ -388,7 +388,8 @@ def _root_unit_expression(expr: Any, degree: int, name: str) -> Any:
     scale = 1.0
     for canonical, exponent in new_factors:
         definition = registry.by_canonical(canonical)
-        assert definition is not None
+        if definition is None:
+            raise EvaluationError(f"Unknown canonical unit: '{canonical}'")
         scale *= definition.scale**exponent
     return UnitExpression(tuple(new_factors), expected_dimension, scale)
 
@@ -578,7 +579,7 @@ def _get_function_specs() -> dict[str, FunctionSpec]:
 # are evicted when the cap is reached.
 MAX_ORPHANED_PROCESSES = 256
 _orphaned_eval_processes: set[multiprocessing.Process] = set()
-_orphaned_eval_order: list[multiprocessing.Process] = []
+_orphaned_eval_order: deque[multiprocessing.Process] = deque()
 _orphaned_eval_lock: threading.Lock = threading.Lock()
 
 
@@ -839,7 +840,8 @@ def get_config_generation() -> int:
     Increments each time user configuration is loaded or cleared.
     Useful for detecting whether cached results may be stale.
     """
-    return _config_generation
+    with _cache_lock:
+        return _config_generation
 
 
 def _store_cache_entry(expression: str, result: Any) -> None:
@@ -955,7 +957,13 @@ def load_user_config_extended() -> None:
 
 
 def _safe_pow(base: float, exp: float) -> float | int | complex:
-    """Safe power function with exponent limits to prevent DoS."""
+    """Safe power function with exponent limits to prevent DoS.
+
+    Exact integer arithmetic is retained for large integral powers that
+    cannot be represented as a finite float, including an integral float
+    base such as ``5.0``. When the exact result fits in the float range,
+    an integral float base retains its float result type.
+    """
     if abs(exp) > MAX_EXPONENT:
         raise EvaluationError(f"Exponent too large (max {MAX_EXPONENT})")
     if not isinstance(base, complex) and base < 0:
@@ -982,6 +990,8 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
             and (not isinstance(base, float) or base.is_integer())
         ):
             result = pow(int(base), int(exp))
+            if isinstance(base, float) and abs(result) <= MAX_RESULT_VALUE:
+                result = float(result)
         else:
             result = pow(base, exp)
     except ZeroDivisionError:
@@ -3340,7 +3350,7 @@ def evaluate_with_timeout(
                         _orphaned_eval_processes.add(proc)
                         _orphaned_eval_order.append(proc)
                         while len(_orphaned_eval_order) > MAX_ORPHANED_PROCESSES:
-                            oldest = _orphaned_eval_order.pop(0)
+                            oldest = _orphaned_eval_order.popleft()
                             _orphaned_eval_processes.discard(oldest)
                             try:
                                 if oldest.is_alive():

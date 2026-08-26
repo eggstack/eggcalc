@@ -359,10 +359,6 @@ def _apply_hunk(
         elif hline.startswith("\\"):
             hunk_idx += 1
         else:
-            if hline.startswith(" "):
-                if new_idx < len(original_lines):
-                    new_lines.append(original_lines[new_idx])
-                new_idx += 1
             hunk_idx += 1
 
     while new_idx < len(original_lines):

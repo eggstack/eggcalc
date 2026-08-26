@@ -13,7 +13,7 @@ import unicodedata
 from typing import Literal, TypedDict, cast
 
 from .diff import levenshtein_distance
-from .unicode_tools import detect_confusables
+from .unicode_tools import ConfusableInfo, detect_confusables
 
 
 class IdentifierInspectResult(TypedDict):
@@ -229,6 +229,7 @@ def identifier_inspect(
     normalized_ids: list[str] = []
     id_infos: list[IdentifierInfo] = []
     collisions: list[CollisionInfo] = []
+    confusables_by_norm: dict[str, list[ConfusableInfo]] = {}
 
     for raw_id in identifiers:
         normalized = raw_id
@@ -242,7 +243,9 @@ def identifier_inspect(
 
         confusables_found = []
         if check_confusables:
-            confusables_found = detect_confusables(normalized)
+            if normalized not in confusables_by_norm:
+                confusables_by_norm[normalized] = detect_confusables(normalized)
+            confusables_found = confusables_by_norm[normalized]
 
         has_confusables = len(confusables_found) > 0
 
@@ -294,8 +297,8 @@ def identifier_inspect(
                 a_norm = normalized_ids[i]
                 b_norm = normalized_ids[j]
 
-                a_confusables = detect_confusables(a_norm)
-                b_confusables = detect_confusables(b_norm)
+                a_confusables = confusables_by_norm[a_norm]
+                b_confusables = confusables_by_norm[b_norm]
 
                 if a_confusables and b_confusables:
                     a_targets = {c["confusable_with"] for c in a_confusables}

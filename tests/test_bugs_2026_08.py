@@ -1,5 +1,6 @@
 """Regression tests for actionable defects from bugs.md (August 2026)."""
 
+import ast
 import math
 import unicodedata
 from unittest.mock import patch
@@ -8,7 +9,7 @@ import pytest
 
 from eggcalc import EvaluationError, evaluate, evaluate_raw
 from eggcalc.cli import _cli_text_command, _CommandStatus, _run_repl, run_cli
-from eggcalc.evaluator import _polar, _safe_pow
+from eggcalc.evaluator import _polar, _root_unit_expression, _safe_pow
 from eggcalc.exact.primitives import detect_newline_style
 from eggcalc.exact.repo_audit import _classify_path
 from eggcalc.exact.shell import shell_split
@@ -23,6 +24,87 @@ def test_safe_pow_accepts_integral_float_exponents():
     result = _safe_pow(5, 500.0)
     assert isinstance(result, int)
     assert result == 5**500
+
+
+def test_safe_pow_preserves_float_type_when_result_fits():
+    result = _safe_pow(5.0, 301)
+    assert isinstance(result, float)
+    assert result == float(5**301)
+
+
+def test_root_unit_expression_reports_missing_scale_definition(monkeypatch):
+    from eggcalc.units import DIM_LENGTH, Dimension, UnitDefinition, UnitExpression
+
+    definition = UnitDefinition(
+        canonical="m",
+        dimension=DIM_LENGTH,
+        scale=1.0,
+        aliases=("m",),
+        category="length",
+        base_canonical="m",
+    )
+
+    class Registry:
+        def __init__(self):
+            self.calls = 0
+
+        def by_canonical(self, canonical):
+            self.calls += 1
+            if self.calls == 1:
+                return definition
+            return None
+
+    expression = UnitExpression((("m", 2),), Dimension(length=2), 1.0)
+    registry = Registry()
+    monkeypatch.setattr("eggcalc.units._get_unit_registry", lambda: registry)
+    with pytest.raises(EvaluationError, match="Unknown canonical unit"):
+        _root_unit_expression(expression, 2, "sqrt")
+
+
+def test_visible_repr_only_reports_actual_changes():
+    from eggcalc.exact.transform import text_transform
+
+    result = text_transform("hello", ["visible_repr"])
+    assert result["changed"] is False
+    assert result["operations_applied"] == []
+    assert result["summary"] == "No recognized operations applied"
+
+
+@pytest.mark.parametrize(
+    "char,escaped",
+    [("\x00", r"\x00"), ("\x07", r"\x07"), ("\x1f", r"\x1f"), ("\x7f", r"\x7f")],
+)
+def test_python_string_escapes_control_characters(char, escaped):
+    from eggcalc.exact.transform import _escape_python_string
+
+    result = _escape_python_string(char)
+    assert result == "'" + escaped + "'"
+    assert ast.literal_eval(result) == char
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [("foo`bar", "`` foo`bar ``"), ("foo``bar", "``` foo``bar ```")],
+)
+def test_markdown_inline_code_uses_longer_fence(text, expected):
+    from eggcalc.exact.transform import _escape_markdown_inline_code
+
+    assert _escape_markdown_inline_code(text) == expected
+
+
+def test_identifier_inspect_reuses_confusable_results(monkeypatch):
+    import importlib
+
+    identifier_module = importlib.import_module("eggcalc.exact.identifier_inspect")
+
+    calls = []
+    monkeypatch.setattr(
+        identifier_module,
+        "detect_confusables",
+        lambda text: calls.append(text) or [],
+    )
+    identifier_module.identifier_inspect(["alpha", "beta", "alpha"], check_confusables=True)
+    assert calls == ["alpha", "beta"]
 
 
 def test_polar_supports_complex_and_coordinate_forms():

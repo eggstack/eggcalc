@@ -19,6 +19,7 @@ import math
 import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from types import MappingProxyType
 
 Numeric = float | int | complex
@@ -3549,6 +3550,9 @@ def _install_generated_adapters(
     TEMPERATURE_CONVERSIONS = _generated_temperature_conversions(registry)  # type: ignore[assignment]
     UNIT_CONVERSIONS = _LazyUnitConversions(registry)  # type: ignore[assignment]
     _refresh_compatibility_consumers()
+    lookup_definition = globals().get("_lookup_definition")
+    if lookup_definition is not None:
+        lookup_definition.cache_clear()
 
 
 def register_custom_units(
@@ -3628,6 +3632,7 @@ def unregister_custom_units(names: Mapping[str, object] | set[str] | tuple[str, 
     _install_generated_adapters(definitions)
 
 
+@lru_cache(maxsize=1024)
 def _lookup_definition(unit: str) -> UnitDefinition | None:
     registry = _get_unit_registry()
     if registry is None:

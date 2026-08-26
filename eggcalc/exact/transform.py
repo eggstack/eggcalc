@@ -273,8 +273,10 @@ def text_transform(
         elif op_lower == "visible_repr":
             from .primitives import visible_repr as _visible_repr_impl
 
-            current_text = _visible_repr_impl(current_text)
-            operations_applied.append("visible_repr")
+            new_text = _visible_repr_impl(current_text)
+            if new_text != current_text:
+                current_text = new_text
+                operations_applied.append("visible_repr")
 
     changed = current_text != text
 
@@ -331,16 +333,24 @@ def _escape_json_string(text: str) -> str:
 
 def _escape_python_string(text: str) -> str:
     """Escape text as Python string literal."""
-    return (
-        "'"
-        + text.replace("\\", "\\\\")
-        .replace("'", "\\'")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
-        .replace("\x00", "\\0")
-        + "'"
-    )
+    escaped: list[str] = []
+    for char in text:
+        codepoint = ord(char)
+        if char == "\\":
+            escaped.append("\\\\")
+        elif char == "'":
+            escaped.append("\\'")
+        elif char == "\n":
+            escaped.append("\\n")
+        elif char == "\r":
+            escaped.append("\\r")
+        elif char == "\t":
+            escaped.append("\\t")
+        elif codepoint < 0x20 or codepoint == 0x7F:
+            escaped.append(f"\\x{codepoint:02x}")
+        else:
+            escaped.append(char)
+    return "'" + "".join(escaped) + "'"
 
 
 def _escape_rust_string(text: str) -> str:
@@ -368,9 +378,11 @@ def _escape_regex_literal(text: str) -> str:
 
 def _escape_markdown_inline_code(text: str) -> str:
     """Escape text for inline markdown code (wrap in backticks)."""
-    if "`" in text:
-        return "`` " + text + " ``"
-    return "`" + text + "`"
+    longest_run = max((len(run) for run in re.findall(r"`+", text)), default=0)
+    fence = "`" * (longest_run + 1)
+    if longest_run:
+        return fence + " " + text + " " + fence
+    return fence + text + fence
 
 
 def _escape_markdown_code_block(text: str) -> str:
