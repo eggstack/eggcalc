@@ -5,12 +5,18 @@ complete -c calc -f
 
 # Options
 complete -c calc -s h -l help -d 'Show help message'
+complete -c calc -l usage -d 'Show full usage information and examples'
 complete -c calc -s v -l version -d 'Show version information'
 complete -c calc -s e -l expression -d 'Evaluate a single expression' -x
 complete -c calc -s q -l quiet -d 'Suppress expression in output'
+complete -c calc -l verbose -d 'Accepted for compatibility; output remains result-only'
 complete -c calc -s s -l show -d 'Show expression in output'
 complete -c calc -l json -d 'Output result as JSON'
 complete -c calc -s i -l interactive -d 'Start interactive REPL mode'
+complete -c calc -l capabilities -d 'Show runtime capabilities as JSON'
+complete -c calc -l mcp -d 'Run as MCP server for exact text tools'
+complete -c calc -l mcp-profile -x -a '(full default codegg_core_min codegg_core codegg_preflight codegg_patch codegg_config codegg_unicode_security codegg_shell codegg_repo_audit human_math)' -d 'MCP profile to use'
+complete -c calc -l mcp-schema-detail -x -a '(compact normal full)' -d 'MCP schema detail level'
 
 # Functions
 complete -c calc -n '__fish_use_subcommand' -a 'sin cos tan asin acos atan sinh cosh tanh' -d 'Trigonometric function'

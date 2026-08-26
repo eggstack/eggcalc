@@ -101,7 +101,10 @@ MAX_EXPONENT = 10000
 MAX_FACTORIAL = 1000
 MAX_NESTING_DEPTH = 100
 MAX_RESULT_VALUE = 1e308
-MAX_RESULT_DIGITS = 10000
+# CPython 3.11+ refuses int->str conversion past 4300 digits by default
+# (sys.get_int_max_str_digits()), so results beyond this could never be
+# printed by callers. Keep the limit at or below that boundary.
+MAX_RESULT_DIGITS = 4300
 MAX_SHIFT_COUNT = 50000
 MAX_INPUT_LENGTH = 10_000  # max characters in expression string
 MAX_USER_VARIABLES = 1000  # cap on setvar entries per evaluator
@@ -1600,14 +1603,25 @@ _sqrt = _complex_aware(math.sqrt, cmath.sqrt, use_complex_for_negative=True)
 
 _log_complex = _complex_aware(math.log, cmath.log, use_complex_for_negative=True)
 _log10_complex = _complex_aware(math.log10, cmath.log10, use_complex_for_negative=True)
-_log2_complex = _complex_aware(math.log2, lambda x: cmath.log(x, 2), use_complex_for_negative=True)
+# Two-arg cmath.log(x, base) silently returns (-inf+nanj) for x == 0 instead
+# of raising, so divide by the explicitly computed base log: this raises the
+# expected domain error for zero and matches CPython's own implementation.
+_log2_complex = _complex_aware(
+    math.log2, lambda x: cmath.log(x) / cmath.log(2), use_complex_for_negative=True
+)
+
+
+def _is_non_positive_log_operand(arg: Any) -> bool:
+    if isinstance(arg, complex):
+        return arg == 0
+    return isinstance(arg, (int, float)) and arg <= 0
 
 
 def _safe_log(*args: Any) -> Any:
     try:
         return _log_complex(*args)
     except ValueError:
-        if args and isinstance(args[0], (int, float)) and args[0] <= 0:
+        if args and _is_non_positive_log_operand(args[0]):
             raise EvaluationError("Logarithm undefined for non-positive values")
         raise
 
@@ -1616,7 +1630,7 @@ def _safe_log10(*args: Any) -> Any:
     try:
         return _log10_complex(*args)
     except ValueError:
-        if args and isinstance(args[0], (int, float)) and args[0] <= 0:
+        if args and _is_non_positive_log_operand(args[0]):
             raise EvaluationError("Logarithm undefined for non-positive values")
         raise
 
@@ -1625,7 +1639,7 @@ def _safe_log2(*args: Any) -> Any:
     try:
         return _log2_complex(*args)
     except ValueError:
-        if args and isinstance(args[0], (int, float)) and args[0] <= 0:
+        if args and _is_non_positive_log_operand(args[0]):
             raise EvaluationError("Logarithm undefined for non-positive values")
         raise
 
@@ -2451,6 +2465,20 @@ class Evaluator(ast.NodeVisitor):
         left = self.visit(node.left)
         right = self.visit(node.right)
         op_class = type(node.op)
+
+        # A bitwise NOT feeding a unit product means the user applied "~" to
+        # only the numeric part of a unit quantity ("~3m" normalizes to
+        # "~3*m"); bitwise NOT is undefined for unit values, so reject it
+        # exactly like the explicit "~(3*m)" form.
+        def _is_invert_subtree(n: ast.expr) -> bool:
+            return isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.Invert)
+
+        if (
+            op_class in (ast.Mult, ast.Div)
+            and (_is_invert_subtree(node.left) or _is_invert_subtree(node.right))
+            and (isinstance(left, UnitValue) or isinstance(right, UnitValue))
+        ):
+            raise EvaluationError("Bitwise NOT requires an integer operand")
 
         # Extract values and units
         left_val = left.value if isinstance(left, UnitValue) else left

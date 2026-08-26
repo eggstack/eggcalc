@@ -12,7 +12,7 @@ import re
 import unicodedata
 from typing import Any, Literal, TypedDict, cast
 
-MAX_INPUT_LENGTH = 100_000
+MAX_TEXT_INPUT_LENGTH = 100_000
 MAX_LIST_ITEMS = 10_000
 MAX_PATTERN_LENGTH = 1000
 MAX_PATTERN_NESTING = 5
@@ -212,10 +212,12 @@ def check_brackets(
         and unmatched_closers (list).
 
     Raises:
-        ValueError: If input exceeds MAX_INPUT_LENGTH.
+        ValueError: If input exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(s) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(s)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(s) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(s)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
 
     if pairs is None:
         pairs = DEFAULT_BRACKET_PAIRS
@@ -302,13 +304,18 @@ def validate_json(s: str) -> ValidateJsonResult:
         line, column, position (if invalid), and type/top_level_keys (if valid).
 
     Raises:
-        ValueError: If input exceeds MAX_INPUT_LENGTH.
+        ValueError: If input exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(s) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(s)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(s) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(s)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
+
+    def _reject_non_finite(name: str) -> float:
+        raise ValueError(f"{name} is not valid JSON (RFC 8259 forbids non-finite constants)")
 
     try:
-        parsed = json.loads(s)
+        parsed = json.loads(s, parse_constant=_reject_non_finite)
 
         # Determine the type
         if isinstance(parsed, dict):
@@ -353,6 +360,27 @@ def validate_json(s: str) -> ValidateJsonResult:
             type=None,
             top_level_keys=None,
         )
+    except ValueError as e:
+        # json.loads also raises plain ValueError for integer literals beyond
+        # CPython's int->str conversion limit, and our parse_constant hook
+        # raises for NaN/Infinity extensions forbidden by RFC 8259. Report
+        # both as findings instead of leaking the exception.
+        message = str(e)
+        if "is not valid JSON" in message:
+            pass
+        elif "Exceeds the limit" in message:
+            message = "integer literal exceeds supported size"
+        else:
+            message = f"invalid JSON: {message}"
+        return ValidateJsonResult(
+            valid=False,
+            error=message,
+            line=None,
+            column=None,
+            position=None,
+            type=None,
+            top_level_keys=None,
+        )
 
 
 def _extract_tables(d: dict, prefix: str = "") -> list[str]:
@@ -378,10 +406,12 @@ def validate_toml_text(text: str) -> ValidateTomlResult:
         and tables (table paths like 'package', 'dependencies.dev').
 
     Raises:
-        ValueError: If input exceeds MAX_INPUT_LENGTH.
+        ValueError: If input exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(text)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
 
     try:
         import tomllib
@@ -464,7 +494,7 @@ def toml_shape(text: str, max_tables: int = 100) -> TomlShapeResult:
         Dictionary with valid (bool), top_level_keys, tables, and summary.
 
     Raises:
-        ValueError: If input exceeds MAX_INPUT_LENGTH.
+        ValueError: If input exceeds MAX_TEXT_INPUT_LENGTH.
     """
     try:
         import tomllib
@@ -477,8 +507,10 @@ def toml_shape(text: str, max_tables: int = 100) -> TomlShapeResult:
             summary="tomllib not available - Python 3.11+ required",
         )
 
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(text)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
 
     try:
         parsed = tomllib.loads(text)
@@ -522,12 +554,12 @@ def version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareRes
         and summary.
 
     Raises:
-        ValueError: If either input string exceeds MAX_INPUT_LENGTH.
+        ValueError: If either input string exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(a) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input 'a' length {len(a)} exceeds maximum {MAX_INPUT_LENGTH}")
-    if len(b) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input 'b' length {len(b)} exceeds maximum {MAX_INPUT_LENGTH}")
+    if len(a) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(f"Input 'a' length {len(a)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}")
+    if len(b) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(f"Input 'b' length {len(b)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}")
     if scheme == "semver":
         return _semver_compare(a, b)
     elif scheme == "pep440":
@@ -1304,12 +1336,12 @@ def json_compare(
         Dictionary with comparison results including diffs and summary.
 
     Raises:
-        ValueError: If either input string exceeds MAX_INPUT_LENGTH.
+        ValueError: If either input string exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(a) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input 'a' length {len(a)} exceeds maximum {MAX_INPUT_LENGTH}")
-    if len(b) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input 'b' length {len(b)} exceeds maximum {MAX_INPUT_LENGTH}")
+    if len(a) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(f"Input 'a' length {len(a)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}")
+    if len(b) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(f"Input 'b' length {len(b)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}")
     diffs: list[JsonCompareDiff] = []
     valid_json_a = True
     valid_json_b = True
@@ -1723,10 +1755,12 @@ def json_extract(text: str, pointer: str = "", max_output_chars: int = 4000) -> 
         and for missing values: reason, available_keys, and missing_at.
 
     Raises:
-        ValueError: If input exceeds MAX_INPUT_LENGTH.
+        ValueError: If input exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(text)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
 
     try:
         parsed = json.loads(text)
@@ -2014,10 +2048,12 @@ def json_shape(
         Dictionary with valid (bool), shape (nested structure), and truncated (bool).
 
     Raises:
-        ValueError: If input exceeds MAX_INPUT_LENGTH.
+        ValueError: If input exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(text)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
 
     try:
         parsed = json.loads(text)
@@ -2760,8 +2796,10 @@ def json_canonicalize(
         Dictionary with canonical form, minified form, SHA256 hash,
         duplicate_keys, top_level_type, and top_level_keys.
     """
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(text)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
 
     duplicate_keys: list[str] = []
     parsed: Any = None
@@ -2889,8 +2927,10 @@ def json_query(text: str, pointer: str = "") -> JsonQueryResult:
         Dictionary with found (bool), value, type, and for missing values:
         missing_at, reason, and available information.
     """
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds MAX_INPUT_LENGTH {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(
+            f"Input length {len(text)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
+        )
 
     try:
         parsed = json.loads(text)

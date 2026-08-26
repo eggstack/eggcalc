@@ -27,7 +27,7 @@ copies is caught by the test suites listed in the "Tests" column.
 | `MAX_FACTORIAL` | `eggcalc/evaluator.py:104` | 1 000 | `test_evaluator` |
 | `MAX_NESTING_DEPTH` | `eggcalc/evaluator.py:105` | 100 | `test_evaluator`, `test_unit_dimensions` |
 | `MAX_RESULT_VALUE` | `eggcalc/evaluator.py:106` | 1e308 | `test_evaluator` |
-| `MAX_RESULT_DIGITS` | `eggcalc/evaluator.py:107` | 10 000 | `test_evaluator` |
+| `MAX_RESULT_DIGITS` | `eggcalc/evaluator.py:107` | 4 300 | `test_evaluator` |
 | `MAX_SHIFT_COUNT` | `eggcalc/evaluator.py:108` | 50 000 | `test_evaluator` |
 | `MAX_INPUT_LENGTH` | `eggcalc/evaluator.py:109` | 10 000 | `test_evaluator` |
 | `MAX_USER_VARIABLES` | `eggcalc/evaluator.py:110` | 1 000 | `test_evaluator` |

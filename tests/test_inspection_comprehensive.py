@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from eggcalc.exact.cargo import (
-    _MAX_INPUT_LENGTH as _CARGO_MAX_INPUT_LENGTH,
+    _MAX_CARGO_INPUT_LENGTH as _CARGO_MAX_INPUT_LENGTH,
 )
 from eggcalc.exact.cargo import (
     cargo_toml_inspect,

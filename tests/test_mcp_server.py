@@ -281,7 +281,7 @@ class TestErrorHandling:
             }
         )
         assert response is not None
-        assert response["error"]["code"] == -32600
+        assert response["error"]["code"] == -32602
         assert "expected object" in response["error"]["message"]
 
     def test_reject_non_object_arguments(self):
@@ -294,7 +294,7 @@ class TestErrorHandling:
             }
         )
         assert response is not None
-        assert response["error"]["code"] == -32600
+        assert response["error"]["code"] == -32602
         assert "expected object" in response["error"]["message"]
 
     def test_unknown_method_returns_error(self):
@@ -5234,7 +5234,7 @@ class TestMCPSecurityAndValidation:
             }
         )
         assert "error" in response
-        assert response["error"]["code"] == -32600
+        assert response["error"]["code"] == -32602
 
     def test_tools_list_rejects_non_object_params(self):
         """tools/list must return JSON-RPC error for non-object params."""
@@ -5246,7 +5246,7 @@ class TestMCPSecurityAndValidation:
                 "params": [],
             }
         )
-        assert response["error"]["code"] == -32600
+        assert response["error"]["code"] == -32602
         assert "Invalid params" in response["error"]["message"]
 
     def test_profiles_list_rejects_non_object_params(self):
@@ -7010,8 +7010,13 @@ class TestLineRangeCompareValidation:
 class TestCancelledRequests:
     """Test session-scoped cancellation behavior in MCP server."""
 
-    def test_cancelled_request_returns_cancelled_error(self):
-        """Sending a cancelled notification then a tool call with same ID returns cancelled error."""
+    def test_stale_cancellation_does_not_poison_reused_id(self):
+        """A late/stale cancellation record must not cancel a future request.
+
+        A notifications/cancelled for an id with no live request (already
+        completed or never sent) is recorded, but a subsequent request that
+        reuses the id must run normally and retire the stale record.
+        """
         session = ready_session()
         cancelled_id = "test_cancelled_1"
 
@@ -7024,8 +7029,9 @@ class TestCancelledRequests:
             },
             session=session,
         )
+        assert cancelled_id in session._cancelled_requests
 
-        # Send tool call with same ID through same session
+        # A later tool call reusing the ID must NOT be falsely cancelled
         response = handle_request(
             {
                 "jsonrpc": "2.0",
@@ -7040,9 +7046,9 @@ class TestCancelledRequests:
         )
         assert "result" in response
         content = json.loads(response["result"]["content"][0]["text"])
-        assert content["ok"] is False
-        assert content["error_type"] == "cancelled"
-        assert "cancelled" in content["error"].lower()
+        assert content["ok"] is True
+        # The stale record was retired by the request that reused the id
+        assert cancelled_id not in session._cancelled_requests
 
     def test_cancelled_request_removed_from_deque(self):
         """After matching a tool call, the cancelled ID is removed from the deque."""
@@ -7166,7 +7172,7 @@ class TestCancelledRequests:
         )
         assert cancelled_id in session._cancelled_requests
 
-        # Send tool call with same ID
+        # A later tool call reusing the ID runs normally (stale record retired)
         response = handle_request(
             {
                 "jsonrpc": "2.0",
@@ -7179,9 +7185,38 @@ class TestCancelledRequests:
             },
             session=session,
         )
+        assert "result" in response
         content = json.loads(response["result"]["content"][0]["text"])
+        assert content["ok"] is True
+        assert cancelled_id not in session._cancelled_requests
+
+    def test_live_cancellation_record_honored_by_executor(self):
+        """A cancellation record added while a request is live is honored.
+
+        This exercises the genuine mid-flight cancellation path: the executor
+        consumes the record and returns a cancelled result instead of running
+        the tool.
+        """
+        session = ready_session()
+        owner = session.owner
+        request_id = "live-cancel-target"
+        session._cancelled_requests.add(request_id)
+        session._cancelled_requests_order.append(request_id)
+
+        result = owner._executor.call_tool(
+            name="math_eval",
+            arguments={"expression": "1 + 1"},
+            request_id=request_id,
+            cancelled_set=session._cancelled_requests,
+            cancelled_order=session._cancelled_requests_order,
+            cancelled_lock=session._cancelled_lock,
+            evaluator=None,
+        )
+        content = json.loads(result["result"]["content"][0]["text"])
         assert content["ok"] is False
         assert content["error_type"] == "cancelled"
+        # The consumed record is removed
+        assert request_id not in session._cancelled_requests
 
     def test_cancellation_is_session_scoped(self):
         """Cancellation in one session does not affect another session."""
@@ -7460,7 +7495,7 @@ class TestHandleCallToolErrors:
             }
         )
         assert "error" in response
-        assert response["error"]["code"] == -32600
+        assert response["error"]["code"] == -32602
         assert "expected object" in response["error"]["message"]
 
     def test_jsonrpc_id_float_nan(self):

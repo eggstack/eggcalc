@@ -294,7 +294,7 @@ MAX_EXPONENT = 10000       # Maximum exponent size
 MAX_FACTORIAL = 1000       # Maximum factorial input
 MAX_NESTING_DEPTH = 100    # Maximum expression nesting (parentheses)
 MAX_RESULT_VALUE = 1e308   # Maximum result magnitude
-MAX_RESULT_DIGITS = 10000  # Maximum integer result digits
+MAX_RESULT_DIGITS = 4300   # Maximum integer result digits
 DEFAULT_CACHE_SIZE = 1024  # LRU cache size
 ```
 

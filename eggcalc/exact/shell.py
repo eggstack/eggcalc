@@ -60,7 +60,7 @@ _CONTROL_OPERATORS = {";", "&", "&&", "||"}
 _VARIABLE_PATTERN = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*")
 _COMMAND_SUB_PATTERN = re.compile(r"\$\(|`")
 
-MAX_INPUT_LENGTH = 100_000
+MAX_TEXT_INPUT_LENGTH = 100_000
 MAX_LIST_ITEMS = 10_000
 
 
@@ -126,10 +126,10 @@ def shell_split(
         ShellSplitResult with parsed argv, features, and findings.
 
     Raises:
-        ValueError: If command exceeds MAX_INPUT_LENGTH.
+        ValueError: If command exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(command) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Command length {len(command)} exceeds maximum {MAX_INPUT_LENGTH}")
+    if len(command) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(f"Command length {len(command)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}")
     findings: list[str] = []
 
     if shell != "posix":
@@ -276,19 +276,19 @@ def argv_compare(
         ArgvCompareResult with comparison results.
 
     Raises:
-        ValueError: If command strings exceed MAX_INPUT_LENGTH or argv lists
+        ValueError: If command strings exceed MAX_TEXT_INPUT_LENGTH or argv lists
             exceed MAX_LIST_ITEMS.
     """
     findings: list[str] = []
 
     # Validate input sizes
-    if left_command is not None and len(left_command) > MAX_INPUT_LENGTH:
+    if left_command is not None and len(left_command) > MAX_TEXT_INPUT_LENGTH:
         raise ValueError(
-            f"left_command length {len(left_command)} exceeds maximum {MAX_INPUT_LENGTH}"
+            f"left_command length {len(left_command)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}"
         )
-    if right_command is not None and len(right_command) > MAX_INPUT_LENGTH:
+    if right_command is not None and len(right_command) > MAX_TEXT_INPUT_LENGTH:
         raise ValueError(
-            f"right_command length {len(right_command)} exceeds maximum {MAX_INPUT_LENGTH}"
+            f"right_command length {len(right_command)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}"
         )
     if left_argv is not None and len(left_argv) > MAX_LIST_ITEMS:
         raise ValueError(f"left_argv count {len(left_argv)} exceeds maximum {MAX_LIST_ITEMS}")

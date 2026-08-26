@@ -1688,6 +1688,9 @@ class McpSession:
         self._cancelled_requests: set[Any] = set()
         self._cancelled_requests_order: deque[Any] = deque()
         self._cancelled_lock = threading.Lock()
+        # Monotonic timestamp for each recorded cancellation, used to
+        # retire records that predate a later request reusing the id.
+        self._cancelled_times: dict[Any, float] = {}
 
     def handle_message(
         self,
@@ -1721,7 +1724,49 @@ class McpSession:
         if error is not None:
             return error
 
-        # Dispatch
+        # Retire cancellation records that predate this request: JSON-RPC
+        # allows id reuse, so a late notifications/cancelled for an
+        # already-completed request must not cancel this one.
+        if (
+            request_id is not None
+            and method != "notifications/cancelled"
+            and self._cancelled_requests
+        ):
+            self._discard_stale_cancellation(request_id, time.monotonic())
+
+        response = self._dispatch_message(request, method, server, context)
+
+        # A produced response retires any leftover cancellation record for
+        # this id (the executor consumed it or the cancel raced completion).
+        if (
+            response is not None
+            and "id" in request
+            and (self._cancelled_requests or self._cancelled_times)
+        ):
+            self._discard_cancellation_record(request_id)
+
+        return response
+
+    def _dispatch_message(
+        self,
+        request: dict[str, Any],
+        method: str,
+        server: McpServer | None,
+        context: RuntimeContext | None,
+    ) -> dict[str, Any] | None:
+        """Route a validated message to its handler (no lifecycle logic)."""
+        request_id = request.get("id")
+        # Production protocol dispatch is owner-routed.  Ping and the local
+        # lifecycle notification are the only owner-independent methods.
+        if server is None and method not in {"ping", "notifications/initialized"}:
+            try:
+                server = self.owner
+            except RuntimeError:
+                return _invalid_request_error(
+                    request_id,
+                    "Production MCP dispatch requires a live owning server",
+                )
+
         if method == "initialize":
             return self._handle_initialize(request, server=server)
         elif method == "notifications/initialized":
@@ -1768,14 +1813,14 @@ class McpSession:
         """
         params = request.get("params", {})
         if not isinstance(params, dict):
-            return _invalid_request(request.get("id"), "Invalid params: expected object")
+            return _invalid_params(request.get("id"), "Invalid params: expected object")
 
         name = params.get("name", "")
         arguments = params.get("arguments", {})
         if not isinstance(name, str) or not name:
-            return _invalid_request(request.get("id"), "Invalid params: missing tool name")
+            return _invalid_params(request.get("id"), "Invalid params: missing tool name")
         if not isinstance(arguments, dict):
-            return _invalid_request(request.get("id"), "Invalid arguments: expected object")
+            return _invalid_params(request.get("id"), "Invalid arguments: expected object")
 
         # Check handler existence first (returns -32601 for unknown tools)
         if not server.registry.has_tool(name):
@@ -1964,9 +2009,38 @@ class McpSession:
                 if cancelled_id not in self._cancelled_requests:
                     self._cancelled_requests.add(cancelled_id)
                     self._cancelled_requests_order.append(cancelled_id)
+                self._cancelled_times[cancelled_id] = time.monotonic()
                 while len(self._cancelled_requests) > max_cancelled:
                     oldest = self._cancelled_requests_order.popleft()
                     self._cancelled_requests.discard(oldest)
+                    self._cancelled_times.pop(oldest, None)
+
+    def _discard_cancellation_record(self, request_id: Any) -> None:
+        """Remove any cancellation record for *request_id* (best effort)."""
+        with self._cancelled_lock:
+            if request_id in self._cancelled_requests or request_id in self._cancelled_times:
+                self._cancelled_requests.discard(request_id)
+                self._cancelled_times.pop(request_id, None)
+                try:
+                    self._cancelled_requests_order.remove(request_id)
+                except ValueError:
+                    pass
+
+    def _discard_stale_cancellation(self, request_id: Any, started_at: float) -> None:
+        """Drop a cancellation record that predates *started_at*.
+
+        A late notifications/cancelled for an already-completed request
+        must not silently cancel a future request that reuses the id.
+        """
+        with self._cancelled_lock:
+            recorded_at = self._cancelled_times.get(request_id)
+            if recorded_at is not None and recorded_at < started_at:
+                self._cancelled_requests.discard(request_id)
+                del self._cancelled_times[request_id]
+                try:
+                    self._cancelled_requests_order.remove(request_id)
+                except ValueError:
+                    pass
 
 
 class McpServer:
@@ -2669,7 +2743,7 @@ def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None)
     params = request.get("params", {})
     request_id = request.get("id")
     if not isinstance(params, dict):
-        return _invalid_request(request_id, "Invalid params: expected object")
+        return _invalid_params(request_id, "Invalid params: expected object")
 
     tier_filter = params.get("tier")
     tags_filter = params.get("tags")
@@ -2709,6 +2783,24 @@ def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None)
     # Determine profile-visible tools (server-aware)
     try:
         if server is not None:
+            if profile_filter is not None and profile_filter != server.config.profile:
+                # Per-request profile overrides may narrow but never broaden
+                # beyond the configured profile (least-privilege guard).
+                configured_tools = set(server.registry.get_profile_tools(server.config.profile))
+                requested_tools = set(server.registry.get_profile_tools(profile_filter))
+                if not requested_tools <= configured_tools:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32602,
+                            "message": (
+                                f"Profile '{profile_filter}' exceeds the tools "
+                                f"available in the configured profile "
+                                f"'{server.config.profile}'"
+                            ),
+                        },
+                    }
             default_profile = (
                 profile_filter if profile_filter is not None else server.config.profile
             )
@@ -3007,7 +3099,8 @@ def main() -> int:
                 now = time.monotonic()
                 rate_tokens = min(rate_capacity, rate_tokens + (now - last_refill) * rate)
                 last_refill = now
-                if rate_tokens < 1:
+                batch_size = len(request) if isinstance(request, list) else 1
+                if rate_tokens < batch_size:
                     response = _invalid_request_error(
                         request.get("id") if isinstance(request, dict) else None,
                         f"Rate limit exceeded: max {config.max_requests_per_second} requests per second",
@@ -3015,17 +3108,22 @@ def main() -> int:
                     print(json.dumps(response), flush=True)
                     continue
 
-                rate_tokens -= 1
+                rate_tokens -= batch_size
 
                 if isinstance(request, list):
                     if not request:
                         response = _invalid_request_error(None, "Invalid Request: empty batch")
                     else:
+                        # Notifications (entries without "id") must never receive a response.
                         response = [
-                            _invalid_request_error(None, "Batch requests are not supported")
-                            for _ in request
+                            _invalid_request_error(
+                                entry.get("id"), "Batch requests are not supported"
+                            )
+                            for entry in request
+                            if isinstance(entry, dict) and "id" in entry
                         ]
-                    print(json.dumps(response), flush=True)
+                    if response:
+                        print(json.dumps(response), flush=True)
                     continue
 
                 try:

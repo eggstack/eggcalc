@@ -123,7 +123,7 @@ _BIDI_CHARS = frozenset(
 )
 
 # Zero-width characters
-_ZERO_WIDTH_CHARS = frozenset(
+_ZERO_WIDTH_CHAR_SET = frozenset(
     {
         "\u200b",
         "\u200c",
@@ -303,7 +303,7 @@ def _check_identifier_strict(text: str, normalized: str) -> list[PolicyFinding]:
         )
 
     # Zero-width characters
-    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
+    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHAR_SET]
     if zw_found:
         findings.append(
             PolicyFinding(
@@ -397,7 +397,7 @@ def _check_filename_safe(text: str, normalized: str) -> list[PolicyFinding]:
         )
 
     # Zero-width characters
-    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
+    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHAR_SET]
     if zw_found:
         findings.append(
             PolicyFinding(
@@ -439,7 +439,7 @@ def _check_source_code(text: str, normalized: str) -> list[PolicyFinding]:
         )
 
     # Zero-width characters (except word joiner which is sometimes intentional)
-    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS and c != "\u2060"]
+    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHAR_SET and c != "\u2060"]
     if zw_found:
         findings.append(
             PolicyFinding(
@@ -479,7 +479,7 @@ def _check_human_text(text: str, normalized: str) -> list[PolicyFinding]:
         )
 
     # Zero-width characters (warning only)
-    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
+    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHAR_SET]
     if zw_found:
         findings.append(
             PolicyFinding(
@@ -530,7 +530,7 @@ def _check_json_key(text: str, normalized: str) -> list[PolicyFinding]:
         )
 
     # Zero-width characters
-    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
+    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHAR_SET]
     if zw_found:
         findings.append(
             PolicyFinding(
@@ -616,7 +616,7 @@ def _check_domain_like(text: str, normalized: str) -> list[PolicyFinding]:
         )
 
     # Zero-width characters
-    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHARS]
+    zw_found = [c for c in normalized if c in _ZERO_WIDTH_CHAR_SET]
     if zw_found:
         findings.append(
             PolicyFinding(

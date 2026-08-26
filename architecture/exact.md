@@ -1501,8 +1501,8 @@ Architecture docs may show `@dataclass class Xxx(NamedTuple)` but code uses `cla
 
 | Module | Constant | Value |
 |--------|----------|-------|
-| `config.py` | `MAX_INPUT_LENGTH` | 100,000 |
-| `validate.py` | `MAX_INPUT_LENGTH` | 100,000 |
+| `config.py` | `MAX_TEXT_INPUT_LENGTH` | 100,000 |
+| `validate.py` | `MAX_TEXT_INPUT_LENGTH` | 100,000 |
 | `validate.py` | `MAX_LIST_ITEMS` | 10,000 |
 | `validate.py` | `MAX_PATTERN_LENGTH` | 1,000 |
 | `validate.py` | `MAX_SAMPLE_LENGTH` | 10,000 |
@@ -1510,7 +1510,7 @@ Architecture docs may show `@dataclass class Xxx(NamedTuple)` but code uses `cla
 | `validate.py` | `MAX_SCHEMA_ELEMENTS` | 100,000 |
 | `patch.py` | `MAX_PATCH_LENGTH` | 200,000 |
 | `patch.py` | `MAX_ORIGINAL_LENGTH` | 200,000 |
-| `cargo.py` | `_MAX_INPUT_LENGTH` | 200,000 |
+| `cargo.py` | `_MAX_CARGO_INPUT_LENGTH` | 200,000 |
 | `manifests.py` | `_MAX_INPUT_LENGTH` | 500,000 |
 | `inspect_prompt.py` | `MAX_TEXT_LENGTH` | 100,000 |
 | `inspect_prompt.py` | `MAX_FINDINGS` | 1,000 |
@@ -1518,7 +1518,7 @@ Architecture docs may show `@dataclass class Xxx(NamedTuple)` but code uses `cla
 | `repo_audit.py` | `_MAX_PATHS` | 50,000 |
 | `synthesis.py` | `MAX_TEXT_LENGTH` | 100,000 |
 | `synthesis.py` | `MAX_DIFF_SPANS` | 50 |
-| `shell.py` | `MAX_INPUT_LENGTH` | 100,000 |
+| `shell.py` | `MAX_TEXT_INPUT_LENGTH` | 100,000 |
 | `shell.py` | `MAX_LIST_ITEMS` | 10,000 |
 | `unicode_policy.py` | `MAX_TEXT_LENGTH` | 100,000 |
 | `diff.py` | `MAX_LEVENSHTEIN_LEN` | 10,000 |

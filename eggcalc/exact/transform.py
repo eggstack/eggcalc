@@ -13,6 +13,7 @@ import json
 import re
 import unicodedata
 import zlib
+from collections.abc import Sequence
 from typing import Literal, TypedDict, cast
 
 try:
@@ -581,7 +582,7 @@ _SUPPORTED_HASH_ALGORITHMS = {"sha256", "sha1", "md5", "crc32"}
 
 def text_hash(
     text: str,
-    algorithms: list[str] = ["sha256"],
+    algorithms: Sequence[str] = ("sha256",),
     encoding: str = "utf-8",
 ) -> TextHashResult:
     """Compute cryptographic hashes of text for identity checking.

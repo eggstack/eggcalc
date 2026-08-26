@@ -16,7 +16,7 @@ Provides validation utilities for checking brackets, JSON/TOML syntax, regex pat
 ## Constants
 
 ```python
-MAX_INPUT_LENGTH = 100_000        # Maximum input length for most functions
+MAX_TEXT_INPUT_LENGTH = 100_000        # Maximum input length for most functions
 MAX_LIST_ITEMS = 10_000           # Maximum list items for list_dedupe/list_sort
 MAX_PATTERN_LENGTH = 1000         # Maximum regex pattern length
 MAX_PATTERN_NESTING = 5           # Maximum regex nesting depth
@@ -324,7 +324,7 @@ CheckBracketsResult(balanced=False, unmatched_openers=[...],
                     unmatched_closers=[...])
 ```
 
-**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+**Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `validate_json(s: str) -> ValidateJsonResult`
 
@@ -341,7 +341,7 @@ ValidateJsonResult(valid=False, error='Expecting property name',
                    top_level_keys=None)
 ```
 
-**Note:** `top_level_keys` is only populated for objects. For arrays and primitives, it returns `None`. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+**Note:** `top_level_keys` is only populated for objects. For arrays and primitives, it returns `None`. **Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `validate_toml_text(text: str) -> ValidateTomlResult`
 
@@ -352,7 +352,7 @@ Validate TOML string and return detailed structure information. Requires Python 
 ValidateTomlResult(valid=True, error=None, tables=['package', 'package.name'], ...)
 ```
 
-**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+**Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `toml_shape(text: str, max_tables: int = 100) -> TomlShapeResult`
 
@@ -363,7 +363,7 @@ Analyze the structure of a TOML document without returning values.
 TomlShapeResult(valid=True, tables=['package', 'package.name'], ...)
 ```
 
-**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+**Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareResult`
 
@@ -376,7 +376,7 @@ VersionCompareResult(comparison=-1, valid=True, scheme='semver', summary='1.2.3 
 VersionCompareResult(comparison=0, valid=True, scheme='semver', summary='1.2.3 == 1.2.3')
 ```
 
-**Raises:** `ValueError` if either input exceeds `MAX_INPUT_LENGTH`.
+**Raises:** `ValueError` if either input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `list_dedupe(items: list[str], normalization: str = "NFC", casefold: bool = False, stable: bool = True) -> list[str]`
 
@@ -487,7 +487,7 @@ JsonCompareResult(equal=True, diff_count=0, ...)
 JsonCompareResult(equal=False, diff_count=1, diffs=[...], ...)
 ```
 
-Diff kinds: `parse_error_a`, `parse_error_b`, `type_changed`, `value_changed`, `key_missing_in_b`, `key_missing_in_a`, `array_length_changed`. **Raises:** `ValueError` if either input exceeds `MAX_INPUT_LENGTH`.
+Diff kinds: `parse_error_a`, `parse_error_b`, `type_changed`, `value_changed`, `key_missing_in_b`, `key_missing_in_a`, `array_length_changed`. **Raises:** `ValueError` if either input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `json_extract(text: str, pointer: str = "", max_output_chars: int = 4000) -> JsonExtractResult`
 
@@ -498,7 +498,7 @@ Extract a value from JSON using RFC 6901 JSON Pointer. Empty pointer returns the
 JsonExtractResult(found=True, value=2, value_type='number', ...)
 ```
 
-**Missing-value reasons:** `invalid_json`, `key_not_found`, `index_out_of_range`, `invalid_pointer_syntax`. Returns `available_keys` for missing object keys, `array_length` for out-of-range array access. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+**Missing-value reasons:** `invalid_json`, `key_not_found`, `index_out_of_range`, `invalid_pointer_syntax`. Returns `available_keys` for missing object keys, `array_length` for out-of-range array access. **Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `json_shape(text: str, max_depth: int = 4, max_keys: int = 100, max_array_items: int = 5) -> JsonShapeResult`
 
@@ -509,7 +509,7 @@ Analyze the structure of a JSON document without returning values.
 JsonShapeResult(valid=True, shape=JsonShapeKey(type='object', keys={...}, ...), ...)
 ```
 
-**Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+**Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `json_canonicalize(text: str, sort_keys: bool = True, indent: int | None = None, ensure_ascii: bool = False, detect_duplicate_keys: bool = True, trailing_newline: bool = False) -> JsonCanonicalizeResult`
 
@@ -529,7 +529,7 @@ JsonCanonicalizeResult(
 )
 ```
 
-When `detect_duplicate_keys=True`, uses a custom `object_pairs_hook` to track duplicate keys during parsing. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+When `detect_duplicate_keys=True`, uses a custom `object_pairs_hook` to track duplicate keys during parsing. **Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `json_query(text: str, pointer: str = "") -> JsonQueryResult`
 
@@ -540,7 +540,7 @@ Query JSON using RFC 6901 JSON Pointer. Simpler than `json_extract` — returns 
 JsonQueryResult(found=True, value='baz', type='string', ...)
 ```
 
-**Missing-value reasons:** `invalid_json`, `key_not_found`, `index_out_of_range`, `invalid_pointer_syntax`. **Raises:** `ValueError` if input exceeds `MAX_INPUT_LENGTH`.
+**Missing-value reasons:** `invalid_json`, `key_not_found`, `index_out_of_range`, `invalid_pointer_syntax`. **Raises:** `ValueError` if input exceeds `MAX_TEXT_INPUT_LENGTH`.
 
 ### `validate_schema_light(data: Any, schema: dict) -> ValidateSchemaLightResult`
 
@@ -604,7 +604,7 @@ Recursively extract all table names from parsed TOML (e.g., `['package', 'packag
 
 ## Input Limits
 
-Functions raise `ValueError` when input exceeds `MAX_INPUT_LENGTH`:
+Functions raise `ValueError` when input exceeds `MAX_TEXT_INPUT_LENGTH`:
 - `check_brackets()`, `validate_json()`, `validate_toml_text()`, `toml_shape()`, `json_extract()`, `json_shape()`, `json_canonicalize()`, `json_query()`, `version_compare()`
 
 Functions use their own limits:

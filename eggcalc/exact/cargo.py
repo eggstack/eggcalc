@@ -17,7 +17,7 @@ from eggcalc.exact.manifests import (
     _truncate_findings,
 )
 
-_MAX_INPUT_LENGTH = 200_000
+_MAX_CARGO_INPUT_LENGTH = 200_000
 
 _CARGO_PACKAGE_FIELDS = {"name", "version", "edition", "license", "repository", "readme"}
 
@@ -252,7 +252,7 @@ def cargo_toml_inspect(
         CargoInspectResult with package metadata, workspace info,
         dependency analysis, and findings.
     """
-    if len(text) > _MAX_INPUT_LENGTH:
+    if len(text) > _MAX_CARGO_INPUT_LENGTH:
         return CargoInspectResult(
             parse_ok=False,
             package=CargoPackageInfo(),
@@ -270,7 +270,7 @@ def cargo_toml_inspect(
                 _finding(
                     "INPUT_TOO_LONG",
                     "error",
-                    f"Input length {len(text)} exceeds maximum {_MAX_INPUT_LENGTH}",
+                    f"Input length {len(text)} exceeds maximum {_MAX_CARGO_INPUT_LENGTH}",
                 ),
             ],
         )

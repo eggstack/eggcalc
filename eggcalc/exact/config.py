@@ -12,7 +12,7 @@ from typing import TypedDict
 DEFAULT_KEY_PATTERN = r"^[A-Za-z_][A-Za-z0-9_]*$"
 _EXPANSION_RE = re.compile(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*")
 
-MAX_INPUT_LENGTH = 100_000
+MAX_TEXT_INPUT_LENGTH = 100_000
 
 
 class DotenvEntry(TypedDict):
@@ -90,10 +90,10 @@ def dotenv_validate(
         Validation result dict.
 
     Raises:
-        ValueError: If text exceeds MAX_INPUT_LENGTH.
+        ValueError: If text exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds maximum {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(f"Input length {len(text)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}")
     key_re = re.compile(key_pattern)
     seen_keys: dict[str, int] = {}
     entries: list[DotenvEntry] = []
@@ -228,10 +228,10 @@ def ini_validate(
         Validation result dict.
 
     Raises:
-        ValueError: If text exceeds MAX_INPUT_LENGTH.
+        ValueError: If text exceeds MAX_TEXT_INPUT_LENGTH.
     """
-    if len(text) > MAX_INPUT_LENGTH:
-        raise ValueError(f"Input length {len(text)} exceeds maximum {MAX_INPUT_LENGTH}")
+    if len(text) > MAX_TEXT_INPUT_LENGTH:
+        raise ValueError(f"Input length {len(text)} exceeds maximum {MAX_TEXT_INPUT_LENGTH}")
     seen_keys: dict[tuple[str | None, str], int] = {}
     seen_sections: dict[str, int] = {}
     sections: list[str] = []

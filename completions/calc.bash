@@ -5,7 +5,7 @@ _calc_completion() {
     _init_completion || return
 
     # Options
-    local options="-h --help -v --version -e --expression -q --quiet -s --show --json -i --interactive"
+    local options="-h --help --usage -v --version -e --expression -q --quiet --verbose -s --show --json -i --interactive --capabilities --mcp --mcp-profile --mcp-schema-detail"
 
     if [[ ${cur} == -* ]]; then
         COMPREPLY=($(compgen -W "${options}" -- "${cur}"))

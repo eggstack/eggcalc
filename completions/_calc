@@ -4,12 +4,18 @@ _calc() {
     local -a options
     options=(
         '(-h --help)'{-h,--help}'[Show help message]'
+        '--usage[Show full usage information and examples]'
         '(-v --version)'{-v,--version}'[Show version information]'
         '(-e --expression)'{-e,--expression}'[Evaluate a single expression]'
         '(-q --quiet)'{-q,--quiet}'[Suppress expression in output]'
+        '--verbose[Accepted for compatibility; output remains result-only]'
         '(-s --show)'{-s,--show}'[Show expression in output]'
         '--json[Output result as JSON]'
         '(-i --interactive)'{-i,--interactive}'[Start interactive REPL mode]'
+        '--capabilities[Show runtime capabilities as JSON]'
+        '--mcp[Run as MCP server for exact text tools]'
+        '--mcp-profile[MCP profile to use]'
+        '--mcp-schema-detail[MCP schema detail level (compact, normal, full)]'
     )
 
     local -a functions

@@ -126,9 +126,11 @@ class TestBitlshiftGuard:
     """Bug 5: left-shift guard rejects valid results below digit limit."""
 
     def test_30001_bit_shift_within_limit(self):
-        result = evaluate("1 << 30001")
+        # ~4214 decimal digits, within MAX_RESULT_DIGITS (= CPython's
+        # int->str conversion boundary so callers can always print results).
+        result = evaluate("1 << 14000")
         assert isinstance(result, int)
-        assert result.bit_length() == 30002
+        assert result.bit_length() == 14001
 
 
 class TestUnitPowerZeroUnwraps:

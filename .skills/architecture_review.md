@@ -53,7 +53,7 @@ For each module, examine:
 - `_get_script_heuristic()` is cached with `@lru_cache`
 - CONFUSABLES dict has `reverse_confusables()` for reverse lookups
 - `unicode_normalization_only` classification is valid and reachable in `text_equal()`/`explain_diff()`, but NOT in `list_compare()` near_matches (removed as dead code)
-- `MAX_INPUT_LENGTH = 100_000` enforced in validate.py and MCP tools
+- `MAX_TEXT_INPUT_LENGTH = 100_000` enforced in validate.py and MCP tools
 
 ## Documentation/Code Inconsistencies to Watch For
 

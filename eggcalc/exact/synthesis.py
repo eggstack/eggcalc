@@ -1823,25 +1823,30 @@ def line_range_extract(
     byte_start = len(text[:char_start].encode("utf-8"))
     byte_end = len(text[:char_end].encode("utf-8"))
 
-    # Extract lines
+    # Extract lines. A trailing "\r" is stripped from each line so CRLF
+    # input does not leak carriage returns into per-line text; the join
+    # below restores the document's own newline style.
     extracted_lines: list[dict[str, Any]] = []
     extracted_text_parts: list[str] = []
     for i in range(start_1based - 1, min(end_1based, len(lines_raw))):
         line_text = lines_raw[i] if i < len(lines_raw) else ""
+        if line_text.endswith("\r"):
+            line_text = line_text[:-1]
         line_dict: dict[str, Any] = {"text": line_text}
         if include_line_numbers:
             line_dict["line"] = i + line_base
         extracted_lines.append(line_dict)
         extracted_text_parts.append(line_text)
 
-    extracted_text = "\n".join(extracted_text_parts)
+    newline_style = _detect_newline_lr(text)
+    joiner = {"CRLF": "\r\n", "CR": "\r"}.get(newline_style, "\n")
+    extracted_text = joiner.join(extracted_text_parts)
 
     # Fingerprint
     fingerprint = ""
     if include_fingerprint:
         fingerprint = hashlib.sha256(extracted_text.encode("utf-8")).hexdigest()[:16]
 
-    newline_style = _detect_newline_lr(text)
     ends_with_newline = text.endswith("\n")
 
     return LineRangeExtractResult(

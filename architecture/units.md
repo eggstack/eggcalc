@@ -131,6 +131,14 @@ UnitValue(value: float | complex, unit: str | None = None)
 
 **Important:** Adding/subtracting incompatible units raises `ValueError`.
 
+**Temperature asymmetry (intentional):** adding absolute temperatures from
+*different scales* is rejected (`UnitValue(100, "C") + UnitValue(212, "F")` →
+`ValueError`) because mixing absolute temperatures across scales is
+ill-defined. *Subtraction* remains allowed in that case: it produces a
+well-defined interval delta (`UnitValue(100, "C") - UnitValue(212, "F")`).
+This `__add__`-rejects / `__sub__`-allows split is a documented design
+decision covered by regression tests.
+
 ### Scalar + UnitValue Operations
 
 Adding or subtracting scalars from dimensional UnitValues is **not allowed** and raises

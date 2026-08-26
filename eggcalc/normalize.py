@@ -60,6 +60,29 @@ _UNITS_BY_LENGTH: list[str] = sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
 # to the unit instead of the "<num>*<unit>" product.
 _UNIT_POWER_EXPONENT_RE: re.Pattern[str] = re.compile(r"\*\*\s*([+-]?\d+)")
 
+
+def _is_best_case_variant(input_text: str, unit: str) -> bool:
+    """Return True when *unit* is the registry spelling that best matches the
+    input's own letter casing among aliases colliding case-insensitively.
+
+    Prefers maximal positional case agreement so ``"mw"`` resolves to mW
+    (milliwatt) rather than MW (megawatt), and ``"KN"`` to kN (kilonewton)
+    rather than kn (knot).
+    """
+    lowered = unit.lower()
+    best_alias = unit
+    best_key: tuple[int, str] | None = None
+    for alias in UNIT_ALIASES:
+        if len(alias) != len(unit) or alias.lower() != lowered:
+            continue
+        agreement = sum(a == b for a, b in zip(input_text, alias))
+        key = (-agreement, alias)
+        if best_key is None or key < best_key:
+            best_key = key
+            best_alias = alias
+    return best_alias == unit
+
+
 # Regex alternation for matching any known unit name (for "in"/"into" disambiguation)
 _UNIT_NAMES_ALTERNATION: str = "|".join(
     re.escape(u) for u in sorted(UNIT_ALIASES.keys(), key=len, reverse=True)
@@ -67,6 +90,26 @@ _UNIT_NAMES_ALTERNATION: str = "|".join(
 
 # Lowercase temperature abbreviations that should map to canonical uppercase forms
 _LOWERCASE_TEMP_UNITS: dict[str, str] = {"f": "F", "c": "C", "k": "K"}
+
+# Temperature unit words for phrase handling ("100 degrees in fahrenheit").
+# Phrases where "degrees" precedes one of these are temperature statements,
+# not angle conversions, and must be deferred to the dedicated handler.
+_TEMPERATURE_UNIT_WORDS: frozenset[str] = frozenset(
+    {
+        "f",
+        "c",
+        "k",
+        "ra",
+        "celsius",
+        "fahrenheit",
+        "kelvin",
+        "rankine",
+        "degc",
+        "degf",
+        "degk",
+        "degr",
+    }
+)
 
 # Common unit prefixes for faster lookup (most frequently used units first)
 _COMMON_UNITS: list[str] = [
@@ -1437,6 +1480,14 @@ def _normalize_spelled_unit_conversions(expression: str) -> str:
         return UNIT_ALIASES.get(compound, UNIT_ALIASES.get(compound.lower(), compound))
 
     def _replace(m: re.Match[str]) -> str:
+        # Defer "<number> degrees in <temperature-unit>" to the dedicated
+        # degrees-to-temperature handler; converting from the *angle* degree
+        # would produce an incompatible-units error.
+        if (
+            m.group("from_num_unit").lower() in ("deg", "degree", "degrees")
+            and m.group("to_num_unit").lower() in _TEMPERATURE_UNIT_WORDS
+        ):
+            return m.group(0)
         from_unit = _canon_unit_expr(m.group("from_num_unit"), m.group("from_den_unit"))
         to_unit = _canon_unit_expr(m.group("to_num_unit"), m.group("to_den_unit"))
         return f"convert({m.group('number')}*{from_unit},{to_unit})"
@@ -1920,14 +1971,21 @@ _SCALE_WORDS = frozenset(
         "quintillion",
     }
 )
+_TEEN_WORDS = frozenset(word for words in _NUMBER_WORDS_TEENS.values() for word in words)
 
 
 def _naturalness_key(phrase: str) -> tuple:
     words = phrase.split()
+    # Penalize unnatural "tens teen" pairs (e.g., "fifty thirteen"); these
+    # alternate wordings must never beat the natural form for the same value.
+    teen_penalty = any(
+        words[i] in _TENS_WORDS and words[i + 1] in _TEEN_WORDS for i in range(len(words) - 1)
+    )
     return (
         len(words),
         -1 if any(w in _SCALE_WORDS for w in words) else 0,
         1 if words[0] in _TENS_WORDS else 0,
+        1 if teen_penalty else 0,
         phrase,
     )
 
@@ -2022,8 +2080,8 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     expression = re.sub(r"[\u200b\u200c\u200d\u200e\u200f\u2060\ufeff\u00ad]", "", expression)
     expression = re.sub(r"#.*$", "", expression, flags=re.MULTILINE)
     expression = re.sub(
-        r"(?<![\w.])(\d{1,3}(?:,\d{3})+)(?![\w.])",
-        lambda m: m.group(1).replace(",", ""),
+        r"(?<![\w.])(\d{1,3}(?:[,\u00a0\u202f]\d{3})+)(?![\w.])",
+        lambda m: m.group(1).replace(",", "").replace("\u00a0", "").replace("\u202f", ""),
         expression,
     )
 
@@ -2123,13 +2181,14 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     )
 
     # Handle short-form power phrases BEFORE individual word replacement so
-    # that "2 to the 10" doesn't become "2 TO 10". Long forms like
-    # "to the power of" and "raised to" are handled by the word_to_all
-    # loop below; this catches the abbreviated form "N to the M".
+    # that "2 to the 10" doesn't become "2 TO 10". Longer forms like
+    # "to the power of" are handled by the word_to_all loop below; this
+    # catches the abbreviated forms "N to the M" and "N raised to M"
+    # (whose bare "to" would otherwise trip _binary_word_check).
     # Also handles word numbers like "three to the ten" by matching both
     # digit and word number patterns.
     expression = re.sub(
-        r"(\d+(?:\.\d+)?)\s+to\s+the\s+(\d+(?:\.\d+)?)",
+        r"(\d+(?:\.\d+)?)\s+(?:to\s+the|raised\s+to)\s+(\d+(?:\.\d+)?)",
         r"\1**\2",
         expression,
         flags=re.IGNORECASE,
@@ -2184,7 +2243,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     # word numbers like "three to the ten" → "3**10". This must run after
     # number word replacement but before word_to_all replaces "to" with "TO".
     expression = re.sub(
-        r"(\d+(?:\.\d+)?)\s+to\s+the\s+(\d+(?:\.\d+)?)",
+        r"(\d+(?:\.\d+)?)\s+(?:to\s+the|raised\s+to)\s+(\d+(?:\.\d+)?)",
         r"\1**\2",
         expression,
         flags=re.IGNORECASE,
@@ -2379,22 +2438,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     # Also handle "degrees in <unit>" by converting the full phrase.
     # Temperature units are skipped so "100 degrees in fahrenheit" is handled
     # by the unit conversion system, not the angle conversion.
-    _TEMP_UNITS = frozenset(
-        {
-            "f",
-            "c",
-            "k",
-            "fahrenheit",
-            "celsius",
-            "kelvin",
-            "rankine",
-            "degf",
-            "degc",
-            "degk",
-            "degr",
-            "ra",
-        }
-    )
+    _TEMP_UNITS = _TEMPERATURE_UNIT_WORDS
     # Use a placeholder to prevent subsequent regexes from re-matching temperature expressions.
     _DEG_PLACEHOLDER = "\x00DEG_TEMP\x00"
 
@@ -2893,6 +2937,7 @@ def _preprocess_units(expression: str) -> str:
                         not matched_unit
                         and len(unit) > 1
                         and remaining[: len(unit)].lower() == unit.lower()
+                        and _is_best_case_variant(remaining, unit)
                     ):
                         matched_unit = True
                     if matched_unit:

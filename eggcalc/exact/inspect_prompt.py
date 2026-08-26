@@ -114,7 +114,7 @@ _BASE64_LIKE_RE = re.compile(
 _MARKDOWN_LINK_RE = re.compile(r"\[([^\]]{1,2000})\]\(([^)]{1,2000})\)")
 
 # HTML comment: <!-- ... -->
-_HTML_COMMENT_RE = re.compile(
+_HTML_COMMENT_CONTENT_RE = re.compile(
     r"<!--(.*?)-->",
     re.DOTALL,
 )
@@ -239,7 +239,7 @@ def _find_unicode_hidden(text: str) -> list[PromptInspectionFinding]:
 def _find_html_comments(text: str) -> list[PromptInspectionFinding]:
     """Find HTML comments which may hide instructions."""
     findings: list[PromptInspectionFinding] = []
-    for match in _HTML_COMMENT_RE.finditer(text):
+    for match in _HTML_COMMENT_CONTENT_RE.finditer(text):
         content = match.group(1).strip()
         severity = "warn" if content else "info"
         message = f"HTML comment at position {match.start()}"

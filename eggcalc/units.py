@@ -3027,9 +3027,11 @@ class UnitValue:
                 and other._unit_expr.dimension.is_affine
                 and self._unit_expr.factors != other._unit_expr.factors
             ):
-                raise ValueError(
-                    "Cannot add/subtract absolute temperatures across different scales"
-                )
+                # Addition across temperature scales is rejected (mixing
+                # absolute temperatures is ill-defined), while subtraction
+                # stays allowed: it yields a well-defined interval delta
+                # (e.g. 10*C - 10*F). This asymmetry is intentional.
+                raise ValueError("Cannot add absolute temperatures across different scales")
             if self.unit == other.unit:
                 result = self.value + other.value
                 out_unit = self.unit
@@ -3303,7 +3305,9 @@ class UnitValue:
             base_value = self.value * source_definition.scale + source_definition.offset
             if isinstance(base_value, complex):
                 raise ValueError("Temperature value must be real")
-            if base_value < 0:
+            # Tolerance matches the near-zero snap below so float noise at
+            # exactly absolute zero (e.g. -459.67 F) is not rejected.
+            if base_value < -1e-9:
                 raise ValueError("Temperature cannot be below absolute zero")
             converted = float(base_value - target_definition.offset) / target_definition.scale
             # Snap near-integer results the same way convert_temperature
@@ -3628,9 +3632,36 @@ def _lookup_definition(unit: str) -> UnitDefinition | None:
     registry = _get_unit_registry()
     if registry is None:
         return None
-    candidates = (unit, unit.lower(), unit.upper(), unit.title(), unit.capitalize())
-    for candidate in candidates:
-        definition = registry.by_alias(candidate) or registry.by_canonical(candidate)
+    definition = registry.by_alias(unit) or registry.by_canonical(unit)
+    if definition is not None:
+        return definition
+    lowered = unit.lower()
+    legacy_forms = (unit.lower(), unit.upper(), unit.title(), unit.capitalize())
+    best_key: tuple[int, int, int, str] | None = None
+    best_definition: UnitDefinition | None = None
+    for alias in registry.all_aliases:
+        if alias.lower() != lowered:
+            continue
+        candidate = registry.by_alias(alias)
+        if candidate is None:
+            continue
+        # Prefer maximal positional case agreement with the input so "mw"
+        # resolves to mW (milliwatt) rather than MW (megawatt), and "KN"
+        # to kN (kilonewton) rather than kn (knot).  Ties keep the legacy
+        # candidate ordering for stability.
+        agreement = sum(a == b for a, b in zip(unit, alias))
+        try:
+            rank = legacy_forms.index(alias)
+        except ValueError:
+            rank = len(legacy_forms)
+        key = (-agreement, rank, len(alias), alias)
+        if best_key is None or key < best_key:
+            best_key = key
+            best_definition = candidate
+    if best_definition is not None:
+        return best_definition
+    for form in legacy_forms:
+        definition = registry.by_canonical(form)
         if definition is not None:
             return definition
     return None
@@ -3709,7 +3740,9 @@ def convert_temperature(value: float, from_unit: str, to_unit: str) -> float:  #
     if source.dimension != target.dimension:
         raise ValueError(f"Cannot convert temperature from {from_unit} to {to_unit}")
     base_value = value * source_definition.scale + source_definition.offset
-    if base_value < 0:
+    # Tolerance matches the near-zero snap below so float noise at exactly
+    # absolute zero (e.g. -459.67 F -> 0 K) is not rejected.
+    if base_value < -1e-9:
         raise ValueError("Temperature cannot be below absolute zero")
     result = (base_value - target_definition.offset) / target_definition.scale
     if not math.isfinite(result):

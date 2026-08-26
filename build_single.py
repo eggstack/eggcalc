@@ -1273,6 +1273,11 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
         }
     )
     symbols: dict[str, tuple[str, str]] = {}
+    # Top-level assignments tracked separately: in the concatenated file a
+    # later assignment silently rebinds the name for every module, so two
+    # modules assigning different values to one name changes runtime
+    # behavior.  Identical assignments are harmless and allowed.
+    assign_values: dict[str, tuple[str, str]] = {}
     for spec in manifest:
         if not spec.include_single_file:
             continue
@@ -1296,6 +1301,21 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
                             f"Duplicate generated global {name!r}: {first_module} and {spec.name}"
                         )
                 symbols[name] = (spec.name, source_key)
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                for target in targets:
+                    if not isinstance(target, ast.Name) or target.id.startswith("__"):
+                        continue
+                    name = target.id
+                    value_key = ast.dump(node.value) if node.value is not None else ""
+                    prior = assign_values.get(name)
+                    if prior is not None and prior[0] != spec.name and prior[1] != value_key:
+                        errors.append(
+                            f"Conflicting top-level assignment {name!r}: "
+                            f"{prior[0]} and {spec.name} assign different values"
+                        )
+                    if prior is None or prior[0] != spec.name:
+                        assign_values[name] = (spec.name, value_key)
 
     return errors
 
