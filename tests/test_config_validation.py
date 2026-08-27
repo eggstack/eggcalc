@@ -83,11 +83,13 @@ class TestDotenvValidate:
         assert result["entries"][1]["value"] == "single quoted"
 
     def test_empty_value(self):
-        text = "KEY=\nOTHER=value"
+        text = 'KEY=\nQUOTED=""\nOTHER=value'
         result = dotenv_validate(text)
         assert result["parse_ok"] is True
         assert result["entries"][0]["value"] == ""
         assert result["entries"][0]["value_present"] is True
+        assert result["entries"][1]["value"] == ""
+        assert result["entries"][1]["value_present"] is True
 
     def test_value_with_hash_comment(self):
         text = "KEY=value # this is a comment"

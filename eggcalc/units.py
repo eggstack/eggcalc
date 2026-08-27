@@ -3122,6 +3122,8 @@ class UnitValue:
 
     def __rmul__(self, other: Numeric | UnitValue) -> UnitValue:
         if not isinstance(other, UnitValue):
+            if self.unit and self._unit_expr.dimension.is_affine:
+                raise ValueError("Affine units cannot participate in multiplication")
             result = self.value * other
             UnitValue._check_overflow(result)
             return UnitValue(result, self.unit)

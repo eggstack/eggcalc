@@ -414,6 +414,16 @@ class TestCargoTomlInspectGitDeps:
         assert pinned["git"] == "https://github.com/example/other"
         assert pinned["tag"] == "v1.0"
 
+    def test_suspicious_git_dependency_is_reported_once(self):
+        toml_text = (
+            '[package]\nname = "git-test"\nversion = "0.1.0"\nedition = "2021"\n'
+            '[dependencies]\n0bad = { git = "https://github.com/example/repo" }\n'
+        )
+        result = cargo_toml_inspect(toml_text)
+        findings = [f for f in result["findings"] if "SUSPICIOUS" in f["code"]]
+        assert len(findings) == 1
+        assert findings[0]["code"] == "CARGO_SUSPICIOUS_DEPENDENCY_NAME"
+
 
 class TestCargoTomlInspectMissingEdition:
     """Tests for missing edition detection."""

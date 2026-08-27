@@ -2138,6 +2138,9 @@ def _build_allowed_ast_types() -> frozenset[type[ast.AST]]:
             )
         ):
             allowed.add(obj)
+    # Matrix multiplication is an AST operator, but is not supported by the
+    # calculator and should be rejected during validation.
+    allowed.discard(ast.MatMult)
     return frozenset(allowed)
 
 
@@ -2707,6 +2710,30 @@ class Evaluator(ast.NodeVisitor):
                 if op_class is ast.Sub:
                     return left - right if isinstance(left, UnitValue) else right.__rsub__(left)
                 if op_class is ast.Mult:
+                    # Scalar multiplication is also how the normalizer
+                    # constructs an affine unit literal (e.g. ``100*C``).
+                    # Permit that direct unit-name form, but reject scaling
+                    # an already-formed affine quantity (e.g. ``2*100*C``).
+                    if (
+                        not isinstance(left, UnitValue)
+                        and isinstance(right, UnitValue)
+                        and right.unit
+                        and right._unit_expr.dimension.is_affine
+                    ):
+                        numeric_literal = isinstance(node.left, ast.Constant) or (
+                            isinstance(node.left, ast.UnaryOp)
+                            and isinstance(node.left.op, (ast.UAdd, ast.USub))
+                            and isinstance(node.left.operand, ast.Constant)
+                        )
+                        if not (
+                            isinstance(node.right, ast.Name)
+                            and node.right.id in UNIT_ALIASES
+                            and numeric_literal
+                        ):
+                            raise ValueError("Affine units cannot participate in multiplication")
+                        result = left * right.value
+                        UnitValue._check_overflow(result)
+                        return UnitValue(result, right.unit)
                     return left * right if isinstance(left, UnitValue) else right.__rmul__(left)
                 if op_class is ast.Div:
                     quotient = (
@@ -3077,6 +3104,8 @@ class Evaluator(ast.NodeVisitor):
             raise EvaluationError("Comparison operators are not supported")
         if node_type is ast.BoolOp:
             raise EvaluationError("Boolean operators are not supported")
+        if node_type is ast.MatMult:
+            raise EvaluationError("Invalid syntax: matrix multiplication is not supported")
 
         raise EvaluationError(f"Unsupported node type: '{node_type.__name__}'")
 
@@ -3558,7 +3587,7 @@ class EggCalcApp:
         """Initialize EggCalcApp.
 
         Args:
-            cache_size: LRU cache size (default 1000)
+            cache_size: LRU cache size (default 1024)
             enable_cache: Whether to enable caching (default True)
         """
         self._evaluator = Evaluator()

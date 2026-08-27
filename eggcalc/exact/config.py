@@ -163,8 +163,6 @@ def dotenv_validate(
                 requires_quoting.append(key)
 
         value_present = True
-        if value == "" or value == "''" or value == '""':
-            value_present = True
 
         if _EXPANSION_RE.search(raw_value):
             contains_expansion.append(key)

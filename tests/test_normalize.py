@@ -939,6 +939,10 @@ class TestUnitSpacingProbes:
         assert result.value == pytest.approx(212)
         assert result.unit == "F"
 
+    def test_unknown_single_letter_conversion_target_is_not_glued(self):
+        with pytest.raises(ValueError, match="gas constant.*Rankine"):
+            normalize_expression("100 K in R", NORMALIZE, PATTERNS)
+
     def test_spaced_pascal_second_not_collapsed_identifier(self):
         normalized, code = normalize_expression("5 Pa s", NORMALIZE, PATTERNS)
         assert code == 0

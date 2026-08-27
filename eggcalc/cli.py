@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import re
 import sys
 from collections import deque
@@ -344,6 +345,7 @@ def _run_repl() -> int:
         except Exception:
             # The REPL must survive any handler crash; run_cli normally
             # catches Exception itself, this is a defensive backstop.
+            logging.debug("REPL command failed for %r", line, exc_info=True)
             continue
 
         if exit_code == 0 and result is not None:

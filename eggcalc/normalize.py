@@ -1466,6 +1466,26 @@ def _normalize_lowercase_temperature_conversion(expression: str) -> str:
     )
 
 
+def _reject_unknown_unit_conversion(expression: str) -> str:
+    """Reject conversion phrases whose target would otherwise be glued to ``in``.
+
+    In particular, ``100 K in R`` must not become the misleading identifier
+    ``KINR``: ``R`` is the gas constant, while Rankine is ``Ra``.
+    """
+    match = re.search(
+        rf"(?<![A-Za-z0-9_.])\d+(?:\.\d+)?\s+(?:{_UNIT_NAMES_ALTERNATION})"
+        rf"\s+(?:in|to|as|into)\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+        expression,
+        flags=re.IGNORECASE,
+    )
+    if match and not is_unit(match.group(1)):
+        target = match.group(1)
+        if target.upper() == "R":
+            raise ValueError("'R' is the gas constant, not a unit; use 'Ra' for Rankine")
+        raise ValueError(f"Unknown conversion target unit: '{target}'")
+    return expression
+
+
 def _normalize_spelled_unit_conversions(expression: str) -> str:
     """Canonicalize unit conversion phrases before operator words are replaced.
 
@@ -2260,6 +2280,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
 
     _binary_word_check(expression)
     expression = _normalize_lowercase_temperature_conversion(expression)
+    expression = _reject_unknown_unit_conversion(expression)
 
     for scale_word, scale_val in _DIGIT_SCALES.items():
         # Convert "N thousand" to the evaluated product (e.g., "5 thousand" -> "5000").
@@ -2377,14 +2398,17 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     # This avoids ".5" at expression start while still allowing "5 point 3" -> "5.3"
     expression = re.sub(r"(?<=[\d)])\s*point\s*", ".", expression, flags=re.IGNORECASE)
 
-    # Merge digits following a decimal point: "3.1 4" -> "3.14"
+    # Merge digits following a decimal point: "3.1 4" -> "3.14". Consume
+    # each contiguous digit run in one pass rather than rescanning once per
+    # digit.
     # After "point" replacement, space-separated digit words after the decimal
     # become separate tokens (e.g., "three point one four" -> "3 point 1 4" ->
-    # "3.1 4"). Iteratively concatenate them into a single decimal number.
-    prev_expr = None
-    while prev_expr != expression:
-        prev_expr = expression
-        expression = re.sub(r"(\d+\.\d*)\s+(\d)", lambda m: m.group(1) + m.group(2), expression)
+    # "3.1 4"). Concatenate them into a single decimal number.
+    expression = re.sub(
+        r"(\d+\.\d*(?:\s+\d)+)",
+        lambda m: re.sub(r"\s+", "", m.group(1)),
+        expression,
+    )
 
     # Strip short filler phrases after word-to-operator conversion
     stripped = patterns["stripped_chars"].sub("", expression)

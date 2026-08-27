@@ -254,7 +254,10 @@ def identifier_analyze(
     if python_keyword:
         warnings.append("Python keyword - cannot be used as identifier in Python")
     if rust_valid is False and "rust" in languages:
-        warnings.append("Rust keyword - cannot be used as identifier in Rust")
+        if text in _RUST_KEYWORDS:
+            warnings.append("Rust keyword - cannot be used as identifier in Rust")
+        else:
+            warnings.append("Invalid Rust identifier - cannot be used as identifier in Rust")
     if classification == "mixed":
         warnings.append("Identifier has mixed naming convention")
     if text.startswith("_"):

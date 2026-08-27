@@ -442,16 +442,6 @@ def cargo_toml_inspect(
                 path = form.get("path")
                 if path:
                     path_deps.append(path)
-                if form.get("git"):
-                    git_name_findings = _detect_suspicious_name(str(dep_name))
-                    if git_name_findings:
-                        findings.append(
-                            _finding(
-                                "CARGO_SUSPICIOUS_NAME",
-                                "warning",
-                                f"Git dependency '{dep_name}' has suspicious name pattern",
-                            )
-                        )
 
             dep_section[section_key] = parsed_deps  # type: ignore[literal-required]
 

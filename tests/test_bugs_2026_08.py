@@ -16,7 +16,7 @@ from eggcalc.exact.shell import shell_split
 from eggcalc.exact.synthesis import _detect_special_sequences, text_window
 from eggcalc.exact.validate import _check_pattern_complexity, regex_safety_check, validate_json
 from eggcalc.mcp.server import McpServer, McpSession, McpSessionState, handle_request
-from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_text
+from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression, normalize_text
 from eggcalc.units import UnitValue, convert_temperature
 
 
@@ -295,6 +295,7 @@ def test_unit_overflow_is_wrapped_as_evaluation_error(expression):
     "operation",
     [
         lambda: UnitValue(100, "C") * 2,
+        lambda: 2 * UnitValue(100, "C"),
         lambda: UnitValue(100, "C") / 2,
         lambda: UnitValue(100, "C") // 2,
         lambda: UnitValue(100, "C") % 2,
@@ -317,6 +318,28 @@ def test_normalization_preserves_chained_operator_meaning(expression, expected):
 def test_multiword_reserved_operator_is_rejected():
     with pytest.raises(ValueError, match="not in"):
         normalize_text("5 not in 10", NORMALIZE, PATTERNS)
+
+
+def test_matrix_multiplication_is_rejected_during_validation():
+    with pytest.raises(EvaluationError, match="Invalid syntax"):
+        evaluate("5 @ 3")
+
+
+@pytest.mark.parametrize("expression", ["2 * 100*C", "2 * (100*C)"])
+def test_affine_quantity_scaling_is_rejected(expression):
+    with pytest.raises(EvaluationError, match="Affine"):
+        evaluate_raw(expression)
+
+
+def test_single_letter_unknown_conversion_target_has_clear_error():
+    with pytest.raises(ValueError, match="gas constant.*Rankine"):
+        normalize_text("100 K in R", NORMALIZE, PATTERNS)
+
+
+def test_spaced_decimal_digits_are_merged_in_one_pass():
+    normalized, code = normalize_expression("3.1 2", NORMALIZE, PATTERNS)
+    assert code == 0
+    assert normalized == "3.12"
 
 
 def test_temperature_below_absolute_zero_is_rejected():
@@ -379,6 +402,14 @@ def test_repl_reports_unrecognized_input(capsys):
     with patch("builtins.input", side_effect=["hello world", EOFError]):
         assert _run_repl() == 0
     assert "Error:" in capsys.readouterr().err
+
+
+def test_repl_logs_unexpected_handler_errors(caplog):
+    with patch("builtins.input", side_effect=["1 + 1", EOFError]):
+        with patch("eggcalc.cli.run_cli", side_effect=RuntimeError("boom")):
+            with caplog.at_level("DEBUG"):
+                assert _run_repl() == 0
+    assert any("REPL command failed" in record.message for record in caplog.records)
 
 
 def test_compatibility_ping_notification_has_no_response():

@@ -2131,6 +2131,7 @@ class TestIdentifierAnalyzeDirect:
         result = identifier_analyze("my-crate-name")
         assert result["classification"] == "kebab-case"
         assert result["rust_valid"] is False
+        assert any("Invalid Rust identifier" in warning for warning in result["warnings"])
 
     def test_python_package_like_name(self):
         result = identifier_analyze("my_package")
