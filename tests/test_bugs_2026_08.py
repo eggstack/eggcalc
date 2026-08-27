@@ -20,6 +20,56 @@ from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_text
 from eggcalc.units import UnitValue, convert_temperature
 
 
+def test_multi_word_number_misses_do_not_scan_a_monolithic_regex():
+    from eggcalc.normalize import _replace_multi_word_numbers
+
+    expression = "a b c d " * 1000
+    assert _replace_multi_word_numbers(expression) == expression
+
+
+def test_unit_value_equality_uses_physical_quantity():
+    assert UnitValue(5, "m") == UnitValue(5, "meter")
+    assert UnitValue(100, "cm") == UnitValue(1, "m")
+    assert hash(UnitValue(100, "cm")) == hash(UnitValue(1, "m"))
+    assert UnitValue(1, "m") != UnitValue(1, "s")
+
+
+def test_cross_unit_floor_division_and_modulo_preserve_integral_types():
+    quotient = UnitValue(700, "cm") // UnitValue(2, "m")
+    remainder = UnitValue(700, "cm") % UnitValue(2, "m")
+    assert quotient.value == 3
+    assert isinstance(quotient.value, int)
+    assert remainder.value == 1
+    assert isinstance(remainder.value, int)
+    assert isinstance((UnitValue(7, "m") // UnitValue(2, "meter")).value, int)
+    assert isinstance((UnitValue(7, "m") % UnitValue(2, "meter")).value, int)
+
+
+def test_root_mapping_does_not_depend_on_canonical_suffix_slicing():
+    assert str(evaluate_raw("sqrt(9*in2)")) == "3 inch"
+    assert str(evaluate_raw("cbrt(8*ft3)")) == "2 ft"
+
+
+def test_cache_byte_accounting_handles_none_and_large_values():
+    import eggcalc.evaluator as evaluator
+
+    evaluator._clear_global_cache()
+    with evaluator._cache_lock:
+        evaluator._store_cache_entry("__none_cache_test__", None)
+        assert evaluator._cache_bytes > 0
+    evaluator._remove_cache_entry("__none_cache_test__")
+    assert evaluator._cache_bytes == 0
+    large_int = 10**5000
+    assert evaluator._entry_size("key", large_int) >= large_int.__sizeof__()
+
+
+def test_flat_parentheses_count_toward_nesting_limit():
+    from eggcalc.evaluator import EvaluationError
+
+    with pytest.raises(EvaluationError, match="too deeply nested"):
+        evaluate("(" * 101 + "1" + ")" * 101)
+
+
 def test_safe_pow_accepts_integral_float_exponents():
     result = _safe_pow(5, 500.0)
     assert isinstance(result, int)

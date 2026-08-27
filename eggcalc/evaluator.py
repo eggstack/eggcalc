@@ -16,6 +16,7 @@ import math
 import multiprocessing
 import os
 import random
+import sys
 import threading
 from collections import OrderedDict, deque
 from dataclasses import dataclass
@@ -343,6 +344,29 @@ def _root_dimension(dimension: Any, degree: int) -> Any | None:
     )
 
 
+# Only the compact square/cube units have a representable named root.  Keep
+# this relationship explicit instead of inferring it by removing a suffix
+# from an arbitrary canonical unit name.
+_ROOT_CANONICAL_MAP: dict[tuple[str, int], str] = {
+    ("cm2", 2): "cm",
+    ("ft2", 2): "ft",
+    ("in2", 2): "inch",
+    ("km2", 2): "km",
+    ("m2", 2): "m",
+    ("mi2", 2): "mi",
+    ("mm2", 2): "mm",
+    ("yd2", 2): "yd",
+    ("cm3", 3): "cm",
+    ("ft3", 3): "ft",
+    ("in3", 3): "inch",
+    ("km3", 3): "km",
+    ("m3", 3): "m",
+    ("mi3", 3): "mi",
+    ("mm3", 3): "mm",
+    ("yd3", 3): "yd",
+}
+
+
 def _root_unit_expression(expr: Any, degree: int, name: str) -> Any:
     """Build a representable structural unit expression root."""
     from .units import UnitExpression, _get_unit_registry
@@ -368,9 +392,7 @@ def _root_unit_expression(expr: Any, degree: int, name: str) -> Any:
             raise EvaluationError(
                 f"{name}() cannot represent the root of unit with integer exponents"
             )
-        root_name = canonical[:-1] if canonical.endswith(str(degree)) else ""
-        if root_name == "in":
-            root_name = "inch"
+        root_name = _ROOT_CANONICAL_MAP.get((canonical, degree), "")
         root_definition = registry.by_canonical(root_name)
         if root_definition is not None and (
             root_definition.affine or root_definition.dimension != root_dimension
@@ -774,14 +796,29 @@ _cache_lock = threading.Lock()
 _cache_bytes: int = 0
 
 
-def _entry_size(key: str, value: Any) -> int:
-    """Approximate size of a cache entry in bytes.
+def _deep_size(value: Any, seen: set[int]) -> int:
+    """Return a stable size estimate without converting values to strings."""
+    identity = id(value)
+    if identity in seen:
+        return 0
+    seen.add(identity)
+    size = sys.getsizeof(value)
+    if isinstance(value, dict):
+        size += sum(_deep_size(item, seen) for pair in value.items() for item in pair)
+    elif isinstance(value, (list, tuple, set, frozenset, deque)):
+        size += sum(_deep_size(item, seen) for item in value)
+    elif isinstance(value, UnitValue):
+        size += _deep_size(value.value, seen)
+        size += _deep_size(value.unit, seen)
+        size += _deep_size(value._unit_expr, seen)
+    elif hasattr(value, "__dict__"):
+        size += _deep_size(vars(value), seen)
+    return size
 
-    Uses the key length and the str() of the value as a simple proxy.
-    """
-    if isinstance(value, int) and not isinstance(value, bool):
-        return len(key) + _int_digit_count(value)
-    return len(key) + len(str(value))
+
+def _entry_size(key: str, value: Any) -> int:
+    """Estimate cache bytes from the objects' in-memory footprint."""
+    return _deep_size(key, set()) + _deep_size(value, set())
 
 
 def _evict_until_under_cap() -> None:
@@ -796,19 +833,15 @@ def _evict_until_under_cap() -> None:
     while _cache and _cache_bytes > MAX_CACHE_BYTES:
         old_key, old_value = _cache.popitem(last=False)
         _cache_bytes -= _entry_size(old_key, old_value)
-    if _cache_bytes < 0:
-        _cache_bytes = 0
 
 
 def _remove_cache_entry(expression: str) -> None:
     """Remove one global cache entry and keep byte accounting in sync."""
     global _cache_bytes
     with _cache_lock:
-        old_value = _cache.pop(expression, None)
-        if old_value is not None:
+        if expression in _cache:
+            old_value = _cache.pop(expression)
             _cache_bytes -= _entry_size(expression, old_value)
-        if _cache_bytes < 0:
-            _cache_bytes = 0
 
 
 def _clear_global_cache() -> None:
@@ -841,8 +874,8 @@ def get_config_generation() -> int:
 def _store_cache_entry(expression: str, result: Any) -> None:
     """Store one result while the global cache lock is held."""
     global _cache_bytes
-    old_value = _cache.pop(expression, None)
-    if old_value is not None:
+    if expression in _cache:
+        old_value = _cache.pop(expression)
         _cache_bytes -= _entry_size(expression, old_value)
     while len(_cache) >= DEFAULT_CACHE_SIZE:
         old_key, old_value = _cache.popitem(last=False)
@@ -2111,6 +2144,41 @@ def _build_allowed_ast_types() -> frozenset[type[ast.AST]]:
 _ALLOWED_AST_TYPES: frozenset[type[ast.AST]] = _build_allowed_ast_types()
 
 
+def _source_nesting_depth(expression: str) -> int:
+    """Return maximum parenthesis depth outside string literals."""
+    depth = 0
+    maximum = 0
+    quote = ""
+    index = 0
+    while index < len(expression):
+        if quote:
+            if expression[index] == "\\":
+                index += 2
+                continue
+            if expression.startswith(quote, index):
+                index += len(quote)
+                quote = ""
+                continue
+            index += 1
+            continue
+        if expression.startswith("'''", index) or expression.startswith('"""', index):
+            quote = expression[index : index + 3]
+            index += 3
+        elif expression[index] in "'\"":
+            quote = expression[index]
+            index += 1
+        elif expression[index] == "(":
+            depth += 1
+            maximum = max(maximum, depth)
+            index += 1
+        elif expression[index] == ")":
+            depth = max(0, depth - 1)
+            index += 1
+        else:
+            index += 1
+    return maximum
+
+
 class Evaluator(ast.NodeVisitor):
     """Safe AST-based expression evaluator.
 
@@ -3024,6 +3092,9 @@ class Evaluator(ast.NodeVisitor):
                 raise EvaluationError(
                     f"Expression too long (max {MAX_INPUT_LENGTH} characters, got {len(expression)})"
                 )
+            source_depth = _source_nesting_depth(expression)
+            if source_depth > MAX_NESTING_DEPTH:
+                raise EvaluationError(f"Expression too deeply nested (max {MAX_NESTING_DEPTH})")
             try:
                 tree = ast.parse(expression, mode="eval")
             except SyntaxError as e:

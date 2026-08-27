@@ -2050,16 +2050,69 @@ _LONG_PHRASES_PATTERN: str = (
     else ""
 )
 
-# Combined multi-word number pattern: a single regex over every phrase in
-# _MULTI_WORD_NUMBERS, longest first. Compiling one regex is ~40,000x faster
-# than calling re.sub() per entry on every normalize() call.
-_MULTI_WORD_PATTERN: Pattern[str] = re.compile(
-    r"\b(?:"
-    + "|".join(re.escape(p) for p in sorted(_MULTI_WORD_NUMBERS, key=len, reverse=True))
-    + r")\b",
-    flags=re.IGNORECASE,
-)
-_MULTI_WORD_PATTERN_LOOKUP: dict[str, str] = {k.lower(): v for k, v in _MULTI_WORD_NUMBERS.items()}
+# Index multi-word numbers by their first word.  Matching the whole 7,000+
+# phrase set as one alternation makes misses increasingly expensive as the
+# input grows.  The trie preserves longest-first, non-overlapping replacement
+# while limiting each lookup to the words at the current position.
+_MULTI_WORD_TRIE: dict[str, dict[str, Any]] = {}
+for _phrase, _value in _MULTI_WORD_NUMBERS.items():
+    _node: dict[str, Any] = _MULTI_WORD_TRIE
+    for _word in _phrase.split():
+        _node = _node.setdefault(_word, {})
+    _node[""] = _value
+_MULTI_WORD_WORD_PATTERN = re.compile(r"\b[A-Za-z]+\b")
+
+
+def _replace_multi_word_numbers(expression: str) -> str:
+    """Replace multi-word number phrases without scanning all phrases per position."""
+    words = list(_MULTI_WORD_WORD_PATTERN.finditer(expression))
+    replacements: list[tuple[int, int, str]] = []
+    word_index = 0
+    while word_index < len(words):
+        first = words[word_index].group(0).lower()
+        node = _MULTI_WORD_TRIE.get(first)
+        if node is None:
+            word_index += 1
+            continue
+
+        previous = words[word_index]
+        candidate = node.get("")
+        candidate_end = previous.end()
+        candidate_index = word_index
+        next_index = word_index + 1
+        while next_index < len(words):
+            current = words[next_index]
+            if expression[previous.end() : current.start()] != " ":
+                break
+            child = node.get(current.group(0).lower())
+            if child is None:
+                break
+            node = child
+            previous = current
+            value = node.get("")
+            if value is not None:
+                candidate = value
+                candidate_end = current.end()
+                candidate_index = next_index
+            next_index += 1
+
+        if candidate is not None:
+            replacements.append((words[word_index].start(), candidate_end, candidate))
+            word_index = candidate_index + 1
+        else:
+            word_index += 1
+
+    if not replacements:
+        return expression
+    pieces: list[str] = []
+    last_end = 0
+    for start, end, replacement in replacements:
+        pieces.append(expression[last_end:start])
+        pieces.append(replacement)
+        last_end = end
+    pieces.append(expression[last_end:])
+    return "".join(pieces)
+
 
 # Digit scale words for "N thousand" -> evaluated result conversion
 _DIGIT_SCALES: dict[str, str] = {
@@ -2187,9 +2240,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
 
     # Replace multi-word number phrases to prevent incorrect joining
     # e.g., "one hundred" -> "100", "two thousand" -> "2000"
-    expression = _MULTI_WORD_PATTERN.sub(
-        lambda m: _MULTI_WORD_PATTERN_LOOKUP[m.group(0).lower()], expression
-    )
+    expression = _replace_multi_word_numbers(expression)
 
     # Handle short-form power phrases BEFORE individual word replacement so
     # that "2 to the 10" doesn't become "2 TO 10". Longer forms like

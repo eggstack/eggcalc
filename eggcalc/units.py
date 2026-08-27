@@ -3014,15 +3014,22 @@ class UnitValue:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, UnitValue):
             return NotImplemented
-        if self.unit != other.unit:
+        if self._unit_expr.dimension != other._unit_expr.dimension:
             return False
-        return self.value == other.value
+        return self._value_in_base() == other._value_in_base()
+
+    def _value_in_base(self) -> Numeric:
+        """Return this quantity's numeric value in its dimension's base unit."""
+        if self.unit is None:
+            return self.value
+        definition = _single_definition(self._unit_expr)
+        if definition is not None and definition.affine:
+            return self.value * definition.scale + definition.offset
+        return self.value * self._unit_expr.scale_to_base
 
     def __hash__(self) -> int:
-        """Hash consistent with __eq__: real/imag components and unit are compared."""
-        if isinstance(self.value, complex):
-            return hash((self.value.real, self.value.imag, self.unit))
-        return hash((self.value, self.unit))
+        """Hash the physical quantity, independent of its display unit."""
+        return hash((self._unit_expr.dimension, self._value_in_base()))
 
     def __add__(self, other: Numeric | UnitValue) -> UnitValue:
         if isinstance(other, UnitValue):
@@ -3430,11 +3437,19 @@ def _floor_divide_quantities(left: UnitValue, right: UnitValue) -> int | float:
     Raises ``ValueError`` if the units are incompatible.
     """
     if left.unit and right.unit:
-        if left.unit == right.unit:
+        if left._unit_expr == right._unit_expr:
             return left.value // right.value  # type: ignore[operator]
         # Convert left into right's unit before floor division.
         converted = left.convert_to(right.unit)
-        return converted.value // right.value  # type: ignore[operator]
+        result = converted.value // right.value  # type: ignore[operator]
+        if (
+            isinstance(left.value, int)
+            and not isinstance(left.value, bool)
+            and isinstance(right.value, int)
+            and not isinstance(right.value, bool)
+        ):
+            return int(result)
+        return result
     if right.unit:
         raise ValueError(f"Cannot floor-divide a number by a unit value ('{right.unit}')")
     return left.value // right.value  # type: ignore[operator]
@@ -3450,11 +3465,19 @@ def _modulo_quantities(left: UnitValue, right: UnitValue) -> UnitValue:
     Raises ``ValueError`` if the units are incompatible.
     """
     if left.unit and right.unit:
-        if left.unit == right.unit:
+        if left._unit_expr == right._unit_expr:
             return UnitValue(left.value % right.value, right.unit)  # type: ignore[operator]
         # Convert left into right's unit before modulo.
         converted = left.convert_to(right.unit)
-        return UnitValue(converted.value % right.value, right.unit)  # type: ignore[operator]
+        result = converted.value % right.value  # type: ignore[operator]
+        if (
+            isinstance(left.value, int)
+            and not isinstance(left.value, bool)
+            and isinstance(right.value, int)
+            and not isinstance(right.value, bool)
+        ):
+            result = int(result)
+        return UnitValue(result, right.unit)
     if right.unit:
         raise ValueError(f"Cannot compute modulo by a unit value ('{right.unit}')")
     return UnitValue(left.value % right.value, left.unit)  # type: ignore[operator]
