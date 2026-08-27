@@ -304,7 +304,7 @@ class TestUnitRegistryClaims:
         from eggcalc.units import build_unit_registry
 
         reg = build_unit_registry()
-        assert len(reg) >= 400, f"Expected >= 400 aliases, got {len(reg)}"
+        assert len(reg.all_aliases) >= 400, f"Expected >= 400 aliases, got {len(reg.all_aliases)}"
 
     def test_registry_canonical_count(self):
         from eggcalc.units import build_unit_registry

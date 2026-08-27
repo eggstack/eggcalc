@@ -354,9 +354,10 @@ With `show_expression=False`:
 - `EvaluationError` → prints `"Evaluation error: <msg>"` to stderr
 - Other exceptions → prints `"Error: <msg>"` to stderr (or full traceback with `--verbose`)
 
-### `check_if_number(token: str) -> dict`
+### `check_if_number(token: str) -> Mapping[str, Any]`
 
 LRU-cached (maxsize=1024) function that checks if a token represents a number.
+The returned mapping is read-only so callers cannot mutate the cached result.
 
 **Returns:**
 ```python

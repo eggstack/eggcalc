@@ -19,6 +19,7 @@ import traceback
 from collections.abc import Mapping
 from functools import lru_cache
 from re import Pattern
+from types import MappingProxyType
 from typing import Any
 
 from .evaluator import EvaluationError, evaluate
@@ -556,7 +557,7 @@ def _rebuild_config() -> None:
 
 
 @lru_cache(maxsize=1024)
-def check_if_number(token: str) -> dict:
+def check_if_number(token: str) -> Mapping[str, Any]:
     """Check if a token represents a number.
 
     The LRU cache is cleared during _rebuild_config() so that cached results
@@ -566,14 +567,18 @@ def check_if_number(token: str) -> dict:
     the cache is per-process and any stale value would still be valid for the
     (now-superseded) old configuration.
 
-    Returns a dict with:
+    Returns a read-only mapping with:
         bool: whether the token is a number
         converted: the parsed number or original string
         type: the original input type
     """
     patterns = PATTERNS
+
+    def result(is_number: bool, converted: Any, value_type: type) -> Mapping[str, Any]:
+        return MappingProxyType({"bool": is_number, "converted": converted, "type": value_type})
+
     if len(token) == 0:
-        return {"bool": False, "converted": token, "type": type(token)}
+        return result(False, token, type(token))
 
     # Remove thousands separator
     cleaned = patterns["thousands_separator"].sub("", token)
@@ -583,7 +588,7 @@ def check_if_number(token: str) -> dict:
         num_part = cleaned[:-1]
         try:
             val = float(num_part) / 100
-            return {"bool": True, "converted": val, "type": type(token)}
+            return result(True, val, type(token))
         except ValueError:
             pass
 
@@ -592,14 +597,10 @@ def check_if_number(token: str) -> dict:
         num_part = cleaned[:-1]
         if num_part in ("+", "-"):
             # Just "+i" or "-i"
-            return {
-                "bool": True,
-                "converted": complex(0, 1 if num_part == "+" else -1),
-                "type": type(token),
-            }
+            return result(True, complex(0, 1 if num_part == "+" else -1), type(token))
         try:
             val = float(num_part)
-            return {"bool": True, "converted": complex(0, val), "type": type(token)}
+            return result(True, complex(0, val), type(token))
         except ValueError:
             pass
 
@@ -607,7 +608,7 @@ def check_if_number(token: str) -> dict:
     if cleaned.lower().startswith("0x"):
         try:
             val = int(cleaned, 16)
-            return {"bool": True, "converted": val, "type": int}
+            return result(True, val, int)
         except ValueError:
             pass
 
@@ -615,7 +616,7 @@ def check_if_number(token: str) -> dict:
     if cleaned.lower().startswith("0b"):
         try:
             val = int(cleaned, 2)
-            return {"bool": True, "converted": val, "type": int}
+            return result(True, val, int)
         except ValueError:
             pass
 
@@ -623,24 +624,20 @@ def check_if_number(token: str) -> dict:
     if cleaned.lower().startswith("0o"):
         try:
             val = int(cleaned, 8)
-            return {"bool": True, "converted": val, "type": int}
+            return result(True, val, int)
         except ValueError:
             pass
 
     # Check if it's a plain number
     if patterns["int"].match(cleaned):
-        return {"bool": True, "converted": int(cleaned), "type": type(token)}
+        return result(True, int(cleaned), type(token))
     if patterns["float"].match(cleaned):
-        return {"bool": True, "converted": float(cleaned), "type": type(token)}
+        return result(True, float(cleaned), type(token))
 
     # Check if it's a number with unit.
     unit_number_match = _UNIT_NUMBER_RE.fullmatch(cleaned)
     if unit_number_match:
-        return {
-            "bool": True,
-            "converted": float(unit_number_match.group(1)),
-            "type": type(token),
-        }
+        return result(True, float(unit_number_match.group(1)), type(token))
 
     # Check lowercase temperature units (e.g., "5f", "5c", "5k") that are not
     # in UNIT_ALIASES but are handled by _preprocess_units via _LOWERCASE_TEMP_UNITS.
@@ -650,11 +647,11 @@ def check_if_number(token: str) -> dict:
             if num_part:
                 try:
                     val = float(num_part)
-                    return {"bool": True, "converted": val, "type": type(token)}
+                    return result(True, val, type(token))
                 except ValueError:
                     pass
 
-    return {"bool": False, "converted": token, "type": type(token)}
+    return result(False, token, type(token))
 
 
 def validate_for_eval(tokens: list, patterns: Mapping[str, Pattern[str]]) -> bool:
@@ -739,7 +736,7 @@ def combine_number_parts(
                 result.append(str(part + next_part))
                 skip_next = True
             elif part < 10 and next_part >= 100:
-                result.append(f"{part}*{next_part}")
+                result.extend((str(part), "*", str(next_part)))
                 skip_next = True
             elif part != 10:
                 result.append(str(part))
@@ -749,16 +746,16 @@ def combine_number_parts(
             if part == 10 and number_parts[i - 1] < 10:
                 pass
             elif _is_tens(part) and next_part < 10:
-                result.append(f"+{part + next_part}")
+                result.extend(("+", str(part + next_part)))
                 skip_next = True
             elif part < 10:
-                result.append(f"+{part}")
+                result.extend(("+", str(part)))
             elif number_parts[i - 1] < 10 and part < 100:
-                result.append(f"+{part}")
+                result.extend(("+", str(part)))
             elif number_parts[i - 1] < 100:
-                result.append(f"*{part}")
+                result.extend(("*", str(part)))
             else:
-                result.append(f"+{part}")
+                result.extend(("+", str(part)))
 
     if split_tokens and patterns["negative"].match(split_tokens[0]):
         result.insert(0, "-")
@@ -1057,7 +1054,10 @@ def convert_from_human_handler(
             tokens[i] = convert_numbers(tokens[i], patterns)
             is_valid = True
         except ValueError:
-            tokens[i] = tokens[i][0] if isinstance(tokens[i], dict) else tokens[i]
+            pass
+        finally:
+            if isinstance(tokens[i], dict):
+                tokens[i] = tokens[i][0]
 
     return tokens, is_valid
 
@@ -1244,10 +1244,7 @@ def _combine_consecutive_numbers(
         if len(number_parts) > 1:
             values = [v for v, _ in number_parts]
             combined = _finish_number_group(values, patterns)
-            if len(combined) == 1 and combined[0] == "+".join(original_tokens):
-                result.append(combined[0])
-            else:
-                result.extend(combined)
+            result.extend(combined)
         else:
             result.append(original_tokens[0])
 

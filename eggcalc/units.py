@@ -26,6 +26,8 @@ Numeric = float | int | complex
 
 FLOAT_EPSILON = 1e-10
 MAX_RESULT_VALUE = 1e308
+MAX_RESULT_DIGITS = 4300
+_MAX_RESULT_INT = 10**MAX_RESULT_DIGITS - 1
 
 # Resource bounds for compound unit parsing
 MAX_COMPOUND_DEPTH = 16
@@ -2897,7 +2899,7 @@ class UnitRegistry:
         return tuple(self._by_canonical.values())
 
     def __len__(self) -> int:
-        return len(self._by_alias)
+        return len(self._by_canonical)
 
     def __repr__(self) -> str:
         return f"UnitRegistry(aliases={len(self._by_alias)}, canonicals={len(self._by_canonical)})"
@@ -2960,8 +2962,11 @@ class UnitValue:
                 raise OverflowError("Result too large")
         elif isinstance(result, float) and not math.isfinite(result):
             raise OverflowError("Result too large")
-        # For int results, skip magnitude check — digit count is the correct
-        # limit for arbitrary-precision ints (enforced by _check_result_size).
+        elif isinstance(result, int) and not isinstance(result, bool):
+            # Avoid converting enormous integers to strings before the
+            # evaluator can enforce the same output-size limit.
+            if result > _MAX_RESULT_INT or result < -_MAX_RESULT_INT:
+                raise OverflowError("Result too large")
 
     def __init__(self, value: Numeric, unit: str | None = None) -> None:
         # Normalize complex values with zero imaginary part to float
@@ -3157,19 +3162,19 @@ class UnitValue:
         if isinstance(other, UnitValue):
             if other.value == 0:
                 raise ZeroDivisionError("Cannot divide UnitValue by zero")
-            if self.unit or other.unit:
+            if other.unit:
                 if (self.unit and self._unit_expr.dimension.is_affine) or (
-                    other.unit and other._unit_expr.dimension.is_affine
+                    other._unit_expr.dimension.is_affine
                 ):
                     raise ValueError("Affine units cannot participate in floor division")
                 quotient = _floor_divide_quantities(self, other)
                 UnitValue._check_overflow(quotient)
-                # A dimensionless divisor leaves the dividend's unit intact
-                # (consistent with __truediv__ and __mod__).
-                return UnitValue(quotient, None if other.unit else self.unit)
+                return UnitValue(quotient, None)
+            if self.unit and self._unit_expr.dimension.is_affine:
+                raise ValueError("Affine units cannot participate in floor division")
             result = self.value // other.value  # type: ignore[operator]
             UnitValue._check_overflow(result)
-            return UnitValue(result, None)
+            return UnitValue(result, self.unit)
         if other == 0:
             raise ZeroDivisionError("Cannot divide UnitValue by zero")
         if self.unit and self._unit_expr.dimension.is_affine:
@@ -3193,17 +3198,19 @@ class UnitValue:
         if isinstance(other, UnitValue):
             if other.value == 0:
                 raise ZeroDivisionError("Cannot mod UnitValue by zero")
-            if self.unit or other.unit:
+            if other.unit:
                 if (self.unit and self._unit_expr.dimension.is_affine) or (
-                    other.unit and other._unit_expr.dimension.is_affine
+                    other._unit_expr.dimension.is_affine
                 ):
                     raise ValueError("Affine units cannot participate in modulo")
                 remainder = _modulo_quantities(self, other)
                 UnitValue._check_overflow(remainder.value)
                 return remainder
+            if self.unit and self._unit_expr.dimension.is_affine:
+                raise ValueError("Affine units cannot participate in modulo")
             result = self.value % other.value  # type: ignore[operator]
             UnitValue._check_overflow(result)
-            return UnitValue(result, None)
+            return UnitValue(result, self.unit)
         if other == 0:
             raise ZeroDivisionError("Cannot mod UnitValue by zero")
         if self.unit and self._unit_expr.dimension.is_affine:
@@ -3641,7 +3648,9 @@ def _lookup_definition(unit: str) -> UnitDefinition | None:
     if definition is not None:
         return definition
     lowered = unit.lower()
-    legacy_forms = (unit.lower(), unit.upper(), unit.title(), unit.capitalize())
+    legacy_forms = tuple(
+        dict.fromkeys((unit.lower(), unit.upper(), unit.title(), unit.capitalize()))
+    )
     best_key: tuple[int, int, int, str] | None = None
     best_definition: UnitDefinition | None = None
     for alias in registry.all_aliases:

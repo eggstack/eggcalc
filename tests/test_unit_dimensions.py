@@ -238,7 +238,7 @@ class TestUnitRegistry:
     def test_build_registry(self):
         reg = build_unit_registry()
         assert isinstance(reg, UnitRegistry)
-        assert len(reg) > 400
+        assert len(reg.all_aliases) > 400
 
     def test_every_alias_has_definition(self):
         from eggcalc.units import UNIT_ALIASES

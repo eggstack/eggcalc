@@ -16,7 +16,6 @@ import math
 import multiprocessing
 import os
 import random
-import re
 import threading
 from collections import OrderedDict, deque
 from dataclasses import dataclass
@@ -150,11 +149,6 @@ _SIDE_EFFECT_FUNCTIONS: frozenset[str] = frozenset(
     }
 )
 
-_UNCACHEABLE_CALL_RE = re.compile(
-    rf"(?<![A-Za-z0-9_])(?:{'|'.join(re.escape(name) for name in _RANDOM_FUNCTIONS | _SIDE_EFFECT_FUNCTIONS)})\s*\(",
-    re.IGNORECASE,
-)
-
 # Functions whose first argument is a variable name (string). The argument
 # is preserved as a raw string even if it collides with a constant or unit
 # name (e.g., setvar("pi", 5) should bind the variable "pi" rather than
@@ -231,22 +225,23 @@ def _compatible_reducer(name: str, func: Any, args: list[Any]) -> Any:
         return func(*args)
     if all(has_unit):
         units = [a.unit for a in args]
-        if len(set(units)) > 1:
-            base_unit = units[0]
-            converted_vals: list[float] = []
-            for a in args:
-                try:
-                    converted_vals.append(a.convert_to(base_unit).value)
-                except (ValueError, TypeError):
-                    raise EvaluationError(
-                        f"{name}() requires compatible units; "
-                        f"received incompatible units '{units[0]}' and '{a.unit}'"
-                    )
-            result = func(*converted_vals)
-            return UnitValue(result, base_unit)
-        else:
-            result = func(*[a.value for a in args])
-            return UnitValue(result, units[0])
+        base_unit = units[0]
+        if not all(are_units_compatible(base_unit, unit) for unit in units[1:]):
+            raise EvaluationError(
+                f"{name}() requires compatible units; "
+                f"received incompatible units '{units[0]}' and '{units[1]}'"
+            )
+        converted_vals: list[float] = []
+        for a in args:
+            try:
+                converted_vals.append(a.convert_to(base_unit).value)
+            except (ValueError, TypeError):
+                raise EvaluationError(
+                    f"{name}() requires compatible units; "
+                    f"received incompatible units '{units[0]}' and '{a.unit}'"
+                )
+        result = func(*converted_vals)
+        return UnitValue(result, base_unit)
     raise EvaluationError(
         f"{name}() requires compatible units; received a mix of dimensionless and dimensional arguments"
     )
@@ -616,12 +611,9 @@ def _check_result_size(result: Any) -> Any:
     """Raise EvaluationError if a result has too many digits or is NaN/inf."""
     if isinstance(result, UnitValue):
         if isinstance(result.value, complex):
-            if (
-                math.isnan(result.value.real)
-                or math.isnan(result.value.imag)
-                or math.isinf(result.value.real)
-                or math.isinf(result.value.imag)
-            ):
+            if math.isnan(result.value.real) or math.isnan(result.value.imag):
+                raise EvaluationError("Result is not a number")
+            if math.isinf(result.value.real) or math.isinf(result.value.imag):
                 raise EvaluationError("Result too large")
             if abs(result.value) > MAX_RESULT_VALUE:
                 raise EvaluationError("Result too large")
@@ -630,7 +622,9 @@ def _check_result_size(result: Any) -> Any:
             pass
         else:
             try:
-                if not math.isfinite(result.value):
+                if math.isnan(result.value):
+                    raise EvaluationError("Result is not a number")
+                if math.isinf(result.value):
                     raise EvaluationError("Result too large")
                 if abs(result.value) > MAX_RESULT_VALUE:
                     raise EvaluationError("Result too large")
@@ -640,17 +634,16 @@ def _check_result_size(result: Any) -> Any:
             if _int_digit_count(result.value) > MAX_RESULT_DIGITS:
                 raise EvaluationError(f"Result has too many digits (max {MAX_RESULT_DIGITS})")
     if isinstance(result, complex):
-        if (
-            math.isnan(result.real)
-            or math.isnan(result.imag)
-            or math.isinf(result.real)
-            or math.isinf(result.imag)
-        ):
+        if math.isnan(result.real) or math.isnan(result.imag):
+            raise EvaluationError("Result is not a number")
+        if math.isinf(result.real) or math.isinf(result.imag):
             raise EvaluationError("Result too large")
         if abs(result) > MAX_RESULT_VALUE:
             raise EvaluationError("Result too large")
     elif isinstance(result, float):
-        if math.isnan(result) or math.isinf(result):
+        if math.isnan(result):
+            raise EvaluationError("Result is not a number")
+        if math.isinf(result):
             raise EvaluationError("Result too large")
         if abs(result) > MAX_RESULT_VALUE:
             raise EvaluationError("Result too large")
@@ -732,13 +725,14 @@ def load_user_config() -> None:
         import eggcalc.normalize as normalize_mod  # noqa: F401
         import eggcalc_config as config
 
-        for name, value in getattr(config, "CUSTOM_CONSTANTS", {}).items():
-            _default_evaluator.CONSTANTS[name] = value
-            config_changed = True
+        with _lock:
+            for name, value in getattr(config, "CUSTOM_CONSTANTS", {}).items():
+                _default_evaluator.CONSTANTS[name] = value
+                config_changed = True
 
-        for name, func in getattr(config, "CUSTOM_FUNCTIONS", {}).items():
-            _default_evaluator.FUNCTIONS[name] = func
-            config_changed = True
+            for name, func in getattr(config, "CUSTOM_FUNCTIONS", {}).items():
+                _default_evaluator.FUNCTIONS[name] = func
+                config_changed = True
 
         from . import units
 
@@ -845,32 +839,21 @@ def get_config_generation() -> int:
 
 
 def _store_cache_entry(expression: str, result: Any) -> None:
-    """Store one result in the global LRU cache with consistent accounting."""
+    """Store one result while the global cache lock is held."""
     global _cache_bytes
-    with _cache_lock:
-        old_value = _cache.pop(expression, None)
-        if old_value is not None:
-            _cache_bytes -= _entry_size(expression, old_value)
-        while len(_cache) >= DEFAULT_CACHE_SIZE:
-            old_key, old_value = _cache.popitem(last=False)
-            _cache_bytes -= _entry_size(old_key, old_value)
-        _cache[expression] = result
-        _cache_bytes += _entry_size(expression, result)
-        _evict_until_under_cap()
+    old_value = _cache.pop(expression, None)
+    if old_value is not None:
+        _cache_bytes -= _entry_size(expression, old_value)
+    while len(_cache) >= DEFAULT_CACHE_SIZE:
+        old_key, old_value = _cache.popitem(last=False)
+        _cache_bytes -= _entry_size(old_key, old_value)
+    _cache[expression] = result
+    _cache_bytes += _entry_size(expression, result)
+    _evict_until_under_cap()
 
 
-def _cached_normalize_and_evaluate(expression: str) -> Any:
-    """Cache for normalized and evaluated expressions."""
-    # Bypass the cache for non-deterministic or stateful expressions so
-    # repeated calls execute instead of returning stale results.
-    if _expression_bypasses_cache(expression):
-        return _normalize_and_evaluate_uncached(expression)
-    with _cache_lock:
-        if expression in _cache:
-            _cache.move_to_end(expression)
-            return _cache[expression]
-
-    _ensure_config_loaded()
+def _normalize_for_evaluation(expression: str) -> str:
+    """Normalize an expression and raise the public error for invalid input."""
     from .normalize import NORMALIZE, PATTERNS, normalize_expression
 
     normalized, exit_code = normalize_expression(
@@ -878,10 +861,31 @@ def _cached_normalize_and_evaluate(expression: str) -> Any:
     )
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
+    return normalized
+
+
+def _cached_normalize_and_evaluate(expression: str) -> Any:
+    """Cache for normalized and evaluated expressions."""
+    _ensure_config_loaded()
+    normalized = _normalize_for_evaluation(expression)
+
+    # Bypass the cache for non-deterministic or stateful calls. Detection is
+    # performed on the normalized AST so strings containing function names and
+    # natural-language spellings cannot produce false positives/negatives.
+    if _expression_bypasses_cache(normalized):
+        return _default_evaluator.evaluate(normalized)
+    with _cache_lock:
+        if expression in _cache:
+            _cache.move_to_end(expression)
+            return _cache[expression]
 
     result = _default_evaluator.evaluate(normalized)
 
-    _store_cache_entry(expression, result)
+    with _cache_lock:
+        if expression in _cache:
+            _cache.move_to_end(expression)
+            return _cache[expression]
+        _store_cache_entry(expression, result)
 
     return result
 
@@ -889,19 +893,23 @@ def _cached_normalize_and_evaluate(expression: str) -> Any:
 def _normalize_and_evaluate_uncached(expression: str) -> Any:
     """Run the normalize-then-evaluate pipeline without consulting the cache."""
     _ensure_config_loaded()
-    from .normalize import NORMALIZE, PATTERNS, normalize_expression
-
-    normalized, exit_code = normalize_expression(
-        expression, NORMALIZE, PATTERNS, skip_validation=True
-    )
-    if exit_code != 0:
-        raise EvaluationError(f"Invalid expression: {expression}")
+    normalized = _normalize_for_evaluation(expression)
     return _default_evaluator.evaluate(normalized)
 
 
 def _expression_bypasses_cache(expression: str) -> bool:
     """Return True for expressions whose calls must execute every time."""
-    return _UNCACHEABLE_CALL_RE.search(expression) is not None
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except (SyntaxError, TypeError, ValueError):
+        return False
+    uncacheable = _RANDOM_FUNCTIONS | _SIDE_EFFECT_FUNCTIONS
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in uncacheable
+        for node in ast.walk(tree)
+    )
 
 
 def evaluate_cached(expression: str) -> Any:
@@ -1578,8 +1586,6 @@ def _as_percent(x: float, total: float) -> float:
     """Calculate what percent x is of total."""
     if total == 0:
         raise EvaluationError("Cannot divide by zero")
-    if abs(total) < 1e-100:
-        raise EvaluationError("Near-zero divisor could cause overflow")
     return (x / total) * 100
 
 
@@ -1788,6 +1794,15 @@ def _fn_clear(register: str | None = None) -> None:
     return None
 
 
+def _notify_evaluator_state_change(ev: Evaluator) -> None:
+    """Invalidate caches after changing evaluator-local variable state."""
+    callback = getattr(ev, "_state_change_callback", None)
+    if callback is not None:
+        callback()
+    elif ev is _default_evaluator:
+        _clear_global_cache()
+
+
 def _set_user_variable(ev: Evaluator, name: Any, value: Any) -> Any:
     """Validate and store a user variable on the given evaluator.
 
@@ -1808,6 +1823,7 @@ def _set_user_variable(ev: Evaluator, name: Any, value: Any) -> Any:
             oldest_key = next(iter(ev._user_variables))
             del ev._user_variables[oldest_key]
         ev._user_variables[name] = value
+    _notify_evaluator_state_change(ev)
     return value
 
 
@@ -1826,6 +1842,7 @@ def _fn_delvar(name: str) -> None:
     ev = _get_current_evaluator()
     with ev._var_lock:
         ev._user_variables.pop(name, None)
+    _notify_evaluator_state_change(ev)
     return None
 
 
@@ -1839,6 +1856,7 @@ def _fn_clearvars() -> None:
     ev = _get_current_evaluator()
     with ev._var_lock:
         ev._user_variables.clear()
+    _notify_evaluator_state_change(ev)
     return None
 
 
@@ -1992,6 +2010,7 @@ def delvar(name: str) -> None:
     ev = _default_evaluator
     with ev._var_lock:
         ev._user_variables.pop(name, None)
+    _notify_evaluator_state_change(ev)
 
 
 def listvars() -> dict[str, Any]:
@@ -2006,6 +2025,7 @@ def clearvars() -> None:
     ev = _default_evaluator
     with ev._var_lock:
         ev._user_variables.clear()
+    _notify_evaluator_state_change(ev)
 
 
 # === AST allow-list (M7) ===
@@ -2371,6 +2391,7 @@ class Evaluator(ast.NodeVisitor):
         self._memory = Memory()
         self._user_variables: dict[str, Any] = {}
         self._var_lock = threading.Lock()
+        self._state_change_callback: Any = None
         self._depth = 0
         self._allow_random = allow_random
         self._allow_side_effects = allow_side_effects
@@ -3013,14 +3034,11 @@ class Evaluator(ast.NodeVisitor):
             # that would each trigger _validate_node, so an explicit count cap
             # prevents CPU DoS by attackers crafting adversarial shapes.
             _MAX_AST_NODES = 10_000
-            node_count = sum(1 for _ in ast.walk(tree))
-            if node_count > _MAX_AST_NODES:
-                raise EvaluationError(
-                    f"Expression has too many AST nodes (max {_MAX_AST_NODES}, got {node_count})"
-                )
-
-            # Validate all nodes
-            for node in ast.walk(tree):
+            for node_count, node in enumerate(ast.walk(tree), start=1):
+                if node_count > _MAX_AST_NODES:
+                    raise EvaluationError(
+                        f"Expression has too many AST nodes (max {_MAX_AST_NODES}, got {node_count})"
+                    )
                 self._validate_node(node)
 
             result = self.visit(tree.body)
@@ -3401,10 +3419,18 @@ def configure_default_evaluator(
         allow_side_effects: New value for ``Evaluator._allow_side_effects``
             (or None to keep).
     """
-    if allow_random is not None:
+    changed = False
+    if allow_random is not None and _default_evaluator._allow_random != allow_random:
         _default_evaluator._allow_random = allow_random
-    if allow_side_effects is not None:
+        changed = True
+    if (
+        allow_side_effects is not None
+        and _default_evaluator._allow_side_effects != allow_side_effects
+    ):
         _default_evaluator._allow_side_effects = allow_side_effects
+        changed = True
+    if changed:
+        _clear_global_cache()
 
 
 def get_default_evaluator() -> Evaluator:
@@ -3469,6 +3495,7 @@ class EggCalcApp:
         self._cache: OrderedDict[str, Any] | None = OrderedDict() if enable_cache else None
         self._lock = threading.Lock()
         self._cache_max_size = max(0, cache_size)
+        self._evaluator._state_change_callback = self.clear_cache
 
     def calculate(self, expression: str) -> Any:
         """Evaluate an expression (thread-safe).
@@ -3482,7 +3509,8 @@ class EggCalcApp:
         Raises:
             EvaluationError: If expression is invalid
         """
-        use_cache = self._cache is not None and not _expression_bypasses_cache(expression)
+        normalized = self._normalize_expression(expression)
+        use_cache = self._cache is not None and not _expression_bypasses_cache(normalized)
 
         if use_cache:
             with self._lock:
@@ -3491,7 +3519,7 @@ class EggCalcApp:
                     self._cache.move_to_end(expression)
                     return self._cache[expression]
 
-        result = self._evaluate_internal(expression)
+        result = self._evaluator.evaluate(normalized)
 
         if use_cache:
             with self._lock:
@@ -3523,15 +3551,11 @@ class EggCalcApp:
 
     def _evaluate_internal(self, expression: str) -> Any:
         """Internal evaluation that uses the instance's evaluator."""
-        from .normalize import NORMALIZE, PATTERNS, normalize_expression
+        return self._evaluator.evaluate(self._normalize_expression(expression))
 
-        normalized, exit_code = normalize_expression(
-            expression, NORMALIZE, PATTERNS, skip_validation=True
-        )
-        if exit_code != 0:
-            raise EvaluationError(f"Invalid expression: {expression}")
-
-        return self._evaluator.evaluate(normalized)
+    @staticmethod
+    def _normalize_expression(expression: str) -> str:
+        return _normalize_for_evaluation(expression)
 
     def register_constant(self, name: str, value: float) -> None:
         """Register a custom constant on this instance (thread-safe).

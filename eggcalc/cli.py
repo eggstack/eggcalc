@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections import deque
 from enum import Enum, auto
 from typing import Any, TypedDict
 
@@ -283,7 +284,7 @@ def _run_repl() -> int:
     print("eggcalc interactive mode. Type 'help' for available commands, 'quit' or 'exit' to exit.")
     print()
 
-    history: list[tuple[str, Any]] = []
+    history: deque[tuple[str, Any]] = deque(maxlen=1000)
 
     history_path = os.path.expanduser("~/.eggcalc_history")
     if readline is not None:
