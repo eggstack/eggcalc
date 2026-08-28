@@ -1009,12 +1009,14 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
         raise EvaluationError(f"Exponent too large (max {MAX_EXPONENT})")
     if not isinstance(base, complex) and base < 0:
         if isinstance(exp, complex):
-            if abs(exp.imag) > 1e-9 or not math.isclose(exp.real, round(exp.real), rel_tol=1e-9):
+            if abs(exp.imag) > 1e-9 or not math.isclose(
+                exp.real, round(exp.real), rel_tol=0.0, abs_tol=1e-9
+            ):
                 raise EvaluationError("Cannot raise negative number to non-integer power")
             exp = int(round(exp.real))
         else:
             try:
-                if not math.isclose(exp, round(exp), rel_tol=1e-9):
+                if not math.isclose(exp, round(exp), rel_tol=0.0, abs_tol=1e-9):
                     raise EvaluationError("Cannot raise negative number to non-integer power")
                 exp = int(round(exp))
             except (TypeError, ValueError):

@@ -414,3 +414,38 @@ def test_repl_logs_unexpected_handler_errors(caplog):
 
 def test_compatibility_ping_notification_has_no_response():
     assert handle_request({"jsonrpc": "2.0", "method": "ping"}) is None
+
+
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        ("min 5 10", 5),
+        ("min 5.0 10.0", 5.0),
+        ("min 5, 10", 5),
+        ("mean of 1, 2, 3", 2.0),
+        ("max of 5, 10", 10),
+        ("sum of 1, 2, 3", 6),
+    ],
+)
+def test_multi_argument_functions_accept_spaced_and_comma_arguments(expression, expected):
+    assert evaluate_raw(expression) == expected
+
+
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        ("log -1", complex(0, math.pi)),
+        ("sqrt -1", 1j),
+        ("sin -30", math.sin(-30)),
+        ("log +1", 0.0),
+    ],
+)
+def test_functions_accept_leading_signed_arguments(expression, expected):
+    assert evaluate_raw(expression) == pytest.approx(expected)
+
+
+def test_safe_pow_rejects_non_integral_exponents_beyond_absolute_tolerance():
+    with pytest.raises(EvaluationError, match="non-integer"):
+        _safe_pow(-4, 2.000000001)
+    with pytest.raises(EvaluationError, match="non-integer"):
+        _safe_pow(-4, 1000.000001)

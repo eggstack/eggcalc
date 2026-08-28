@@ -973,6 +973,24 @@ def apply_math_functions(
                     if next_token in operators["functions"]:
                         break
 
+                    if skipped_of and next_token == "," and token in _MULTI_ARG_OF_FUNCS:
+                        output_tokens.append(",")
+                        i += 1
+                        continue
+
+                    # A leading unary plus is split from its number by the
+                    # general operator tokenizer; it carries no value and
+                    # should remain inside the function call.
+                    if (
+                        skipped_of
+                        and next_token == "+"
+                        and tokens[i] in ("*", ",", "(")
+                        and i + 2 < len(tokens)
+                        and check_if_number(tokens[i + 2])["bool"]
+                    ):
+                        i += 1
+                        continue
+
                     if is_operator:
                         if next_token == ".":
                             pass  # continue collecting
@@ -2405,7 +2423,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     # become separate tokens (e.g., "three point one four" -> "3 point 1 4" ->
     # "3.1 4"). Concatenate them into a single decimal number.
     expression = re.sub(
-        r"(\d+\.\d*(?:\s+\d)+)",
+        r"(\d+\.\d*(?:\s+\d+(?![\d.]))+)",
         lambda m: re.sub(r"\s+", "", m.group(1)),
         expression,
     )
@@ -2787,9 +2805,10 @@ def _join_number_parts(expression: str) -> str:
     # multiplication. Keep compact expressions ("20*20") untouched because the
     # later split_at_operators pass already handles them.
     expanded_tokens: list[str] = []
+    function_names = set(FUNCTION_MAPPINGS)
     # Shared operator tokenizer for both boundary splitting and internal
     # splitting of operator-only tokens.
-    operator_split_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^])")
+    operator_split_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^,])")
 
     def _split_boundary_operators(token: str) -> list[str]:
         """Split operators attached at token edges without tokenizing internals.
@@ -2801,6 +2820,13 @@ def _join_number_parts(expression: str) -> str:
         parts: list[str] = []
         rest = token
         while rest:
+            # Keep a leading sign attached to a numeric argument (e.g., the
+            # ``-1`` in ``log -1``) so it can be collected by the function
+            # argument handling below.
+            if rest[:1] in ("+", "-") and re.fullmatch(
+                r"[+-](?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", rest
+            ):
+                break
             match = operator_split_re.match(rest)
             if match and match.end() < len(rest):
                 parts.append(match.group(1))
@@ -2811,7 +2837,21 @@ def _join_number_parts(expression: str) -> str:
         suffixes: list[str] = []
         while rest:
             op_match: str | None = None
-            for op in ("**", "//", "<<", ">>", "+", "-", "*", "/", "%", "&", "|", "^"):
+            for op in (
+                "**",
+                "//",
+                "<<",
+                ">>",
+                "+",
+                "-",
+                "*",
+                "/",
+                "%",
+                "&",
+                "|",
+                "^",
+                ",",
+            ):
                 if rest.endswith(op) and len(rest) > len(op):
                     op_match = op
                     break
@@ -2827,7 +2867,12 @@ def _join_number_parts(expression: str) -> str:
 
     for token in tokens:
         if not re.search(r"[A-Za-z_()]", token) and operator_split_re.search(token):
-            expanded_tokens.extend(part for part in operator_split_re.split(token) if part)
+            if re.fullmatch(r"[+-](?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", token) and (
+                not expanded_tokens or expanded_tokens[-1] in function_names
+            ):
+                expanded_tokens.append(token)
+            else:
+                expanded_tokens.extend(part for part in operator_split_re.split(token) if part)
         elif re.search(r"[A-Za-z_()]", token) and operator_split_re.search(token):
             expanded_tokens.extend(_split_boundary_operators(token))
         else:
@@ -2870,6 +2915,7 @@ def _join_number_parts(expression: str) -> str:
         "IN",
         "TO",
         "MOD",
+        ",",
     }
 
     def _is_digit_token(tok: str) -> bool:
@@ -2943,7 +2989,7 @@ def _join_number_parts(expression: str) -> str:
             prev_kind = "num"
         else:
             _flush_number_seq()
-            is_unit = _is_unit_token(token)
+            is_unit = _is_unit_token(token) and token not in FUNCTION_MAPPINGS
             if prev_kind == "num":
                 result.append("*")
             elif prev_kind == "unit" and is_unit:
