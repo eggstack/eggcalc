@@ -913,11 +913,13 @@ def inspect_text(
                     )
 
         if normalize == "NFKC":
-            normalization_findings.append(
-                NormalizationFinding(
-                    kind="compatibility_fold", message="NFKC changes fullwidth character to ASCII"
+            if norm_changed:
+                normalization_findings.append(
+                    NormalizationFinding(
+                        kind="compatibility_fold",
+                        message="NFKC changes fullwidth character to ASCII",
+                    )
                 )
-            )
         elif normalize == "NFC":
             if norm_changed:
                 normalization_findings.append(
@@ -933,12 +935,13 @@ def inspect_text(
                     )
                 )
         elif normalize == "NFKD":
-            normalization_findings.append(
-                NormalizationFinding(
-                    kind="compatibility_decomposition",
-                    message="NFKD decomposes and converts compatibility characters",
+            if norm_changed:
+                normalization_findings.append(
+                    NormalizationFinding(
+                        kind="compatibility_decomposition",
+                        message="NFKD decomposes and converts compatibility characters",
+                    )
                 )
-            )
 
         normalized_analysis = InspectTextNormalized(
             form=normalize,

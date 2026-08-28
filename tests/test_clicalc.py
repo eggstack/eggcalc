@@ -1583,6 +1583,65 @@ class TestWorkerReap:
         elapsed = time.monotonic() - start
         assert elapsed < 5.0, f"Timeout took {elapsed:.2f}s"
 
+    def test_surviving_worker_is_tracked_outside_mcp_mode(self, monkeypatch):
+        import queue
+
+        import eggcalc.evaluator as ev
+
+        class FakeQueue:
+            def get(self, timeout):
+                raise queue.Empty
+
+            def close(self):
+                pass
+
+            def join_thread(self):
+                pass
+
+        class FakeProcess:
+            pid = 12345
+            exitcode = None
+
+            def start(self):
+                pass
+
+            def is_alive(self):
+                return True
+
+            def terminate(self):
+                pass
+
+            def kill(self):
+                pass
+
+            def join(self, timeout):
+                pass
+
+            def close(self):
+                pass
+
+        class FakeContext:
+            def Queue(self):
+                return FakeQueue()
+
+            def Process(self, **kwargs):
+                return FakeProcess()
+
+        monkeypatch.setattr(ev, "_get_eval_multiprocessing_context", lambda: FakeContext())
+        monkeypatch.setattr(ev, "_mcp_mode", False)
+        with ev._orphaned_eval_lock:
+            ev._orphaned_eval_processes.clear()
+            ev._orphaned_eval_order.clear()
+        try:
+            with pytest.raises(ev.TimeoutError):
+                ev.evaluate_with_timeout("1+1", timeout=0.01)
+            with ev._orphaned_eval_lock:
+                assert len(ev._orphaned_eval_processes) == 1
+        finally:
+            with ev._orphaned_eval_lock:
+                ev._orphaned_eval_processes.clear()
+                ev._orphaned_eval_order.clear()
+
 
 class TestDigitScales:
     """Verify _DIGIT_SCALES produces correct results."""

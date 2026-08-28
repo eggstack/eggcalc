@@ -11578,6 +11578,14 @@ class TestBugFixJsonCompareArrayOrder:
         result = json_compare('["a", 1]', '["a", 2]', ignore_array_order=True)
         assert result["equal"] is False
 
+    @pytest.mark.parametrize("number", ["3.14", "-0.0", "1e5"])
+    def test_numeric_string_equivalence_handles_json_numbers(self, number):
+        from eggcalc.exact.validate import json_compare
+
+        result = json_compare(json.dumps(number), number, numeric_string_equivalence=True)
+        assert result["equal"] is True
+        assert result["same_type"] is True
+
 
 class TestBugFixTierFilterValidation:
     """Bug fix: tools/list tier filter rejects booleans and out-of-range integers."""

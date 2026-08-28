@@ -1423,8 +1423,8 @@ def json_compare(
         b_type = _get_json_type(b_val)
 
         if numeric_string_equivalence and a_type != b_type:
-            if (a_type == "string" and b_type in ("integer", "float")) or (
-                b_type == "string" and a_type in ("integer", "float")
+            if (a_type == "string" and b_type in ("integer", "number")) or (
+                b_type == "string" and a_type in ("integer", "number")
             ):
                 try:
                     num_a = float(a_val)

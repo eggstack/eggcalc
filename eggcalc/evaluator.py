@@ -590,7 +590,7 @@ def _get_function_specs() -> dict[str, FunctionSpec]:
     return _FUNCTION_SPECS
 
 
-# Set of child processes that survived terminate+kill in MCP mode.
+# Set of child processes that survived terminate+kill.
 # Checked by MCP server's _cleanup_orphaned_processes for defensive cleanup.
 # Bounded to prevent unbounded growth across many timeouts; oldest entries
 # are evicted when the cap is reached.
@@ -3462,8 +3462,9 @@ def evaluate_with_timeout(
                     proc.kill()
                     proc.join(timeout=1)
                 # If the process survived terminate+kill, register it for
-                # defensive cleanup by the MCP server's orphan tracker.
-                if proc.is_alive() and _mcp_mode:
+                # defensive cleanup by the orphan tracker regardless of the
+                # caller's mode.
+                if proc.is_alive():
                     with _orphaned_eval_lock:
                         _orphaned_eval_processes.add(proc)
                         _orphaned_eval_order.append(proc)
@@ -3481,6 +3482,11 @@ def evaluate_with_timeout(
                                     oldest.close()
                             except Exception:
                                 pass
+                    logging.warning(
+                        "Evaluation worker survived terminate+kill (pid=%s, exitcode=%s)",
+                        proc.pid,
+                        proc.exitcode,
+                    )
                 try:
                     proc.close()
                 except Exception:

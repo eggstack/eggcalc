@@ -92,7 +92,7 @@ def line_metrics(s: str) -> LineMetrics:
     num_lines = len(lines)
 
     # Check how string ends
-    ends_with_newline = s.endswith("\n") or s.endswith("\r") or s.endswith("\r\n")
+    ends_with_newline = s.endswith(("\n", "\r"))
 
     # Detect newline style
     newline_style = _measure_detect_newline_style(s)

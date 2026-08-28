@@ -648,6 +648,13 @@ class TestMeasure:
         result = line_metrics("hello\r\nworld\r\n")
         assert result["newline_style"] in ("CRLF", "mixed")
 
+    @pytest.mark.parametrize("text", ["hello\n", "hello\r", "hello\r\n"])
+    def test_line_metrics_all_newline_terminators(self, text):
+        assert line_metrics(text)["ends_with_newline"] is True
+
+    def test_line_metrics_without_newline(self):
+        assert line_metrics("hello")["ends_with_newline"] is False
+
     def test_line_metrics_mixed(self):
         result = line_metrics("hello\nworld\r\n")
         assert result["newline_style"] == "mixed"
@@ -787,6 +794,16 @@ class TestSynthesis:
     def test_inspect_text_warnings(self):
         result = inspect_text("hello\u200bworld")
         assert len(result["warnings"]) > 0
+
+    @pytest.mark.parametrize("form", ["NFKC", "NFKD"])
+    def test_inspect_text_normalization_findings_only_when_changed(self, form):
+        unchanged = inspect_text("hello", normalize=form, compare_normalized=True)
+        assert unchanged["normalized"]["changed"] is False
+        assert unchanged["normalization_findings"] == []
+
+        changed = inspect_text("①", normalize=form, compare_normalized=True)
+        assert changed["normalized"]["changed"] is True
+        assert changed["normalization_findings"]
 
     def test_count_chars_target(self):
         result = count_chars("strawberry", "r")
