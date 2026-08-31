@@ -94,6 +94,16 @@ class TestInstanceStateIsolation:
         assert ev1.evaluate("recall()") == 7
         assert ev2.evaluate("recall()") == 0
 
+    def test_named_memory_limit_is_evaluation_error(self):
+        from eggcalc.evaluator import MAX_NAMED_REGISTERS, Evaluator
+
+        ev = Evaluator()
+        ev._memory._registers.update(
+            {f"register_{index}": float(index) for index in range(MAX_NAMED_REGISTERS)}
+        )
+        with pytest.raises(EvaluationError, match="Named register limit reached"):
+            ev.evaluate('store(1, "overflow")')
+
     def test_module_level_setvar_proxies_to_default(self):
         from eggcalc import clearvars, getvar, setvar
 
@@ -216,6 +226,32 @@ class TestCustomUnitCategories:
             assert abs(result.value - 2.0) < 1e-9
         finally:
             self._unregister_custom(units_mod, "xu")
+
+    def test_custom_unit_refreshes_normalization_and_cli_consumers(self):
+        import eggcalc.cli as cli_mod
+        import eggcalc.normalize as normalize_mod
+        import eggcalc.units as units_mod
+
+        self._register_custom(units_mod, "xu", 0.001, "length")
+        try:
+            assert normalize_mod.check_if_number("5xu")["bool"] is True
+            normalized, code = normalize_mod.normalize_expression("5xu")
+            assert code == 0
+            assert normalized == "5*xu"
+
+            compact = evaluate_raw("5xu")
+            assert isinstance(compact, UnitValue)
+            assert compact.unit == "xu"
+            assert compact.value == pytest.approx(5)
+
+            converted = evaluate_raw("5 xu in m")
+            assert isinstance(converted, UnitValue)
+            assert converted.unit == "m"
+            assert converted.value == pytest.approx(0.005)
+            assert "xu" in cli_mod._get_units_by_category()["length"]
+        finally:
+            self._unregister_custom(units_mod, "xu")
+            assert normalize_mod.check_if_number("5xu")["bool"] is False
 
     def test_custom_unit_inferred_category(self):
         import eggcalc.units as units_mod

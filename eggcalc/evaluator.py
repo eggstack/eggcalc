@@ -2977,7 +2977,7 @@ class Evaluator(ast.NodeVisitor):
                 return self.FUNCTIONS[func_name](*plain_args, **kwargs)
             except OverflowError:
                 raise EvaluationError("Result too large") from None
-            except (ValueError, TypeError, ZeroDivisionError) as e:
+            except (ValueError, TypeError, ZeroDivisionError, MemoryError) as e:
                 raise EvaluationError(str(e)) from None
 
         # Callable identity check: built-in unit policies apply only when
@@ -2998,7 +2998,7 @@ class Evaluator(ast.NodeVisitor):
                 return inst_func(*plain_args, **kwargs)
             except OverflowError:
                 raise EvaluationError("Result too large") from None
-            except (ValueError, TypeError, ZeroDivisionError) as e:
+            except (ValueError, TypeError, ZeroDivisionError, MemoryError) as e:
                 raise EvaluationError(str(e)) from None
 
         policy = spec.unit_policy

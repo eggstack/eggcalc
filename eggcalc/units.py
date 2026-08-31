@@ -3538,17 +3538,38 @@ _CUSTOM_UNIT_DEFINITIONS: dict[str, UnitSpec] = {}
 
 
 def _refresh_compatibility_consumers() -> None:
-    """Refresh legacy evaluator bindings after a declaration extension."""
+    """Refresh legacy consumer bindings after a declaration extension."""
     import sys
 
     namespaces = [globals()]
-    evaluator_module = sys.modules.get("eggcalc.evaluator")
-    if evaluator_module is not None:
-        namespaces.append(vars(evaluator_module))
+    for module_name in ("eggcalc.evaluator", "eggcalc.normalize", "eggcalc.cli"):
+        module = sys.modules.get(module_name)
+        if module is not None:
+            namespaces.append(vars(module))
     for namespace in namespaces:
         if "UNIT_ALIASES" in namespace:
             namespace["UNIT_ALIASES"] = UNIT_ALIASES
             namespace["_SORTED_UNIT_ALIASES"] = sorted(UNIT_ALIASES, key=len, reverse=True)
+        if "UNIT_CATEGORIES" in namespace:
+            namespace["UNIT_CATEGORIES"] = UNIT_CATEGORIES
+
+    normalize_namespaces = []
+    normalize_module = sys.modules.get("eggcalc.normalize")
+    if normalize_module is not None:
+        normalize_namespaces.append(vars(normalize_module))
+    if "_DECIMAL_NUMBER_TOKEN_RE" in globals():
+        normalize_namespaces.append(globals())
+    for normalize_namespace in normalize_namespaces:
+        units_by_length = sorted(UNIT_ALIASES, key=len, reverse=True)
+        unit_names = "|".join(re.escape(unit) for unit in units_by_length)
+        normalize_namespace["_UNITS_BY_LENGTH"] = units_by_length
+        normalize_namespace["_UNIT_NUMBER_RE"] = re.compile(
+            rf"^([+-]?{normalize_namespace['_DECIMAL_NUMBER_TOKEN_RE']})(?:{unit_names})$"
+        )
+        normalize_namespace["_UNIT_NAMES_ALTERNATION"] = unit_names
+        check_if_number = normalize_namespace.get("check_if_number")
+        if check_if_number is not None:
+            check_if_number.cache_clear()
 
 
 def _install_generated_adapters(
