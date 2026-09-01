@@ -152,3 +152,59 @@ def test_unit_registry_length_is_canonical_count():
     registry = build_unit_registry()
     assert len(registry) == len(registry.definitions)
     assert len(registry.all_aliases) > len(registry)
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-01 bugs.md: abs(complex) leaks OverflowError at three call sites,
+# and visit_BinOp is missing the MAX_RESULT_VALUE magnitude check for complex.
+# ---------------------------------------------------------------------------
+class TestComplexAbsOverflow:
+    """abs(complex) raises OverflowError for |x| > ~1.97e308 with finite components.
+
+    All three call sites (_check_result_size for UnitValue+complex, for bare
+    complex, and _safe_pow's post-pow magnitude check) must catch it.
+    """
+
+    def test_balance_overflow_at_check_result_size_bare_complex(self):
+        from eggcalc.evaluator import EvaluationError, evaluate
+
+        with pytest.raises(EvaluationError, match="Result too large"):
+            evaluate("(7e307+7e307j) + (7e307+7e307j)")
+
+    def test_complex_with_huge_components_at_check_result_size(self):
+        from eggcalc.evaluator import EvaluationError, evaluate
+
+        with pytest.raises(EvaluationError, match="Result too large"):
+            evaluate("(1.4e308+1.4e308j) + 0j")
+
+    def test_check_result_size_unitvalue_complex_overflow(self):
+        from eggcalc.evaluator import EvaluationError, _check_result_size
+        from eggcalc.units import UnitValue
+
+        value = object.__new__(UnitValue)
+        value.value = complex(1.4e308, 1.4e308)
+        with pytest.raises(EvaluationError, match="Result too large"):
+            _check_result_size(value)
+
+    def test_safe_pow_complex_result_overflow_at_abs(self):
+        from eggcalc.evaluator import EvaluationError, _safe_pow
+
+        with pytest.raises(EvaluationError, match="Result too large"):
+            _safe_pow(complex(1.4e308, 1.4e308), 1.0)
+
+    def test_check_result_size_bare_complex_overflow(self):
+        from eggcalc.evaluator import EvaluationError, _check_result_size
+
+        with pytest.raises(EvaluationError, match="Result too large"):
+            _check_result_size(complex(1.4e308, 1.4e308))
+
+    def test_finite_complex_just_under_threshold_is_accepted(self):
+        from eggcalc.evaluator import evaluate
+
+        assert evaluate("(1e308+0j)") == complex(1e308, 0.0)
+
+    def test_normal_complex_arithmetic_still_works(self):
+        from eggcalc.evaluator import evaluate
+
+        assert evaluate("(3+4j) * (3-4j)") == complex(25, 0)
+        assert evaluate("abs(3+4j)") == 5.0

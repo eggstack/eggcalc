@@ -637,8 +637,11 @@ def _check_result_size(result: Any) -> Any:
                 raise EvaluationError("Result is not a number")
             if math.isinf(result.value.real) or math.isinf(result.value.imag):
                 raise EvaluationError("Result too large")
-            if abs(result.value) > MAX_RESULT_VALUE:
-                raise EvaluationError("Result too large")
+            try:
+                if abs(result.value) > MAX_RESULT_VALUE:
+                    raise EvaluationError("Result too large")
+            except OverflowError:
+                raise EvaluationError("Result too large") from None
         elif isinstance(result.value, int) and not isinstance(result.value, bool):
             # Int values: skip float-specific checks, rely on digit count below
             pass
@@ -660,8 +663,11 @@ def _check_result_size(result: Any) -> Any:
             raise EvaluationError("Result is not a number")
         if math.isinf(result.real) or math.isinf(result.imag):
             raise EvaluationError("Result too large")
-        if abs(result) > MAX_RESULT_VALUE:
-            raise EvaluationError("Result too large")
+        try:
+            if abs(result) > MAX_RESULT_VALUE:
+                raise EvaluationError("Result too large")
+        except OverflowError:
+            raise EvaluationError("Result too large") from None
     elif isinstance(result, float):
         if math.isnan(result):
             raise EvaluationError("Result is not a number")
@@ -1064,8 +1070,12 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
             raise EvaluationError("Result too large")
     # For int results, skip the magnitude check — _check_result_size enforces
     # MAX_RESULT_DIGITS which is the correct limit for arbitrary-precision ints.
-    if not isinstance(result, int) and abs(result) > MAX_RESULT_VALUE:
-        raise EvaluationError("Result too large")
+    if not isinstance(result, int):
+        try:
+            if abs(result) > MAX_RESULT_VALUE:
+                raise EvaluationError("Result too large")
+        except OverflowError:
+            raise EvaluationError("Result too large") from None
     return cast(float | int | complex, result)
 
 
@@ -2805,6 +2815,11 @@ class Evaluator(ast.NodeVisitor):
                 or math.isinf(result.imag)
             ):
                 raise EvaluationError("Result too large")
+            try:
+                if abs(result) > MAX_RESULT_VALUE:
+                    raise EvaluationError("Result too large")
+            except OverflowError:
+                raise EvaluationError("Result too large") from None
         elif isinstance(result, float):
             if math.isnan(result) or math.isinf(result):
                 raise EvaluationError("Result too large")
