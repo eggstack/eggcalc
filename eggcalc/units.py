@@ -3390,7 +3390,7 @@ class _LazyUnitConversions(Mapping):
         if source_def.dimension != target_def.dimension:
             raise KeyError(key)
         if source_def.canonical == target_def.canonical:
-            raise KeyError(key)
+            return 1.0
         factor: float = source_def.scale / target_def.scale
         return factor
 
@@ -3802,7 +3802,9 @@ def convert_temperature(value: float, from_unit: str, to_unit: str) -> float:  #
     base_value = value * source_definition.scale + source_definition.offset
     # Tolerance matches the near-zero snap below so float noise at exactly
     # absolute zero (e.g. -459.67 F -> 0 K) is not rejected.
-    if base_value < -1e-9:
+    if math.isclose(base_value, 0.0, rel_tol=0.0, abs_tol=1e-12):
+        base_value = 0.0
+    if base_value < 0.0:
         raise ValueError("Temperature cannot be below absolute zero")
     result = (base_value - target_definition.offset) / target_definition.scale
     if not math.isfinite(result):

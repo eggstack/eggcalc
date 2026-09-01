@@ -518,7 +518,7 @@ def _success_response(
     return envelope
 
 
-def math_eval(expression: str) -> dict:
+def math_eval(expression: str, timeout: float = 5.0) -> dict:
     """Evaluate a math expression.
 
     Args:
@@ -540,7 +540,7 @@ def math_eval(expression: str) -> dict:
             tool="math_eval",
         )
     try:
-        result = evaluate_with_timeout(expression, timeout=5.0)
+        result = evaluate_with_timeout(expression, timeout=timeout)
         if hasattr(result, 'value') and hasattr(result, 'unit'):
             response_data: dict[str, Any] = {
                 "value": str(result.value),
@@ -679,7 +679,7 @@ def unit_info(unit: str) -> dict:
         Success response with unit information.
     """
     try:
-        from ..units import UNIT_ALIASES, UNIT_BASE, UNIT_CATEGORIES, normalize_unit
+        from ..units import UNIT_ALIASES, UNIT_CATEGORIES, normalize_unit
 
         if (err := _require_str(unit, "unit", "unit_info")) is not None:
             return err
@@ -690,11 +690,6 @@ def unit_info(unit: str) -> dict:
 
         canonical = UNIT_ALIASES[normalized]
         category = UNIT_CATEGORIES.get(canonical)
-        if category is None:
-            for base_unit, units_dict in UNIT_BASE.items():
-                if canonical in units_dict:
-                    category = base_unit
-                    break
 
         return _success_response(
             {

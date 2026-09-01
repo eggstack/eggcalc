@@ -67,6 +67,10 @@ _VALID_EVAL_TOKEN_RE = re.compile(
 # to the unit instead of the "<num>*<unit>" product.
 _UNIT_POWER_EXPONENT_RE: re.Pattern[str] = re.compile(r"\*\*\s*([+-]?\d+)")
 
+_POSTFIX_FACTORIAL_RE: re.Pattern[str] = re.compile(
+    r"(\d+(?:\.\d+)?|\((?:[^()]*|\([^()]*\))*\)|[a-zA-Z_]\w*\((?:[^()]*|\([^()]*\))*\))(\!+)"
+)
+
 
 def _is_best_case_variant(input_text: str, unit: str) -> bool:
     """Return True when *unit* is the registry spelling that best matches the
@@ -523,6 +527,19 @@ def _build_config() -> tuple[dict, dict]:
         ),
         "valid_operations": re.compile(
             f"^({'|'.join([re.escape(s) for s in symbols] + [re.escape(f) for f in FUNCTION_MAPPINGS.values()] + [re.escape(c) for c in CONSTANT_WORDS.keys()])}){{1}}$"
+        ),
+        "word_to_number": (
+            re.compile(rf"\b(?:{'|'.join(re.escape(word) for word in sorted_word_to_number)})\b")
+            if sorted_word_to_number
+            else re.compile(r"(?!x)x")
+        ),
+        "word_to_all": (
+            re.compile(
+                rf"\b(?:{'|'.join(re.escape(word) for word in sorted_all_words)})\b",
+                flags=re.IGNORECASE,
+            )
+            if sorted_all_words
+            else re.compile(r"(?!x)x", flags=re.IGNORECASE)
         ),
     }
 
@@ -1060,10 +1077,21 @@ def convert_from_human_handler(
         if not is_number["bool"]:
             replaced = tokens[i]
             word_to_number = operators.get("word_to_number", {})
-            for word, num_val in word_to_number.items():
-                # Word-boundary replacement so substrings inside other words
-                # (e.g. "one" inside "None", "Phone", "stone") are not mutated.
-                replaced = re.sub(rf"\b{re.escape(word)}\b", f"@{num_val}", replaced)
+            word_pattern = patterns.get("word_to_number")
+            if word_pattern is None and word_to_number:
+                word_pattern = re.compile(
+                    rf"\b(?:{'|'.join(re.escape(word) for word in word_to_number)})\b"
+                )
+            if word_pattern is not None:
+                number_mapping: Mapping[str, str] = word_to_number
+
+                def _replace_number(
+                    match: re.Match[str], mapping: Mapping[str, str] = number_mapping
+                ) -> str:
+                    replacement = mapping.get(match.group(0))
+                    return match.group(0) if replacement is None else f"@{replacement}"
+
+                replaced = word_pattern.sub(_replace_number, replaced)
             tokens[i] = {0: replaced, 1: is_number}
         else:
             tokens[i] = {0: tokens[i], 1: is_number}
@@ -2383,23 +2411,29 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression,
         flags=re.IGNORECASE,
     )
-    for word, replacement in sorted(word_to_all.items(), key=lambda x: len(x[0]), reverse=True):
-        # Special case: don't convert "in"/"into" when it appears to be a unit suffix
-        # (preceded by a digit, no following unit, or followed by something that
-        # isn't a unit). E.g., "5 in" or "5 in to cm" where "in" is a unit, not a keyword.
-        if word.lower() in ("in", "into"):
-            # Preserve "in" as a unit (not keyword) when:
-            # 1. At end of expression ("5 in" = 5 inches), OR
-            # 2. Followed by a conversion keyword ("in"/"to"/"as") - e.g., "5 in in cm"
-            if re.search(
+    word_pattern = patterns.get("word_to_all")
+    if word_pattern is None and word_to_all:
+        word_pattern = re.compile(
+            rf"\b(?:{'|'.join(re.escape(word) for word in sorted(word_to_all, key=len, reverse=True))})\b",
+            flags=re.IGNORECASE,
+        )
+    if word_pattern is not None:
+        word_to_all_lower: dict[str, str] = {
+            word.lower(): str(replacement) for word, replacement in word_to_all.items()
+        }
+
+        def _replace_word(match: re.Match[str]) -> str:
+            word = match.group(0).lower()
+            # Preserve "in"/"into" when it appears to be an inch unit.
+            if word in ("in", "into") and re.search(
                 r"(?:\d|\))\s+" + re.escape(word) + r"(?:\s*$|\s+(?:in|to|as)\b)",
                 expression,
                 flags=re.IGNORECASE,
             ):
-                continue
-        expression = re.sub(
-            r"\b" + re.escape(word) + r"\b", replacement, expression, flags=re.IGNORECASE
-        )
+                return match.group(0)
+            return word_to_all_lower.get(word, match.group(0))
+
+        expression = word_pattern.sub(_replace_word, expression)
 
     # Strip "and" only after multi-word operators such as "bit and" have
     # been replaced. This preserves both number filler and bitwise syntax.
@@ -2764,11 +2798,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         prev = expression
         # Match: number!, (expr)!, or func(args)!
         # The func(args) pattern matches any function call before !
-        expression = re.sub(
-            r"(\d+(?:\.\d+)?|\((?:[^()]*|\([^()]*\))*\)|[a-zA-Z_]\w*\((?:[^()]*|\([^()]*\))*\))(\!+)",
-            _replace_factorial,
-            expression,
-        )
+        expression = _POSTFIX_FACTORIAL_RE.sub(_replace_factorial, expression)
 
     expression = re.sub(r"(?<=\))(?=factorial\()", "*", expression)
 

@@ -794,6 +794,7 @@ def _ensure_config_loaded() -> None:
 _cache: OrderedDict[str, Any] = OrderedDict()
 _cache_lock = threading.Lock()
 _cache_bytes: int = 0
+_cache_entry_sizes: dict[str, int] = {}
 
 
 def _deep_size(value: Any, seen: set[int]) -> int:
@@ -821,6 +822,12 @@ def _entry_size(key: str, value: Any) -> int:
     return _deep_size(key, set()) + _deep_size(value, set())
 
 
+def _pop_cache_entry_size(key: str, value: Any) -> int:
+    """Remove and return a cached size, calculating it only for legacy entries."""
+    size = _cache_entry_sizes.pop(key, None)
+    return _entry_size(key, value) if size is None else size
+
+
 def _evict_until_under_cap() -> None:
     """Evict LRU entries from _cache until total size <= MAX_CACHE_BYTES.
 
@@ -832,7 +839,7 @@ def _evict_until_under_cap() -> None:
     global _cache_bytes
     while _cache and _cache_bytes > MAX_CACHE_BYTES:
         old_key, old_value = _cache.popitem(last=False)
-        _cache_bytes -= _entry_size(old_key, old_value)
+        _cache_bytes -= _pop_cache_entry_size(old_key, old_value)
 
 
 def _remove_cache_entry(expression: str) -> None:
@@ -841,7 +848,7 @@ def _remove_cache_entry(expression: str) -> None:
     with _cache_lock:
         if expression in _cache:
             old_value = _cache.pop(expression)
-            _cache_bytes -= _entry_size(expression, old_value)
+            _cache_bytes -= _pop_cache_entry_size(expression, old_value)
 
 
 def _clear_global_cache() -> None:
@@ -858,6 +865,7 @@ def _clear_global_cache() -> None:
     with cache_lock:
         _config_generation += 1
         cache.clear()
+        _cache_entry_sizes.clear()
         _cache_bytes = 0
 
 
@@ -876,12 +884,14 @@ def _store_cache_entry(expression: str, result: Any) -> None:
     global _cache_bytes
     if expression in _cache:
         old_value = _cache.pop(expression)
-        _cache_bytes -= _entry_size(expression, old_value)
+        _cache_bytes -= _pop_cache_entry_size(expression, old_value)
     while len(_cache) >= DEFAULT_CACHE_SIZE:
         old_key, old_value = _cache.popitem(last=False)
-        _cache_bytes -= _entry_size(old_key, old_value)
+        _cache_bytes -= _pop_cache_entry_size(old_key, old_value)
     _cache[expression] = result
-    _cache_bytes += _entry_size(expression, result)
+    entry_size = _entry_size(expression, result)
+    _cache_entry_sizes[expression] = entry_size
+    _cache_bytes += entry_size
     _evict_until_under_cap()
 
 
@@ -1092,8 +1102,15 @@ def _int_digit_count(n: int) -> int:
         return len(s) - (1 if s.startswith('-') else 0)
     except ValueError:
         # Python 3.11+ raises ValueError for integers with >4300 str digits
-        # Use bit_length as an upper bound: digits <= bit_length * log10(2) + 1
-        return int(n.bit_length() * math.log10(2)) + 1
+        # Estimate from the bit length, then correct against powers of ten so
+        # the result remains exact without changing the process-wide str limit.
+        magnitude = abs(n)
+        digits = max(1, int((magnitude.bit_length() - 1) * math.log10(2)) + 1)
+        while magnitude >= 10**digits:
+            digits += 1
+        while digits > 1 and magnitude < 10 ** (digits - 1):
+            digits -= 1
+        return digits
 
 
 def _safe_factorial(n: int) -> int:
@@ -1508,13 +1525,16 @@ def _prime_factors(n: int) -> str:
         return str(n)
 
     factors: dict[int, int] = {}
-    d = 2
     temp = n
+    while temp % 2 == 0:
+        factors[2] = factors.get(2, 0) + 1
+        temp //= 2
+    d = 3
     while d * d <= temp:
         while temp % d == 0:
             factors[d] = factors.get(d, 0) + 1
             temp //= d
-        d += 1
+        d += 2
     if temp > 1:
         factors[temp] = factors.get(temp, 0) + 1
 
@@ -3602,7 +3622,9 @@ class EggCalcApp:
         self._enable_cache = enable_cache
         self._cache: OrderedDict[str, Any] | None = OrderedDict() if enable_cache else None
         self._lock = threading.Lock()
-        self._cache_max_size = max(0, cache_size)
+        if cache_size < 0:
+            raise ValueError("cache_size must be non-negative")
+        self._cache_max_size = cache_size
         self._evaluator._state_change_callback = self.clear_cache
 
     def calculate(self, expression: str) -> Any:

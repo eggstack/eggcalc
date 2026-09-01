@@ -1042,13 +1042,15 @@ class ToolExecutor:
             reservation = self._reserve()
             if reservation is None:
                 max_inflight = self._config.max_tool_workers + self._config.max_tool_queue_size
+                with self._accounting_lock:
+                    total_inflight = self._total_inflight
                 return {
                     "jsonrpc": "2.0",
                     "id": request_id,
                     "error": {
                         "code": -32000,
                         "message": (
-                            f"Server busy: {self._total_inflight} requests in flight "
+                            f"Server busy: {total_inflight} requests in flight "
                             f"(limit {max_inflight})"
                         ),
                     },
@@ -1062,7 +1064,12 @@ class ToolExecutor:
                     if not self._start(reservation):
                         return None  # Cancelled before start
                     try:
-                        return _run_handler_in_thread(handler, arguments, active_evaluator)
+                        return _run_handler_in_thread(
+                            handler,
+                            arguments,
+                            active_evaluator,
+                            timeout_seconds=self._config.max_tool_timeout_seconds,
+                        )
                     finally:
                         # Active completion releases active and total exactly once.
                         self._release_active(reservation)
@@ -2452,6 +2459,7 @@ def _run_handler_in_thread(
     handler: Any,
     arguments: dict[str, Any],
     evaluator: _evaluator.Evaluator | None = None,
+    timeout_seconds: float | None = None,
 ) -> Any:
     """Run a tool handler on a pool thread, returning the result or raising.
 
@@ -2460,6 +2468,8 @@ def _run_handler_in_thread(
     the module-level default. This binds MCP math execution to the
     server-owned evaluator without modifying handler signatures.
     """
+    if timeout_seconds is not None and handler is math_eval:
+        arguments = {**arguments, "timeout": timeout_seconds}
     if evaluator is not None:
         token = _evaluator._server_evaluator.set(evaluator)
         try:

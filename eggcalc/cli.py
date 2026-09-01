@@ -805,10 +805,10 @@ def maybe_load_cli_config() -> None:
 
     if os.environ.get("EGGCALC_NO_CONFIG", ""):
         return
-    loader = globals().get("load_user_config")
-    if loader is None:
-        loader = __import__("eggcalc.evaluator", fromlist=["load_user_config"]).load_user_config
-    loader()
+    if globals().get("EGGCALC_SINGLE_FILE"):
+        globals()["load_user_config"]()
+    else:
+        __import__("eggcalc.evaluator", fromlist=["load_user_config"]).load_user_config()
 
 
 def main() -> int:

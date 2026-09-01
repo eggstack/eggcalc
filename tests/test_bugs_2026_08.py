@@ -9,7 +9,13 @@ import pytest
 
 from eggcalc import EvaluationError, evaluate, evaluate_raw
 from eggcalc.cli import _cli_text_command, _CommandStatus, _run_repl, run_cli
-from eggcalc.evaluator import _polar, _root_unit_expression, _safe_pow
+from eggcalc.evaluator import (
+    _int_digit_count,
+    _polar,
+    _prime_factors,
+    _root_unit_expression,
+    _safe_pow,
+)
 from eggcalc.exact.primitives import detect_newline_style
 from eggcalc.exact.repo_audit import _classify_path
 from eggcalc.exact.shell import shell_split
@@ -17,7 +23,7 @@ from eggcalc.exact.synthesis import _detect_special_sequences, text_window
 from eggcalc.exact.validate import _check_pattern_complexity, regex_safety_check, validate_json
 from eggcalc.mcp.server import McpServer, McpSession, McpSessionState, handle_request
 from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression, normalize_text
-from eggcalc.units import UnitValue, convert_temperature
+from eggcalc.units import UNIT_CONVERSIONS, UnitValue, convert_temperature
 
 
 def test_multi_word_number_misses_do_not_scan_a_monolithic_regex():
@@ -347,6 +353,63 @@ def test_temperature_below_absolute_zero_is_rejected():
         UnitValue(-1, "K").convert_to("C")
     with pytest.raises(ValueError, match="absolute zero"):
         convert_temperature(-1, "K", "C")
+
+
+def test_temperature_near_absolute_zero_is_snapped_before_guard():
+    assert convert_temperature(-5e-13, "K", "C") == pytest.approx(-273.15)
+    with pytest.raises(ValueError, match="absolute zero"):
+        convert_temperature(-5e-10, "K", "C")
+
+
+def test_large_integer_digit_count_is_exact():
+    assert _int_digit_count(10**4300 - 1) == 4300
+    assert _int_digit_count(-(10**4300 - 1)) == 4300
+
+
+def test_prime_factors_skip_even_candidates_without_changing_result():
+    assert _prime_factors(2**8 * 3**2 * 11) == "2^8 × 3^2 × 11"
+
+
+def test_unit_conversion_mapping_returns_identity_factor():
+    assert UNIT_CONVERSIONS[("m", "m")] == 1.0
+    assert UNIT_CONVERSIONS[("meter", "m")] == 1.0
+    assert ("m", "m") in UNIT_CONVERSIONS
+
+
+def test_negative_app_cache_size_is_rejected():
+    from eggcalc import EggCalcApp
+
+    with pytest.raises(ValueError, match="cache_size"):
+        EggCalcApp(cache_size=-1)
+
+
+def test_pow_unit_guard_and_normalized_unit_power():
+    with pytest.raises(EvaluationError, match="unit"):
+        evaluate("2**(5*m)")
+    result = evaluate_raw("2**5m")
+    assert isinstance(result, UnitValue)
+    assert result.value == 32
+    assert result.unit == "m"
+
+
+def test_mcp_math_eval_uses_server_timeout(monkeypatch):
+    from eggcalc.mcp import tools as mcp_tools
+    from eggcalc.mcp.server import McpServerConfig, ToolExecutor, ToolRegistry
+
+    calls = []
+
+    def fake_evaluate(expression, timeout):
+        calls.append((expression, timeout))
+        return 4
+
+    monkeypatch.setattr(mcp_tools, "evaluate_with_timeout", fake_evaluate)
+    executor = ToolExecutor(McpServerConfig(max_tool_timeout_seconds=7), ToolRegistry())
+    try:
+        response = executor.call_tool("math_eval", {"expression": "2+2"}, request_id="timeout")
+    finally:
+        executor.close()
+    assert response["result"]["content"]
+    assert calls == [("2+2", 7)]
 
 
 def test_compact_units_are_case_insensitive_for_multi_character_symbols():
