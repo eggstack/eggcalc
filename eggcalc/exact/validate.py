@@ -1611,7 +1611,6 @@ def json_compare(
                         b_preview=f"{len(b_val)} items",
                     )
                 )
-                return
 
             if ignore_array_order and _is_serializable(a_val) and _is_serializable(b_val):
 
@@ -1635,8 +1634,8 @@ def json_compare(
                 norm_b = sorted((_canonicalize_for_compare(v) for v in b_val), key=_sort_key)
                 if norm_a == norm_b:
                     return
-                for i in range(len(norm_a)):
-                    _compare_values(f"{path}/[{i}]", norm_a[i], norm_b[i], _depth + 1)
+                for i, (item_a, item_b) in enumerate(zip(norm_a, norm_b)):
+                    _compare_values(f"{path}/[{i}]", item_a, item_b, _depth + 1)
             else:
                 for i, (item_a, item_b) in enumerate(zip(a_val, b_val)):
                     _compare_values(f"{path}/[{i}]", item_a, item_b, _depth + 1)
@@ -1990,11 +1989,12 @@ def _build_found_result(value: Any, pointer: str, max_output_chars: int) -> Json
             summary="null",
         )
     else:
+        value_type = _get_json_type(value)
         return JsonExtractResult(
             valid_json=True,
             found=True,
             pointer=pointer,
-            value_type="number",
+            value_type=value_type,
             value=value,
             preview=str(value),
             child_keys=None,

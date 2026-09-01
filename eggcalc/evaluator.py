@@ -683,6 +683,8 @@ def _check_result_size(result: Any) -> Any:
 
 def register_constant(name: str, value: float) -> None:
     """Register a user-defined constant (thread-safe)."""
+    if not name.isidentifier():
+        raise ValueError(f"name must be a valid identifier, got {name!r}")
     with _lock:
         _default_evaluator.CONSTANTS[name] = value
     _clear_global_cache()
@@ -901,12 +903,16 @@ def _store_cache_entry(expression: str, result: Any) -> None:
     _evict_until_under_cap()
 
 
-def _normalize_for_evaluation(expression: str) -> str:
+def _normalize_for_evaluation(expression: str, function_names: dict[str, Any] | None = None) -> str:
     """Normalize an expression and raise the public error for invalid input."""
     from .normalize import NORMALIZE, PATTERNS, normalize_expression
 
     normalized, exit_code = normalize_expression(
-        expression, NORMALIZE, PATTERNS, skip_validation=True
+        expression,
+        NORMALIZE,
+        PATTERNS,
+        skip_validation=True,
+        function_names=function_names,
     )
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
@@ -3240,12 +3246,16 @@ def evaluate_raw(expression: str, _evaluator: Evaluator | None = None) -> Any:
     _ensure_config_loaded()
     from .normalize import NORMALIZE, PATTERNS, normalize_expression
 
+    ev = _evaluator if _evaluator is not None else (_server_evaluator.get() or _default_evaluator)
     normalized, exit_code = normalize_expression(
-        expression, NORMALIZE, PATTERNS, skip_validation=True
+        expression,
+        NORMALIZE,
+        PATTERNS,
+        skip_validation=True,
+        function_names=ev.FUNCTIONS,
     )
     if exit_code != 0:
         raise EvaluationError(f"Invalid expression: {expression}")
-    ev = _evaluator if _evaluator is not None else (_server_evaluator.get() or _default_evaluator)
     return ev.evaluate(normalized)
 
 
@@ -3640,6 +3650,8 @@ class EggCalcApp:
         if cache_size < 0:
             raise ValueError("cache_size must be non-negative")
         self._cache_max_size = cache_size
+        self._cache_bytes = 0
+        self._cache_entry_sizes: dict[str, int] = {}
         self._evaluator._state_change_callback = self.clear_cache
 
     def calculate(self, expression: str) -> Any:
@@ -3672,8 +3684,19 @@ class EggCalcApp:
                 if self._cache_max_size == 0:
                     return result
                 while len(self._cache) >= self._cache_max_size:
-                    self._cache.popitem(last=False)
+                    old_key, old_value = self._cache.popitem(last=False)
+                    self._cache_bytes -= self._cache_entry_sizes.pop(
+                        old_key, _entry_size(old_key, old_value)
+                    )
                 self._cache[expression] = result
+                entry_size = _entry_size(expression, result)
+                self._cache_entry_sizes[expression] = entry_size
+                self._cache_bytes += entry_size
+                while self._cache_bytes > MAX_CACHE_BYTES and len(self._cache) > 1:
+                    old_key, old_value = self._cache.popitem(last=False)
+                    self._cache_bytes -= self._cache_entry_sizes.pop(
+                        old_key, _entry_size(old_key, old_value)
+                    )
 
         return result
 
@@ -3698,9 +3721,8 @@ class EggCalcApp:
         """Internal evaluation that uses the instance's evaluator."""
         return self._evaluator.evaluate(self._normalize_expression(expression))
 
-    @staticmethod
-    def _normalize_expression(expression: str) -> str:
-        return _normalize_for_evaluation(expression)
+    def _normalize_expression(self, expression: str) -> str:
+        return _normalize_for_evaluation(expression, self._evaluator.FUNCTIONS)
 
     def register_constant(self, name: str, value: float) -> None:
         """Register a custom constant on this instance (thread-safe).
@@ -3708,6 +3730,8 @@ class EggCalcApp:
         Unlike the global register_constant function, this only affects
         this EggCalcApp instance.
         """
+        if not name.isidentifier():
+            raise ValueError(f"name must be a valid identifier, got {name!r}")
         with self._lock:
             self._evaluator.CONSTANTS[name] = value
         self.clear_cache()
@@ -3718,6 +3742,10 @@ class EggCalcApp:
         Unlike the global register_function function, this only affects
         this EggCalcApp instance.
         """
+        if not callable(func):
+            raise TypeError(f"func must be callable, got {type(func).__name__}")
+        if not name.isidentifier():
+            raise ValueError(f"name must be a valid identifier, got {name!r}")
         with self._lock:
             self._evaluator.FUNCTIONS[name] = func
         self.clear_cache()
@@ -3727,6 +3755,8 @@ class EggCalcApp:
         if self._cache is not None:
             with self._lock:
                 self._cache.clear()
+                self._cache_entry_sizes.clear()
+                self._cache_bytes = 0
 
     @property
     def cache_size(self) -> int:

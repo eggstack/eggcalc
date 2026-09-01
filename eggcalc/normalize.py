@@ -671,11 +671,16 @@ def check_if_number(token: str) -> Mapping[str, Any]:
     return result(False, token, type(token))
 
 
-def validate_for_eval(tokens: list, patterns: Mapping[str, Pattern[str]]) -> bool:
+def validate_for_eval(
+    tokens: list,
+    patterns: Mapping[str, Pattern[str]],
+    function_names: set[str] | None = None,
+) -> bool:
     """Validate that all tokens are either numbers, valid operations, units, or known constants."""
     from .evaluator import _default_evaluator
 
     known_constants = set(_default_evaluator.CONSTANTS.keys())
+    known_functions = _IMPLICIT_MUL_FUNCS | (function_names or set())
 
     for token in tokens:
         # Skip tokens containing parentheses — these are function calls or
@@ -700,6 +705,8 @@ def validate_for_eval(tokens: list, patterns: Mapping[str, Pattern[str]]) -> boo
                 continue  # Balanced parens — skip validation, evaluator handles it
             # Unbalanced — fall through to validate the raw token
         if not check_if_number(check_token)["bool"]:
+            if check_token in known_functions:
+                continue
             if not patterns["valid_operations"].match(check_token):
                 if not is_unit(check_token):
                     if check_token not in known_constants:
@@ -710,7 +717,7 @@ def validate_for_eval(tokens: list, patterns: Mapping[str, Pattern[str]]) -> boo
                         if _VALID_EVAL_TOKEN_RE.match(check_token):
                             continue
                         # Allow unary minus before function names (e.g., "-sqrt")
-                        if check_token.startswith("-") and check_token[1:] in _IMPLICIT_MUL_FUNCS:
+                        if check_token.startswith("-") and check_token[1:] in known_functions:
                             continue
                         raise ValueError(f"Invalid token: {check_token}")
     return True
@@ -2199,6 +2206,8 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     if len(expression) > MAX_INPUT_LENGTH:
         raise ValueError(f"Input too long (max {MAX_INPUT_LENGTH} characters)")
 
+    implicit_mul_funcs = _IMPLICIT_MUL_FUNCS | set(operators["functions"])
+
     # Replace unicode math operators with ASCII equivalents before any
     # tokenization or whitespace processing. Must happen early because
     # the whitespace-removal loop treats these as alpha characters.
@@ -2635,7 +2644,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     # Join space-separated number sequences with + for proper evaluation.
     # Compound numbers like "twenty one" are already resolved by _MULTI_WORD_NUMBERS,
     # but fallback sequences (e.g., from unrecognized patterns) still need joining.
-    expression = _join_number_parts(expression)
+    expression = _join_number_parts(expression, set(operators["functions"]))
 
     # Replace whitespace outside parentheses with nothing
     # Preserve whitespace inside parentheses to separate function args
@@ -2696,7 +2705,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
                 candidate = "".join(trail)
                 # Skip if the candidate is a unit alias (e.g., "30 min" -> "30min", not "30*min()")
                 if (
-                    (candidate in _IMPLICIT_MUL_FUNCS or candidate in _IMPLICIT_MUL_CONSTANTS)
+                    (candidate in implicit_mul_funcs or candidate in _IMPLICIT_MUL_CONSTANTS)
                     and candidate not in UNIT_ALIASES
                     and candidate.lower() not in UNIT_ALIASES
                 ):
@@ -2704,7 +2713,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
                     for c in candidate:
                         result.append(c)
                     i = j
-                    prev_was_func_end = candidate in _IMPLICIT_MUL_FUNCS
+                    prev_was_func_end = candidate in implicit_mul_funcs
                     continue
 
             if prev_was_func_end and char.isdigit():
@@ -2731,10 +2740,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
                 full_name = alpha_run + char
                 # If the full name is a function in the implicit-mul set,
                 # do NOT insert '*' — keep them together.
-                if (
-                    full_name not in _IMPLICIT_MUL_FUNCS
-                    and full_name not in _IMPLICIT_MUL_CONSTANTS
-                ):
+                if full_name not in implicit_mul_funcs and full_name not in _IMPLICIT_MUL_CONSTANTS:
                     result.append("*")
             if result and result[-1] == ")" and (char.isdigit() or char == "("):
                 # Implicit multiplication: ")(" or ")<digit>" -> ")*(" or ")*<digit>"
@@ -2772,7 +2778,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
                     # alpha run to complete.
                     prev_was_func_end = False
                 else:
-                    prev_was_func_end = cand in _IMPLICIT_MUL_FUNCS
+                    prev_was_func_end = cand in implicit_mul_funcs
             else:
                 prev_was_func_end = False
             i += 1
@@ -2805,7 +2811,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     return expression
 
 
-def _join_number_parts(expression: str) -> str:
+def _join_number_parts(expression: str, function_names: set[str] | None = None) -> str:
     """Join space-separated number parts with + operators.
 
     Detects sequences of space-separated tokens that are all numbers
@@ -2835,7 +2841,7 @@ def _join_number_parts(expression: str) -> str:
     # multiplication. Keep compact expressions ("20*20") untouched because the
     # later split_at_operators pass already handles them.
     expanded_tokens: list[str] = []
-    function_names = set(FUNCTION_MAPPINGS)
+    function_names = set(FUNCTION_MAPPINGS) if function_names is None else function_names
     # Shared operator tokenizer for both boundary splitting and internal
     # splitting of operator-only tokens.
     operator_split_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^,])")
@@ -3484,6 +3490,7 @@ def normalize_expression(
     operators: dict | None = None,
     patterns: Mapping[str, Pattern[str]] | None = None,
     skip_validation: bool = False,
+    function_names: Mapping[str, Any] | None = None,
 ) -> tuple[str, int]:
     """Normalize an expression without evaluating it.
 
@@ -3494,6 +3501,7 @@ def normalize_expression(
         operators: The operators configuration dict
         patterns: The compiled regex patterns dict
         skip_validation: If True, skip token validation (for custom evaluators)
+        function_names: Additional function names recognized by the normalizer.
 
     Returns:
         tuple: (normalized_expression, exit_code) - normalized_expression is the
@@ -3503,6 +3511,15 @@ def normalize_expression(
         operators = NORMALIZE
     if patterns is None:
         patterns = PATTERNS
+
+    if function_names is None:
+        from .evaluator import _default_evaluator
+
+        function_names = _default_evaluator.FUNCTIONS
+    if function_names:
+        operators = dict(operators)
+        operators["functions"] = dict(operators["functions"])
+        operators["functions"].update({name: name for name in function_names})
 
     if not expression or not expression.strip():
         return "", 1
@@ -3532,7 +3549,7 @@ def normalize_expression(
 
     if not skip_validation:
         try:
-            validate_for_eval(tokens, patterns)
+            validate_for_eval(tokens, patterns, set(operators["functions"]))
         except ValueError:
             return "", 1
 
