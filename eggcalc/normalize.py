@@ -50,6 +50,9 @@ from .evaluator import MAX_NESTING_DEPTH  # noqa: E402 — authoritative source
 # intentionally excludes non-decimal prefixes because 0x/0b/0o literals are
 # passed through before suffix-unit handling.
 _DECIMAL_NUMBER_TOKEN_RE = (
+    # The exponent marker is only valid after a decimal mantissa. A token
+    # such as ``e3`` therefore remains an identifier/unit candidate rather
+    # than being mistaken for scientific notation.
     r"(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*|\d[\d_]*\.)(?:[eE][+-]?\d[\d_]*)?"
 )
 
@@ -523,7 +526,8 @@ def _build_config() -> tuple[dict, dict]:
         # users can write Python-style shorthand. Both ".5" and "5." are
         # accepted; "5." is normalized to "5.0" before evaluation.
         "float": re.compile(
-            r"^[-+]?(?:(?:\d(?:_?\d)*)?\.(?:\d(?:_?\d)*)?|" r"\d(?:_?\d)*[eE][-+]?\d(?:_?\d)*)$"
+            r"^[-+]?(?:(?:\d(?:_?\d)*)\.(?:\d(?:_?\d)*)?|"
+            r"\.(?:\d(?:_?\d)*)|\d(?:_?\d)*[eE][-+]?\d(?:_?\d)*)$"
         ),
         "valid_operations": re.compile(
             f"^({'|'.join([re.escape(s) for s in symbols] + [re.escape(f) for f in FUNCTION_MAPPINGS.values()] + [re.escape(c) for c in CONSTANT_WORDS.keys()])}){{1}}$"
@@ -1330,7 +1334,7 @@ def _should_split_number_sequence(token: str) -> bool:
 # value may end in a unit identifier ("5 m in 3 s") — such inputs would
 # otherwise fuse into invalid names like "mIN3".
 _BINARY_WORD_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\)|\d*[A-Za-z_]\w*)\s+"
+    r"(\d+(?:\.\d+)?|\((?:[^()]|\([^()]*\))*\)|(?>\d*[A-Za-z_]\w*))\s+"
     r"(not\s+in|not|in|to|as|into)\s+"
     r"(\d+(?:\.\d+)?)\b",
     flags=re.IGNORECASE,
@@ -2026,18 +2030,8 @@ def _build_multi_word_numbers() -> dict[str, str]:
     return result
 
 
-_MULTI_WORD_NUMBERS: dict[str, str] = _build_multi_word_numbers()
-# Compound fraction words (e.g., "one half" → 0.5)
-_MULTI_WORD_NUMBERS["one half"] = "0.5"
-_MULTI_WORD_NUMBERS["one quarter"] = "0.25"
-_MULTI_WORD_NUMBERS["one third"] = "0.3333333333333333"
-_MULTI_WORD_NUMBERS["two thirds"] = "0.6666666666666666"
-_MULTI_WORD_NUMBERS["three quarters"] = "0.75"
-_MULTI_WORD_NUMBERS["one tenth"] = "0.1"
-_MULTI_WORD_NUMBERS["one hundredth"] = "0.01"
-
-# Dedupe by value, keeping the most natural form. The builder above produces
-# many alternate phrases for the same number (e.g. ``"ninety ten"`` and
+# Dedupe by value, keeping the most natural form. The builder produces many
+# alternate phrases for the same number (e.g. ``"ninety ten"`` and
 # ``"one hundred"`` both → ``100``); real-world NL input only ever uses the
 # natural forms. Sort key prefers: fewer words, presence of a scale word,
 # non-tens first word, then lexicographic order for stability.
@@ -2074,12 +2068,42 @@ def _naturalness_key(phrase: str) -> tuple:
     )
 
 
-_by_value: dict[str, list[str]] = {}
-for _phrase, _value in _MULTI_WORD_NUMBERS.items():
-    _by_value.setdefault(_value, []).append(_phrase)
-_MULTI_WORD_NUMBERS = {
-    min(_phrases, key=_naturalness_key): _value for _value, _phrases in _by_value.items()
-}
+_MULTI_WORD_TRIE: dict[str, dict[str, Any]] | None = None
+
+
+def _get_multi_word_trie() -> dict[str, dict[str, Any]]:
+    """Build the multi-word number trie on first use."""
+    global _MULTI_WORD_TRIE
+    if _MULTI_WORD_TRIE is None:
+        multi_word_numbers = _build_multi_word_numbers()
+        # Compound fraction words (e.g., "one half" → 0.5)
+        multi_word_numbers.update(
+            {
+                "one half": "0.5",
+                "one quarter": "0.25",
+                "one third": "0.3333333333333333",
+                "two thirds": "0.6666666666666666",
+                "three quarters": "0.75",
+                "one tenth": "0.1",
+                "one hundredth": "0.01",
+            }
+        )
+        by_value: dict[str, list[str]] = {}
+        for phrase, value in multi_word_numbers.items():
+            by_value.setdefault(value, []).append(phrase)
+        multi_word_numbers = {
+            min(phrases, key=_naturalness_key): value for value, phrases in by_value.items()
+        }
+
+        trie: dict[str, dict[str, Any]] = {}
+        for phrase, value in multi_word_numbers.items():
+            node: dict[str, Any] = trie
+            for word in phrase.split():
+                node = node.setdefault(word, {})
+            node[""] = value
+        _MULTI_WORD_TRIE = trie
+    return _MULTI_WORD_TRIE
+
 
 # Set of all number words (for hyphen detection)
 _ALL_NUMBER_WORDS_SET: frozenset[str] = frozenset(
@@ -2123,27 +2147,22 @@ _LONG_PHRASES_PATTERN: str = (
     else ""
 )
 
-# Index multi-word numbers by their first word.  Matching the whole 7,000+
+# Index multi-word numbers by their first word. Matching the whole 7,000+
 # phrase set as one alternation makes misses increasingly expensive as the
-# input grows.  The trie preserves longest-first, non-overlapping replacement
+# input grows. The trie preserves longest-first, non-overlapping replacement
 # while limiting each lookup to the words at the current position.
-_MULTI_WORD_TRIE: dict[str, dict[str, Any]] = {}
-for _phrase, _value in _MULTI_WORD_NUMBERS.items():
-    _node: dict[str, Any] = _MULTI_WORD_TRIE
-    for _word in _phrase.split():
-        _node = _node.setdefault(_word, {})
-    _node[""] = _value
 _MULTI_WORD_WORD_PATTERN = re.compile(r"\b[A-Za-z]+\b")
 
 
 def _replace_multi_word_numbers(expression: str) -> str:
     """Replace multi-word number phrases without scanning all phrases per position."""
+    multi_word_trie = _get_multi_word_trie()
     words = list(_MULTI_WORD_WORD_PATTERN.finditer(expression))
     replacements: list[tuple[int, int, str]] = []
     word_index = 0
     while word_index < len(words):
         first = words[word_index].group(0).lower()
-        node = _MULTI_WORD_TRIE.get(first)
+        node = multi_word_trie.get(first)
         if node is None:
             word_index += 1
             continue
@@ -2371,7 +2390,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
 
     # Replace single number words with digits BEFORE _join_number_parts runs
     # This ensures unrecognized number words are converted to digits for the fallback path.
-    # Compound numbers like "twenty one" are already resolved by _MULTI_WORD_NUMBERS above.
+    # Compound numbers like "twenty one" are already resolved by the multi-word trie above.
     for word, replacement in _SORTED_ALL_NUMBER_WORDS:
         expression = re.sub(
             r"\b" + re.escape(word) + r"\b", replacement, expression, flags=re.IGNORECASE
@@ -2642,7 +2661,7 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     )
 
     # Join space-separated number sequences with + for proper evaluation.
-    # Compound numbers like "twenty one" are already resolved by _MULTI_WORD_NUMBERS,
+    # Compound numbers like "twenty one" are already resolved by the multi-word trie,
     # but fallback sequences (e.g., from unrecognized patterns) still need joining.
     expression = _join_number_parts(expression, set(operators["functions"]))
 
@@ -2818,7 +2837,7 @@ def _join_number_parts(expression: str, function_names: set[str] | None = None) 
     (or simple expressions evaluating to numbers) and joins them with +.
     This ensures fallback number sequences like "3 100 20 2" -> "3+100+20+2",
     not "3100202". (Compound numbers like "twenty one" are typically resolved
-    earlier by _MULTI_WORD_NUMBERS and never reach this function.)
+    earlier by the multi-word trie and never reach this function.)
 
     Also inserts implicit '*' between adjacent number and non-number non-operator
     tokens (e.g., "sqrt 144" -> "sqrt*144", "2 sqrt 9" -> "2*sqrt*9").
@@ -3296,12 +3315,17 @@ def _add_same_unit_division_parens(expression: str) -> str:
     units cancel and the result is dimensionless.
     """
 
-    unit_token = r"(?:[^\W\d]\w*)(?:/(?:[^\W\d]\w*))*"
+    unit_token = r"(?:[^\W\d]\w*(?:\*\*[+-]?\d+)?)(?:/(?:[^\W\d]\w*(?:\*\*[+-]?\d+)?))*"
     number_token = _DECIMAL_NUMBER_TOKEN_RE
     canonical_units = set(UNIT_ALIASES.values())
 
     def _is_known_unit(unit: str) -> bool:
-        return unit in canonical_units or unit in UNIT_ALIASES
+        if unit.startswith("(") and unit.endswith(")"):
+            unit = unit[1:-1]
+        return all(
+            part.split("**", 1)[0] in canonical_units or part.split("**", 1)[0] in UNIT_ALIASES
+            for part in unit.split("/")
+        )
 
     def _replace_unit_left(match: re.Match) -> str:
         left_unit = match.group(1)
@@ -3325,12 +3349,13 @@ def _add_same_unit_division_parens(expression: str) -> str:
         return f"{numerator}/({denom}*{right_unit})"
 
     expression = re.sub(
-        rf"(?<!\w)({unit_token})/({number_token})\*({unit_token})(?!\w)",
+        rf"(?<!\w)({unit_token})/({number_token})\*((?:{unit_token}|\({unit_token}\)))(?!\w)",
         _replace_unit_left,
         expression,
     )
+    right_unit_token = rf"(?:{unit_token}|\({unit_token}\))"
     return re.sub(
-        rf"(?<![\w.])({number_token})/({number_token})\*({unit_token})(?!\w)",
+        rf"(?<![\w.])({number_token})/({number_token})\*({right_unit_token})(?!\w)",
         _replace_scalar_left,
         expression,
     )
@@ -3345,7 +3370,11 @@ def _add_unit_floor_mod_parens(expression: str) -> str:
     """
 
     number_token = _DECIMAL_NUMBER_TOKEN_RE
-    unit_atom = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\*\*-?\d+)?"
+    unit_atom = (
+        r"(?:[a-zA-Z_][a-zA-Z0-9_]*|"
+        r"\([a-zA-Z_][a-zA-Z0-9_]*(?:/[a-zA-Z_][a-zA-Z0-9_]*)*\))"
+        r"(?:\*\*[+-]?\d+)?"
+    )
     unit_expr = rf"{unit_atom}(?:(?:\*(?!\*)|/){unit_atom})*"
     unit_operand = rf"{number_token}\*{unit_expr}"
 

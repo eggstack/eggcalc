@@ -228,6 +228,10 @@ Units are organized by category (base unit → friendly name):
 | Frequency | `Hz` | `frequency` | kHz, MHz, GHz, THz |
 | Temperature | *(manual)* | `temperature` | K, C, F, Ra (offset-based, not in `UNIT_BASE`) |
 
+Long-duration units use the common 365-day year (`yr` = 31,536,000 seconds),
+not the astronomical Julian year of 365.25 days. Decades, centuries, and
+millennia use that same convention.
+
 **Note:** Temperature conversions use a separate offset-based mechanism via `TEMPERATURE_CONVERSIONS` rather than multiplicative factors in `UNIT_BASE`. Temperature units (`K`, `C`, `F`, `Ra`) are registered in `UNIT_CATEGORIES_EXTRA` and cannot be converted to non-temperature units.
 
 ## Unit Definition Structure

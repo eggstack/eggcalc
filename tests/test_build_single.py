@@ -157,6 +157,21 @@ print("OK")
             result.returncode == 0 and result.stdout.strip() == "OK"
         ), f"Wrapper smoke failed: {result.stderr}"
 
+    def test_mcp_schema_detail_flag_is_forwarded(self, single_file_path):
+        """The single-file wrapper accepts and forwards the schema detail value."""
+        for args in (
+            ["--mcp", "--mcp-schema-detail", "compact"],
+            ["--capabilities", "--mcp-schema-detail", "compact"],
+        ):
+            result = subprocess.run(
+                [sys.executable, single_file_path, *args],
+                input="",
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            assert result.returncode == 0, f"Single-file flags failed: {result.stderr}"
+
     def test_matches_package_mode(self, single_file_path):
         """Results should match package-mode for a set of expressions."""
         test_exprs = ["5+3", "sqrt(144)", "2**10", "floor(3.7)"]

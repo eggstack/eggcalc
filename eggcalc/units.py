@@ -1720,6 +1720,8 @@ UNIT_DEFINITIONS: tuple[UnitSpec, ...] = (
             'century',
         ),
         dimension=DIM_TIME,
+        # Calendar-style duration: one year is the common 365-day year,
+        # rather than the astronomical Julian year of 365.25 days.
         scale_to_base=3153600000.0,
         display='century',
         category='time',

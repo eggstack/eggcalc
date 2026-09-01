@@ -3,6 +3,79 @@
 import pytest
 
 
+@pytest.mark.parametrize(
+    ("expression", "expected_value", "expected_unit"),
+    [
+        ("5 m / 3 s^2", 5 / 3, "m/s**2"),
+        ("10 kg / 2 s^3", 5, "kg/s**3"),
+        ("5m/3s^2", 5 / 3, "m/s**2"),
+        ("10kg/2s^3", 5, "kg/s**3"),
+    ],
+)
+def test_unit_denominator_exponents_stay_inside_group(expression, expected_value, expected_unit):
+    from eggcalc import evaluate_raw
+    from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
+    from eggcalc.units import UnitValue
+
+    normalized, code = normalize_expression(expression, NORMALIZE, PATTERNS)
+    assert code == 0
+    assert "/(" in normalized
+    result = evaluate_raw(expression)
+    assert isinstance(result, UnitValue)
+    assert result.value == pytest.approx(expected_value)
+    assert result.unit == expected_unit
+
+
+@pytest.mark.parametrize("token", [".", "+.", "-.", "5.."])
+def test_bare_decimal_points_are_not_numbers(token):
+    from eggcalc.normalize import check_if_number
+
+    result = check_if_number(token)
+    assert result["bool"] is False
+    assert result["converted"] == token
+
+
+def test_bare_decimal_point_raises_evaluation_error():
+    from eggcalc import EvaluationError, evaluate_raw
+
+    with pytest.raises(EvaluationError):
+        evaluate_raw(". + 1")
+
+
+def test_bitwise_variables_reject_booleans():
+    from eggcalc import EvaluationError
+    from eggcalc.evaluator import Evaluator
+
+    evaluator = Evaluator()
+    evaluator._user_variables["truth"] = True
+    with pytest.raises(EvaluationError):
+        evaluator.evaluate("truth | 1")
+    with pytest.raises(EvaluationError):
+        evaluator.evaluate("truth & 1")
+
+
+def test_combination_result_has_digit_limit(monkeypatch):
+    import eggcalc.evaluator as evaluator
+
+    monkeypatch.setattr(evaluator, "MAX_RESULT_DIGITS", 1)
+    with pytest.raises(evaluator.EvaluationError, match="too many digits"):
+        evaluator._comb(5, 2)
+
+
+def test_large_integer_digit_count_is_efficient_and_exact():
+    from eggcalc.evaluator import _int_digit_count
+
+    assert _int_digit_count(10**10000 - 1) == 10000
+
+
+def test_parenthesized_compound_unit_floor_mod_operand_is_grouped():
+    from eggcalc.normalize import NORMALIZE, PATTERNS, normalize_expression
+
+    normalized, code = normalize_expression("7*m/s//1*(m/s)", NORMALIZE, PATTERNS)
+    assert code == 0
+    assert normalized == "(7*m/s)//(1*(m/s))"
+
+
 def test_register_constant_requires_identifier():
     from eggcalc import register_constant
 

@@ -805,7 +805,7 @@ def _main():
     parser.add_argument("-s", "--show", action="store_true", help="Show expression in output (default for interactive)")
     parser.add_argument("--verbose", action="store_true", help="Show expression in output")
     parser.add_argument("--mcp-profile", metavar="<profile>", help="MCP server tool profile filter")
-    parser.add_argument("--mcp-schema-detail", action="store_true", help="Show full JSON Schema in MCP tools/list")
+    parser.add_argument("--mcp-schema-detail", choices=["compact", "normal", "full"], help="MCP schema detail level")
     parser.add_argument("--capabilities", action="store_true", help="Show runtime capabilities as JSON and exit")
     args = parser.parse_args()
 
@@ -819,7 +819,7 @@ def _main():
         if args.mcp_profile:
             sys.argv.extend(["--mcp-profile", args.mcp_profile])
         if args.mcp_schema_detail:
-            sys.argv.append("--mcp-schema-detail")
+            sys.argv.extend(["--mcp-schema-detail", args.mcp_schema_detail])
         return normalize_main()
     elif args.usage:
         print_help()
@@ -843,7 +843,7 @@ def _main():
         if args.mcp_profile:
             sys.argv.extend(["--mcp-profile", args.mcp_profile])
         if args.mcp_schema_detail:
-            sys.argv.append("--mcp-schema-detail")
+            sys.argv.extend(["--mcp-schema-detail", args.mcp_schema_detail])
         return normalize_main()
     else:
         # No expression given - forward recognized flags to normalize_main
@@ -863,7 +863,7 @@ def _main():
         if args.mcp_profile:
             sys.argv.extend(["--mcp-profile", args.mcp_profile])
         if args.mcp_schema_detail:
-            sys.argv.append("--mcp-schema-detail")
+            sys.argv.extend(["--mcp-schema-detail", args.mcp_schema_detail])
         if len(sys.argv) > 1:
             return normalize_main()
         parser.print_help()

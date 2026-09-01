@@ -31,6 +31,10 @@ eggcalc supports unit conversions across multiple categories.
 
 ## Time
 
+Long-duration units use a common 365-day year (`yr` = 31,536,000 seconds),
+not the astronomical Julian year of 365.25 days. `decade`, `century`, and
+`millennium` are derived from that same convention.
+
 | Unit | Name | Aliases |
 |------|------|---------|
 | `s` | seconds | second, seconds |

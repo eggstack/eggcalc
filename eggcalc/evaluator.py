@@ -687,7 +687,7 @@ def register_constant(name: str, value: float) -> None:
         raise ValueError(f"name must be a valid identifier, got {name!r}")
     with _lock:
         _default_evaluator.CONSTANTS[name] = value
-    _clear_global_cache()
+        _clear_global_cache()
 
 
 def register_function(name: str, func: Any) -> None:
@@ -707,7 +707,7 @@ def register_function(name: str, func: Any) -> None:
         raise ValueError(f"name must be a valid identifier, got {name!r}")
     with _lock:
         _default_evaluator.FUNCTIONS[name] = func
-    _clear_global_cache()
+        _clear_global_cache()
 
 
 def load_user_config() -> None:
@@ -806,7 +806,12 @@ _cache_entry_sizes: dict[str, int] = {}
 
 
 def _deep_size(value: Any, seen: set[int]) -> int:
-    """Return a stable size estimate without converting values to strings."""
+    """Return a stable size estimate without converting values to strings.
+
+    ``seen`` is intentionally fresh for each top-level cache entry, and all
+    objects visited during one traversal remain live, so their ids cannot be
+    reused while the set is active.
+    """
     identity = id(value)
     if identity in seen:
         return 0
@@ -1118,15 +1123,18 @@ def _int_digit_count(n: int) -> int:
         return len(s) - (1 if s.startswith('-') else 0)
     except ValueError:
         # Python 3.11+ raises ValueError for integers with >4300 str digits
-        # Estimate from the bit length, then correct against powers of ten so
-        # the result remains exact without changing the process-wide str limit.
+        # Search against powers of ten rather than incrementing one digit at a
+        # time. This keeps the fallback logarithmic in the number of digits.
         magnitude = abs(n)
-        digits = max(1, int((magnitude.bit_length() - 1) * math.log10(2)) + 1)
-        while magnitude >= 10**digits:
-            digits += 1
-        while digits > 1 and magnitude < 10 ** (digits - 1):
-            digits -= 1
-        return digits
+        low = 1
+        high = int(magnitude.bit_length() * math.log10(2)) + 2
+        while low < high:
+            middle = (low + high) // 2
+            if magnitude < 10**middle:
+                high = middle
+            else:
+                low = middle + 1
+        return low
 
 
 def _safe_factorial(n: int) -> int:
@@ -1450,7 +1458,10 @@ def _comb(n: int, r: int) -> int:
         return 0
     if r > 10000:
         raise EvaluationError(f"comb input too large (max 10000, got {r})")
-    return math.comb(n, r)
+    result = math.comb(n, r)
+    if _int_digit_count(result) > MAX_RESULT_DIGITS:
+        raise EvaluationError(f"Result has too many digits (max {MAX_RESULT_DIGITS})")
+    return result
 
 
 # === LCM ===
@@ -2458,9 +2469,9 @@ class Evaluator(ast.NodeVisitor):
         # Bitwise operators
         ast.LShift: _bitlshift_safe,
         ast.RShift: _bitrshift_safe,
-        ast.BitOr: (lambda a, b: a | b),
+        ast.BitOr: (lambda a, b: _require_int(a, "bitor") | _require_int(b, "bitor")),
         ast.BitXor: (lambda a, b: _require_int(a, "bitxor") ^ _require_int(b, "bitxor")),
-        ast.BitAnd: (lambda a, b: a & b),
+        ast.BitAnd: (lambda a, b: _require_int(a, "bitand") & _require_int(b, "bitand")),
     }
 
     # Safe unary operators
@@ -3669,6 +3680,9 @@ class EggCalcApp:
         normalized = self._normalize_expression(expression)
         use_cache = self._cache is not None and not _expression_bypasses_cache(normalized)
 
+        # Evaluate outside the cache lock so unrelated expressions can make
+        # progress; concurrent misses for the same expression may duplicate
+        # work by design.
         if use_cache:
             with self._lock:
                 assert self._cache is not None

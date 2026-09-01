@@ -243,7 +243,9 @@ _MULTI_WORD_FUNCTIONS = {
 
 ### `_MULTI_WORD_NUMBERS`
 
-Pre-computed mapping of multi-word number phrases to numeric values. Built at module import time by `_build_multi_word_numbers()`. Handles:
+Lazy trie of multi-word number phrases mapped to numeric values. Built on first
+use from `_build_multi_word_numbers()` so importing the normalizer does not pay
+the phrase-generation cost. Handles:
 - Single-word × scale: `"one hundred"` → `100`, `"twenty thousand"` → `20000`
 - Compound tens + scale: `"twenty one thousand"` → `21000`
 - Compound hundreds: `"one hundred forty four"` → `144`
@@ -535,7 +537,9 @@ Returns the canonical form of a unit raised to an exponent, looking up `UNIT_ALI
 
 ### `_build_multi_word_numbers() -> dict[str, str]`
 
-Builds the `_MULTI_WORD_NUMBERS` mapping at module import time. Generates all combinations of ones/tens/teens × scale words, including compound hundreds with larger scales.
+Builds the multi-word number mapping used to populate the lazy trie. Generates
+all combinations of ones/tens/teens × scale words, including compound hundreds
+with larger scales.
 
 ### `_get_units_by_category() -> dict[str, list[str]]`
 
