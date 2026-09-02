@@ -2802,11 +2802,12 @@ class Evaluator(ast.NodeVisitor):
                     quotient = (
                         left // right if isinstance(left, UnitValue) else right.__rfloordiv__(left)
                     )
-                    return (
-                        quotient.value
-                        if isinstance(quotient, UnitValue) and quotient.unit is None
-                        else quotient
-                    )
+                    if isinstance(quotient, UnitValue) and quotient.unit is None:
+                        val = quotient.value
+                        if isinstance(val, float) and val.is_integer():
+                            return int(val)
+                        return val
+                    return quotient
                 if op_class is ast.Mod:
                     return left % right if isinstance(left, UnitValue) else right.__rmod__(left)
                 if op_class is ast.Pow and isinstance(left, UnitValue):

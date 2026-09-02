@@ -3442,10 +3442,15 @@ def _floor_divide_quantities(left: UnitValue, right: UnitValue) -> int | float:
     """
     if left.unit and right.unit:
         if left._unit_expr == right._unit_expr:
-            return left.value // right.value  # type: ignore[operator]
+            result = left.value // right.value  # type: ignore[operator]
+            if isinstance(result, float) and result.is_integer():
+                return int(result)
+            return result
         # Convert left into right's unit before floor division.
         converted = left.convert_to(right.unit)
         result = converted.value // right.value  # type: ignore[operator]
+        if isinstance(result, float) and result.is_integer():
+            return int(result)
         if (
             isinstance(left.value, int)
             and not isinstance(left.value, bool)
