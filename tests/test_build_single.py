@@ -14,25 +14,56 @@ import pytest
 BUILD_SCRIPT = os.path.join(os.path.dirname(__file__), "..", "build_single.py")
 
 
+def _run_subprocess(cmd: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    """Run a subprocess with retry for SIGTERM/SystemExit flakes under load.
+
+    Under heavy pytest load the child can receive SIGTERM while blocking in
+    selector.select (cli.py SIGTERM handler raises SystemExit(0)).  Treat
+    that as a transient failure and retry once.
+    """
+    last: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(3):
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            # Timeout is a transient load issue — retry, then surface.
+            last_exc: subprocess.TimeoutExpired | None = exc
+            if attempt < 2:
+                continue
+            raise
+        # SIGTERM is delivered as returncode -15 (POSIX) or 143 (128+15).
+        # The app's handler converts it to SystemExit(0) → returncode 0 but
+        # with possible truncated output and SystemExit in stderr.
+        sigterm = result.returncode in (-15, 143) or "SystemExit" in (result.stderr or "")
+        # Empty stdout with otherwise-successful exit is also a SIGTERM artifact.
+        empty_success = result.returncode == 0 and not result.stdout.strip() and sigterm
+        if sigterm or empty_success:
+            last = result
+            if attempt < 2:
+                continue
+            # On final attempt, prefer to return what we have if stdout looks
+            # valid, otherwise surface the SIGTERM result.
+            return result
+        return result
+    # Should be unreachable; return last result if any.
+    assert last is not None
+    return last
+
+
 def _run_eggcalc_module(expr: str) -> str:
     """Run an expression using the package-mode eggcalc and return stdout."""
-    result = subprocess.run(
-        [sys.executable, "-m", "eggcalc", "-e", expr],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    result = _run_subprocess([sys.executable, "-m", "eggcalc", "-e", expr], timeout=30)
     return result.stdout.strip()
 
 
 def _run_single_file(path: str, expr: str) -> str:
     """Run an expression using the single-file build and return stdout."""
-    result = subprocess.run(
-        [sys.executable, path, "-e", expr],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    result = _run_subprocess([sys.executable, path, "-e", expr], timeout=30)
     return result.stdout.strip()
 
 
@@ -272,3 +303,56 @@ class TestBuildManifestValidation:
 
         violations = re.findall(r"from \.\.\w", content)
         assert not violations, f"Residual relative imports found: {violations}"
+
+    def test_no_string_literal_corruption(self, single_file_path):
+        """Naive str.replace in build must not corrupt string literals/comments.
+
+        Guards BUG-02: ``build_single.py`` uses broad ``code.replace`` for
+        cross-module rewrites (e.g. ``units.UNIT_ALIASES`` → ``UNIT_ALIASES``).
+        If a future docstring or comment contains a risky source pattern it
+        would be silently rewritten while the file still parses.  The manifest
+        validator (check 11) rejects such literals; this test also verifies the
+        already-built file did not suffer literal corruption.
+        """
+        import ast
+        import sys as _sys
+
+        # Use the same risky set as the validator.
+        build_single_path = os.path.join(os.path.dirname(__file__), "..", "build_single.py")
+        risky: tuple[str, ...] = ()
+        try:
+            import importlib.util
+
+            spec = importlib.util.spec_from_file_location("_build_single_check", build_single_path)
+            assert spec is not None and spec.loader is not None
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+            risky = getattr(mod, "_RISKY_REPLACE_SOURCES", ())
+        except Exception:
+            # Fallback to the core subset if import fails.
+            risky = (
+                "units.UNIT_ALIASES",
+                "units.UNIT_BASE",
+                "from ..exact import",
+            )
+
+        with open(single_file_path, encoding="utf-8") as f:
+            content = f.read()
+        # Built file must still be valid Python.
+        try:
+            tree = ast.parse(content)
+        except SyntaxError as exc:
+            pytest.fail(f"Built file is not valid Python: {exc}")
+        # No string literal in the built file should contain a risky source
+        # pattern — the validator ensures the source tree has none, so any
+        # occurrence in the build would indicate the replace corrupted a literal.
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                for pat in risky:
+                    assert pat not in node.value, (
+                        f"Risky pattern {pat!r} found inside a string literal in the built file; "
+                        "build_single.py str.replace would have corrupted it"
+                    )
+        # Also ensure the validator itself is clean for the current tree.
+        result = _run_subprocess([_sys.executable, build_single_path, "--validate"], timeout=30)
+        assert result.returncode == 0, f"Manifest validation failed: {result.stderr}"

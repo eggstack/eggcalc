@@ -21,6 +21,30 @@ from typing import Literal
 EGGCALC_DIR = os.path.join(os.path.dirname(__file__), "eggcalc")
 
 # ---------------------------------------------------------------------------
+# Guard for BUG-02: `get_module_code` uses naive `str.replace` for
+# cross-module rewrites (e.g. ``units.UNIT_ALIASES`` → ``UNIT_ALIASES``,
+# ``from ..exact import`` → ``from exact import``).  If any of those source
+# substrings appear inside a string literal or comment in the source tree,
+# the built file would be silently corrupted while remaining syntactically
+# valid.  The validator (check 11) ensures no literal/comment currently
+# contains a risky pattern; adding a doc example with such text must either
+# avoid the pattern or switch the rewrite to an AST-aware transform.
+# ---------------------------------------------------------------------------
+_RISKY_REPLACE_SOURCES: tuple[str, ...] = (
+    "units.UNIT_BASE",
+    "units.UNIT_ALIASES",
+    "units.UNIT_CATEGORIES",
+    "units.TEMPERATURE_CONVERSIONS",
+    "units._UNITS_LOCK",
+    "units._rebuild_conversions()",
+    "units._simplify_unit_string",
+    "units._expand_short_compound",
+    "from ..exact import",
+    "from .. import EvaluationError",
+    "from .. import evaluator as _evaluator",
+)
+
+# ---------------------------------------------------------------------------
 # Module manifest - the single source of truth for single-file assembly.
 #
 # Each entry declares a module, its group, and its dependencies.  The builder
@@ -1023,6 +1047,13 @@ if __name__ == "__main__":
 
     final_content = _replace_local_imports(final_content)
 
+    # Validate that the assembled file is syntactically valid before writing.
+    # This catches accidental corruption from the naive str.replace rewrites.
+    try:
+        ast.parse(final_content)
+    except SyntaxError as exc:
+        raise ValueError(f"Generated single-file source is not valid Python: {exc}") from exc
+
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(final_content)
 
@@ -1316,6 +1347,59 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
                         )
                     if prior is None or prior[0] != spec.name:
                         assign_values[name] = (spec.name, value_key)
+
+    # 11. Guard BUG-02: naive `str.replace` in `get_module_code` would corrupt
+    # string literals/comments that contain a risky source pattern.  The
+    # current tree is safe, but a future doc example like
+    # ``"from ..exact import ..."`` inside a docstring would be silently
+    # rewritten.  Fail validation if any literal/comment contains a risk
+    # pattern so the rewrite can be made AST-aware before it ships.
+    import io as _io
+    import tokenize
+
+    for spec in manifest:
+        if not spec.include_single_file:
+            continue
+        path = os.path.join(EGGCALC_DIR, spec.path)
+        try:
+            source = open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        # Check string literals via AST (covers docstrings and inline strings)
+        try:
+            tree = ast.parse(source, filename=path)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                for pat in _RISKY_REPLACE_SOURCES:
+                    if pat in node.value:
+                        errors.append(
+                            f"Risky pattern {pat!r} appears inside a string literal in {spec.path!r}; "
+                            f"build_single.py str.replace would corrupt it"
+                        )
+                        break
+        # Check comments via tokenize (AST does not retain comments)
+        try:
+            for tok in tokenize.generate_tokens(_io.StringIO(source).readline):
+                if tok.type == tokenize.COMMENT:
+                    for pat in _RISKY_REPLACE_SOURCES:
+                        if pat in tok.string:
+                            errors.append(
+                                f"Risky pattern {pat!r} appears inside a comment in {spec.path!r}; "
+                                f"build_single.py str.replace would corrupt it"
+                            )
+                            break
+        except (tokenize.TokenError, SyntaxError, IndentationError):
+            pass
+
+    # 12. Ensure the concatenated source is still valid Python (catches
+    # accidental syntax errors from the rewrites, including any future
+    # string-literal corruption that slips past check 11).
+    try:
+        ast.parse(generated)
+    except SyntaxError as exc:
+        errors.append(f"Generated single-file source is not valid Python: {exc}")
 
     return errors
 

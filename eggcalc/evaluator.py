@@ -2743,8 +2743,13 @@ class Evaluator(ast.NodeVisitor):
         result_unit = left_unit or right_unit
 
         is_bitwise = op_class in (ast.BitAnd, ast.BitOr, ast.BitXor, ast.LShift, ast.RShift)
-        if is_bitwise and (isinstance(left_val, float) or isinstance(right_val, float)):
-            raise EvaluationError("Bitwise operations require integer operands, not floats")
+        if is_bitwise:
+            if isinstance(left, UnitValue) or isinstance(right, UnitValue):
+                raise EvaluationError("Bitwise operations require integer operands, not floats")
+            if (isinstance(left_val, float) and not left_val.is_integer()) or (
+                isinstance(right_val, float) and not right_val.is_integer()
+            ):
+                raise EvaluationError("Bitwise operations require integer operands, not floats")
 
         if op_class not in self.BINOPS:
             raise EvaluationError(f"Unsupported binary operator: '{node.op.__class__.__name__}'")
@@ -2874,7 +2879,10 @@ class Evaluator(ast.NodeVisitor):
             raise EvaluationError(f"Unsupported unary operator: '{node.op.__class__.__name__}'")
 
         if op_class is ast.Invert and not isinstance(operand, int):
-            raise EvaluationError("Bitwise NOT requires an integer operand")
+            if isinstance(operand, float) and operand.is_integer():
+                pass
+            else:
+                raise EvaluationError("Bitwise NOT requires an integer operand")
 
         # UAdd is the identity — return operand directly to avoid nesting UnitValue.
         if op_class is ast.UAdd:
