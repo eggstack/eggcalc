@@ -716,6 +716,14 @@ def go_mod_inspect(text: str) -> GoModInspectResult:
 
 
 def _parse_go_replace(line: str) -> dict[str, str] | None:
+    if "=>" in line:
+        left, _, right = line.partition("=>")
+        left = left.strip()
+        right = right.strip()
+        if not left or not right:
+            return None
+        old = left.split(None, 1)[0]
+        return {"old": old, "new": right}
     parts = line.split(None, 2)
     if len(parts) >= 2:
         result: dict[str, str] = {"old": parts[0]}

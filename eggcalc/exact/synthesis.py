@@ -33,6 +33,7 @@ from .measure import (
     word_metrics as _word_metrics,
 )
 from .primitives import InvisibleCharInfo
+from .primitives import _advance_grapheme as _advance_grapheme
 from .primitives import casefold_text as _casefold_text
 from .primitives import (
     count_graphemes as _count_graphemes,
@@ -1001,8 +1002,12 @@ def count_chars(
     if normalization != "raw":
         text = _normalize_unicode(text, normalization)
 
-    if target is not None and len(target) != 1 and count_mode != "substring":
-        raise ValueError("target must be a single character")
+    if target is not None and count_mode != "substring":
+        if count_mode == "grapheme":
+            if _count_graphemes(target) != 1:
+                raise ValueError("target must be a single grapheme")
+        elif len(target) != 1:
+            raise ValueError("target must be a single character")
 
     if count_mode == "byte":
         target_bytes = target.encode("utf-8") if target else None
@@ -1026,13 +1031,22 @@ def count_chars(
             text_length_codepoints=len(text),
         )
     elif count_mode == "grapheme":
-        grapheme_text = list(text)
+        grapheme_text: list[str] = []
+        _i = 0
+        _n = len(text)
+        while _i < _n:
+            _j = _advance_grapheme(text, _i, _n)
+            grapheme_text.append(text[_i:_j])
+            _i = _j
         if target is None:
             freq_grapheme: dict[str, int] = {}
             for g in grapheme_text:
                 freq_grapheme[g] = freq_grapheme.get(g, 0) + 1
             return freq_grapheme
-        target_grapheme = list(target)[0] if target else None
+        _ti = 0
+        _tn = len(target)
+        _tj = _advance_grapheme(target, _ti, _tn)
+        target_grapheme = target[_ti:_tj] if target else None
         positions = [i for i, g in enumerate(grapheme_text) if g == target_grapheme]
         return CountCharsResult(
             target=target,

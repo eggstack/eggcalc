@@ -1029,8 +1029,8 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
 
     Exact integer arithmetic is retained for large integral powers that
     cannot be represented as a finite float, including an integral float
-    base such as ``5.0``. When the exact result fits in the float range,
-    an integral float base retains its float result type.
+    base such as ``5.0``. The exact integer result is preserved even when
+    it fits in the float range, to avoid losing precision via a float cast.
     """
     if abs(exp) > MAX_EXPONENT:
         raise EvaluationError(f"Exponent too large (max {MAX_EXPONENT})")
@@ -1052,6 +1052,7 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
         # For float base with large integer exponent, use int arithmetic
         # to avoid float overflow (e.g., pow(5.0, 500) overflows but 5**500 is exact)
         # Only apply when base is an exact integer (5.0, not 5.1) to avoid truncation.
+        # The exact int is returned as-is to preserve precision.
         if (
             isinstance(base, (int, float))
             and isinstance(exp, (int, float))
@@ -1060,8 +1061,6 @@ def _safe_pow(base: float, exp: float) -> float | int | complex:
             and (not isinstance(base, float) or base.is_integer())
         ):
             result = pow(int(base), int(exp))
-            if isinstance(base, float) and abs(result) <= MAX_RESULT_VALUE:
-                result = float(result)
         else:
             result = pow(base, exp)
     except ZeroDivisionError:
@@ -2812,11 +2811,12 @@ class Evaluator(ast.NodeVisitor):
                     return left % right if isinstance(left, UnitValue) else right.__rmod__(left)
                 if op_class is ast.Pow and isinstance(left, UnitValue):
                     powered = left**right
-                    return (
-                        powered.value
-                        if isinstance(powered, UnitValue) and powered.unit is None
-                        else powered
-                    )
+                    if isinstance(powered, UnitValue) and powered.unit is None:
+                        val = powered.value
+                        if isinstance(val, float) and val.is_integer():
+                            return int(val)
+                        return val
+                    return powered
             except (TypeError, ValueError, ZeroDivisionError, OverflowError) as exc:
                 raise EvaluationError(str(exc)) from exc
 

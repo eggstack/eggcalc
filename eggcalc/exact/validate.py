@@ -367,7 +367,58 @@ def validate_json(s: str) -> ValidateJsonResult:
         # both as findings instead of leaking the exception.
         message = str(e)
         if "is not valid JSON" in message:
-            pass
+            token: str | None = None
+            if message.startswith("-Infinity"):
+                token = "-Infinity"
+            elif "Infinity" in message:
+                token = "Infinity"
+            elif "NaN" in message:
+                token = "NaN"
+            if token is not None:
+                pos: int | None = None
+                in_str = False
+                esc = False
+                idx = 0
+                while idx < len(s):
+                    ch = s[idx]
+                    if in_str:
+                        if esc:
+                            esc = False
+                        elif ch == "\\":
+                            esc = True
+                        elif ch == '"':
+                            in_str = False
+                        idx += 1
+                        continue
+                    if ch == '"':
+                        in_str = True
+                        idx += 1
+                        continue
+                    if s.startswith(token, idx):
+                        if token == "Infinity" and idx > 0 and s[idx - 1] == "-":
+                            idx += 1
+                            continue
+                        before = s[idx - 1] if idx > 0 else ""
+                        end = idx + len(token)
+                        after = s[end] if end < len(s) else ""
+                        if (before.isalnum() or before == "_") or (after.isalnum() or after == "_"):
+                            idx += 1
+                            continue
+                        pos = idx
+                        break
+                    idx += 1
+                if pos is not None:
+                    line_no = s.count("\n", 0, pos) + 1
+                    col_no = pos - s.rfind("\n", 0, pos)
+                    return ValidateJsonResult(
+                        valid=False,
+                        error=message,
+                        line=line_no,
+                        column=col_no,
+                        position=pos,
+                        type=None,
+                        top_level_keys=None,
+                    )
         elif "Exceeds the limit" in message:
             message = "integer literal exceeds supported size"
         else:

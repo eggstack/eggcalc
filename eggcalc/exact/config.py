@@ -157,6 +157,29 @@ def dotenv_validate(
         if len(value) >= 2 and value[0] in ("'", '"') and value[-1] == value[0]:
             quote_style = value[0]
             value = value[1:-1]
+            if quote_style == '"':
+                # Double-quoted values process backslash escapes
+                # (single-quoted stay literal). Handles common escapes;
+                # unknown escapes preserve the following char.
+                _escapes = {
+                    "n": "\n",
+                    "r": "\r",
+                    "t": "\t",
+                    '"': '"',
+                    "'": "'",
+                    "\\": "\\",
+                }
+                _out: list[str] = []
+                _idx = 0
+                while _idx < len(value):
+                    if value[_idx] == "\\" and _idx + 1 < len(value):
+                        _nxt = value[_idx + 1]
+                        _out.append(_escapes.get(_nxt, _nxt))
+                        _idx += 2
+                    else:
+                        _out.append(value[_idx])
+                        _idx += 1
+                value = "".join(_out)
         else:
             value = value.split("#", 1)[0].rstrip()
             if " " in value and not value.startswith(("{", "[")):

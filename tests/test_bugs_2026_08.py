@@ -82,10 +82,10 @@ def test_safe_pow_accepts_integral_float_exponents():
     assert result == 5**500
 
 
-def test_safe_pow_preserves_float_type_when_result_fits():
+def test_safe_pow_preserves_exact_int_for_integral_float_base():
     result = _safe_pow(5.0, 301)
-    assert isinstance(result, float)
-    assert result == float(5**301)
+    assert isinstance(result, int)
+    assert result == 5**301
 
 
 def test_root_unit_expression_reports_missing_scale_definition(monkeypatch):

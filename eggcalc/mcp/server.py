@@ -2205,6 +2205,7 @@ class McpServer:
 
         if session is None:
             session = self.create_session()
+            auto_created = True
         elif session._closed:
             # Notifications never receive responses, even on closed sessions.
             if "id" not in request:
@@ -2213,6 +2214,7 @@ class McpServer:
         elif session._owner_ref is None:
             return _invalid_request(request_id, "Session is not bound to a server")
         else:
+            auto_created = False
             owner = session._owner_ref()
             if owner is None:
                 return _invalid_request(request_id, "Session owner is unavailable")
@@ -2221,6 +2223,11 @@ class McpServer:
 
         # Capture one immutable context before dispatch.
         context = self._runtime_context
+        if auto_created:
+            try:
+                return session.handle_message(request, server=self, context=context)
+            finally:
+                session.close()
         return session.handle_message(request, server=self, context=context)
 
     def close(self) -> None:
