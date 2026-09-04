@@ -143,6 +143,12 @@ _MCP_EXTRAS_EXPECTED = {
     "config_preflight",
     "structured_data_compare",
     "repo_file_inventory",
+    "ip_inspect",
+    "cidr_inspect",
+    "codec_convert",
+    "radix_convert",
+    "datetime_convert",
+    "cron_inspect",
 }
 
 

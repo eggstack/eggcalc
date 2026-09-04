@@ -146,6 +146,9 @@ MODULE_MANIFEST: tuple[ModuleSpec, ...] = (
     ModuleSpec(
         "exact.repo_audit", "exact/repo_audit.py", "exact", depends_on=("exact.primitives",)
     ),
+    ModuleSpec("exact.network", "exact/network.py", "exact"),
+    ModuleSpec("exact.encoding", "exact/encoding.py", "exact"),
+    ModuleSpec("exact.temporal", "exact/temporal.py", "exact"),
     # -- MCP server --------------------------------------------------------
     ModuleSpec("mcp.schemas", "mcp/schemas.py", "mcp", depends_on=("exact.primitives",)),
     ModuleSpec(
@@ -161,6 +164,7 @@ MODULE_MANIFEST: tuple[ModuleSpec, ...] = (
             "exact.confusables",
             "exact.diff",
             "exact.diff_analysis",
+            "exact.encoding",
             "exact.glob",
             "exact.identifier",
             "exact.identifier_inspect",
@@ -169,6 +173,7 @@ MODULE_MANIFEST: tuple[ModuleSpec, ...] = (
             "exact.manifests",
             "exact.markdown",
             "exact.measure",
+            "exact.network",
             "exact.patch",
             "exact.path_tools",
             "exact.position",
@@ -176,6 +181,7 @@ MODULE_MANIFEST: tuple[ModuleSpec, ...] = (
             "exact.repo_audit",
             "exact.shell",
             "exact.synthesis",
+            "exact.temporal",
             "exact.transform",
             "exact.unicode_policy",
             "exact.unicode_tools",

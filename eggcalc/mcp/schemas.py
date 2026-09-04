@@ -3900,6 +3900,286 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
+    # ── Network utilities ─────────────────────────────────────────────────
+    "ip_inspect": {
+        "description": "Inspect a single IPv4 or IPv6 address: canonical text, family, packed bytes, numeric value, and explicit special-use tags. Pure computation, no network access.",
+        "tier": 2,
+        "tags": ["network", "ip", "inspection", "address"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "IP address text (e.g., '192.0.2.1', '::ffff:192.0.2.1')",
+                    "maxLength": 100000,
+                },
+            },
+            "required": ["address"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "address": {"type": "string", "description": "Canonical address text"},
+                "family": {
+                    "type": "string",
+                    "enum": ["ipv4", "ipv6"],
+                    "description": "Address family",
+                },
+                "bytes_hex": {
+                    "type": "string",
+                    "description": "Packed bytes as lowercase hex, no separators",
+                },
+                "numeric": {
+                    "type": "string",
+                    "description": "Exact unsigned integer value as decimal string",
+                },
+                "special_use": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Sorted explicit special-use tags",
+                },
+                "ipv4_mapped": {
+                    "type": ["object", "null"],
+                    "description": "Embedded IPv4 metadata for ::ffff:0:0/96 addresses, else null",
+                    "properties": {
+                        "address": {"type": "string"},
+                        "numeric": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
+    "cidr_inspect": {
+        "description": "Inspect a CIDR range: canonical network, prefix/host bits, range bounds, exact address count, and optional same-family containment. Pure computation, no network access.",
+        "tier": 2,
+        "tags": ["network", "ip", "cidr", "inspection", "range"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "cidr": {
+                    "type": "string",
+                    "description": "CIDR text such as '192.0.2.99/24' or '2001:db8::1/64'",
+                    "maxLength": 100000,
+                },
+                "contains": {
+                    "type": "string",
+                    "description": "Optional candidate address to test for membership (must use the same family)",
+                    "maxLength": 100000,
+                },
+            },
+            "required": ["cidr"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "family": {"type": "string", "enum": ["ipv4", "ipv6"]},
+                "cidr": {"type": "string", "description": "Canonical network CIDR"},
+                "prefix_length": {"type": "integer"},
+                "host_bits": {"type": "integer"},
+                "network_address": {"type": "string"},
+                "netmask": {"type": "string"},
+                "first_address": {"type": "string"},
+                "last_address": {"type": "string"},
+                "broadcast_address": {
+                    "type": ["string", "null"],
+                    "description": "Final address for IPv4, null for IPv6",
+                },
+                "address_count": {
+                    "type": "string",
+                    "description": "Exact address count as decimal string",
+                },
+                "contains": {
+                    "type": ["boolean", "null"],
+                    "description": "Containment result, null when no candidate supplied",
+                },
+                "contains_address": {
+                    "type": ["string", "null"],
+                    "description": "Candidate canonical address, null when none supplied",
+                },
+            },
+        },
+    },
+    # ── Encoding utilities ────────────────────────────────────────────────
+    "codec_convert": {
+        "description": "Convert text between utf8, hex, base64, and base64url codecs with strict validation and canonical outputs.",
+        "tier": 2,
+        "tags": ["encoding", "codec", "conversion", "base64", "hex"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string",
+                    "description": "Encoded input text in the source format",
+                    "maxLength": 100000,
+                },
+                "from": {
+                    "type": "string",
+                    "enum": ["utf8", "hex", "base64", "base64url"],
+                    "description": "Source codec format",
+                },
+                "to": {
+                    "type": "string",
+                    "enum": ["utf8", "hex", "base64", "base64url"],
+                    "description": "Destination codec format",
+                },
+            },
+            "required": ["value", "from", "to"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "value": {"type": "string", "description": "Canonical converted text"},
+                "from": {"type": "string"},
+                "to": {"type": "string"},
+                "byte_length": {
+                    "type": "integer",
+                    "description": "Decoded payload length in bytes",
+                },
+            },
+        },
+    },
+    "radix_convert": {
+        "description": "Convert a signed ASCII integer between bases 2 and 36. Magnitude is capped at 2**128 - 1 for cross-implementation parity.",
+        "tier": 2,
+        "tags": ["encoding", "radix", "conversion", "base", "integer"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string",
+                    "description": "Integer text with optional single leading +/- and ASCII digits",
+                    "maxLength": 100000,
+                },
+                "from_base": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 36,
+                    "description": "Source base",
+                },
+                "to_base": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 36,
+                    "description": "Destination base",
+                },
+                "uppercase": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Use uppercase A-Z digits instead of lowercase",
+                },
+            },
+            "required": ["value", "from_base", "to_base"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "value": {"type": "string", "description": "Canonical converted value"},
+                "from_base": {"type": "integer"},
+                "to_base": {"type": "integer"},
+                "uppercase": {"type": "boolean"},
+                "negative": {"type": "boolean"},
+                "magnitude_decimal": {
+                    "type": "string",
+                    "description": "Decimal magnitude string",
+                },
+            },
+        },
+    },
+    # ── Temporal utilities ────────────────────────────────────────────────
+    "datetime_convert": {
+        "description": "Convert between RFC3339 timestamps and Unix seconds/milliseconds/nanoseconds with exact nanosecond precision and fixed offsets. No named timezones or DST database.",
+        "tier": 2,
+        "tags": ["temporal", "datetime", "conversion", "timestamp", "rfc3339"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string",
+                    "description": "Timestamp text: RFC3339 or signed decimal Unix integer string",
+                    "maxLength": 100000,
+                },
+                "format": {
+                    "type": "string",
+                    "enum": ["rfc3339", "unix_seconds", "unix_milliseconds", "unix_nanoseconds"],
+                    "description": "Input format of value",
+                },
+                "output_offset": {
+                    "type": "string",
+                    "pattern": "^(Z|[+-][0-9]{2}:[0-9]{2})$",
+                    "maxLength": 100000,
+                    "description": "Optional fixed display offset (Z or +/-HH:MM)",
+                },
+            },
+            "required": ["value", "format"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "rfc3339": {"type": "string"},
+                "utc_rfc3339": {"type": "string"},
+                "unix_seconds": {"type": "string"},
+                "unix_milliseconds": {"type": "string"},
+                "unix_nanoseconds": {"type": "string"},
+                "offset_seconds": {"type": "integer"},
+                "selected_offset": {"type": "string"},
+                "components": {
+                    "type": "object",
+                    "description": "Calendar components in the selected offset",
+                },
+            },
+        },
+    },
+    "cron_inspect": {
+        "description": "Inspect a five-field cron expression and list strictly-later runs at a fixed offset. Corrected Vixie/Cronie DOM/DOW star-syntax semantics; bounded search over one 400-year Gregorian cycle.",
+        "tier": 2,
+        "tags": ["temporal", "cron", "inspection", "schedule"],
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "Five whitespace-delimited fields: minute hour day-of-month month day-of-week",
+                    "maxLength": 100000,
+                },
+                "after": {
+                    "type": "string",
+                    "description": "RFC3339 reference instant; results are strictly later and reuse its fixed offset",
+                    "maxLength": 100000,
+                },
+                "count": {
+                    "type": "integer",
+                    "default": 5,
+                    "minimum": 1,
+                    "maximum": 32,
+                    "description": "Requested run count",
+                },
+            },
+            "required": ["expression", "after"],
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "expression": {"type": "string"},
+                "normalized_expression": {"type": "string"},
+                "parsed_values": {
+                    "type": "object",
+                    "description": "Sorted normalized integer sets per field",
+                },
+                "offset": {"type": "string"},
+                "offset_seconds": {"type": "integer"},
+                "satisfiable": {"type": "boolean"},
+                "next_runs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Strictly-later runs in the same fixed offset",
+                },
+                "count": {
+                    "type": "integer",
+                    "description": "Actual entries in next_runs",
+                },
+            },
+        },
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -4777,6 +5057,73 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "aliases": [],
         "llm_exposure": "contextual",
         "harness_use": ["repo_audit"],
+        "cost": "moderate",
+        "stability": "stable",
+        "composite": False,
+    },
+    # ── Network / encoding / temporal utilities (full-only contextual) ────
+    "ip_inspect": {
+        "category": "network",
+        "tier": 2,
+        "profiles": ["full"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "cidr_inspect": {
+        "category": "network",
+        "tier": 2,
+        "profiles": ["full"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "codec_convert": {
+        "category": "encoding",
+        "tier": 2,
+        "profiles": ["full"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "radix_convert": {
+        "category": "encoding",
+        "tier": 2,
+        "profiles": ["full"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "datetime_convert": {
+        "category": "temporal",
+        "tier": 2,
+        "profiles": ["full"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
+        "cost": "cheap",
+        "stability": "stable",
+        "composite": False,
+    },
+    "cron_inspect": {
+        "category": "temporal",
+        "tier": 2,
+        "profiles": ["full"],
+        "aliases": [],
+        "llm_exposure": "contextual",
+        "harness_use": ["none"],
         "cost": "moderate",
         "stability": "stable",
         "composite": False,

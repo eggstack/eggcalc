@@ -192,6 +192,23 @@ def _assert_mcp_responses(result: dict, label: str) -> None:
 
     if 2 in ids_received:
         _pass(f"{label} tools/list response")
+        list_msg = next((m for m in msgs if m.get("id") == 2), None)
+        if list_msg:
+            entries = list_msg.get("result", {}).get("tools", [])
+            names = {e.get("name") for e in entries if isinstance(e, dict)}
+            expected = {
+                "ip_inspect",
+                "cidr_inspect",
+                "codec_convert",
+                "radix_convert",
+                "datetime_convert",
+                "cron_inspect",
+            }
+            missing = expected - names
+            if not missing:
+                _pass(f"{label} tools/list includes utility tools")
+            else:
+                _fail(f"{label} tools/list utility tools", f"Missing: {sorted(missing)}")
     else:
         _fail(f"{label} tools/list", f"No response for id=2. Messages: {msgs}")
 

@@ -6295,3 +6295,244 @@ def repo_file_inventory_mcp(
         return _success_response(result, tool="repo_file_inventory")
     except Exception as e:
         return _error_response("internal_error", str(e), tool="repo_file_inventory")
+
+
+# ---------------------------------------------------------------------------
+# Network / encoding / temporal utilities (thin deferred-import handlers)
+# ---------------------------------------------------------------------------
+
+
+def ip_inspect_mcp(address: str) -> dict:
+    """Inspect a single IPv4 or IPv6 address (no network access).
+
+    Args:
+        address: IP address text (e.g., "192.0.2.1", "::ffff:192.0.2.1").
+
+    Returns:
+        Success envelope with inspection result, or error envelope.
+    """
+    from ..exact.network import ip_inspect as _ip_inspect
+
+    if (err := _require_str(address, "address", "ip_inspect")) is not None:
+        return err
+    try:
+        result = _ip_inspect(address)
+        return _success_response(result, tool="ip_inspect")
+    except ValueError as e:
+        return _error_response("invalid_arguments", str(e), tool="ip_inspect")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="ip_inspect")
+
+
+def cidr_inspect_mcp(cidr: str, contains: str | None = None) -> dict:
+    """Inspect a CIDR range with optional same-family containment check.
+
+    Args:
+        cidr: CIDR text such as "192.0.2.99/24" or "2001:db8::1/64".
+        contains: Optional candidate address to test for membership.
+
+    Returns:
+        Success envelope with inspection result, or error envelope.
+    """
+    from ..exact.network import cidr_inspect as _cidr_inspect
+
+    if (err := _require_str(cidr, "cidr", "cidr_inspect")) is not None:
+        return err
+    if (
+        contains is not None
+        and (err := _require_str(contains, "contains", "cidr_inspect")) is not None
+    ):
+        return err
+    try:
+        result = _cidr_inspect(cidr, contains)
+        return _success_response(result, tool="cidr_inspect")
+    except ValueError as e:
+        return _error_response("invalid_arguments", str(e), tool="cidr_inspect")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="cidr_inspect")
+
+
+def codec_convert_mcp(value: str, **kwargs: Any) -> dict:
+    """Convert text between utf8, hex, base64, and base64url codecs.
+
+    The codec names use the JSON keys ``from``/``to`` (``from`` is a Python
+    keyword, so they arrive via ``kwargs``); they map to the exact params
+    ``from_format``/``to_format``.
+
+    Args:
+        value: Encoded input text in the source format.
+        **kwargs: ``from`` (source codec) and ``to`` (destination codec).
+
+    Returns:
+        Success envelope with conversion result, or error envelope.
+    """
+    from ..exact.encoding import codec_convert as _codec_convert
+
+    if (err := _require_str(value, "value", "codec_convert")) is not None:
+        return err
+    from_format = kwargs.get("from")
+    to_format = kwargs.get("to")
+    if not isinstance(from_format, str):
+        return _error_response(
+            "invalid_arguments",
+            f"from must be a string, got {type(from_format).__name__}",
+            ["Use one of: utf8, hex, base64, base64url"],
+            tool="codec_convert",
+        )
+    if not isinstance(to_format, str):
+        return _error_response(
+            "invalid_arguments",
+            f"to must be a string, got {type(to_format).__name__}",
+            ["Use one of: utf8, hex, base64, base64url"],
+            tool="codec_convert",
+        )
+    valid_formats = {"utf8", "hex", "base64", "base64url"}
+    if from_format not in valid_formats:
+        return _error_response(
+            "invalid_arguments",
+            f"Unsupported source format: {from_format}",
+            ["Use one of: utf8, hex, base64, base64url"],
+            tool="codec_convert",
+        )
+    if to_format not in valid_formats:
+        return _error_response(
+            "invalid_arguments",
+            f"Unsupported destination format: {to_format}",
+            ["Use one of: utf8, hex, base64, base64url"],
+            tool="codec_convert",
+        )
+    try:
+        result = _codec_convert(value, from_format, to_format)
+        return _success_response(result, tool="codec_convert")
+    except ValueError as e:
+        return _error_response("invalid_arguments", str(e), tool="codec_convert")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="codec_convert")
+
+
+def radix_convert_mcp(
+    value: str,
+    from_base: int,
+    to_base: int,
+    uppercase: bool = False,
+) -> dict:
+    """Convert a signed ASCII integer between bases 2 and 36.
+
+    Args:
+        value: Integer text with optional single leading +/-.
+        from_base: Source base (2..36).
+        to_base: Destination base (2..36).
+        uppercase: Use uppercase A-Z digits instead of lowercase.
+
+    Returns:
+        Success envelope with conversion result, or error envelope.
+    """
+    from ..exact.encoding import radix_convert as _radix_convert
+
+    if (err := _require_str(value, "value", "radix_convert")) is not None:
+        return err
+    for name, base in (("from_base", from_base), ("to_base", to_base)):
+        if not isinstance(base, int) or isinstance(base, bool):
+            return _error_response(
+                "invalid_arguments",
+                f"{name} must be an integer in 2..=36, got {base!r}",
+                tool="radix_convert",
+            )
+        if base < 2 or base > 36:
+            return _error_response(
+                "invalid_arguments",
+                f"{name} must be an integer in 2..=36, got {base!r}",
+                tool="radix_convert",
+            )
+    if not isinstance(uppercase, bool):
+        return _error_response(
+            "invalid_arguments",
+            f"uppercase must be a boolean, got {type(uppercase).__name__}",
+            tool="radix_convert",
+        )
+    try:
+        result = _radix_convert(value, from_base, to_base, uppercase)
+        return _success_response(result, tool="radix_convert")
+    except ValueError as e:
+        return _error_response("invalid_arguments", str(e), tool="radix_convert")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="radix_convert")
+
+
+def datetime_convert_mcp(
+    value: str,
+    format: str,
+    output_offset: str | None = None,
+) -> dict:
+    """Convert between RFC3339 and Unix time units with nanosecond precision.
+
+    Args:
+        value: Timestamp text (RFC3339 or signed decimal Unix integer string).
+        format: One of rfc3339, unix_seconds, unix_milliseconds, unix_nanoseconds.
+        output_offset: Optional fixed display offset (Z or +/-HH:MM).
+
+    Returns:
+        Success envelope with conversion result, or error envelope.
+    """
+    from ..exact.temporal import datetime_convert as _datetime_convert
+
+    if (err := _require_str(value, "value", "datetime_convert")) is not None:
+        return err
+    valid_formats = {"rfc3339", "unix_seconds", "unix_milliseconds", "unix_nanoseconds"}
+    if format not in valid_formats:
+        return _error_response(
+            "invalid_arguments",
+            f"Unsupported format: {format}",
+            ["Use one of: rfc3339, unix_seconds, unix_milliseconds, unix_nanoseconds"],
+            tool="datetime_convert",
+        )
+    if (
+        output_offset is not None
+        and (err := _require_str(output_offset, "output_offset", "datetime_convert")) is not None
+    ):
+        return err
+    try:
+        result = _datetime_convert(value, format, output_offset)
+        return _success_response(result, tool="datetime_convert")
+    except ValueError as e:
+        return _error_response("invalid_arguments", str(e), tool="datetime_convert")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="datetime_convert")
+
+
+def cron_inspect_mcp(expression: str, after: str, count: int = 5) -> dict:
+    """Inspect a five-field cron expression and list strictly-later runs.
+
+    Args:
+        expression: Five whitespace-delimited cron fields.
+        after: RFC3339 reference instant; results are strictly later.
+        count: Requested run count (1..32, default 5).
+
+    Returns:
+        Success envelope with inspection result, or error envelope.
+    """
+    from ..exact.temporal import cron_inspect as _cron_inspect
+
+    if (err := _require_str(expression, "expression", "cron_inspect")) is not None:
+        return err
+    if (err := _require_str(after, "after", "cron_inspect")) is not None:
+        return err
+    if not isinstance(count, int) or isinstance(count, bool):
+        return _error_response(
+            "invalid_arguments",
+            f"count must be an integer in 1..32, got {type(count).__name__}",
+            tool="cron_inspect",
+        )
+    if count < 1 or count > 32:
+        return _error_response(
+            "invalid_arguments",
+            f"count must be an integer in 1..32, got {count!r}",
+            tool="cron_inspect",
+        )
+    try:
+        result = _cron_inspect(expression, after, count)
+        return _success_response(result, tool="cron_inspect")
+    except ValueError as e:
+        return _error_response("invalid_arguments", str(e), tool="cron_inspect")
+    except Exception as e:
+        return _error_response("internal_error", str(e), tool="cron_inspect")

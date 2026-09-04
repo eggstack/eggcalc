@@ -1,0 +1,121 @@
+{
+  "_comment": "Representative parity corpus for the six deterministic utility tools (Plans 030-032). Vectors transcribed from reviewed eggsact behavior (upstream feature commit 879570e, corrective commit ae2be1d, cron semantics correction 330e7a6). No test shells out to eggsact. Shared by MCP handler tests and package/single-file parity tests; 'expect_subset' is matched as a subset of the result dict.",
+  "cases": [
+    {
+      "tool": "ip_inspect",
+      "arguments": {"address": "::ffff:192.0.2.1"},
+      "expect_ok": true,
+      "expect_subset": {
+        "family": "ipv6",
+        "special_use": ["ipv4_mapped"],
+        "ipv4_mapped": {"address": "192.0.2.1", "numeric": "3221225985"}
+      }
+    },
+    {
+      "tool": "ip_inspect",
+      "arguments": {"address": "not-an-ip"},
+      "expect_ok": false,
+      "expect_error_type": "invalid_arguments"
+    },
+    {
+      "tool": "cidr_inspect",
+      "arguments": {"cidr": "2001:db8::1/64", "contains": "2001:db8::2"},
+      "expect_ok": true,
+      "expect_subset": {
+        "family": "ipv6",
+        "cidr": "2001:db8::/64",
+        "prefix_length": 64,
+        "host_bits": 64,
+        "broadcast_address": null,
+        "contains": true,
+        "contains_address": "2001:db8::2"
+      }
+    },
+    {
+      "tool": "cidr_inspect",
+      "arguments": {"cidr": "10.0.0.1"},
+      "expect_ok": false,
+      "expect_error_type": "invalid_arguments"
+    },
+    {
+      "tool": "codec_convert",
+      "arguments": {"value": "SGVsbG8", "from": "base64", "to": "hex"},
+      "expect_ok": true,
+      "expect_subset": {
+        "value": "48656c6c6f",
+        "from": "base64",
+        "to": "hex",
+        "byte_length": 5
+      }
+    },
+    {
+      "tool": "codec_convert",
+      "arguments": {"value": "!!!", "from": "base64", "to": "hex"},
+      "expect_ok": false,
+      "expect_error_type": "invalid_arguments"
+    },
+    {
+      "tool": "radix_convert",
+      "arguments": {
+        "value": "340282366920938463463374607431768211455",
+        "from_base": 10,
+        "to_base": 16,
+        "uppercase": true
+      },
+      "expect_ok": true,
+      "expect_subset": {
+        "value": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "uppercase": true,
+        "negative": false,
+        "magnitude_decimal": "340282366920938463463374607431768211455"
+      }
+    },
+    {
+      "tool": "radix_convert",
+      "arguments": {
+        "value": "340282366920938463463374607431768211456",
+        "from_base": 10,
+        "to_base": 16
+      },
+      "expect_ok": false,
+      "expect_error_type": "invalid_arguments"
+    },
+    {
+      "tool": "datetime_convert",
+      "arguments": {"value": "-1", "format": "unix_nanoseconds"},
+      "expect_ok": true,
+      "expect_subset": {
+        "unix_seconds": "-1",
+        "unix_milliseconds": "-1",
+        "unix_nanoseconds": "-1",
+        "selected_offset": "Z"
+      }
+    },
+    {
+      "tool": "datetime_convert",
+      "arguments": {"value": "not-a-timestamp", "format": "rfc3339"},
+      "expect_ok": false,
+      "expect_error_type": "invalid_arguments"
+    },
+    {
+      "tool": "cron_inspect",
+      "arguments": {
+        "expression": "0 0 */1 * MON",
+        "after": "2026-09-03T00:00:00Z",
+        "count": 3
+      },
+      "expect_ok": true,
+      "expect_subset": {
+        "satisfiable": true,
+        "count": 3,
+        "offset": "Z"
+      }
+    },
+    {
+      "tool": "cron_inspect",
+      "arguments": {"expression": "@daily", "after": "2026-09-03T00:00:00Z"},
+      "expect_ok": false,
+      "expect_error_type": "invalid_arguments"
+    }
+  ]
+}

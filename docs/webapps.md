@@ -235,7 +235,7 @@ For AI agent workflows, eggcalc includes an MCP (Model Context Protocol) server 
 calc --mcp
 ```
 
-The MCP server provides 77 tools for AI agent use across text analysis, validation, unit conversion, and more.
+The MCP server provides 83 tools for AI agent use across text analysis, validation, unit conversion, and more.
 
 See [MCP Server](mcp.md) for full documentation.
 

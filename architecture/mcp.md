@@ -194,7 +194,7 @@ class ErrorEnvelope(TypedDict):
 
 ### TOOL_SCHEMAS
 
-Registry of all available tools (77 total). Tools are organized by tier for selective exposure. The tiers reflect actual schema definitions:
+Registry of all available tools (83 total). Tools are organized by tier for selective exposure. The tiers reflect actual schema definitions:
 
 #### Tier 0 — Ultra-common (minimal schema)
 
@@ -280,6 +280,12 @@ Registry of all available tools (77 total). Tools are organized by tier for sele
 | `go_mod_inspect` | manifest | Inspect go.mod structure |
 | `lockfile_summary` | manifest | Summarize lockfile contents |
 | `repo_file_inventory` | repo | Inventory repository file structure |
+| `ip_inspect` | network | Inspect IP address (canonical text, family, special-use tags) |
+| `cidr_inspect` | network | Inspect CIDR range (bounds, exact count, containment) |
+| `codec_convert` | encoding | Convert between utf8/hex/base64/base64url codecs |
+| `radix_convert` | encoding | Convert integers between bases 2–36 (u128-capped) |
+| `datetime_convert` | temporal | Convert RFC3339 <-> Unix time with nanosecond precision |
+| `cron_inspect` | temporal | Inspect five-field cron, list strictly-later runs |
 
 #### Tier 3 — Domain-specific tools
 
@@ -297,7 +303,7 @@ Registry of all available tools (77 total). Tools are organized by tier for sele
 
 Per-tool metadata used for profile building and exposure control. Each entry includes:
 
-- `category` — Tool category (math, text, path, validation, regex, identifier, json, list, shell, config, unicode, markdown, patch, toml, version, manifest, cargo, repo)
+- `category` — Tool category (math, text, path, validation, regex, identifier, json, list, shell, config, unicode, markdown, patch, toml, version, manifest, cargo, repo, network, encoding, temporal)
 - `tier` — Tier level (0–3)
 - `profiles` — List of named profiles that include this tool
 - `llm_exposure` — Exposure level: `"default"`, `"contextual"`, `"harness_only"`, or `"expert_only"`. Tools with `"hidden"` are excluded from the `full` profile.
@@ -310,7 +316,9 @@ Per-tool metadata used for profile building and exposure control. Each entry inc
 
 ## tools.py — Tool Implementations
 
-Wraps exact/ functions with error handling, sanitization, and response envelopes. 77 tool functions implemented.
+Wraps exact/ functions with error handling, sanitization, and response envelopes. 83 tool functions implemented.
+
+Handlers import their exact/ function lazily inside the function body (never at module top level), pre-check inputs with `_require_str`/`_validate_str_list` against `MAX_TEXT_LENGTH`, then map exact `ValueError` to `invalid_arguments` envelopes and unexpected exceptions to `internal_error`. One naming exception: `codec_convert_mcp` accepts the JSON keys `from`/`to` via `**kwargs` (`from` is a Python keyword) and forwards them to the exact params `from_format`/`to_format`.
 
 ### Response Helpers
 
@@ -456,17 +464,21 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
 
 ### Tool Handler Map
 
-`TOOL_HANDLERS` in server.py maps tool names to handler functions (77 entries). All tools are registered alphabetically:
+`TOOL_HANDLERS` in server.py maps tool names to handler functions (83 entries). All tools are registered alphabetically:
 
 ```python
 TOOL_HANDLERS: dict[str, Any] = {
     "argv_compare": shell_argv_compare,
     "canonicalize_text": canonicalize_text_mcp,
     "cargo_toml_inspect": cargo_toml_inspect_mcp,
+    "cidr_inspect": cidr_inspect_mcp,
     "code_fence_extract": code_fence_extract_mcp,
+    "codec_convert": codec_convert_mcp,
     "command_preflight": command_preflight,
     "config_preflight": config_preflight,
     "constant_lookup": constant_lookup,
+    "cron_inspect": cron_inspect_mcp,
+    "datetime_convert": datetime_convert_mcp,
     "diff_file_headers": diff_file_headers_mcp,
     "diff_hunk_ranges": diff_hunk_ranges_mcp,
     "diff_touched_paths": diff_touched_paths_mcp,
@@ -475,6 +487,7 @@ TOOL_HANDLERS: dict[str, Any] = {
     "escape_text": escape_text,
     "glob_match": glob_match_mcp,
     "go_mod_inspect": go_mod_inspect_mcp,
+    "ip_inspect": ip_inspect_mcp,
     "identifier_analyze": identifier_analyze,
     "identifier_inspect": identifier_inspect_mcp,
     "identifier_table_inspect": identifier_table_inspect_mcp,
@@ -504,6 +517,7 @@ TOOL_HANDLERS: dict[str, Any] = {
     "path_scope_check": path_scope_check_mcp,
     "prompt_input_inspect": prompt_input_inspect_mcp,
     "pyproject_inspect": pyproject_inspect_mcp,
+    "radix_convert": radix_convert_mcp,
     "regex_finditer": regex_finditer,
     "regex_safety_check": regex_safety_check,
     "repo_file_inventory": repo_file_inventory_mcp,
@@ -664,11 +678,11 @@ Profiles are named subsets of tools that control which tools are available via `
 
 ### Data Structures
 
-**`TOOL_METADATA`** (schemas.py:3808–4670): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile.
+**`TOOL_METADATA`** (schemas.py:4202–5131): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile.
 
-**`TOOL_PROFILES`** (schemas.py:4691): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
+**`TOOL_PROFILES`** (schemas.py:5152): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
 
-**`PROFILE_NAMES`** (schemas.py:4694–4706): Canonical list of all 11 profile names:
+**`PROFILE_NAMES`** (schemas.py:5155–5168): Canonical list of all 11 profile names:
 `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
 
 ### Profile Selection
@@ -779,7 +793,7 @@ Cancellation is best-effort. The server checks cancellation records before dispa
 |---------|-----------|----------------|
 | Interface | stdio/JSON-RPC | Python API |
 | Use case | AI agents | Embedded usage |
-| Functions | 77 tools | All |
+| Functions | 83 tools | All |
 | Error format | Envelope | Exceptions |
 | Config loading | Blocked | Opt-in via `EGGCALC_LOAD_CONFIG` |
 

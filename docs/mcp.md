@@ -1176,6 +1176,168 @@ Heuristic check for potential catastrophic backtracking risks in regex patterns.
 
 ---
 
+### ip_inspect
+
+Inspect a single IPv4 or IPv6 address: canonical text, family, packed bytes, numeric value, and explicit special-use tags. Pure computation — no network access, DNS lookups, or platform-specific behavior.
+
+**Arguments:**
+- `address` (string): IP address text (e.g., `192.0.2.1`, `::ffff:192.0.2.1`)
+
+**Tier:** 2
+**Tags:** `network`, `ip`, `inspection`, `address`
+
+**Returns:**
+- `address`: Canonical address text
+- `family`: `ipv4` or `ipv6`
+- `bytes_hex`: Packed bytes as lowercase hex, no separators
+- `numeric`: Exact unsigned integer value as decimal string
+- `special_use`: Sorted explicit special-use tags (`unspecified`, `loopback`, `private`, `link_local`, `multicast`, `documentation`, `shared`, `unique_local`, `ipv4_mapped`)
+- `ipv4_mapped`: Embedded IPv4 metadata for `::ffff:0:0/96` addresses, else null
+
+**Example:**
+```json
+{"name": "ip_inspect", "arguments": {"address": "192.0.2.1"}}
+// Returns: {"ok": true, "result": {"address": "192.0.2.1", "family": "ipv4", "bytes_hex": "c0000201", "numeric": "3221225985", "special_use": ["documentation"], "ipv4_mapped": null}}
+```
+
+**Limits:** Input limited to 100,000 characters. Special-use classification uses an explicit version-stable taxonomy, not version-sensitive `is_private`/`is_global` properties.
+
+---
+
+### cidr_inspect
+
+Inspect a CIDR range: canonical network, prefix/host bits, range bounds, exact address count, and optional same-family containment. Pure computation — no network access.
+
+**Arguments:**
+- `cidr` (string): CIDR text such as `192.0.2.99/24` or `2001:db8::1/64` (host-address CIDRs are canonicalized to their network boundary)
+- `contains` (string, optional): Candidate address to test for membership (must use the same address family)
+
+**Tier:** 2
+**Tags:** `network`, `ip`, `cidr`, `inspection`, `range`
+
+**Returns:**
+- `family`, `cidr`, `prefix_length`, `host_bits`, `network_address`, `netmask`, `first_address`, `last_address`
+- `broadcast_address`: Final address for IPv4, null for IPv6
+- `address_count`: Exact address count as decimal string (arbitrary precision, including IPv6 `/0`)
+- `contains`, `contains_address`: Containment result, null when no candidate is supplied
+
+**Example:**
+```json
+{"name": "cidr_inspect", "arguments": {"cidr": "192.0.2.99/24", "contains": "192.0.2.1"}}
+// Returns: {"ok": true, "result": {"family": "ipv4", "cidr": "192.0.2.0/24", "prefix_length": 24, "host_bits": 8, "address_count": "256", "contains": true, "contains_address": "192.0.2.1", ...}}
+```
+
+**Limits:** Inputs limited to 100,000 characters. The prefix must be decimal digits within the address width; cross-family containment checks are rejected.
+
+---
+
+### codec_convert
+
+Convert text between `utf8`, `hex`, `base64`, and `base64url` codecs with strict validation and canonical outputs.
+
+**Arguments:**
+- `value` (string): Encoded input text in the source format
+- `from` (string): Source codec (`utf8`, `hex`, `base64`, `base64url`)
+- `to` (string): Destination codec (same vocabulary)
+
+**Tier:** 2
+**Tags:** `encoding`, `codec`, `conversion`, `base64`, `hex`
+
+**Returns:**
+- `value`: Canonical converted text (padded standard Base64, unpadded URL-safe Base64, lowercase hex, strict UTF-8)
+- `from`, `to`: Resolved formats
+- `byte_length`: Decoded payload length in bytes
+
+**Example:**
+```json
+{"name": "codec_convert", "arguments": {"value": "Hello", "from": "utf8", "to": "base64"}}
+// Returns: {"ok": true, "result": {"value": "SGVsbG8=", "from": "utf8", "to": "base64", "byte_length": 5}}
+```
+
+**Limits:** Input and output limited to 100,000 characters. Base64 parsing is strict: whitespace, mixed alphabets, misplaced padding, and invalid lengths are rejected. No aliases, Base32/Base85, or compression.
+
+---
+
+### radix_convert
+
+Convert a signed ASCII integer between bases 2 and 36. Magnitude is capped at `2**128 - 1` for cross-implementation parity even though Python integers are unbounded.
+
+**Arguments:**
+- `value` (string): Integer text with an optional single leading `+`/`-` followed by ASCII digits
+- `from_base` (integer 2–36): Source base
+- `to_base` (integer 2–36): Destination base
+- `uppercase` (boolean, optional): Use uppercase `A-Z` digits (default false)
+
+**Tier:** 2
+**Tags:** `encoding`, `radix`, `conversion`, `base`, `integer`
+
+**Returns:**
+- `value`: Canonical converted value (no leading `+`, no leading zeroes, `-` only for nonzero negatives)
+- `from_base`, `to_base`, `uppercase`, `negative`, `magnitude_decimal`
+
+**Example:**
+```json
+{"name": "radix_convert", "arguments": {"value": "-ff", "from_base": 16, "to_base": 2}}
+// Returns: {"ok": true, "result": {"value": "-11111111", "from_base": 16, "to_base": 2, "uppercase": false, "negative": true, "magnitude_decimal": "255"}}
+```
+
+**Limits:** Input limited to 100,000 characters. Whitespace, underscores, `0x` prefixes, decimal points, exponents, and non-ASCII digits are rejected. Negative zero normalizes to zero.
+
+---
+
+### datetime_convert
+
+Convert between RFC3339 timestamps and Unix seconds/milliseconds/nanoseconds with exact nanosecond precision and fixed offsets. No named timezones, DST database, system clock, or floating-point timestamps.
+
+**Arguments:**
+- `value` (string): Timestamp text — bounded RFC3339 (`YYYY-MM-DDTHH:MM:SS[.fraction]Z` or `±HH:MM`, 1–9 fractional digits) or a signed decimal Unix integer string
+- `format` (string): `rfc3339`, `unix_seconds`, `unix_milliseconds`, or `unix_nanoseconds`
+- `output_offset` (string, optional): Fixed display offset (`Z` or `±HH:MM`); defaults to the input offset for RFC3339 input and UTC for Unix input
+
+**Tier:** 2
+**Tags:** `temporal`, `datetime`, `conversion`, `timestamp`, `rfc3339`
+
+**Returns:**
+- `rfc3339`, `utc_rfc3339`, `unix_seconds`, `unix_milliseconds` (floor-derived strings), `unix_nanoseconds`
+- `offset_seconds`, `selected_offset`, `components` (year, month, day, hour, minute, second, nanosecond, weekday `SUN`..`SAT`)
+
+**Example:**
+```json
+{"name": "datetime_convert", "arguments": {"value": "2026-09-03T11:00:00-04:00", "format": "rfc3339", "output_offset": "Z"}}
+// Returns: {"ok": true, "result": {"rfc3339": "2026-09-03T15:00:00Z", "utc_rfc3339": "2026-09-03T15:00:00Z", "unix_seconds": "1788447600", ...}}
+```
+
+**Limits:** Input limited to 100,000 characters. Offsets must be under 24 hours. Years 1–9999 (proleptic Gregorian).
+
+---
+
+### cron_inspect
+
+Inspect a five-field cron expression and list strictly-later runs at a fixed offset, with corrected Vixie/Cronie day-of-month/day-of-week star-syntax semantics. No scheduler execution, named timezones, or DST transitions.
+
+**Arguments:**
+- `expression` (string): Five whitespace-delimited fields (`minute hour day-of-month month day-of-week`) with lists, inclusive nonwrapping ranges, and `/step` syntax; `JAN`–`DEC` and `SUN`–`SAT` names are case-insensitive, Sunday `7` normalizes to `0`
+- `after` (string): RFC3339 reference instant; results are strictly later and reuse its fixed offset
+- `count` (integer 1–32, optional): Requested run count (default 5)
+
+**Tier:** 2
+**Tags:** `temporal`, `cron`, `inspection`, `schedule`
+
+**Returns:**
+- `expression`, `normalized_expression`, `parsed_values`, `offset`, `offset_seconds`, `satisfiable`
+- `next_runs`: Strictly-later runs in the same fixed offset
+- `count`: Actual entries in `next_runs`
+
+**Example:**
+```json
+{"name": "cron_inspect", "arguments": {"expression": "0 9 * * MON-FRI", "after": "2026-09-03T00:00:00Z", "count": 1}}
+// Returns: {"ok": true, "result": {"expression": "0 9 * * MON-FRI", "satisfiable": true, "next_runs": ["2026-09-03T09:00:00Z"], "count": 1, ...}}
+```
+
+**Limits:** Macros (`@daily`), six-field forms, and `CRON_TZ=`/`TZ=` prefixes are rejected. Search is bounded to one 400-year Gregorian cycle at minute resolution.
+
+---
+
 ## Error Responses
 
 When a tool call fails, the response includes an error envelope:
@@ -1351,7 +1513,7 @@ Tools are categorized into tiers based on scope and context cost. See [tool_inve
 - `text_diff_explain`, `text_inspect`, `text_replace_check`, `line_range_extract`, `json_query`, `json_compare`, `validate_toml`, `glob_match`, `validate_regex`, `regex_finditer`, `regex_safety_check`, `identifier_inspect`, `escape_text`, `unescape_text`, `text_window`, `json_canonicalize`, `validate_brackets`, `list_dedupe`, `list_sort`
 
 **Tier 2:** Heavier analysis tools. Exposed when text/unicode/config analysis is needed.
-- `text_position`, `text_hash`, `text_transform`, `text_measure`, `unit_convert`, `unit_info`, `constant_lookup`, `path_analyze`, `path_compare`, `path_scope_check`, `list_compare`, `json_extract`, `version_compare`, `toml_shape`, `markdown_structure`, `code_fence_extract`, `dotenv_validate`, `ini_validate`, `patch_apply_check`, `patch_summary`, `shell_split`, `shell_quote_join`, `argv_compare`, `unicode_policy_check`, `canonicalize_text`, `line_range_compare`, `diff_touched_paths`, `pyproject_inspect`, `repo_file_inventory`
+- `text_position`, `text_hash`, `text_transform`, `text_measure`, `unit_convert`, `unit_info`, `constant_lookup`, `path_analyze`, `path_compare`, `path_scope_check`, `list_compare`, `json_extract`, `version_compare`, `toml_shape`, `markdown_structure`, `code_fence_extract`, `dotenv_validate`, `ini_validate`, `patch_apply_check`, `patch_summary`, `shell_split`, `shell_quote_join`, `argv_compare`, `unicode_policy_check`, `canonicalize_text`, `line_range_compare`, `diff_touched_paths`, `pyproject_inspect`, `repo_file_inventory`, `ip_inspect`, `cidr_inspect`, `codec_convert`, `radix_convert`, `datetime_convert`, `cron_inspect`
 
 **Tier 3:** Domain-specific tools. Opt-in for specialized workflows.
 - `text_truncate`, `json_shape`, `identifier_analyze`, `validate_schema_light`, `version_constraint_check`, `cargo_toml_inspect`
@@ -1370,7 +1532,7 @@ EGGCALC_MCP_PROFILE=codegg_core_min calc --mcp
 EGGCALC_MCP_PROFILE=human_math calc --mcp
 ```
 
-The default profile is `full`, which exposes all 77 tools. Unknown profile names cause an immediate `SystemExit(1)` at startup.
+The default profile is `full`, which exposes all 83 tools. Unknown profile names cause an immediate `SystemExit(1)` at startup.
 
 Tools outside the active profile are **rejected** at `tools/call` time with JSON-RPC error `-32602`:
 
@@ -1488,7 +1650,7 @@ See [tool_inventory.md](tool_inventory.md) for the complete profile membership t
 
 ### `full`
 
-All 77 tools. This is the default profile — it includes every tool where `llm_exposure` is not `"hidden"`.
+All 83 tools. This is the default profile — it includes every tool where `llm_exposure` is not `"hidden"`.
 
 ### Filtering tools/list
 
@@ -1520,8 +1682,8 @@ A `profiles/list` request returns all available profile names, their tool lists,
   "result": {
     "active": "full",
     "profiles": {
-      "full": {"tools": ["math_eval", "text_equal", ...], "tool_count": 77},
-      "default": {"tools": ["escape_text", "glob_match", ...], "tool_count": 25},
+      "full": {"tools": ["math_eval", "text_equal", ...], "tool_count": 83},
+      "default": {"tools": ["escape_text", "glob_match", ...], "tool_count": 26},
       "codegg_core_min": {"tools": ["command_preflight", ...], "tool_count": 6},
       "codegg_core": {"tools": ["cargo_toml_inspect", ...], "tool_count": 22},
       "codegg_preflight": {"tools": ["command_preflight", ...], "tool_count": 10},

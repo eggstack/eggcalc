@@ -86,9 +86,9 @@ Note: `MAX_INPUT_LENGTH` in `exact/validate.py` (100 000), `exact/cargo.py` (200
 | Item | Authoritative source | Tests |
 |------|---------------------|-------|
 | `TOOL_SCHEMAS` | `eggcalc/mcp/schemas.py:45` | `test_mcp_schema_lint` |
-| `TOOL_METADATA` | `eggcalc/mcp/schemas.py:3921` | `test_mcp_schema_lint` |
-| `TOOL_PROFILES` | `eggcalc/mcp/schemas.py:4804` (built from `TOOL_METADATA`) | `test_mcp_server` |
-| `PROFILE_NAMES` | `eggcalc/mcp/schemas.py:4807` | `test_mcp_server` |
+| `TOOL_METADATA` | `eggcalc/mcp/schemas.py:4202` | `test_mcp_schema_lint` |
+| `TOOL_PROFILES` | `eggcalc/mcp/schemas.py:5152` (built from `TOOL_METADATA`) | `test_mcp_server` |
+| `PROFILE_NAMES` | `eggcalc/mcp/schemas.py:5155` | `test_mcp_server` |
 
 ## CLI Command Metadata
 

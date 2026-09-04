@@ -42,7 +42,7 @@ class ModuleSpec:
 
 Three derived views are generated from the manifest:
 - `MODULES_CALC` — core calculator modules (units, evaluator, normalize, cli, capabilities, _protocol)
-- `MODULES_EXACT` — 25 exact/ submodules
+- `MODULES_EXACT` — 28 exact/ submodules (including `network`, `encoding`, `temporal`)
 - `MODULES_MCP` — 3 MCP server modules (schemas, tools, server)
 
 ### Assembly Process

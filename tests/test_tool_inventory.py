@@ -216,6 +216,9 @@ class TestToolMetadata:
         "unicode",
         "manifest",
         "repo",
+        "network",
+        "encoding",
+        "temporal",
     }
     VALID_TIERS = {0, 1, 2, 3}
     VALID_LLM_EXPOSURE = {"default", "contextual", "expert_only", "harness_only", "hidden"}

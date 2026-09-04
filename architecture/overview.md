@@ -73,19 +73,19 @@ eggcalc is a dual-purpose tool:
              │                                │
    ┌─────────▼─────────┐          ┌──────────▼──────────┐
    │   normalize.py    │          │    mcp/tools.py     │
-   │  (NL + units →    │          │ (77 tool handlers,  │
+   │  (NL + units →    │          │ (83 tool handlers,  │
    │  Python syntax)   │          │ lazy exact/ bridge) │
    └─────────┬─────────┘          └──────────┬──────────┘
              │                                │
    ┌─────────▼─────────┐          ┌──────────▼──────────┐
    │   evaluator.py    │          │     exact/ pkg      │
    │  (AST eval, no    │          │ (deterministic text │
-   │      eval())      │          │  analysis, 25 mods) │
+   │      eval())      │          │  analysis, 28 mods) │
    └─────────┬─────────┘          └─────────────────────┘
              │
    ┌─────────▼─────────┐          ┌─────────────────────┐
    │     units.py      │          │  mcp/schemas.py     │
-   │  (UnitValue,      │          │ (77 tool schemas,   │
+   │  (UnitValue,      │          │ (83 tool schemas,   │
    │   registry)       │          │  11 profiles)       │
    └───────────────────┘          └─────────────────────┘
 
@@ -203,9 +203,9 @@ All functions are deterministic, side-effect-free, and independently testable. N
 
 | Module | Lines | Role | Key Exports | Deep Dive |
 |--------|------:|------|-------------|-----------|
-| `schemas.py` | 5,075 | 77 tool definitions with JSON Schemas, metadata, tiers, profiles | `TOOL_SCHEMAS`, `TOOL_METADATA`, `TOOL_PROFILES` | [mcp.md](mcp.md#schemaspy--tool-schemas) |
-| `tools.py` | 6,302 | Tool handler implementations; lazily imports exact/ functions inside each handler; bounded input pre-checks | all 77 handlers | [mcp.md](mcp.md#toolspy--tool-implementations) |
-| `server.py` | 3,011 | stdio JSON-RPC server, sessions, config management, executor | `McpServer`, `McpSession`, `McpServerConfig`, `ConfigSnapshot`, `ConfigManager`, `ToolRegistry`, `ToolExecutor`, `EvaluationPolicy`, `RuntimeContext` | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) |
+| `schemas.py` | 5,422 | 83 tool definitions with JSON Schemas, metadata, tiers, profiles | `TOOL_SCHEMAS`, `TOOL_METADATA`, `TOOL_PROFILES` | [mcp.md](mcp.md#schemaspy--tool-schemas) |
+| `tools.py` | 6,536 | Tool handler implementations; lazily imports exact/ functions inside each handler; bounded input pre-checks | all 83 handlers | [mcp.md](mcp.md#toolspy--tool-implementations) |
+| `server.py` | 3,185 | stdio JSON-RPC server, sessions, config management, executor | `McpServer`, `McpSession`, `McpServerConfig`, `ConfigSnapshot`, `ConfigManager`, `ToolRegistry`, `ToolExecutor`, `EvaluationPolicy`, `RuntimeContext` | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) |
 
 ---
 
@@ -332,7 +332,7 @@ primitives.py          ← foundation (no exact/ deps)
 
 stdio JSON-RPC server exposing deterministic tools to AI agents. Protocol versions supported: `2024-11-05` and `2025-11-25` (latest).
 
-### Tool Categories (77 tools, 18 categories)
+### Tool Categories (83 tools, 21 categories)
 
 | Category | Count | Category | Count |
 |----------|------:|----------|------:|
@@ -343,9 +343,10 @@ stdio JSON-RPC server exposing deterministic tools to AI agents. Protocol versio
 | path | 5 | markdown | 2 |
 | math | 4 | unicode | 2 |
 | shell | 4 | version | 2 |
-| validation | 4 | cargo / repo / toml | 1 each |
+| validation | 4 | network / encoding / temporal | 2 each |
+| cargo / repo / toml | 1 each | | |
 
-Tools carry tier metadata (tier 0: 7, tier 1: 23, tier 2: 40, tier 3: 7) used for profile curation.
+Tools carry tier metadata (tier 0: 7, tier 1: 23, tier 2: 46, tier 3: 7) used for profile curation.
 
 ### Profile System (11 profiles)
 
@@ -353,7 +354,7 @@ Selected via `EGGCALC_MCP_PROFILE` at startup or per-request in `tools/list`:
 
 | Profile | Tools | Purpose |
 |---------|------:|---------|
-| `full` | 77 | Everything (default) |
+| `full` | 83 | Everything (default) |
 | `default` | 26 | General-purpose subset |
 | `codegg_core` | 22 | Code analysis workflow |
 | `codegg_repo_audit` | 18 | Repository inventory |
@@ -457,7 +458,7 @@ mcp/server.py ──► schemas, tools, evaluator, capabilities
 | `TimeoutError` (custom) | evaluator.py | Raised by `evaluate_with_timeout()` |
 | `EggCalcApp` | evaluator.py | Thread-safe app wrapper: instance-local evaluator + LRU cache |
 | `CommandSpec` / `COMMANDS` | cli.py | TypedDict metadata for the 9 text subcommands |
-| `TOOL_SCHEMAS` / `TOOL_METADATA` / `TOOL_PROFILES` | mcp/schemas.py | 77 tool schemas/metadata/tiers, 11 profiles |
+| `TOOL_SCHEMAS` / `TOOL_METADATA` / `TOOL_PROFILES` | mcp/schemas.py | 83 tool schemas/metadata/tiers, 11 profiles |
 | `McpServerConfig` / `ConfigSnapshot` / `ConfigManager` | mcp/server.py | Frozen config, deeply-immutable snapshots, atomic generation-numbered replacement |
 | `ToolRegistry` / `ToolExecutor` | mcp/server.py | Validated tool tables; bounded worker pool + reservation state machine |
 | `McpSession` / `McpSessionState` | mcp/server.py | Per-connection lifecycle (`UNINITIALIZED`→`READY`→`CLOSED`), cancellation records |
@@ -471,7 +472,7 @@ mcp/server.py ──► schemas, tools, evaluator, capabilities
 
 Full details: [build.md](build.md).
 
-- **`build_single.py`** (1,323 lines) assembles everything into one portable `eggcalc.py` (~42k lines / ~1.5 MB). `MODULE_MANIFEST` is the single source of truth: **34 `ModuleSpec` entries** (6 core + 25 exact + 3 mcp) with name, path, group, declared `depends_on`, and single-file inclusion flag. `validate_build_manifest()` checks duplicates, missing files, unknown deps, cycles, reachability, and residual package-relative imports. Assembly topologically sorts modules, strips docstrings/`__all__`, rewrites relative imports to globals, renames colliding entry points (`normalize_main()`, `mcp_main()`), and prefixes conflicting MCP function names.
+- **`build_single.py`** (1,438 lines) assembles everything into one portable `eggcalc.py` (~42k lines / ~1.5 MB). `MODULE_MANIFEST` is the single source of truth: **37 `ModuleSpec` entries** (6 core + 28 exact + 3 mcp) with name, path, group, declared `depends_on`, and single-file inclusion flag. `validate_build_manifest()` checks duplicates, missing files, unknown deps, cycles, reachability, and residual package-relative imports. Assembly topologically sorts modules, strips docstrings/`__all__`, rewrites relative imports to globals, renames colliding entry points (`normalize_main()`, `mcp_main()`), and prefixes conflicting MCP function names.
 - **`install.py`** builds and installs the single file as `calc` (`~/.local/bin/calc` on Linux/macOS, `%LOCALAPPDATA%\Programs\calc` on Windows) with atomic copy and PATH management.
 - **Development commands:** `make test`, `make lint`, `make format`, `make typecheck`, `make docs-check` (generated-MCP-doc drift), `make check` (all correctness incl. build validation + pytest), `make package-check` (wheel/sdist/single-file smoke), `make release-check`, `make publish` (manual Twine upload). CI runs `make check` then `make package-check`; GitHub Actions never publishes.
 
@@ -479,7 +480,7 @@ Full details: [build.md](build.md).
 
 ## Constraints
 
-- **Standard library only.** Core modules may import only: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. The `exact/` and `mcp/` packages may additionally use e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`.
+- **Standard library only.** Core modules may import only: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. The `exact/` and `mcp/` packages may additionally use e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`, `ipaddress`, `datetime`.
 - **`build_single.py` compatibility** — runtime code lives only in the six core modules, `exact/`, or `mcp/`; anything else breaks the single-file build.
 - **TypedDict over NamedTuple** for structured returns (TypedDicts cannot take `__slots__`).
 - **CLI output is result-only** — no echo of input, no arrows, no decoration (REPL included).
@@ -560,7 +561,7 @@ Every component has a dedicated document in this directory. Use this index to ju
 | Component | Document | Covers |
 |-----------|----------|--------|
 | mcp/ overall | [mcp.md](mcp.md) | Architecture, isolation, usage, notes |
-| schemas.py | [mcp.md](mcp.md#schemaspy--tool-schemas) | 77 schemas, detail levels, tiers |
+| schemas.py | [mcp.md](mcp.md#schemaspy--tool-schemas) | 83 schemas, detail levels, tiers |
 | tools.py | [mcp.md](mcp.md#toolspy--tool-implementations) | Handler patterns, validation, error mapping |
 | server.py | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) | Sessions, config manager, executor, profiles |
 

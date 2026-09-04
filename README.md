@@ -18,7 +18,7 @@ Written in pure Python with no external dependencies, it can be used as a CLI to
 - **Unit Conversions**: `"30m + 100ft"` → `60.48 m`
 - **Complex Numbers**: `"sqrt(-1)"` → `1j`
 - **Safe Evaluation**: AST-based parsing, no `eval()`, blocks dangerous operations
-- **MCP Server**: deterministic text, JSON, validation, math, path, manifest, patch, and repo-audit tools for AI agents
+- **MCP Server**: deterministic text, JSON, validation, math, path, manifest, patch, repo-audit, network, encoding, and temporal tools for AI agents
 - **Pure Python**: Standard library only, no dependencies
 
 ## Requirements
@@ -99,7 +99,7 @@ before starting a worker process.
 
 ## MCP Server
 
-eggcalc runs as an MCP server exposing deterministic tools across 18 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo). All results are deterministic — same input always produces the same output.
+eggcalc runs as an MCP server exposing deterministic tools across 21 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo, network, encoding, temporal). All results are deterministic — same input always produces the same output.
 
 **Protocol version:** Supports MCP protocol `2025-11-25` (latest stable) with backward compatibility for `2024-11-05`. Clients must complete the `initialize` handshake before calling tools — tool requests before initialization are rejected. See [docs/mcp.md](docs/mcp.md) for protocol details and lifecycle requirements.
 
@@ -168,7 +168,7 @@ eggcalc uses AST-based parsing (no `eval()`) with built-in DoS protection:
 | `MAX_EXPONENT` | 10,000 |
 | `MAX_FACTORIAL` | 1,000 |
 
-The MCP server adds additional resource bounds: request/output byte limits, per-tool timeouts, bounded thread pools, and pre-bounded inputs for all 77 tools. See [docs/mcp.md](docs/mcp.md#resource-limits) and [docs/mcp_resource_limits.md](docs/mcp_resource_limits.md) for details.
+The MCP server adds additional resource bounds: request/output byte limits, per-tool timeouts, bounded thread pools, and pre-bounded inputs for all 83 tools. See [docs/mcp.md](docs/mcp.md#resource-limits) and [docs/mcp_resource_limits.md](docs/mcp_resource_limits.md) for details.
 
 `eggcalc_config.py` is Python code loaded from the current working directory — only run eggcalc in directories you trust. Library APIs do not load config by default; set `EGGCALC_LOAD_CONFIG=1` to enable. CLI loads config by default. Disable config loading with `EGGCALC_NO_CONFIG=1`.
 
