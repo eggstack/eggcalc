@@ -19,7 +19,7 @@ Prefixed units like `kN`, `mV`, `mA` map to themselves in `UNIT_ALIASES`. Word f
 
 **exact/ Module File Organization:**
 - `confusables.py` is an auto-generated file (~40KB) containing a zlib-compressed base85 payload and a lazy `_LazyConfusables` mapping (6565 entries). Data is decoded on first access, not at import time.
-- `network.py` (`ip_inspect`, `cidr_inspect`) and `encoding.py` (`codec_convert`, `radix_convert`) are standalone leaves: stdlib-only (`ipaddress`, `base64`), no exact/ deps, no MCP registration. Manifest/MCP wiring is intentionally deferred to Plan 032 — do not add it as a drive-by.
+- `network.py` (`ip_inspect`, `cidr_inspect`), `encoding.py` (`codec_convert`, `radix_convert`), and `temporal.py` (`datetime_convert`, `cron_inspect`) are standalone leaves: stdlib-only (`ipaddress`, `base64`, `datetime`/`re`), no exact/ deps, no MCP registration. Manifest/MCP wiring is intentionally deferred to Plan 032 — do not add it as a drive-by.
 - `CodecConvertResult` uses functional `TypedDict(...)` syntax because the `from` key is a Python keyword; params are `from_format`/`to_format`.
 - TypedDict classes are in their logical modules (validate.py, measure.py, unicode_tools.py, etc.), NOT in confusables.py
 - Helper functions like `confusables_count()` should go in `unicode_tools.py`, not `confusables.py`

@@ -1,6 +1,6 @@
 # exact/ — Deterministic Utility Modules
 
-Low-level deterministic Unicode text analysis tools plus standalone network/encoding utilities. These modules are **independent** and **testable** without semantic interpretation or LLM calls.
+Low-level deterministic Unicode text analysis tools plus standalone network/encoding/temporal utilities. These modules are **independent** and **testable** without semantic interpretation or LLM calls.
 
 ## Table of Contents
 
@@ -32,6 +32,7 @@ Low-level deterministic Unicode text analysis tools plus standalone network/enco
 - [manifests.py](#manifestspy--manifest-inspection)
 - [network.py](#networkpy--ip-address-and-cidr-inspection)
 - [encoding.py](#encodingpy--codec-and-radix-conversion)
+- [temporal.py](#temporalpy--fixed-offset-datetime-and-cron-inspection)
 - [Architecture Notes](#architecture-notes)
 - [Testing](#testing)
 
@@ -66,7 +67,8 @@ exact/
 ├── repo_audit.py          # Repository file inventory analysis
 ├── manifests.py           # Manifest/package inspection (pyproject, package.json, etc.)
 ├── network.py             # IP address and CIDR inspection (explicit special-use taxonomy)
-└── encoding.py            # Codec (utf8/hex/base64) and radix (2–36) conversion
+├── encoding.py            # Codec (utf8/hex/base64) and radix (2–36) conversion
+└── temporal.py            # Fixed-offset datetime (nanosecond-exact) and cron inspection
 ```
 
 ## exact/__init__.py — Public API
@@ -156,6 +158,9 @@ from eggcalc.exact import (
 
     # Encoding
     codec_convert, radix_convert,
+
+    # Temporal
+    datetime_convert, cron_inspect,
 
     # Prompt Inspection
     prompt_input_inspect,
@@ -1564,6 +1569,51 @@ RadixConvertResult(
 
 ---
 
+## temporal.py — Fixed-Offset Datetime and Cron Inspection
+
+Nanosecond-exact fixed-offset conversion plus bounded five-field cron inspection. No float timestamps, no timezone database, no system clock.
+
+### Functions
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `datetime_convert(value, format, output_offset)` | DatetimeConvertResult | RFC3339 <-> Unix seconds/milliseconds/nanoseconds with floor semantics |
+| `cron_inspect(expression, after, count)` | CronInspectResult | Five-field parse, satisfiability, strictly-later runs in the reference offset |
+
+### DatetimeConvertResult TypedDict
+
+```python
+DatetimeConvertResult(
+    rfc3339=str,            # Selected-offset RFC3339 (Z for zero offset)
+    utc_rfc3339=str,        # UTC RFC3339 for the same instant
+    unix_seconds=str,       # Floor-derived (e.g. -1ns -> "-1")
+    unix_milliseconds=str,  # Floor-derived
+    unix_nanoseconds=str,   # Exact
+    offset_seconds=int,
+    selected_offset=str,    # Canonical "Z" or "+HH:MM"/"-HH:MM"
+    components=DatetimeComponents,  # year, month, day, hour, minute, second, nanosecond, weekday SUN..SAT
+)
+```
+
+### CronInspectResult TypedDict
+
+```python
+CronInspectResult(
+    expression=str,
+    normalized_expression=str,  # Explicit sorted numeric values per field
+    parsed_values=CronParsedValues,  # minute, hour, day_of_month, month, day_of_week
+    offset=str,
+    offset_seconds=int,
+    satisfiable=bool,           # False only after a full 400-year scan finds zero runs
+    next_runs=list[str],        # Strictly-later RFC3339 runs in the same offset
+    count=int,                  # Actual entries in next_runs
+)
+```
+
+Corrected DOM/DOW rule: star syntax (field starts with `*`, including `*/n`) requires both predicates; otherwise either. Search is strictly-after at minute resolution, reuses the reference fixed offset, caps count at 1–32, and scans at most 146,097 days. Calendar-boundary truncation raises `ValueError`.
+
+---
+
 ## Architecture Notes
 
 ```
@@ -1614,6 +1664,7 @@ Architecture docs may show `@dataclass class Xxx(NamedTuple)` but code uses `cla
 | `inspect_prompt.py` | `MAX_FINDINGS` | 1,000 |
 | `network.py` | `MAX_TEXT_INPUT_LENGTH` | 100,000 |
 | `encoding.py` | `MAX_TEXT_INPUT_length` | 100,000 |
+| `temporal.py` | `MAX_TEXT_INPUT_length` | 100,000 |
 | `llm_hygiene.py` | `_MAX_INPUT_LENGTH` | 500,000 |
 | `repo_audit.py` | `_MAX_PATHS` | 50,000 |
 | `synthesis.py` | `MAX_TEXT_LENGTH` | 100,000 |
@@ -1633,4 +1684,4 @@ All exact/ modules have deterministic behavior:
 - No LLM calls
 - Repeatable results for same input
 
-See `tests/test_exact.py` for comprehensive tests and `tests/test_network_encoding.py` for network/encoding parity vectors.
+See `tests/test_exact.py` for comprehensive tests, `tests/test_network_encoding.py` for network/encoding parity vectors, and `tests/test_temporal.py` for temporal/cron parity vectors.

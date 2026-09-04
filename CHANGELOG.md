@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `eggcalc.exact.network` module with `ip_inspect()` (canonical address, family, packed-bytes hex, decimal numeric, explicit version-stable special-use tags, IPv4-mapped metadata) and `cidr_inspect()` (canonical CIDR, prefix/host bits, range bounds, exact address count, optional same-family containment); both lazily re-exported from `eggcalc.exact`
 - `eggcalc.exact.encoding` module with `codec_convert()` (strict utf8/hex/base64/base64url conversion with canonical outputs) and `radix_convert()` (signed ASCII integer conversion across bases 2–36, magnitude capped at `2**128 - 1`); both lazily re-exported from `eggcalc.exact`
+- `eggcalc.exact.temporal` module with `datetime_convert()` (nanosecond-exact fixed-offset RFC3339 <-> Unix seconds/milliseconds/nanoseconds with floor semantics) and `cron_inspect()` (five-field cron with corrected star-syntax DOM/DOW semantics, strictly-after bounded search over one 400-year Gregorian cycle); both lazily re-exported from `eggcalc.exact`
 
 ### Changed
 - Removed import-time `os.environ.setdefault("EGGCALC_NO_CONFIG", "1")` from `server.py`; config suppression now handled by `McpServerConfig.from_environment()` and explicit `main()` setup

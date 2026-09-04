@@ -61,7 +61,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `eggcalc/_protocol.py` - MCP protocol version constants
 - `eggcalc/__main__.py` - Thin entry point (not in build manifest)
 
-#### exact/ modules (27 implementation submodules + `__init__.py`, always separate)
+#### exact/ modules (28 implementation submodules + `__init__.py`, always separate)
 - `primitives.py` - UTF-8, codepoints, visible_repr (CodepointInfo is a NamedTuple with an `idx` field)
 - `unicode_tools.py` - Script detection, confusables (forward and reverse)
 - `confusables.py` - Auto-generated data file (CONFUSABLES dict only)
@@ -87,6 +87,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `manifests.py` - Manifest inspection tools
 - `network.py` - IP/CIDR inspection with explicit special-use taxonomy
 - `encoding.py` - Codec (utf8/hex/base64) and radix (2–36, u128-capped) conversion
+- `temporal.py` - Fixed-offset datetime (nanosecond-exact) and cron inspection
 - `llm_hygiene.py` - LLM hygiene analysis
 - `repo_audit.py` - Repository audit tools
 - `__init__.py` - Fully lazy package exports (`_LAZY_IMPORTS` map + PEP 562)

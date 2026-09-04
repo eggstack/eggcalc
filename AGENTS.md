@@ -142,7 +142,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 | `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class, `UnitSpec`, `UnitExpression` |
 | `eggcalc/cli.py` | CLI dispatch: argparse, REPL, text commands, help, main entry point. Text commands use lazy `importlib` loading of exact modules. |
 | `eggcalc/__main__.py` | Module entry, delegates to `cli.main()` |
-| `eggcalc/exact/` | Text analysis and deterministic utilities: Unicode, confusables, diffs, validation, shell parsing, IP/CIDR inspection (`network.py`), codec/radix conversion (`encoding.py`) |
+| `eggcalc/exact/` | Text analysis and deterministic utilities: Unicode, confusables, diffs, validation, shell parsing, IP/CIDR inspection (`network.py`), codec/radix conversion (`encoding.py`), fixed-offset datetime/cron inspection (`temporal.py`) |
 | `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor, EvaluationPolicy, ConfigCandidate, RuntimeContext |
 | `build_single.py` | Assembles everything into `eggcalc.py`. Uses `MODULE_MANIFEST` (tuple of `ModuleSpec` dataclasses) as the single source of truth for module ordering, dependencies, and validation. `MODULES_CALC`, `MODULES_EXACT`, `MODULES_MCP` are derived views. `validate_build_manifest()` checks for duplicates, missing files, unknown deps, cycles, and reachability. |
 
@@ -183,6 +183,10 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - `CidrInspectResult`: `family`, `cidr`, `prefix_length`, `host_bits`, `network_address`, `netmask`, `first_address`, `last_address`, `broadcast_address` (`None` for IPv6), `address_count` (decimal text), `contains`/`contains_address` (`None` when no candidate)
 - `CodecConvertResult`: `value`, `from`, `to`, `byte_length` (functional-syntax TypedDict — `from` is a keyword; params are `from_format`/`to_format`; byte length is decoded payload size)
 - `RadixConvertResult`: `value`, `from_base`, `to_base`, `uppercase`, `negative`, `magnitude_decimal` (magnitude capped at `2**128 - 1`)
+- `DatetimeConvertResult`: `rfc3339`, `utc_rfc3339`, `unix_seconds`, `unix_milliseconds`, `unix_nanoseconds`, `offset_seconds`, `selected_offset`, `components` (components: `year`, `month`, `day`, `hour`, `minute`, `second`, `nanosecond`, `weekday` `SUN`..`SAT`; seconds/millis are floor-derived strings)
+- `DatetimeComponents`: `year`, `month`, `day`, `hour`, `minute`, `second`, `nanosecond`, `weekday`
+- `CronInspectResult`: `expression`, `normalized_expression`, `parsed_values`, `offset`, `offset_seconds`, `satisfiable`, `next_runs`, `count` (count is actual entries in `next_runs`)
+- `CronParsedValues`: `minute`, `hour`, `day_of_month`, `month`, `day_of_week` (sorted normalized ints; Sunday `7` normalized to `0`)
 
 ## MCP Server
 
@@ -197,11 +201,11 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 
 ## Architecture Docs
 
-The `architecture/` directory has module-level developer docs (40 files — every module in the codebase has a dedicated deep dive). Start with `architecture/overview.md` for the data flow, verified module map, and the full Deep Dive Index; the table below covers the highest-traffic docs.
+The `architecture/` directory has module-level developer docs (41 files — every module in the codebase has a dedicated deep dive). Start with `architecture/overview.md` for the data flow, verified module map, and the full Deep Dive Index; the table below covers the highest-traffic docs.
 
 | Doc | Covers |
 |-----|--------|
-| `overview.md` | System architecture, data flow, module map, Deep Dive Index for all 40 docs |
+| `overview.md` | System architecture, data flow, module map, Deep Dive Index for all 41 docs |
 | `normalize.md` | NL tokenization pipeline |
 | `evaluator.md` | AST parsing, math functions, constants, unit policies |
 | `units.md` | Unit definitions, conversions, UnitValue, UnitSpec, UnitExpression |

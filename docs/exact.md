@@ -618,6 +618,28 @@ radix_convert("-ff", 16, 2)
 
 Base64 inputs reject whitespace, mixed alphabets, and misplaced padding. Radix inputs accept an optional single leading sign followed by ASCII digits valid in the source base.
 
+## temporal.py - Fixed-Offset Datetime and Cron Inspection
+
+Nanosecond-exact conversion between RFC3339 and Unix time units, plus bounded five-field cron inspection. No float timestamps, no timezone database, no system clock.
+
+```python
+from eggcalc.exact import datetime_convert, cron_inspect
+
+datetime_convert("-1", "unix_nanoseconds")
+# {'rfc3339': '1969-12-31T23:59:59.999999999Z', 'utc_rfc3339': ...,
+#  'unix_seconds': '-1', 'unix_milliseconds': '-1',
+#  'unix_nanoseconds': '-1', 'offset_seconds': 0, 'selected_offset': 'Z',
+#  'components': {'year': 1969, ..., 'weekday': 'WED'}}
+
+cron_inspect("0 9 * * MON-FRI", "2026-09-03T00:00:00Z", count=1)
+# {'expression': '0 9 * * MON-FRI', 'normalized_expression': '0 9 ...',
+#  'parsed_values': {'minute': [0], 'hour': [9], ...},
+#  'offset': 'Z', 'offset_seconds': 0, 'satisfiable': True,
+#  'next_runs': ['2026-09-03T09:00:00Z'], 'count': 1}
+```
+
+RFC3339 input is bounded (`YYYY-MM-DDTHH:MM:SS[.fraction]Z` or `+/-HH:MM`, 1–9 fractional digits); Unix inputs are signed decimal strings with floor-derived seconds/milliseconds. Cron uses corrected star-syntax DOM/DOW semantics, strictly-after minute-resolution search, and a 146,097-day bound.
+
 ## Usage Examples
 
 All synthesis functions return TypedDicts (plain `dict` objects) — always use **key access** (`result["key"]`), not attribute access.

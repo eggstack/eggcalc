@@ -161,7 +161,7 @@ These six modules form the calculator and are the only code loaded by `import eg
 | `_version.py` | 3 | Single source of truth for `__version__`; read by `pyproject.toml` and `build_single.py` | [build.md](build.md) |
 | `eggcalc_config.py` (repo root template) | 73 | User config extension points: `CUSTOM_CONSTANTS`, `CUSTOM_FUNCTIONS`, `CUSTOM_UNITS`, `CUSTOM_ALIASES`, `CUSTOM_TEMP_CONVERSIONS`, `CUSTOM_NUMBER_WORDS`, `CUSTOM_OPERATOR_WORDS`. Loaded only by CLI calculator modes or when `EGGCALC_LOAD_CONFIG=1`; never at import time | [api.md](api.md) |
 
-### exact/ — Deterministic Utility Package (27 modules)
+### exact/ — Deterministic Utility Package (28 modules)
 
 All functions are deterministic, side-effect-free, and independently testable. No network, no filesystem, no LLM calls.
 
@@ -194,7 +194,8 @@ All functions are deterministic, side-effect-free, and independently testable. N
 | `repo_audit.py` | 422 | Repository file inventory, language signals, vendor/generated detection | [repo_audit.md](repo_audit.md) |
 | `network.py` | 240 | IP/CIDR inspection with explicit version-stable special-use taxonomy | [network.md](network.md) |
 | `encoding.py` | 282 | Strict codec (utf8/hex/base64/base64url) and radix (2–36, u128-capped) conversion | [encoding.md](encoding.md) |
-| `__init__.py` | 495 | Fully lazy public API: zero implementation imports at import time; 206-name `__all__` resolved via a matching 206-entry `_LAZY_IMPORTS` map | [exact.md](exact.md#exact__init__py--public-api) |
+| `temporal.py` | 616 | Fixed-offset datetime (nanosecond-exact) and cron inspection with corrected DOM/DOW semantics | [temporal.md](temporal.md) |
+| `__init__.py` | 509 | Fully lazy public API: zero implementation imports at import time; 212-name `__all__` resolved via a matching 212-entry `_LAZY_IMPORTS` map | [exact.md](exact.md#exact__init__py--public-api) |
 
 *(Package-level doc: [exact.md](exact.md).)*
 
@@ -306,7 +307,7 @@ primitives.py          ← foundation (no exact/ deps)
     ├── glob.py, position.py, transform.py, identifier.py
     ├── config.py, shell.py, markdown.py, patch.py, version.py
     │                    , manifests.py, llm_hygiene.py, repo_audit.py
-    ├── network.py, encoding.py (standalone leaves, stdlib only)
+    ├── network.py, encoding.py, temporal.py (standalone leaves, stdlib only)
     ├── diff_analysis.py → diff, patch
     ├── inspect_prompt.py → primitives
     ├── unicode_policy.py → primitives, unicode_tools
@@ -524,7 +525,7 @@ Every component has a dedicated document in this directory. Use this index to ju
 
 | Component | Document | Covers |
 |-----------|----------|--------|
-| Package overview (all 27 modules) | [exact.md](exact.md) | Structure, dependency graph, full API listing |
+| Package overview (all 28 modules) | [exact.md](exact.md) | Structure, dependency graph, full API listing |
 | primitives.py | [primitives.md](primitives.md) | Bytes/codepoints/normalization/invisibles/graphemes |
 | unicode_tools.py | [unicode_tools.md](unicode_tools.md) | Scripts, confusables, mixed-script detection |
 | confusables.py | [confusables.md](confusables.md) | Generated data, payload format, regeneration procedure |
@@ -552,6 +553,7 @@ Every component has a dedicated document in this directory. Use this index to ju
 | repo_audit.py | [repo_audit.md](repo_audit.md) | File inventory, language signals |
 | network.py | [network.md](network.md) | IP/CIDR inspection, explicit special-use taxonomy |
 | encoding.py | [encoding.md](encoding.md) | Codec and radix conversion, strict validation |
+| temporal.py | [temporal.md](temporal.md) | Fixed-offset datetime and cron inspection |
 
 ### mcp/ — Model Context Protocol Server
 

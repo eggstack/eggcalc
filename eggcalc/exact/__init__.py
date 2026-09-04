@@ -58,6 +58,13 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Glob
     "GlobMatchResult": (".glob", "GlobMatchResult"),
     "glob_match": (".glob", "glob_match"),
+    # Temporal
+    "CronInspectResult": (".temporal", "CronInspectResult"),
+    "CronParsedValues": (".temporal", "CronParsedValues"),
+    "DatetimeComponents": (".temporal", "DatetimeComponents"),
+    "DatetimeConvertResult": (".temporal", "DatetimeConvertResult"),
+    "cron_inspect": (".temporal", "cron_inspect"),
+    "datetime_convert": (".temporal", "datetime_convert"),
     # Identifier
     "IdentifierAnalyzeResult": (".identifier", "IdentifierAnalyzeResult"),
     "identifier_analyze": (".identifier", "identifier_analyze"),
@@ -367,6 +374,13 @@ __all__ = [
     "radix_convert",
     "CodecConvertResult",
     "RadixConvertResult",
+    # Temporal
+    "datetime_convert",
+    "cron_inspect",
+    "DatetimeConvertResult",
+    "DatetimeComponents",
+    "CronInspectResult",
+    "CronParsedValues",
     # Position
     "text_position",
     "TextPositionResult",
