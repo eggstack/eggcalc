@@ -577,6 +577,47 @@ result = list_compare(["a", "b", "c"], ["c", "b", "a"])
 # {'same_ordered': False, 'same_unordered': True, 'only_in_a': [], 'only_in_b': [], ...}
 ```
 
+## network.py - IP Address and CIDR Inspection
+
+Pure IP/CIDR inspection with an explicit, version-stable special-use taxonomy (no network I/O or DNS).
+
+```python
+from eggcalc.exact import ip_inspect, cidr_inspect
+
+ip_inspect("::ffff:192.0.2.1")
+# {'address': '::ffff:c000:201', 'family': 'ipv6',
+#  'bytes_hex': '00000000000000000000ffffc0000201',
+#  'numeric': '281473902969345', 'special_use': ['ipv4_mapped'],
+#  'ipv4_mapped': {'address': '192.0.2.1', 'numeric': '3221225985'}}
+
+cidr_inspect("192.0.2.99/24", contains="192.0.2.1")
+# {'family': 'ipv4', 'cidr': '192.0.2.0/24', 'prefix_length': 24,
+#  'host_bits': 8, 'network_address': '192.0.2.0',
+#  'netmask': '255.255.255.0', 'first_address': '192.0.2.0',
+#  'last_address': '192.0.2.255', 'broadcast_address': '192.0.2.255',
+#  'address_count': '256', 'contains': True,
+#  'contains_address': '192.0.2.1'}
+```
+
+Malformed addresses, malformed CIDRs, and cross-family containment checks raise `ValueError`.
+
+## encoding.py - Codec and Radix Conversion
+
+Strict conversion between `utf8`, `hex`, `base64`, and `base64url`, plus signed integer conversion between bases 2–36 (magnitude capped at `2**128 - 1`).
+
+```python
+from eggcalc.exact import codec_convert, radix_convert
+
+codec_convert("Hello", "utf8", "base64")
+# {'value': 'SGVsbG8=', 'from': 'utf8', 'to': 'base64', 'byte_length': 5}
+
+radix_convert("-ff", 16, 2)
+# {'value': '-11111111', 'from_base': 16, 'to_base': 2,
+#  'uppercase': False, 'negative': True, 'magnitude_decimal': '255'}
+```
+
+Base64 inputs reject whitespace, mixed alphabets, and misplaced padding. Radix inputs accept an optional single leading sign followed by ASCII digits valid in the source base.
+
 ## Usage Examples
 
 All synthesis functions return TypedDicts (plain `dict` objects) — always use **key access** (`result["key"]`), not attribute access.

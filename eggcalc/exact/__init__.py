@@ -50,6 +50,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "diff_touched_paths": (".diff_analysis", "diff_touched_paths"),
     "patch_conflict_markers_inspect": (".diff_analysis", "patch_conflict_markers_inspect"),
     "unified_diff_validate": (".diff_analysis", "unified_diff_validate"),
+    # Encoding
+    "CodecConvertResult": (".encoding", "CodecConvertResult"),
+    "RadixConvertResult": (".encoding", "RadixConvertResult"),
+    "codec_convert": (".encoding", "codec_convert"),
+    "radix_convert": (".encoding", "radix_convert"),
     # Glob
     "GlobMatchResult": (".glob", "GlobMatchResult"),
     "glob_match": (".glob", "glob_match"),
@@ -97,6 +102,12 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "char_category_metrics": (".measure", "char_category_metrics"),
     "line_metrics": (".measure", "line_metrics"),
     "word_metrics": (".measure", "word_metrics"),
+    # Network
+    "CidrInspectResult": (".network", "CidrInspectResult"),
+    "IpInspectResult": (".network", "IpInspectResult"),
+    "Ipv4MappedInfo": (".network", "Ipv4MappedInfo"),
+    "cidr_inspect": (".network", "cidr_inspect"),
+    "ip_inspect": (".network", "ip_inspect"),
     # Patch
     "FailedHunk": (".patch", "FailedHunk"),
     "PatchApplyCheckResult": (".patch", "PatchApplyCheckResult"),
@@ -345,6 +356,17 @@ __all__ = [
     "LineMetrics",
     "WordMetrics",
     "CharCategoryMetrics",
+    # Network
+    "ip_inspect",
+    "cidr_inspect",
+    "IpInspectResult",
+    "Ipv4MappedInfo",
+    "CidrInspectResult",
+    # Encoding
+    "codec_convert",
+    "radix_convert",
+    "CodecConvertResult",
+    "RadixConvertResult",
     # Position
     "text_position",
     "TextPositionResult",

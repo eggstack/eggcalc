@@ -1,6 +1,6 @@
-# exact/ — Unicode Text Primitives
+# exact/ — Deterministic Utility Modules
 
-Low-level deterministic Unicode text analysis tools. These modules are **independent** and **testable** without semantic interpretation or LLM calls.
+Low-level deterministic Unicode text analysis tools plus standalone network/encoding utilities. These modules are **independent** and **testable** without semantic interpretation or LLM calls.
 
 ## Table of Contents
 
@@ -30,6 +30,8 @@ Low-level deterministic Unicode text analysis tools. These modules are **indepen
 - [llm_hygiene.py](#llm_hygienepy--llm-json-output-hygiene)
 - [repo_audit.py](#repo_auditpy--repository-inventory)
 - [manifests.py](#manifestspy--manifest-inspection)
+- [network.py](#networkpy--ip-address-and-cidr-inspection)
+- [encoding.py](#encodingpy--codec-and-radix-conversion)
 - [Architecture Notes](#architecture-notes)
 - [Testing](#testing)
 
@@ -62,7 +64,9 @@ exact/
 ├── version.py             # Semver/cargo constraint checking
 ├── llm_hygiene.py         # LLM JSON output hygiene detection
 ├── repo_audit.py          # Repository file inventory analysis
-└── manifests.py           # Manifest/package inspection (pyproject, package.json, etc.)
+├── manifests.py           # Manifest/package inspection (pyproject, package.json, etc.)
+├── network.py             # IP address and CIDR inspection (explicit special-use taxonomy)
+└── encoding.py            # Codec (utf8/hex/base64) and radix (2–36) conversion
 ```
 
 ## exact/__init__.py — Public API
@@ -146,6 +150,12 @@ from eggcalc.exact import (
 
     # Repo Audit
     repo_file_inventory,
+
+    # Network
+    ip_inspect, cidr_inspect,
+
+    # Encoding
+    codec_convert, radix_convert,
 
     # Prompt Inspection
     prompt_input_inspect,
@@ -1466,6 +1476,94 @@ class RequirementsInspectResult(TypedDict, total=False):
 
 ---
 
+## network.py — IP Address and CIDR Inspection
+
+Pure IP/CIDR inspection via `ipaddress`; no network I/O or DNS. Special-use classification uses an explicit, version-stable range table (not `is_private`/`is_global`).
+
+### Functions
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `ip_inspect(address)` | IpInspectResult | Canonical address, family, packed-bytes hex, decimal numeric, sorted special-use tags, IPv4-mapped metadata |
+| `cidr_inspect(cidr, contains)` | CidrInspectResult | Canonical network CIDR, prefix/host bits, network/netmask/first/last, IPv4 broadcast (`None` for IPv6), exact address count, optional same-family containment |
+
+### IpInspectResult TypedDict
+
+```python
+IpInspectResult(
+    address=str,            # Canonical address text
+    family=str,             # "ipv4" or "ipv6"
+    bytes_hex=str,          # Packed bytes as lowercase hex, no separators
+    numeric=str,            # Exact unsigned integer value as decimal text
+    special_use=list[str],  # Sorted explicit tags
+    ipv4_mapped=Ipv4MappedInfo | None,  # {"address", "numeric"} or None
+)
+```
+
+### Explicit special-use tags
+
+IPv4: `unspecified`, `loopback`, `private`, `link_local`, `multicast`, `documentation`, `shared`. IPv6: `unspecified`, `loopback`, `link_local`, `unique_local`, `multicast`, `documentation`, `ipv4_mapped` (only `::ffff:0:0/96`, tested by exact integer mask — `::1`, `::`, and `::192.0.2.1` are not mapped).
+
+### CidrInspectResult TypedDict
+
+```python
+CidrInspectResult(
+    family=str,
+    cidr=str,               # Canonical network CIDR (host bits cleared)
+    prefix_length=int,
+    host_bits=int,
+    network_address=str,
+    netmask=str,
+    first_address=str,      # Network address (not first usable host)
+    last_address=str,       # Final address in range
+    broadcast_address=str | None,  # Final address for IPv4, None for IPv6
+    address_count=str,      # Exact decimal text (e.g. 2**128 for ::/0)
+    contains=bool | None,   # None when no candidate supplied
+    contains_address=str | None,
+)
+```
+
+---
+
+## encoding.py — Codec and Radix Conversion
+
+Strict, deterministic conversion between `utf8`, `hex`, `base64`, `base64url` and between integer bases 2–36 (magnitude capped at `2**128 - 1`).
+
+### Functions
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `codec_convert(value, from_format, to_format)` | CodecConvertResult | Canonical converted text plus decoded payload byte length |
+| `radix_convert(value, from_base, to_base, uppercase)` | RadixConvertResult | Canonical converted value, bases, uppercase/negative flags, decimal magnitude |
+
+### CodecConvertResult TypedDict
+
+```python
+CodecConvertResult(
+    value=str,          # Canonical converted text
+    from=str,           # Source format (functional-syntax key: "from" is a keyword)
+    to=str,             # Destination format
+    byte_length=int,    # Decoded payload length in bytes
+)
+```
+
+Standard Base64 output is padded; Base64URL output is unpadded; hex output is lowercase. Base64 inputs reject whitespace, mixed alphabets, misplaced padding, and invalid lengths before decoding.
+
+### RadixConvertResult TypedDict
+
+```python
+RadixConvertResult(
+    value=str,               # No "+", no leading zeroes, "-" only if negative and nonzero
+    from_base=int,
+    to_base=int,
+    uppercase=bool,
+    negative=bool,
+    magnitude_decimal=str,
+)
+```
+
+---
+
 ## Architecture Notes
 
 ```
@@ -1514,6 +1612,8 @@ Architecture docs may show `@dataclass class Xxx(NamedTuple)` but code uses `cla
 | `manifests.py` | `_MAX_INPUT_LENGTH` | 500,000 |
 | `inspect_prompt.py` | `MAX_TEXT_LENGTH` | 100,000 |
 | `inspect_prompt.py` | `MAX_FINDINGS` | 1,000 |
+| `network.py` | `MAX_TEXT_INPUT_LENGTH` | 100,000 |
+| `encoding.py` | `MAX_TEXT_INPUT_length` | 100,000 |
 | `llm_hygiene.py` | `_MAX_INPUT_LENGTH` | 500,000 |
 | `repo_audit.py` | `_MAX_PATHS` | 50,000 |
 | `synthesis.py` | `MAX_TEXT_LENGTH` | 100,000 |
@@ -1533,4 +1633,4 @@ All exact/ modules have deterministic behavior:
 - No LLM calls
 - Repeatable results for same input
 
-See `tests/test_exact.py` for comprehensive tests.
+See `tests/test_exact.py` for comprehensive tests and `tests/test_network_encoding.py` for network/encoding parity vectors.

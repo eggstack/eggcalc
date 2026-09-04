@@ -142,7 +142,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 | `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class, `UnitSpec`, `UnitExpression` |
 | `eggcalc/cli.py` | CLI dispatch: argparse, REPL, text commands, help, main entry point. Text commands use lazy `importlib` loading of exact modules. |
 | `eggcalc/__main__.py` | Module entry, delegates to `cli.main()` |
-| `eggcalc/exact/` | Text analysis: Unicode, confusables, diffs, validation, shell parsing |
+| `eggcalc/exact/` | Text analysis and deterministic utilities: Unicode, confusables, diffs, validation, shell parsing, IP/CIDR inspection (`network.py`), codec/radix conversion (`encoding.py`) |
 | `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor, EvaluationPolicy, ConfigCandidate, RuntimeContext |
 | `build_single.py` | Assembles everything into `eggcalc.py`. Uses `MODULE_MANIFEST` (tuple of `ModuleSpec` dataclasses) as the single source of truth for module ordering, dependencies, and validation. `MODULES_CALC`, `MODULES_EXACT`, `MODULES_MCP` are derived views. `validate_build_manifest()` checks for duplicates, missing files, unknown deps, cycles, and reachability. |
 
@@ -178,6 +178,11 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - `InspectionFinding` (used in `_Finding`): `code`, `severity`, `message`, `line`, `column`
   - Severity vocabulary: `error`, `warning`, `info`
   - Finding codes use stable identifiers: `TOML_PARSE_ERROR`, `INPUT_TOO_LONG`, `CARGO_MISSING_PACKAGE_NAME`, etc.
+- `IpInspectResult`: `address`, `family`, `bytes_hex`, `numeric`, `special_use`, `ipv4_mapped` (family is `"ipv4"`/`"ipv6"`; `ipv4_mapped` is `Ipv4MappedInfo` or `None`)
+- `Ipv4MappedInfo`: `address`, `numeric` (decimal magnitude as text)
+- `CidrInspectResult`: `family`, `cidr`, `prefix_length`, `host_bits`, `network_address`, `netmask`, `first_address`, `last_address`, `broadcast_address` (`None` for IPv6), `address_count` (decimal text), `contains`/`contains_address` (`None` when no candidate)
+- `CodecConvertResult`: `value`, `from`, `to`, `byte_length` (functional-syntax TypedDict — `from` is a keyword; params are `from_format`/`to_format`; byte length is decoded payload size)
+- `RadixConvertResult`: `value`, `from_base`, `to_base`, `uppercase`, `negative`, `magnitude_decimal` (magnitude capped at `2**128 - 1`)
 
 ## MCP Server
 
@@ -192,11 +197,11 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 
 ## Architecture Docs
 
-The `architecture/` directory has module-level developer docs (38 files — every module in the codebase has a dedicated deep dive). Start with `architecture/overview.md` for the data flow, verified module map, and the full Deep Dive Index; the table below covers the highest-traffic docs.
+The `architecture/` directory has module-level developer docs (40 files — every module in the codebase has a dedicated deep dive). Start with `architecture/overview.md` for the data flow, verified module map, and the full Deep Dive Index; the table below covers the highest-traffic docs.
 
 | Doc | Covers |
 |-----|--------|
-| `overview.md` | System architecture, data flow, module map, Deep Dive Index for all 38 docs |
+| `overview.md` | System architecture, data flow, module map, Deep Dive Index for all 40 docs |
 | `normalize.md` | NL tokenization pipeline |
 | `evaluator.md` | AST parsing, math functions, constants, unit policies |
 | `units.md` | Unit definitions, conversions, UnitValue, UnitSpec, UnitExpression |
