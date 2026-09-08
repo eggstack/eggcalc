@@ -390,6 +390,8 @@ def print_help() -> None:
         "",
         "Flags:",
         "  --json                    Output result as JSON",
+        "  --explain                 Show normalization trace (no evaluation)",
+        "  --commands                List curated CLI text commands",
         "",
         "Operators:",
         "  Arithmetic: +  -  *  /  **",
@@ -791,6 +793,58 @@ def _cli_text_command(
     return _CommandStatus.NOT_HANDLED
 
 
+def _print_commands(json_output: bool = False) -> None:
+    """List the curated CLI text commands (distinct from the MCP surface)."""
+    if json_output:
+        import json
+
+        print(
+            json.dumps(
+                [
+                    {
+                        "name": spec["name"],
+                        "description": spec.get("description", ""),
+                        "usage": spec.get("usage", ""),
+                        "category": spec.get("category", ""),
+                    }
+                    for spec in COMMANDS
+                ],
+                indent=2,
+            )
+        )
+        return
+    print("Curated CLI text commands (the MCP server exposes a separate,")
+    print("larger tool surface via `calc --mcp`):")
+    for spec in COMMANDS:
+        print(f"  {spec['name']}: {spec.get('description', '')}")
+        print(f"    usage: {spec.get('usage', '')}")
+
+
+def _explain_expression(expression: str, json_output: bool = False) -> int:
+    """Print the normalization trace for *expression* without evaluating it.
+
+    Returns the trace exit code (0 on success, non-zero on failure).
+    """
+    from .normalize import trace_normalization
+
+    trace = trace_normalization(expression)
+    if json_output:
+        import json
+
+        print(json.dumps(trace, indent=2))
+    else:
+        print(f"input: {expression}")
+        for i, step in enumerate(trace["steps"], 1):
+            print(f"{i}. {step['stage']}: {step['before']} -> {step['after']}")
+            if step["note"]:
+                print(f"   ({step['note']})")
+        if trace["errored"]:
+            print(f"error: {trace['error']}", file=sys.stderr)
+        else:
+            print(f"normalized: {trace['normalized']}")
+    return trace["exit_code"]
+
+
 def maybe_load_cli_config() -> None:
     """Load user config for CLI usage if not disabled.
 
@@ -853,6 +907,16 @@ def main() -> int:
         help="Accepted for compatibility; plain output remains result-only",
     )
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="Show the normalization trace for the expression and exit without evaluating",
+    )
+    parser.add_argument(
+        "--commands",
+        action="store_true",
+        help="List curated CLI text commands and exit",
+    )
     parser.add_argument(
         "-e",
         "--expression",
@@ -922,9 +986,20 @@ def main() -> int:
         print(f"eggcalc {eggcalc.__version__}")
         return 0
 
+    if args.commands:
+        if args.expression or args.single_expr:
+            print("Error: --commands cannot be combined with an expression", file=sys.stderr)
+            return 2
+        _print_commands(json_output=args.json)
+        return 0
+
     if args.usage:
         print_help()
         return 0
+
+    if args.explain and not args.expression and not args.single_expr and not args.interactive:
+        print("Error: --explain requires an expression", file=sys.stderr)
+        return 2
 
     if args.help or (not args.expression and not args.single_expr and not args.interactive):
         parser.print_help()
@@ -940,6 +1015,16 @@ def main() -> int:
         expression = args.single_expr
     else:
         expression = " ".join(args.expression)
+
+    # Normalization observability comes before text-command dispatch so the
+    # raw input is explained even when it names a text command. It loads
+    # config like calculator evaluation because custom words change results.
+    if args.explain:
+        if not expression.strip():
+            print("Error: --explain requires an expression", file=sys.stderr)
+            return 2
+        maybe_load_cli_config()
+        return _explain_expression(expression, json_output=args.json)
 
     # Try text commands first (inspect, count, regex, etc.).
     # Text commands do NOT require user config — they operate only on

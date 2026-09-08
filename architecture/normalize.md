@@ -47,8 +47,11 @@ from eggcalc.normalize import (
     run,              # Full pipeline: normalize + evaluate
     normalize_text,   # Tokenize and normalize text
     normalize_expression,  # Convert NL to Python syntax
-    main,             # CLI entry point
-    print_help,       # Show help text
+    trace_normalization,  # Explain normalization (no behavior change)
+    NormalizationTrace,  # Plain-data trace result (TypedDict)
+    NormalizationStep,  # One material transformation record (TypedDict)
+    main,             # CLI entry point (lazy re-export from cli.py)
+    print_help,       # Show help text (lazy re-export from cli.py)
     NORMALIZE,        # Compiled normalization config
     PATTERNS,         # Compiled regex patterns
     MAX_INPUT_LENGTH, # 10000
@@ -241,11 +244,11 @@ _MULTI_WORD_FUNCTIONS = {
 }
 ```
 
-### `_MULTI_WORD_NUMBERS`
+### `_MULTI_WORD_TRIE`
 
-Lazy trie of multi-word number phrases mapped to numeric values. Built on first
-use from `_build_multi_word_numbers()` so importing the normalizer does not pay
-the phrase-generation cost. Handles:
+Lazy trie of multi-word number phrases mapped to numeric values, built on
+first use by `_get_multi_word_trie()` from `_build_multi_word_numbers()` so
+importing the normalizer does not pay the phrase-generation cost. Handles:
 - Single-word × scale: `"one hundred"` → `100`, `"twenty thousand"` → `20000`
 - Compound tens + scale: `"twenty one thousand"` → `21000`
 - Compound hundreds: `"one hundred forty four"` → `144`
@@ -326,6 +329,37 @@ Normalizes an expression without evaluating it. This is the main entry point for
 8. `_preprocess_units()` — add multiplication before units, emit canonical unit names
 9. `_add_unit_floor_mod_parens()` — wrap unit operands around floor div/mod
 10. `validate_for_eval()` — validate all tokens (unless `skip_validation=True`)
+
+### `trace_normalization(expression: str, operators: dict | None = None, patterns: Mapping[str, Pattern[str]] | None = None, function_names: Mapping[str, Any] | None = None, skip_validation: bool = False) -> NormalizationTrace`
+
+Explains how input is normalized without changing the result. Runs the same
+implementation as `normalize_expression()` via a private optional trace
+collector (`_trace` keyword on `normalize_text()` / `normalize_expression()`;
+ordinary calls pass `None` and keep the fast path) and records only material
+before/after changes at stable stage boundaries.
+
+```python
+trace = trace_normalization("five plus three")
+# {"input": "five plus three",
+#  "steps": [{"stage": "number_words", "before": "five plus three",
+#             "after": "5 plus 3", "changed": True, "note": "..."}, ...],
+#  "normalized": "5+3", "exit_code": 0, "errored": False, "error": None}
+```
+
+**Stage vocabulary** (a stage is absent when it makes no change):
+`sanitize`, `function_phrases`, `number_words`, `unit_phrases`,
+`operator_words`, `unit_conversions`, `symbols` (all inside
+`normalize_text()`), then `tokenize`, `token_numbers`, `combine_numbers`,
+`functions`, `unit_conversion`, `units`, `floor_mod_grouping`, and
+`validation` (recorded only when input is rejected).
+
+Guarantees: deterministic and side-effect-free; same input/normalized-length
+nesting limits as normal normalization; `trace["normalized"]` equals the
+`normalize_expression()` result on success and the same exit/error
+classification on failure; bounded output (one record per pipeline stage at
+most); no internal regex match objects or implementation details exposed.
+Also available from the CLI as `calc --explain` (with `--json` support) and
+as a top-level `eggcalc.trace_normalization()` export.
 
 ### `run(expression: str, operators: dict, patterns: Mapping[str, Pattern[str]], output_format: str = "plain", show_expression: bool = True) -> tuple[Any, int]`
 
@@ -562,7 +596,7 @@ Input: "what's five plus three hundred twenty two?"
     ↓
 1. Strip phrases: "five plus three hundred twenty two"
     ↓
-2. Multi-word numbers: "five plus 322" (via _MULTI_WORD_NUMBERS)
+2. Multi-word numbers: "five plus 322" (via the lazy `_MULTI_WORD_TRIE`)
     ↓
 3. Single word replacement: "5 plus 322"
     ↓
@@ -653,9 +687,11 @@ See [units.md](units.md) for unit conversion details.
 
 ### Multi-word Number System
 
-- `_MULTI_WORD_NUMBERS` maps full phrases to numbers (built at import time)
-- `_MULTI_WORD_PATTERN` is a single compiled regex for fast matching (~40,000x faster than per-entry `re.sub`)
-- `_MULTI_WORD_PATTERN_LOOKUP` provides lowercase key → value lookup
+- `_MULTI_WORD_TRIE` maps full phrases to numbers (built lazily on first use
+  by `_get_multi_word_trie()` from `_build_multi_word_numbers()`)
+- `_MULTI_WORD_WORD_PATTERN` finds word runs; the trie walk preserves
+  longest-first, non-overlapping replacement without scanning all phrases
+  per position
 - Phrases are deduplicated by value, keeping the most natural form
 
 ### Digit Scale Words
@@ -696,21 +732,31 @@ Subset of `_IMPLICIT_MUL_FUNCS` that take multiple arguments. Enables `"of"` cha
 
 ## CLI and REPL
 
+`main()` and `print_help()` live in `cli.py`; `normalize.py` (and the package
+root) re-export them lazily via PEP 562 `__getattr__` so that `import eggcalc`
+never loads argparse, exact-tool implementations, or MCP modules.
+
 ### `main() -> int`
 
-Main entry point for CLI. Handles:
-- Argument parsing (expression, `--help`, `--usage`, `--version`, `--quiet`, `--verbose`, `--json`, `-e`, `-i`, `--mcp`, `--mcp-profile`, `--mcp-schema-detail`)
-- Config loading via `maybe_load_cli_config()`
-- Signal handling (SIGPIPE, SIGTERM)
-- Shell glob expansion detection
-- Text command dispatch via `_cli_text_command()`
-- Math evaluation via `run()`
+Main entry point for CLI (defined in `cli.py`; aliased as `normalize_main()`
+when assembled into a single file by `build_single.py`, to avoid conflict
+with the MCP server's `main()` function).
+
+### Dispatch order and trust boundary
+
+`main()` classifies the mode **before** loading user configuration:
+
+1. Construct argparse parser and parse argv.
+2. Handle informational exits (`--capabilities`, `--mcp`, `--version`, `--commands`, `--usage`, `--help` / no arguments) — no config loaded.
+3. Classify text commands via `_cli_text_command()` — no config loaded.
+4. For `--explain`, calculator expression evaluation, or REPL startup, call `maybe_load_cli_config()` exactly once (`--explain` loads config because custom words change normalization results).
+5. Evaluate expression, print the trace, or enter REPL.
 
 ### `maybe_load_cli_config() -> None`
 
 Loads user config for CLI usage. Called once during CLI startup. Disabled by `EGGCALC_NO_CONFIG=1`. Intentionally NOT called from library API functions.
 
-### `_run_repl(show_expression: bool = True) -> int`
+### `_run_repl() -> int`
 
 Interactive REPL mode. Supports:
 - `help` — show help
@@ -721,7 +767,10 @@ Interactive REPL mode. Supports:
 
 ### `_cli_text_command(expression: str, json_output: bool = False, argv: list[str] | None = None) -> int`
 
-Handles text commands before math evaluation. Returns 0 if command was handled, 1 if expression should continue to math eval.
+Handles text commands before math evaluation. Returns a `_CommandStatus`
+enum (`NOT_HANDLED` — first token is not a recognized command, continue to
+math evaluation; `SUCCESS` — command completed; `ERROR` — recognized command
+failed, caller returns nonzero without falling through to math evaluation).
 
 **Commands:** `inspect`, `count`, `regex`, `replace-check`, `lines`, `patch-check`, `shell-split`, `md-structure`, `dotenv-check`
 

@@ -14,7 +14,7 @@ This document is the birds-eye view: how the subsystems fit together, what each 
 - [Subsystem Map](#subsystem-map)
   - [Core Calculator (6 modules)](#core-calculator-6-modules)
   - [Package Plumbing](#package-plumbing)
-  - [exact/ — Deterministic Utility Package (27 modules)](#exact--deterministic-utility-package-27-modules)
+  - [exact/ — Deterministic Utility Package (28 modules)](#exact--deterministic-utility-package-28-modules)
   - [mcp/ — Model Context Protocol Server (3 modules)](#mcp--model-context-protocol-server-3-modules)
 - [Core Calculator Pipeline](#core-calculator-pipeline)
   - [Two Evaluation Paths](#two-evaluation-paths)
@@ -146,10 +146,10 @@ These seven modules form the calculator and are the only code loaded by `import 
 | Module | Lines | Role | Key Exports | Deep Dive |
 |--------|------:|------|-------------|-----------|
 | `_process.py` | 198 | Shared subprocess lifecycle primitives (mechanism only): `SpawnPermit`, queue/child cleanup, context selection. Limits, timeouts, orphan caps, and error contracts stay with `evaluator.py` / `mcp/tools.py` | `SpawnPermit`, `try_acquire_spawn_permit()`, `cleanup_child_process()`, `close_queue()`, `close_semaphore()`, `get_process_context()` | (covered here + [evaluator.md](evaluator.md), [mcp.md](mcp.md)) |
-| `units.py` | 3,787 | Unit definitions, structural dimensions, conversions, `UnitValue` | `UnitValue`, `Dimension`, `UnitSpec`, `UnitExpression`, `UnitRegistry`, `normalize_unit()`, `get_conversion_factor()` | [units.md](units.md) |
-| `evaluator.py` | 3,472 | Safe AST parsing/evaluation, constants, functions, memory/variables | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `Evaluator`, `EggCalcApp`, `EvaluationError`, `Memory`, `register_constant()`, `register_function()` | [evaluator.md](evaluator.md) |
-| `normalize.py` | 3,330 | NL tokenization, number words, unit preprocessing, expression validation | `run()`, `normalize_text()`, `normalize_expression()`, `NORMALIZE`, `PATTERNS` | [normalize.md](normalize.md) |
-| `cli.py` | 951 | CLI dispatch: argparse, REPL, text subcommands, config loading | `main()`, `print_help()`, `run_cli()`, `COMMANDS` | [cli.md](cli.md) |
+| `units.py` | 3,889 | Unit definitions, structural dimensions, conversions, `UnitValue` | `UnitValue`, `Dimension`, `UnitSpec`, `UnitExpression`, `UnitRegistry`, `normalize_unit()`, `get_conversion_factor()` | [units.md](units.md) |
+| `evaluator.py` | 3,757 | Safe AST parsing/evaluation, constants, functions, memory/variables | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `Evaluator`, `EggCalcApp`, `EvaluationError`, `Memory`, `register_constant()`, `register_function()` | [evaluator.md](evaluator.md) |
+| `normalize.py` | 3,942 | NL tokenization, number words, unit preprocessing, expression validation, normalization traces | `run()`, `normalize_text()`, `normalize_expression()`, `trace_normalization()`, `NormalizationTrace`, `NORMALIZE`, `PATTERNS` | [normalize.md](normalize.md) |
+| `cli.py` | 1,043 | CLI dispatch: argparse, REPL, text subcommands, `--explain`/`--commands`, config loading | `main()`, `print_help()`, `run_cli()`, `COMMANDS` | [cli.md](cli.md) |
 | `capabilities.py` | 141 | Runtime capability detection (frozen snapshot) | `detect_capabilities()`, `RuntimeCapabilities`, `capability_summary()` | [capabilities.md](capabilities.md) |
 | `_protocol.py` | 11 | MCP protocol version constants | `SUPPORTED_PROTOCOL_VERSIONS`, `LATEST_SUPPORTED_PROTOCOL_VERSION` | (covered here + [mcp.md](mcp.md)) |
 
@@ -157,7 +157,7 @@ These seven modules form the calculator and are the only code loaded by `import 
 
 | Module | Lines | Role | Deep Dive |
 |--------|------:|------|-----------|
-| `__init__.py` | 156 | Public API surface; eager re-exports from the seven core modules; PEP 562 lazy `main`/`print_help` | [api.md](api.md) |
+| `__init__.py` | 162 | Public API surface; eager re-exports from the seven core modules; PEP 562 lazy `main`/`print_help` | [api.md](api.md) |
 | `__main__.py` | 19 | `python -m eggcalc` entry; delegates to `cli.main()` | [api.md](api.md) |
 | `_version.py` | 3 | Single source of truth for `__version__`; read by `pyproject.toml` and `build_single.py` | [build.md](build.md) |
 | `eggcalc_config.py` (repo root template) | 73 | User config extension points: `CUSTOM_CONSTANTS`, `CUSTOM_FUNCTIONS`, `CUSTOM_UNITS`, `CUSTOM_ALIASES`, `CUSTOM_TEMP_CONVERSIONS`, `CUSTOM_NUMBER_WORDS`, `CUSTOM_OPERATOR_WORDS`. Loaded only by CLI calculator modes or when `EGGCALC_LOAD_CONFIG=1`; never at import time | [api.md](api.md) |
@@ -253,6 +253,9 @@ Multi-stage pipeline converting natural language to Python syntax:
 | Validation | Token whitelist before eval; length/nesting caps | rejects anything unsafe |
 
 Hard limits: `MAX_INPUT_LENGTH = 10_000`, `MAX_NORMALIZED_LENGTH = 20_000`, `MAX_NESTING_DEPTH = 100`.
+Use `trace_normalization()` (or `calc --explain`) for a deterministic,
+side-effect-free, stage-by-stage explanation of the same pipeline —
+observability only, never a behavior change.
 
 See [normalize.md](normalize.md) for the full pipeline, thread-safety notes, and config rebuild mechanics.
 
@@ -398,6 +401,8 @@ See [mcp.md](mcp.md) for the protocol details, resource limits table, and embedd
 | API (timeout) | `evaluate_with_timeout(expr, timeout=5.0)` | child process, semaphore-bounded |
 | API (webapp) | `EggCalcApp().calculate(expr)` | per-instance evaluator + cache |
 | Capabilities | `calc --capabilities` | `detect_capabilities().to_json()` |
+| Normalization trace | `calc --explain "expr"` | `trace_normalization()` (no evaluation) |
+| Command discovery | `calc --commands` | curated CLI set (distinct from MCP tools) |
 | MCP server | `calc --mcp` | `mcp.server.mcp_main()` (alias: `main`) |
 | Text commands | `calc inspect/count/regex/replace-check/lines/patch-check/shell-split/md-structure/dotenv-check` | lazy `importlib` load of exact/ handler |
 
@@ -453,6 +458,7 @@ mcp/server.py ──► schemas, tools, evaluator, capabilities
 | `UNIT_CONVERSIONS` / `TEMPERATURE_CONVERSIONS` | units.py | Lazily-populated pairwise factor / affine-rule dicts |
 | `NUMBER_WORDS` / `OPERATOR_CONVERSIONS` / `FUNCTION_MAPPINGS` / `CONSTANT_WORDS` | normalize.py | NL lookup tables (40 number entries, 15 operator keys, 128 function aliases, 20 constant word groups; `_MULTI_WORD_FUNCTIONS` adds 20 multi-word names) |
 | `NORMALIZE` / `PATTERNS` | normalize.py | Mutable config dicts rebuilt under a lock on config change |
+| `NormalizationTrace` / `NormalizationStep` | normalize.py | Plain-data TypedDicts returned by `trace_normalization()` (`--explain`) |
 | `Memory` | evaluator.py | Thread-safe memory registers (≤1,000 named registers) |
 | `Evaluator` | evaluator.py | `ast.NodeVisitor` implementation; class-level `CONSTANTS` (55) and `FUNCTIONS` (104); per-instance variables (≤1,000) |
 | `UnitPolicy` / `FunctionSpec` | evaluator.py | Dimensional contract enum (10 members) + frozen wrapper |
@@ -475,7 +481,7 @@ Full details: [build.md](build.md).
 
 - **`build_single.py`** assembles everything into one portable `eggcalc.py` (~42k lines / ~1.5 MB). `MODULE_MANIFEST` is the single source of truth: **38 `ModuleSpec` entries** (7 core + 28 exact + 3 mcp) with name, path, group, declared `depends_on`, and single-file inclusion flag. `validate_build_manifest()` checks duplicates, missing files, unknown deps, cycles, reachability, residual package-relative imports, and lazy-exact manifest coverage (every `_LAZY_IMPORTS` module present). Assembly topologically sorts modules, strips docstrings/`__all__`, rewrites relative imports to globals, renames colliding entry points (`normalize_main()`, `mcp_main()`), and prefixes conflicting MCP function names.
 - **`install.py`** builds and installs the single file as `calc` (`~/.local/bin/calc` on Linux/macOS, `%LOCALAPPDATA%\Programs\calc` on Windows) with atomic copy and PATH management.
-- **Development commands:** `make test`, `make lint`, `make format`, `make typecheck`, `make docs-check` (generated-MCP-doc drift), `make check` (all correctness incl. build validation + pytest), `make package-check` (wheel/sdist/single-file smoke), `make release-check`, `make publish` (manual Twine upload). CI runs `make check` then `make package-check`; GitHub Actions never publishes.
+- **Development commands:** `make test`, `make lint`, `make format`, `make typecheck`, `make docs-check` (generated-MCP-doc drift), `make check` (all correctness incl. build validation + pytest), `make package-check` (wheel/sdist/single-file smoke), `make release-check`, `make publish` (manual Twine upload). CI runs `make check` then `make package-check` on Ubuntu / Python 3.11; a recurring compatibility workflow covers Windows / Python 3.11, macOS / Python 3.11, and Ubuntu / Python 3.14 (path-filtered on push/PR plus weekly). GitHub Actions never publishes.
 
 ---
 

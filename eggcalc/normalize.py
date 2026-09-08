@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from functools import lru_cache
 from re import Pattern
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypedDict
 
 from .evaluator import EvaluationError, evaluate
 from .units import UNIT_ALIASES, UnitValue, is_unit
@@ -32,6 +32,9 @@ __all__ = [
     "run",
     "normalize_text",
     "normalize_expression",
+    "trace_normalization",
+    "NormalizationStep",
+    "NormalizationTrace",
     "error_message",
     "NORMALIZE",
     "PATTERNS",
@@ -2218,12 +2221,67 @@ _DIGIT_SCALES: dict[str, str] = {
 }
 
 
-def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Pattern[str]]) -> str:
-    """Normalize an expression by removing filler words and applying conversions."""
+class NormalizationStep(TypedDict):
+    """One material transformation recorded while tracing normalization."""
+
+    stage: str  # short stable stage identifier (see trace_normalization stage vocabulary)
+    before: str  # value before the material rewrite
+    after: str  # value after the material rewrite
+    changed: bool  # always True; stages with no change are omitted
+    note: str  # short explanation of what the stage covers
+
+
+class NormalizationTrace(TypedDict):
+    """Deterministic, side-effect-free explanation of normalization."""
+
+    input: str  # original string as received
+    steps: list[NormalizationStep]  # ordered material transformation records
+    normalized: str | None  # final evaluator-ready string, or None on failure
+    exit_code: int  # normal normalization exit code (0, 1, or 2)
+    errored: bool  # True when normalization failed
+    error: str | None  # stable user-facing error text, or None on success
+
+
+def _record_trace_step(
+    trace: list[NormalizationStep] | None,
+    stage: str,
+    before: str,
+    after: str,
+    note: str = "",
+) -> None:
+    """Append a trace step when *before* differs materially from *after*.
+
+    No-op when *trace* is None (the normal fast path) or when nothing
+    changed, so stages with no effect are absent from the trace.
+    """
+    if trace is None or before == after:
+        return
+    trace.append({"stage": stage, "before": before, "after": after, "changed": True, "note": note})
+
+
+def normalize_text(
+    expression: str,
+    operators: dict,
+    patterns: Mapping[str, Pattern[str]],
+    _trace: list[NormalizationStep] | None = None,
+) -> str:
+    """Normalize an expression by removing filler words and applying conversions.
+
+    Args:
+        expression: Raw input text.
+        operators: Normalization config dict.
+        patterns: Compiled regex patterns.
+        _trace: Optional private collector for :func:`trace_normalization`.
+            When provided, material before/after changes at stage boundaries
+            are appended as :class:`NormalizationStep` records. ``None``
+            (the default) preserves the current fast path with no tracing.
+    """
     if not expression or not expression.strip():
         raise ValueError("Empty expression")
     if len(expression) > MAX_INPUT_LENGTH:
         raise ValueError(f"Input too long (max {MAX_INPUT_LENGTH} characters)")
+
+    _trace_anchor = expression
 
     implicit_mul_funcs = _IMPLICIT_MUL_FUNCS | set(operators["functions"])
 
@@ -2242,6 +2300,14 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         lambda m: m.group(1).replace(",", "").replace("\u00a0", "").replace("\u202f", ""),
         expression,
     )
+    _record_trace_step(
+        _trace,
+        "sanitize",
+        _trace_anchor,
+        expression,
+        "unicode math operators to ASCII, invisible characters, comments, thousands separators",
+    )
+    _trace_anchor = expression
 
     # Reject juxtaposed bare digit groups ("5 5", "1 000"): the user never
     # typed an operator between them, so silently summing them yields a
@@ -2311,6 +2377,15 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
             return f"{m.group(1)} {m.group(2)}"
 
         expression = compact_arg_pattern.sub(_split_compact_function_arg, expression)
+
+    _record_trace_step(
+        _trace,
+        "function_phrases",
+        _trace_anchor,
+        expression,
+        "multi-word function names, nth-root phrases, compact function arguments",
+    )
+    _trace_anchor = expression
 
     # Convert hyphens between number words to spaces
     # e.g., "twenty-one" -> "twenty one" (prevents hyphen being treated as minus)
@@ -2405,6 +2480,15 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression,
         flags=re.IGNORECASE,
     )
+    _record_trace_step(
+        _trace,
+        "number_words",
+        _trace_anchor,
+        expression,
+        "hyphenated numbers, multi-word number phrases, digit scales, "
+        "ordinal exponents, single number words, short power phrases",
+    )
+    _trace_anchor = expression
 
     expression = _normalize_postfix_unit_power_words(expression)
     # Strip a leading "convert" keyword before the spelled-unit-conversion
@@ -2417,6 +2501,14 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
     # ``bitxor(...)`` function calls so they retain bitwise-XOR meaning
     # now that ``^`` is the symbol for exponentiation.
     expression = _normalize_xor_word_to_bitxor_call(expression)
+    _record_trace_step(
+        _trace,
+        "unit_phrases",
+        _trace_anchor,
+        expression,
+        "postfix unit power words, spelled unit conversions, xor word forms",
+    )
+    _trace_anchor = expression
 
     # Strip longer filler phrases before word-to-operator conversion so that
     # "the value of pi" → "pi" (not "value * pi" after "of" → "*").
@@ -2503,6 +2595,14 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression = re.sub(r"^\s*(?:\*\*|//|<<|>>|[*/%&|^])\s*", "", stripped)
     else:
         expression = stripped
+    _record_trace_step(
+        _trace,
+        "operator_words",
+        _trace_anchor,
+        expression,
+        "filler stripping, word to operator and constant replacement, " "decimal point handling",
+    )
+    _trace_anchor = expression
 
     # Handle compound unit conversions after stripping
     # e.g., "60mi/h in m/s" -> "convert(60*mi/h,m/s)"
@@ -2577,6 +2677,14 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         pattern = rf"(\d+(?:\.\d+)?)\s*{re.escape(u1)}\s*/\s*{re.escape(u2)}\b"
         replacement_fn = lambda m, uu1=u1, uu2=u2: f"({m.group(1)}*{uu1})/({uu2})"
         expression = re.sub(pattern, replacement_fn, expression, flags=re.IGNORECASE)
+    _record_trace_step(
+        _trace,
+        "unit_conversions",
+        _trace_anchor,
+        expression,
+        "compound, bare-compound, and split unit conversion phrases",
+    )
+    _trace_anchor = expression
 
     # Convert percentages (e.g., 50% -> 0.5, but not 5%3 which is modulo)
     # Match % directly attached to a number or with optional space, NOT followed by optional whitespace + digit
@@ -2826,6 +2934,15 @@ def normalize_text(expression: str, operators: dict, patterns: Mapping[str, Patt
         expression = _POSTFIX_FACTORIAL_RE.sub(_replace_factorial, expression)
 
     expression = re.sub(r"(?<=\))(?=factorial\()", "*", expression)
+
+    _record_trace_step(
+        _trace,
+        "symbols",
+        _trace_anchor,
+        expression,
+        "percentages, complex suffix, degree phrases, caret to power rewrites, "
+        "whitespace and implicit multiplication, postfix factorial",
+    )
 
     return expression
 
@@ -3520,6 +3637,7 @@ def normalize_expression(
     patterns: Mapping[str, Pattern[str]] | None = None,
     skip_validation: bool = False,
     function_names: Mapping[str, Any] | None = None,
+    _trace: list[NormalizationStep] | None = None,
 ) -> tuple[str, int]:
     """Normalize an expression without evaluating it.
 
@@ -3531,6 +3649,10 @@ def normalize_expression(
         patterns: The compiled regex patterns dict
         skip_validation: If True, skip token validation (for custom evaluators)
         function_names: Additional function names recognized by the normalizer.
+        _trace: Optional private collector for :func:`trace_normalization`.
+            When provided, material before/after changes at stage boundaries
+            are appended as :class:`NormalizationStep` records. ``None``
+            (the default) preserves the current fast path with no tracing.
 
     Returns:
         tuple: (normalized_expression, exit_code) - normalized_expression is the
@@ -3555,34 +3677,187 @@ def normalize_expression(
     if len(expression) > MAX_INPUT_LENGTH:
         return f"Error: Input too long (max {MAX_INPUT_LENGTH} characters)", 2
 
-    expression = normalize_text(expression, operators, patterns)
+    expression = normalize_text(expression, operators, patterns, _trace=_trace)
 
     if len(expression) > MAX_NORMALIZED_LENGTH:
         return f"Error: Normalized expression too long (max {MAX_NORMALIZED_LENGTH} characters)", 2
     tokens = split_at_operators(expression, operators, patterns)
+    _record_trace_step(
+        _trace, "tokenize", expression, " ".join(tokens), "split at operator boundaries"
+    )
+    token_view = " ".join(tokens)
     tokens, is_valid = convert_from_human_handler(tokens, operators, patterns, expression)
+    _record_trace_step(
+        _trace,
+        "token_numbers",
+        token_view,
+        " ".join(tokens),
+        "human-readable number words to numeric values",
+    )
 
     if not is_valid:
+        _record_trace_step(
+            _trace,
+            "validation",
+            " ".join(tokens),
+            "",
+            "rejected: number-word conversion produced no valid tokens",
+        )
         return "", 1
 
+    token_view = " ".join(tokens)
     tokens = _combine_consecutive_numbers(tokens, operators, patterns)
+    _record_trace_step(
+        _trace,
+        "combine_numbers",
+        token_view,
+        " ".join(tokens),
+        "consecutive number tokens combined into compound numbers",
+    )
+    token_view = " ".join(tokens)
     tokens = apply_math_functions(tokens, operators, patterns)
+    _record_trace_step(
+        _trace,
+        "functions",
+        token_view,
+        " ".join(tokens),
+        "function names converted to math function calls",
+    )
 
     # Handle unit conversion patterns from tokens (e.g., "2m in feet" -> tokens ['2m', 'in', 'feet'])
+    token_view = " ".join(tokens)
     tokens = _handle_unit_conversion_from_tokens(tokens)
+    _record_trace_step(
+        _trace,
+        "unit_conversion",
+        token_view,
+        " ".join(tokens),
+        "unit conversion phrases converted to convert() calls",
+    )
     joined = "".join(tokens)
 
+    pre_units = joined
     joined = _preprocess_units(joined)
+    _record_trace_step(
+        _trace,
+        "units",
+        pre_units,
+        joined,
+        "implicit multiplication before units, canonical unit names",
+    )
 
+    pre_floor_mod = joined
     joined = _add_unit_floor_mod_parens(joined)
+    _record_trace_step(
+        _trace,
+        "floor_mod_grouping",
+        pre_floor_mod,
+        joined,
+        "unit operands grouped around floor division and modulo",
+    )
 
     if not skip_validation:
         try:
             validate_for_eval(tokens, patterns, set(operators["functions"]))
-        except ValueError:
+        except ValueError as e:
+            _record_trace_step(_trace, "validation", " ".join(tokens), "", f"rejected: {e}")
             return "", 1
 
     return joined, 0
+
+
+def trace_normalization(
+    expression: str,
+    operators: dict | None = None,
+    patterns: Mapping[str, Pattern[str]] | None = None,
+    function_names: Mapping[str, Any] | None = None,
+    skip_validation: bool = False,
+) -> NormalizationTrace:
+    """Explain how *expression* is normalized, without changing its result.
+
+    Runs the same implementation as :func:`normalize_expression` (via a
+    private trace collector) and records only material before/after changes
+    at stable stage boundaries. Ordinary ``normalize_expression()`` calls
+    pass no collector and keep the current fast path.
+
+    Stage vocabulary (a stage is absent when it makes no change):
+
+    - ``sanitize``: unicode operators, invisible characters, comments,
+      thousands separators
+    - ``function_phrases``: multi-word function names, nth-root phrases,
+      compact function arguments
+    - ``number_words``: hyphenated/multi-word numbers, digit scales, ordinal
+      exponents, single number words, short power phrases
+    - ``unit_phrases``: postfix unit power words, spelled unit conversions,
+      xor word forms
+    - ``operator_words``: filler stripping, word-to-operator/constant
+      replacement, decimal point handling
+    - ``unit_conversions``: compound, bare-compound, and split unit
+      conversion phrases
+    - ``symbols``: percentages, complex suffix, degree phrases, caret to
+      power rewrites, whitespace/implicit multiplication, factorial
+    - ``tokenize``: split at operator boundaries
+    - ``token_numbers``: human-readable number words to numeric values
+    - ``combine_numbers``: consecutive numbers combined into compounds
+    - ``functions``: function names converted to math calls
+    - ``unit_conversion``: token-level conversion phrases to convert() calls
+    - ``units``: implicit multiplication before units, canonical unit names
+    - ``floor_mod_grouping``: unit operands grouped around // and %
+    - ``validation``: recorded only when input is rejected
+
+    The trace is deterministic and side-effect-free, obeys the same input,
+    normalized-length, and nesting limits as normal normalization, and never
+    exposes internal regex match objects.
+
+    Args:
+        expression: The raw expression to trace.
+        operators: Optional operators configuration dict.
+        patterns: Optional compiled regex patterns dict.
+        function_names: Optional additional function names.
+        skip_validation: If True, skip token validation.
+
+    Returns:
+        A :class:`NormalizationTrace` with the original input, ordered
+        steps, final normalized string (or None on failure), exit code,
+        and error classification matching :func:`normalize_expression`.
+    """
+    steps: list[NormalizationStep] = []
+    try:
+        normalized, exit_code = normalize_expression(
+            expression,
+            operators,
+            patterns,
+            skip_validation=skip_validation,
+            function_names=function_names,
+            _trace=steps,
+        )
+    except ValueError as e:
+        return {
+            "input": expression,
+            "steps": steps,
+            "normalized": None,
+            "exit_code": 1,
+            "errored": True,
+            "error": str(e),
+        }
+    if exit_code != 0:
+        error = normalized if exit_code == 2 else "Unable to normalize expression"
+        return {
+            "input": expression,
+            "steps": steps,
+            "normalized": None,
+            "exit_code": exit_code,
+            "errored": True,
+            "error": error,
+        }
+    return {
+        "input": expression,
+        "steps": steps,
+        "normalized": normalized,
+        "exit_code": 0,
+        "errored": False,
+        "error": None,
+    }
 
 
 def run(

@@ -839,12 +839,20 @@ def _main():
     parser.add_argument("--mcp-profile", metavar="<profile>", help="MCP server tool profile filter")
     parser.add_argument("--mcp-schema-detail", choices=["compact", "normal", "full"], help="MCP schema detail level")
     parser.add_argument("--capabilities", action="store_true", help="Show runtime capabilities as JSON and exit")
+    parser.add_argument("--explain", action="store_true", help="Show normalization trace and exit without evaluating")
+    parser.add_argument("--commands", action="store_true", help="List curated CLI text commands and exit")
     args = parser.parse_args()
 
     if args.capabilities:
         caps = detect_capabilities()
         print(caps.to_json(indent=2))
         return 0
+
+    if args.commands and not (args.expression or args.single_expr):
+        sys.argv = ["eggcalc", "--commands"]
+        if args.json:
+            sys.argv.append("--json")
+        return normalize_main()
 
     if args.mcp:
         sys.argv = ["eggcalc", "--mcp"]
@@ -872,6 +880,8 @@ def _main():
             sys.argv.append("-i")
         if args.show:
             sys.argv.append("-s")
+        if args.explain:
+            sys.argv.append("--explain")
         if args.mcp_profile:
             sys.argv.extend(["--mcp-profile", args.mcp_profile])
         if args.mcp_schema_detail:
@@ -892,6 +902,10 @@ def _main():
             sys.argv.append("--json")
         if args.quiet:
             sys.argv.append("-q")
+        if args.explain:
+            sys.argv.append("--explain")
+        if args.commands:
+            sys.argv.append("--commands")
         if args.mcp_profile:
             sys.argv.extend(["--mcp-profile", args.mcp_profile])
         if args.mcp_schema_detail:

@@ -39,6 +39,8 @@ When you pipe input, the same full pipeline is used.
 | `-q`, `--quiet` | Suppress the expression field in JSON output |
 | `--verbose` | Accepted for compatibility; plain output remains result-only |
 | `--json` | Output result (and normalized expression unless `-q`) as JSON |
+| `--explain` | Show the normalization trace for the expression and exit without evaluating |
+| `--commands` | List curated CLI text commands and exit |
 | `-i`, `--interactive` | Start interactive REPL mode |
 | `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
 | `--mcp` | Run as MCP server for math, text, and validation tools |
@@ -90,6 +92,28 @@ calc --json "5 + 3"
 calc --json -q "5 + 3"
 # {"result": 8}
 ```
+
+### Normalization Trace (`--explain`)
+
+Show how an expression is normalized without evaluating it:
+
+```bash
+calc --explain "five plus three"
+# input: five plus three
+# 1. number_words: five plus three -> 5 plus 3
+#    (...)
+# normalized: 5+3
+```
+
+Add `--json` for the machine-readable `NormalizationTrace`
+(`input`, `steps`, `normalized`, `exit_code`, `errored`, `error`).
+See the `trace_normalization()` Python API in [Python API](api.md).
+
+### Command Discovery (`--commands`)
+
+`calc --commands` lists the small curated CLI text command set
+(`inspect`, `count`, `regex`, …), distinct from the much larger MCP tool
+surface exposed via `calc --mcp`. Add `--json` for machine-readable output.
 
 ### Interactive Mode <!-- cli.md:96 -->
 
@@ -426,7 +450,7 @@ eggcalc can run as an MCP server, exposing deterministic math, text analysis, an
 calc --mcp
 ```
 
-See [MCP Server](mcp.md) for full documentation on all 77 available tools.
+See [MCP Server](mcp.md) for full documentation on all 83 available tools.
 
 ### Quick Reference
 

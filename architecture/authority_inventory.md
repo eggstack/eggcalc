@@ -78,8 +78,8 @@ Re-exports from `eggcalc/__init__.py:28-31`: `DEFAULT_CACHE_SIZE`, `MAX_EXPONENT
 
 | Constant | Authoritative source | Value | Tests |
 |----------|---------------------|-------|-------|
-| `MAX_INPUT_LENGTH` | `eggcalc/normalize.py:44` | 10 000 | `test_normalize` |
-| `MAX_NORMALIZED_LENGTH` | `eggcalc/normalize.py:45` | 20 000 | `test_normalize` |
+| `MAX_INPUT_LENGTH` | `eggcalc/normalize.py:48` | 10 000 | `test_normalize` |
+| `MAX_NORMALIZED_LENGTH` | `eggcalc/normalize.py:49` | 20 000 | `test_normalize` |
 | `MAX_NESTING_DEPTH` | Re-exported from `eggcalc.evaluator:105` | 100 | `test_normalize` |
 
 Note: `MAX_INPUT_LENGTH` in `exact/validate.py` (100 000), `exact/cargo.py` (200 000), `exact/llm_hygiene.py` (500 000), and `exact/manifests.py` (500 000) are intentionally different limits for their respective subsystems.
@@ -132,15 +132,23 @@ Note: `MAX_INPUT_LENGTH` in `exact/validate.py` (100 000), `exact/cargo.py` (200
 |------|---------------------|-------|
 | `COMMANDS` (text command registry) | `eggcalc/cli.py:61` | `test_import_boundaries::TestCommandRegistry` |
 | `_COMMAND_NAME_TO_SPEC` (lookup) | `eggcalc/cli.py:120` | `test_import_boundaries::TestCommandRegistry` |
-| `_HANDLER_MAP` (handler dispatch) | `eggcalc/cli.py:129` | `test_import_boundaries::TestCommandRegistry` |
+| `_get_handler` / `_handler_cache` (lazy handler dispatch) | `eggcalc/cli.py` | `test_import_boundaries::TestCommandRegistry` |
 
 ## Build Inventory
 
 | Item | Authoritative source | Tests |
 |------|---------------------|-------|
-| `MODULES_CALC` | `build_single.py` | `test_import_boundaries` |
-| `MODULES_EXACT` | `build_single.py` | `test_import_boundaries` |
-| `MODULES_MCP` | `build_single.py` | `test_import_boundaries` |
+| `MODULE_MANIFEST` (module ordering, deps, validation) | `build_single.py` (single source of truth) | `test_import_boundaries`, `test_build_manifest_graph` |
+| `MODULES_CALC` / `MODULES_EXACT` / `MODULES_MCP` | Derived views generated from `MODULE_MANIFEST` (never manually maintained) | `test_import_boundaries` |
+
+## Normalization Trace Contract
+
+| Item | Authoritative source | Tests |
+|------|---------------------|-------|
+| `NormalizationTrace` / `NormalizationStep` (trace shape) | `eggcalc/normalize.py` | `test_normalization_trace` |
+| Trace stage vocabulary (`sanitize` … `validation`) | `eggcalc/normalize.py::trace_normalization` docstring | `test_normalization_trace::TestTraceStages` |
+| Trace/normal-path parity | Same implementation via private `_trace` collector | `test_normalization_trace::TestTraceParity`, `test_build_single` (`--explain` parity) |
+| `--explain` / `--commands` CLI surface | `eggcalc/cli.py` (`_explain_expression`, `_print_commands`) | `test_cli_compatibility` |
 
 ## Result / Error Envelopes
 

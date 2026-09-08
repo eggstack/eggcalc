@@ -18,6 +18,9 @@ python -m pytest tests/test_tokenization.py::TestMultiDigitSubtraction -v
 
 ## Test Files
 
+Representative suites (not exhaustive — see `tests/` for the full list,
+including dated regression files such as `test_bugs_2026_09.py`):
+
 | File | Purpose |
 |------|---------|
 | `test_clicalc.py` | Core functional tests |
@@ -26,12 +29,20 @@ python -m pytest tests/test_tokenization.py::TestMultiDigitSubtraction -v
 | `test_math_identities.py` | Mathematical laws |
 | `test_math_edge_cases.py` | Math edge case tests |
 | `test_normalize.py` | Normalization tests |
+| `test_normalization_trace.py` | Normalization trace parity, stages, and failure classification |
 | `test_exact.py` | Unicode text primitives |
 | `test_cli_text.py` | CLI text tools |
+| `test_cli_compatibility.py` | CLI flags, output format, errors, exit codes, `--explain`/`--commands` |
 | `test_mcp_server.py` | MCP server integration |
 | `test_mcp_tools_new.py` | MCP integration tests for new tools |
-| `test_build_single.py` | Build script tests |
+| `test_build_single.py` | Build script tests, package/single-file parity |
+| `test_build_manifest_graph.py` | Build manifest validation |
 | `test_repl_and_cli.py` | REPL and CLI integration tests |
+| `test_authority_consolidation.py` | Semantic authority parity (protocol, JSON Pointer, SemVer) |
+| `test_shared_lifecycle.py` | Shared subprocess lifecycle and export authority |
+| `test_import_boundaries.py` | Import boundaries, command registry, version surface |
+| `test_tool_inventory.py` | Tool registry consistency tests |
+| `test_documentation.py` | Generated-documentation drift checks |
 | `test_production_review_2026_07_b.py` | Production review tests |
 | `test_unit_namespace.py` | Unit namespace tests |
 | `test_patch_tools.py` | Patch apply/summary tools tests |

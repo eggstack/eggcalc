@@ -216,6 +216,39 @@ print("OK")
     @pytest.mark.parametrize(
         "expr",
         [
+            "five plus three",
+            "2 ^ 10",
+            "30 km/h in mph",
+            "square root of 16",
+            "5m % 2m",
+            "5 5",
+        ],
+    )
+    def test_explain_trace_parity(self, single_file_path, expr):
+        """Package and single-file --explain traces must be semantically equal."""
+        import json
+
+        pkg = _run_subprocess(
+            [sys.executable, "-m", "eggcalc", "--explain", "--json", expr], timeout=30
+        )
+        single = _run_subprocess(
+            [sys.executable, single_file_path, "--explain", "--json", expr], timeout=30
+        )
+        assert (
+            pkg.returncode == single.returncode
+        ), f"Exit mismatch for {expr!r}: package={pkg.returncode}, single={single.returncode}"
+        assert json.loads(pkg.stdout) == json.loads(single.stdout), f"Trace mismatch for {expr!r}"
+
+    def test_commands_parity(self, single_file_path):
+        """Package and single-file --commands output must match."""
+        pkg = _run_subprocess([sys.executable, "-m", "eggcalc", "--commands"], timeout=30)
+        single = _run_subprocess([sys.executable, single_file_path, "--commands"], timeout=30)
+        assert pkg.returncode == 0 and single.returncode == 0
+        assert pkg.stdout == single.stdout
+
+    @pytest.mark.parametrize(
+        "expr",
+        [
             # Arithmetic operators
             "2 + 3",
             "5 - 3",

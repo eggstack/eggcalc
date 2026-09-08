@@ -1,6 +1,38 @@
 name: Compatibility
 
+# Recurring evidence for the supported-platform contract (Python >=3.11 on
+# Linux, macOS, Windows). Primary correctness gate stays in ci.yml
+# (ubuntu-latest / Python 3.11 / make check + package-check).
+#
+# This workflow is intentionally small: minimum supported Python on all three
+# OS families, plus the newest supported Python minor on Linux where
+# version incompatibilities are cheapest to detect. Do not add 3.12/3.13 jobs
+# unless a concrete regression requires them.
+
 on:
+  push:
+    branches: [main]
+    paths:
+      - "eggcalc/**"
+      - "tests/**"
+      - "build_single.py"
+      - "pyproject.toml"
+      - "Makefile"
+      - ".github/workflows/**"
+      - "scripts/smoke_release_surfaces.py"
+  pull_request:
+    branches: [main]
+    paths:
+      - "eggcalc/**"
+      - "tests/**"
+      - "build_single.py"
+      - "pyproject.toml"
+      - "Makefile"
+      - ".github/workflows/**"
+      - "scripts/smoke_release_surfaces.py"
+  schedule:
+    # Weekly Monday 06:00 UTC safety net for toolchain drift.
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -13,6 +45,8 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            python-version: "3.11"
+          - os: macos-latest
             python-version: "3.11"
           - os: ubuntu-latest
             python-version: "3.14"
@@ -31,13 +65,33 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Run tests
-        run: python -m pytest tests/ -v
+        run: python -m pytest tests/ -q
 
       - name: Validate single-file build
         run: |
           python build_single.py --validate
           python build_single.py
           python eggcalc.py "5+3"
+
+      - name: Exercise platform-sensitive surfaces
+        # Single shell-agnostic step (no POSIX-only constructs): calculator
+        # units/conversion, exact/regex ops, multiprocessing-backed timeout,
+        # and a subprocess CLI invocation. macOS coverage of subprocess and
+        # timeout behavior is the point of this step on that runner.
+        run: >
+          python -c "from eggcalc import evaluate_raw;
+          assert evaluate_raw('five plus three') == 8;
+          assert 'm' in str(evaluate_raw('30m + 100ft'));
+          assert 'mph' in str(evaluate_raw('30 km / h in mph'));
+          from eggcalc.exact.validate import regex_test;
+          assert regex_test('^[0-9]+$', ['12345'])['valid_pattern'];
+          from eggcalc import evaluate_with_timeout;
+          assert evaluate_with_timeout('2+2', timeout=10) == 4;
+          import subprocess, sys;
+          r = subprocess.run([sys.executable, '-m', 'eggcalc', '5+3'],
+          capture_output=True, text=True, timeout=60);
+          assert r.returncode == 0 and r.stdout.strip() == '8', r.stderr;
+          print('platform-sensitive surfaces OK')"
 
       - name: Validate package surfaces
         if: runner.os == 'Windows'

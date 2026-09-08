@@ -166,7 +166,7 @@ evaluator.CONSTANTS["custom"] = 123
 Load configuration from `eggcalc_config.py` in working directory (thread-safe).
 
 **Safety:** This function is NOT called by `import eggcalc`. Library import is side-effect-free. Config loading happens via:
-- CLI: `maybe_load_cli_config()` in normalize.py (once at startup)
+- CLI: `maybe_load_cli_config()` in cli.py (once at startup, after mode classification)
 - API: `_ensure_config_loaded()` (lazy, only when `EGGCALC_LOAD_CONFIG=1` is set)
 - MCP: Disabled entirely (`EGGCALC_NO_CONFIG=1`)
 
@@ -221,6 +221,10 @@ Exit codes: `0` = success, `1` = empty/invalid expression, `2` = input too long.
 ### `normalize_text(expression: str, operators: dict, patterns: Mapping[str, Pattern[str]]) -> str`
 
 Lower-level function that applies filler word removal, number word conversion, unit preprocessing, and other NL-to-math transformations. `operators` and `patterns` are required (no defaults). Raises `ValueError` on empty expression or input exceeding `MAX_INPUT_LENGTH`.
+
+### `trace_normalization(expression: str, operators: dict | None = None, patterns: Mapping | None = None, function_names: Mapping | None = None, skip_validation: bool = False) -> NormalizationTrace`
+
+Deterministic, side-effect-free explanation of the normalization pipeline: same implementation as `normalize_expression()`, observability only. Returns a `NormalizationTrace` TypedDict (`input`, `steps`, `normalized`, `exit_code`, `errored`, `error`); each step is a `NormalizationStep` (`stage`, `before`, `after`, `changed`, `note`) drawn from the stable stage vocabulary documented in [normalize.md](normalize.md). Also exported from the package root and available from the CLI as `calc --explain`.
 
 ## Utility Functions
 

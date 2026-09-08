@@ -57,6 +57,13 @@ evaluate_raw("5m % 2s")   # → EvaluationError (incompatible dimensions)
 
 **When writing tests:** use `evaluate()` for direct AST evaluator behavior (e.g. `"5+3"`, `"2**10"`). Use `evaluate_raw()`, CLI subprocesses, or `run()` for natural-language and unit parsing behavior.
 
+### Normalization observability (no behavior change)
+
+- `trace_normalization(expr)` in `normalize.py` (also top-level `eggcalc.trace_normalization`) explains normalization via the same implementation (`normalize_expression` with a private `_trace` collector). Returns `NormalizationTrace`: `input`, `steps`, `normalized` (`None` on failure), `exit_code`, `errored`, `error`.
+- Steps use stable stage names (`sanitize`, `function_phrases`, `number_words`, `unit_phrases`, `operator_words`, `unit_conversions`, `symbols`, `tokenize`, `token_numbers`, `combine_numbers`, `functions`, `unit_conversion`, `units`, `floor_mod_grouping`, `validation`); stages with no change are omitted.
+- Trace never evaluates: `trace["normalized"]` parity with `normalize_expression()` is the test contract (`tests/test_normalization_trace.py`).
+- CLI: `calc --explain "<expr>"` prints the trace + final form without evaluating (`--json` supported); `calc --commands` lists the 9 curated CLI text commands (distinct from the 83 MCP tools). Both are forwarded by the single-file build.
+
 ### Unit-aware function contracts
 
 Every built-in function has a `UnitPolicy` (defined in `evaluator.py`, enforced in `visit_Call`). Key policies: `DIMENSIONLESS` (log, exp, gcd, factorial), `ANGLE_INPUT` (sin, cos, tan — accepts angle UnitValue with degree conversion), `ANGLE_OUTPUT` (asin, acos, atan), `PRESERVE_SINGLE` (abs, round, floor, ceil), `COMPATIBLE_REDUCER` (mean, min, max, sum), `ROOT` (sqrt), `HYPOT/ATAN2`. User-registered functions default to DIMENSIONLESS. See `architecture/evaluator.md` for full policy list.
@@ -120,7 +127,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 - **`build_single.py` compatibility** — all runtime code must live in one of the seven core modules (`_process.py`, `units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. `__main__.py` is a thin entry point (not in the manifest). Adding imports outside the allowed set will break the build.
 - **TypedDict over NamedTuple** — the codebase uses `TypedDict` for structured return types. TypedDict classes do NOT support `__slots__`.
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters. Applies to both single-expression and REPL modes.
-- **Python requirement** — `>=3.11` per `pyproject.toml`. Required CI uses 3.11; optional compatibility workflow tests 3.14 and Windows.
+- **Python requirement** — `>=3.11` per `pyproject.toml`. Required CI uses Ubuntu 3.11 (`make check` + `make package-check`). Recurring compatibility workflow covers Windows 3.11, macOS 3.11, and Ubuntu 3.14 (path-filtered on push/PR plus weekly schedule and manual dispatch): full test suite, single-file build + smoke, platform-sensitive calculator/MCP/timeout/subprocess probes, and package-surface validation on Windows.
 - **`McpServerConfig` clamps `max_output_bytes` to min 1** — was previously 1000.
 
 ## Verification and Release Policy

@@ -101,6 +101,32 @@ normalized, exit_code = normalize_expression("30m + 100ft")
 # normalized == "30*m+100*ft", exit_code == 0
 ```
 
+### `trace_normalization(expression: str, operators: dict | None = None, patterns: Mapping | None = None, function_names: Mapping | None = None, skip_validation: bool = False) -> NormalizationTrace`
+
+Explain how input is normalized without changing the result. Runs the same
+implementation as `normalize_expression()` via a private trace collector and
+records only material before/after changes at stable stage boundaries
+(`sanitize`, `function_phrases`, `number_words`, `unit_phrases`,
+`operator_words`, `unit_conversions`, `symbols`, `tokenize`, `token_numbers`,
+`combine_numbers`, `functions`, `unit_conversion`, `units`,
+`floor_mod_grouping`, and `validation` on rejection). Stages with no change
+are omitted. Deterministic, side-effect-free, and bounded; obeys the same
+input, normalized-length, and nesting limits as normal normalization.
+
+```python
+from eggcalc import trace_normalization
+
+trace = trace_normalization("five plus three")
+# trace["normalized"] == "5+3"
+# trace["steps"] == [{"stage": "number_words", ...}, ...]
+# trace["exit_code"] == 0, trace["errored"] is False, trace["error"] is None
+```
+
+The `NormalizationTrace` TypedDict carries `input`, `steps`, `normalized`
+(`None` on failure), `exit_code`, `errored`, and `error` (stable user-facing
+text matching the normal path's exit/error classification). Each step carries
+`stage`, `before`, `after`, `changed` (always `True`), and `note`.
+
 ### `evaluate_cached(expression: str) -> Any`
 
 Like `evaluate_raw()` but with LRU caching (1024 entries). Best for repeated identical queries.

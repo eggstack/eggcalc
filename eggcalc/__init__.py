@@ -60,9 +60,12 @@ from .normalize import (
     MAX_NESTING_DEPTH,
     NORMALIZE,
     PATTERNS,
+    NormalizationStep,
+    NormalizationTrace,
     normalize_expression,
     normalize_text,
     run,
+    trace_normalization,
 )
 from .units import (
     FLOAT_EPSILON,
@@ -97,6 +100,9 @@ __all__ = [
     "run",
     "normalize_text",
     "normalize_expression",
+    "trace_normalization",
+    "NormalizationStep",
+    "NormalizationTrace",
     "print_help",
     # Constants
     "NORMALIZE",

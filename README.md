@@ -26,6 +26,7 @@ Written in pure Python with no external dependencies, it can be used as a CLI to
 - **Python 3.11 or higher** (3.10 is no longer supported)
 - **Operating systems:** Linux, macOS, Windows
 - All tools and features are fully available on every supported runtime — no reduced capability set
+- Compatibility evidence: primary CI runs the full gate on Ubuntu / Python 3.11; a recurring compatibility workflow covers Windows / Python 3.11, macOS / Python 3.11, and Ubuntu / Python 3.14 (path-filtered on push/PR plus a weekly schedule)
 
 ## Installation
 
@@ -66,6 +67,8 @@ calc --mcp                              # MCP server mode
 | `-e`, `--expression` | Evaluate a single expression (quiet mode) |
 | `-q`, `--quiet` | Suppress expression in output |
 | `--json` | Output result as JSON |
+| `--explain` | Show the normalization trace for the expression and exit without evaluating |
+| `--commands` | List curated CLI text commands and exit |
 | `-i`, `--interactive` | Start interactive REPL |
 | `--mcp` | Run as MCP server |
 | `--capabilities` | Show runtime capabilities as JSON and exit |
@@ -87,7 +90,18 @@ result = evaluate("5+3")                     # 8
 - `evaluate()` treats `^` as **bitwise XOR** (Python AST semantics).
 - `evaluate_raw()` and CLI normalize `^` as **exponentiation** (rewritten to `**` before parsing). Use `xor`/`bitxor` word forms for bitwise XOR through the full pipeline.
 
-See [docs/api.md](docs/api.md) for the full API reference including `EggCalcApp`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, custom constants/functions, and performance benchmarks.
+See [docs/api.md](docs/api.md) for the full API reference including `EggCalcApp`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `trace_normalization()`, custom constants/functions, and performance benchmarks.
+
+To inspect how an expression is normalized without evaluating it:
+
+```python
+from eggcalc import trace_normalization
+
+trace = trace_normalization("five plus three")
+# trace["normalized"] == "5+3"; trace["steps"] lists material rewrites per stage
+```
+
+or from the CLI: `calc --explain "five plus three"` (add `--json` for machine-readable output).
 
 Evaluator built-ins preserve their dimensional contracts only while their
 canonical evaluator callables are active. Replacing a built-in name uses the

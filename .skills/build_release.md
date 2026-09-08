@@ -71,7 +71,7 @@ When releasing a new version:
 ## Constraints
 
 - **Standard library only** — no pip packages in `eggcalc/`
-- **Python >=3.11** — required CI uses 3.11; optional compatibility workflow tests 3.14 and Windows
+- **Python >=3.11** — required CI uses Ubuntu 3.11 (`make check` + `make package-check`); recurring compatibility workflow covers Windows 3.11, macOS 3.11, and Ubuntu 3.14 (path-filtered on push/PR plus weekly schedule and manual dispatch)
 - **build_single.py compatibility** — all runtime code must be in core modules, exact/, or mcp/
 - **Import limits** — core modules use: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. `exact/` and `mcp/` packages may use additional stdlib modules (e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`, `ipaddress`, `datetime`).
 

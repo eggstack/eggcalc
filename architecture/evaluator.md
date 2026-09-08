@@ -85,7 +85,7 @@ The `_ALLOWED_AST_TYPES` frozenset is built at import time by walking known-safe
 
 `import eggcalc` does NOT trigger `load_user_config()`. Config loading is handled by three paths:
 
-1. **CLI path:** `maybe_load_cli_config()` in normalize.py — called once at CLI startup
+1. **CLI path:** `maybe_load_cli_config()` in cli.py — called once at CLI startup
 2. **API path:** `_ensure_config_loaded()` — lazy loading, only when `EGGCALC_LOAD_CONFIG=1` is set
 3. **MCP path:** Blocked by `EGGCALC_NO_CONFIG=1` env var set before imports
 

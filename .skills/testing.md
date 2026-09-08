@@ -13,6 +13,7 @@ Guide agents on writing and running tests for this codebase.
 | Natural language (`"five plus three"`) | CLI or `run()` | Requires normalization |
 | Unit conversions with operators | CLI or `run()` | Requires normalization |
 | NL input with units (`"30m + 100ft"`) | CLI or `run()` | Requires normalization |
+| Normalization observability (explain, no eval) | `trace_normalization()` | Same pipeline, records stage trace |
 
 ## Wrong Usage (Will Fail)
 ```python
@@ -143,6 +144,7 @@ tests/
 ├── test_mcp_stdio_smoke.py            # MCP stdio smoke tests
 ├── test_mcp_tools_new.py              # MCP integration tests for new tools
 ├── test_normalize.py                  # Normalization tests
+├── test_normalization_trace.py        # Normalization trace parity/stage/failure tests
 ├── test_patch_tools.py                # Patch apply/summary tools tests
 ├── test_path_compare.py               # Path comparison tests
 ├── test_path_scope.py                 # Path scope check tests

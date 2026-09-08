@@ -29,10 +29,10 @@ It adjusts `sys.path` to ensure the parent of the `eggcalc` package directory is
 `main()` classifies the mode **before** loading user configuration:
 
 1. Construct argparse parser and parse argv.
-2. Handle informational exits (`--capabilities`, `--mcp`, `--version`, `--usage`, `--help` / no arguments) — no config loaded.
+2. Handle informational exits (`--capabilities`, `--mcp`, `--version`, `--commands`, `--usage`, `--help` / no arguments) — no config loaded.
 3. Classify text commands via `_cli_text_command()` — no config loaded.
-4. For calculator expression evaluation or REPL startup, call `maybe_load_cli_config()` exactly once.
-5. Evaluate expression or enter REPL.
+4. For `--explain`, calculator expression evaluation, or REPL startup, call `maybe_load_cli_config()` exactly once (`--explain` loads config because custom words change normalization results).
+5. Explain, evaluate expression, or enter REPL.
 
 This ensures `eggcalc_config.py` is never executed for help, version, capabilities, MCP startup, or text-command invocations.
 
@@ -53,6 +53,9 @@ Signal handling in `main()`:
 | `-q`, `--quiet` | Suppress expression in REPL output |
 | `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
 | `--json` | Output result as JSON (single expressions and text commands) |
+| `--explain` | Show the normalization trace for the expression and exit without evaluating |
+| `--commands` | List curated CLI text commands and exit |
+| `--capabilities` | Show runtime capabilities as JSON and exit |
 | `-i`, `--interactive` | Start interactive REPL mode |
 | `--mcp` | Run as MCP server for exact text tools |
 | `--mcp-profile` | MCP profile to use (default: `full`, or `EGGCALC_MCP_PROFILE` env var) |
@@ -178,6 +181,25 @@ calc dotenv-check "DB_HOST=localhost\nDB_PORT=5432"
 ```
 
 Reports entry count, parse status, and invalid lines.
+
+### `calc --explain <expression>`
+
+Normalization observability without evaluation. Handled by
+`_explain_expression()` **before** text-command dispatch (so the raw input is
+explained even when it names a text command) and **after** config loading
+(because custom words change normalization results). Prints the ordered
+`NormalizationTrace` steps plus the final normalized form; supports `--json`
+for the machine-readable trace. Never executes the resulting expression.
+Requires an expression (exit 2 otherwise); returns the trace exit code.
+
+### `calc --commands`
+
+Command discovery for the curated CLI text command set (`COMMANDS` registry:
+`inspect`, `count`, `regex`, `replace-check`, `lines`, `patch-check`,
+`shell-split`, `md-structure`, `dotenv-check`). Handled as an informational
+mode — no config loaded. The output explicitly distinguishes this small set
+from the much larger MCP tool surface (`calc --mcp`, 83 tools). Supports
+`--json`. No new CLI subcommands are added for MCP tools by design.
 
 ## Interactive REPL
 
