@@ -2050,10 +2050,18 @@ class McpSession:
 
         A late notifications/cancelled for an already-completed request
         must not silently cancel a future request that reuses the id.
+
+        The comparison is ``<=`` (not ``<``) on purpose: the record is only
+        consulted for requests dispatched after it was stored, so a record
+        present at dispatch entry necessarily predates this request. A
+        strict ``<`` misfires on platforms with coarse monotonic clocks
+        (Windows granularity is ~15.6 ms), where the pre-request
+        cancellation and the request start can share one tick and a
+        genuinely stale record would falsely cancel the new request.
         """
         with self._cancelled_lock:
             recorded_at = self._cancelled_times.get(request_id)
-            if recorded_at is not None and recorded_at < started_at:
+            if recorded_at is not None and recorded_at <= started_at:
                 self._cancelled_requests.discard(request_id)
                 del self._cancelled_times[request_id]
                 try:

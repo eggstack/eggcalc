@@ -24,6 +24,19 @@ from eggcalc._process import (
 )
 
 
+def _sem_available(sem) -> bool:
+    """Portable semaphore-availability probe.
+
+    ``multiprocessing.Semaphore.get_value()`` raises ``NotImplementedError``
+    on macOS, so tests infer availability from a non-blocking acquire
+    instead (balanced by an immediate release).
+    """
+    if sem.acquire(block=False):
+        sem.release()
+        return True
+    return False
+
+
 class _FakeQueue:
     def __init__(self, fail_close=False, fail_join=False):
         self.closed = False
@@ -73,22 +86,22 @@ class _FakeProc:
 class TestSpawnPermit:
     def test_acquire_release_count(self):
         sem = multiprocessing.BoundedSemaphore(1)
-        assert sem.get_value() == 1
+        assert _sem_available(sem)
         permit = try_acquire_spawn_permit(sem, timeout=5)
         assert permit is not None
-        assert sem.get_value() == 0
+        assert not _sem_available(sem)
         with permit:
-            assert sem.get_value() == 0
-        assert sem.get_value() == 1
+            assert not _sem_available(sem)
+        assert _sem_available(sem)
 
     def test_acquire_timeout_consumes_no_permit(self):
         sem = multiprocessing.BoundedSemaphore(1)
         assert sem.acquire(block=False)
-        assert sem.get_value() == 0
+        assert not _sem_available(sem)
         assert try_acquire_spawn_permit(sem, timeout=0.05) is None
-        assert sem.get_value() == 0
+        assert not _sem_available(sem)
         sem.release()
-        assert sem.get_value() == 1
+        assert _sem_available(sem)
 
     def test_release_on_exception(self):
         sem = multiprocessing.BoundedSemaphore(1)
@@ -97,19 +110,19 @@ class TestSpawnPermit:
         with pytest.raises(RuntimeError, match="boom"):
             with permit:
                 raise RuntimeError("boom")
-        assert sem.get_value() == 1
+        assert _sem_available(sem)
 
     def test_idempotent_release(self):
         sem = multiprocessing.BoundedSemaphore(1)
         permit = try_acquire_spawn_permit(sem, timeout=5)
         assert permit is not None
         permit.release()
-        assert sem.get_value() == 1
+        assert _sem_available(sem)
         with permit:  # context exit after explicit release must not double-release
             pass
-        assert sem.get_value() == 1
+        assert _sem_available(sem)
         permit.release()
-        assert sem.get_value() == 1
+        assert _sem_available(sem)
 
     def test_evaluator_and_mcp_share_permit_type(self):
         from eggcalc.evaluator import _EvalSpawnPermit

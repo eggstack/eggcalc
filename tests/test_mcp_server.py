@@ -7011,6 +7011,46 @@ class TestLineRangeCompareValidation:
 class TestCancelledRequests:
     """Test session-scoped cancellation behavior in MCP server."""
 
+    def test_stale_cancellation_same_clock_tick_not_poisonous(self):
+        """A stale record sharing the request's clock tick must not cancel it.
+
+        Windows `time.monotonic()` granularity (~15.6 ms) can stamp a
+        pre-request cancellation and the request start with the same tick.
+        The stale record must still be retired (regression test for the
+        Windows compatibility failure: strict `<` falsely cancelled the
+        reused id).
+        """
+        from unittest.mock import patch
+
+        session = ready_session()
+        cancelled_id = "same-tick-id"
+        with patch("eggcalc.mcp.server.time.monotonic", return_value=12345.0):
+            handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/cancelled",
+                    "params": {"requestId": cancelled_id},
+                },
+                session=session,
+            )
+            assert cancelled_id in session._cancelled_requests
+            response = handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": cancelled_id,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "math_eval",
+                        "arguments": {"expression": "1 + 1"},
+                    },
+                },
+                session=session,
+            )
+        assert "result" in response
+        content = json.loads(response["result"]["content"][0]["text"])
+        assert content["ok"] is True
+        assert cancelled_id not in session._cancelled_requests
+
     def test_stale_cancellation_does_not_poison_reused_id(self):
         """A late/stale cancellation record must not cancel a future request.
 
