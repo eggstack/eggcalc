@@ -9,7 +9,7 @@ Guide agents on keeping documentation accurate and up-to-date across the codebas
 |----------|---------|----------------|
 | `AGENTS.md` | Agent-facing conventions and quick reference | Any convention change |
 | `README.md` | User-facing project overview and API reference | Feature/usage changes |
-| `architecture/*.md` | Module-level developer docs (38 files) | Code changes to any module |
+| `architecture/*.md` | Module-level developer docs (41 files) | Code changes to any module |
 | `docs/*.md` | User documentation (MkDocs site) | Feature/usage/API changes |
 | `.skills/*.md` | Agent task guides | Workflow or tooling changes |
 

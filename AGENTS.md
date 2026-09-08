@@ -116,8 +116,8 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 
 ## Constraints
 
-- **Standard library only** — no pip packages in `eggcalc/`. Core modules (`units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) use: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. `exact/` and `mcp/` packages may use additional stdlib modules (e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`, `ipaddress`, `datetime`).
-- **`build_single.py` compatibility** — all runtime code must live in one of the six core modules (`units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. `__main__.py` is a thin entry point (not in the manifest). Adding imports outside the allowed set will break the build.
+- **Standard library only** — no pip packages in `eggcalc/`. Core modules (`_process.py`, `units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) use: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. `exact/` and `mcp/` packages may use additional stdlib modules (e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`, `ipaddress`, `datetime`).
+- **`build_single.py` compatibility** — all runtime code must live in one of the seven core modules (`_process.py`, `units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. `__main__.py` is a thin entry point (not in the manifest). Adding imports outside the allowed set will break the build.
 - **TypedDict over NamedTuple** — the codebase uses `TypedDict` for structured return types. TypedDict classes do NOT support `__slots__`.
 - **CLI output is result-only** — no echo of input, no arrows, no extra characters. Applies to both single-expression and REPL modes.
 - **Python requirement** — `>=3.11` per `pyproject.toml`. Required CI uses 3.11; optional compatibility workflow tests 3.14 and Windows.
@@ -137,6 +137,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 | Module | Role |
 |--------|------|
 | `eggcalc/_version.py` | Single source of truth for `__version__` (imported by `__init__.py`, read by `pyproject.toml` and `build_single.py`) |
+| `eggcalc/_process.py` | Shared subprocess lifecycle primitives (`SpawnPermit`, queue/child cleanup, context selection). Mechanism only — spawn limits, timeouts, orphan caps, and error contracts stay with `evaluator.py` / `mcp/tools.py` |
 | `eggcalc/normalize.py` | NL tokenization, expression normalization (no CLI dispatch) |
 | `eggcalc/evaluator.py` | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
 | `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class, `UnitSpec`, `UnitExpression` |
@@ -164,6 +165,7 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 - `utf8_bytes()` returns `bytes`, not an int count.
 - `manifests.py` functions (`pyproject_inspect`, `requirements_inspect`, etc.) are NOT re-exported from `__init__.py`. Import directly.
 - `cargo.py` `cargo_toml_inspect()` IS re-exported from `__init__.py`.
+- `__all__` is derived from `_LAZY_IMPORTS` (`__all__ = list(_LAZY_IMPORTS)`): do not maintain a parallel manual export list. Build validation (`validate_build_manifest()` check 13) fails if a lazy-referenced exact submodule is missing from the manifest.
 - Both modules use the shared `_Finding` TypedDict from `manifests.py` for structured findings.
 - Inspection is lexical/structural, not dependency resolution. Package-manager signals are heuristic.
 - **RFC 6901 authority:** `json_extract()` in `validate.py` owns JSON Pointer traversal. `json_query()` is a thin compatibility adapter (delegates via `_json_extract_to_query_result`, preserves legacy `JsonQueryResult` shape with integers as `"number"`). Do not add a second traversal implementation.

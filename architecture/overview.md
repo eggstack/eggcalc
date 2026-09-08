@@ -50,7 +50,7 @@ eggcalc is a dual-purpose tool:
 | **Safe evaluation** | Python `ast` parsing — never `eval()` — with explicit DoS limits |
 | **Deterministic tools** | Every exact/ function is pure: same input → same output, no I/O, no LLM calls |
 | **Thread-safe & isolated** | Each `McpServer` / `EggCalcApp` owns its own evaluator, config, and state |
-| **Lazy loading** | `import eggcalc` loads only the six core modules; CLI loads `exact/` handlers via `importlib` on first dispatch |
+| **Lazy loading** | `import eggcalc` loads only the seven core modules; CLI loads `exact/` handlers via `importlib` on first dispatch |
 
 ---
 
@@ -139,12 +139,13 @@ JSON-RPC request → McpSession (must be READY: initialize handshake done)
 
 The codebase is three subsystems plus package plumbing.
 
-### Core Calculator (6 modules)
+### Core Calculator (7 modules)
 
-These six modules form the calculator and are the only code loaded by `import eggcalc` (plus `_version.py`). They are also the only core members of the single-file build manifest.
+These seven modules form the calculator and are the only code loaded by `import eggcalc` (plus `_version.py`). They are also the only core members of the single-file build manifest.
 
 | Module | Lines | Role | Key Exports | Deep Dive |
 |--------|------:|------|-------------|-----------|
+| `_process.py` | 198 | Shared subprocess lifecycle primitives (mechanism only): `SpawnPermit`, queue/child cleanup, context selection. Limits, timeouts, orphan caps, and error contracts stay with `evaluator.py` / `mcp/tools.py` | `SpawnPermit`, `try_acquire_spawn_permit()`, `cleanup_child_process()`, `close_queue()`, `close_semaphore()`, `get_process_context()` | (covered here + [evaluator.md](evaluator.md), [mcp.md](mcp.md)) |
 | `units.py` | 3,787 | Unit definitions, structural dimensions, conversions, `UnitValue` | `UnitValue`, `Dimension`, `UnitSpec`, `UnitExpression`, `UnitRegistry`, `normalize_unit()`, `get_conversion_factor()` | [units.md](units.md) |
 | `evaluator.py` | 3,472 | Safe AST parsing/evaluation, constants, functions, memory/variables | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `Evaluator`, `EggCalcApp`, `EvaluationError`, `Memory`, `register_constant()`, `register_function()` | [evaluator.md](evaluator.md) |
 | `normalize.py` | 3,330 | NL tokenization, number words, unit preprocessing, expression validation | `run()`, `normalize_text()`, `normalize_expression()`, `NORMALIZE`, `PATTERNS` | [normalize.md](normalize.md) |
@@ -156,7 +157,7 @@ These six modules form the calculator and are the only code loaded by `import eg
 
 | Module | Lines | Role | Deep Dive |
 |--------|------:|------|-----------|
-| `__init__.py` | 156 | Public API surface; eager re-exports from the six core modules; PEP 562 lazy `main`/`print_help` | [api.md](api.md) |
+| `__init__.py` | 156 | Public API surface; eager re-exports from the seven core modules; PEP 562 lazy `main`/`print_help` | [api.md](api.md) |
 | `__main__.py` | 19 | `python -m eggcalc` entry; delegates to `cli.main()` | [api.md](api.md) |
 | `_version.py` | 3 | Single source of truth for `__version__`; read by `pyproject.toml` and `build_single.py` | [build.md](build.md) |
 | `eggcalc_config.py` (repo root template) | 73 | User config extension points: `CUSTOM_CONSTANTS`, `CUSTOM_FUNCTIONS`, `CUSTOM_UNITS`, `CUSTOM_ALIASES`, `CUSTOM_TEMP_CONVERSIONS`, `CUSTOM_NUMBER_WORDS`, `CUSTOM_OPERATOR_WORDS`. Loaded only by CLI calculator modes or when `EGGCALC_LOAD_CONFIG=1`; never at import time | [api.md](api.md) |
@@ -195,7 +196,7 @@ All functions are deterministic, side-effect-free, and independently testable. N
 | `network.py` | 240 | IP/CIDR inspection with explicit version-stable special-use taxonomy | [network.md](network.md) |
 | `encoding.py` | 282 | Strict codec (utf8/hex/base64/base64url) and radix (2–36, u128-capped) conversion | [encoding.md](encoding.md) |
 | `temporal.py` | 616 | Fixed-offset datetime (nanosecond-exact) and cron inspection with corrected DOM/DOW semantics | [temporal.md](temporal.md) |
-| `__init__.py` | 509 | Fully lazy public API: zero implementation imports at import time; 212-name `__all__` resolved via a matching 212-entry `_LAZY_IMPORTS` map | [exact.md](exact.md#exact__init__py--public-api) |
+| `__init__.py` | 271 | Fully lazy public API: zero implementation imports at import time; `__all__` derived from the single `_LAZY_IMPORTS` authority (`__all__ = list(_LAZY_IMPORTS)`, 213 names) | [exact.md](exact.md#exact__init__py--public-api) |
 
 *(Package-level doc: [exact.md](exact.md).)*
 
@@ -472,7 +473,7 @@ mcp/server.py ──► schemas, tools, evaluator, capabilities
 
 Full details: [build.md](build.md).
 
-- **`build_single.py`** (1,438 lines) assembles everything into one portable `eggcalc.py` (~42k lines / ~1.5 MB). `MODULE_MANIFEST` is the single source of truth: **37 `ModuleSpec` entries** (6 core + 28 exact + 3 mcp) with name, path, group, declared `depends_on`, and single-file inclusion flag. `validate_build_manifest()` checks duplicates, missing files, unknown deps, cycles, reachability, and residual package-relative imports. Assembly topologically sorts modules, strips docstrings/`__all__`, rewrites relative imports to globals, renames colliding entry points (`normalize_main()`, `mcp_main()`), and prefixes conflicting MCP function names.
+- **`build_single.py`** assembles everything into one portable `eggcalc.py` (~42k lines / ~1.5 MB). `MODULE_MANIFEST` is the single source of truth: **38 `ModuleSpec` entries** (7 core + 28 exact + 3 mcp) with name, path, group, declared `depends_on`, and single-file inclusion flag. `validate_build_manifest()` checks duplicates, missing files, unknown deps, cycles, reachability, residual package-relative imports, and lazy-exact manifest coverage (every `_LAZY_IMPORTS` module present). Assembly topologically sorts modules, strips docstrings/`__all__`, rewrites relative imports to globals, renames colliding entry points (`normalize_main()`, `mcp_main()`), and prefixes conflicting MCP function names.
 - **`install.py`** builds and installs the single file as `calc` (`~/.local/bin/calc` on Linux/macOS, `%LOCALAPPDATA%\Programs\calc` on Windows) with atomic copy and PATH management.
 - **Development commands:** `make test`, `make lint`, `make format`, `make typecheck`, `make docs-check` (generated-MCP-doc drift), `make check` (all correctness incl. build validation + pytest), `make package-check` (wheel/sdist/single-file smoke), `make release-check`, `make publish` (manual Twine upload). CI runs `make check` then `make package-check`; GitHub Actions never publishes.
 
@@ -481,7 +482,7 @@ Full details: [build.md](build.md).
 ## Constraints
 
 - **Standard library only.** Core modules may import only: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. The `exact/` and `mcp/` packages may additionally use e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`, `ipaddress`, `datetime`.
-- **`build_single.py` compatibility** — runtime code lives only in the six core modules, `exact/`, or `mcp/`; anything else breaks the single-file build.
+- **`build_single.py` compatibility** — runtime code lives only in the seven core modules, `exact/`, or `mcp/`; anything else breaks the single-file build.
 - **TypedDict over NamedTuple** for structured returns (TypedDicts cannot take `__slots__`).
 - **CLI output is result-only** — no echo of input, no arrows, no decoration (REPL included).
 - **Import must stay side-effect-free** — no cwd-local config loading at `import eggcalc`; see the config-loading rules in [AGENTS.md](../AGENTS.md).

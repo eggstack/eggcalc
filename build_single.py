@@ -67,8 +67,9 @@ class ModuleSpec:
 
 MODULE_MANIFEST: tuple[ModuleSpec, ...] = (
     # -- core calculator modules -------------------------------------------
+    ModuleSpec("_process", "_process.py", "core"),
     ModuleSpec("units", "units.py", "core"),
-    ModuleSpec("evaluator", "evaluator.py", "core", depends_on=("units",)),
+    ModuleSpec("evaluator", "evaluator.py", "core", depends_on=("_process", "units")),
     ModuleSpec("_protocol", "_protocol.py", "core"),
     ModuleSpec("normalize", "normalize.py", "core", depends_on=("units", "evaluator")),
     ModuleSpec("capabilities", "capabilities.py", "core", depends_on=("_protocol",)),
@@ -157,6 +158,7 @@ MODULE_MANIFEST: tuple[ModuleSpec, ...] = (
         "mcp",
         depends_on=(
             "mcp.schemas",
+            "_process",
             "evaluator",
             "units",
             "exact.cargo",
@@ -908,7 +910,11 @@ if __name__ == "__main__":
     # Post-process: convert local `from <module> import` to global variable assignments.
     # In the single file, modules don't exist as separate packages.
     EXACT_MODULE_NAMES = {m.split("/")[-1] for m in MODULES_EXACT}
-    INLINED_NAMES = EXACT_MODULE_NAMES | {"evaluator", "units", "normalize", "capabilities", "cli"}
+    INLINED_NAMES = (
+        EXACT_MODULE_NAMES
+        | {"evaluator", "units", "normalize", "capabilities", "cli"}
+        | {"_process", "_protocol"}
+    )
 
     def _replace_local_imports(text: str) -> str:
         """Replace local `from <module> import` with global variable assignments."""
@@ -1157,6 +1163,41 @@ def _literal_cli_targets() -> set[str]:
     return set(re.findall(r'module\s*=\s*["\']([^"\']+)["\']', source))
 
 
+def _lazy_exact_modules() -> set[str]:
+    """Return exact submodule names referenced by ``_LAZY_IMPORTS``.
+
+    Parses ``eggcalc/exact/__init__.py`` via AST (no import side effects)
+    and maps relative entries like ``".cargo"`` to ``"exact.cargo"``.
+    """
+    path = os.path.join(EGGCALC_DIR, "exact", "__init__.py")
+    try:
+        tree = ast.parse(open(path, encoding="utf-8").read(), filename=path)
+    except (OSError, SyntaxError):
+        return set()
+    modules: set[str] = set()
+    for node in tree.body:
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        target = node.target
+        if not (isinstance(target, ast.Name) and target.id == "_LAZY_IMPORTS"):
+            continue
+        if not isinstance(node.value, ast.Dict):
+            continue
+        for key, value in zip(node.value.keys, node.value.values):
+            if not isinstance(value, ast.Tuple) or len(value.elts) != 2:
+                continue
+            mod_node = value.elts[0]
+            if not isinstance(mod_node, ast.Constant) or not isinstance(mod_node.value, str):
+                continue
+            mod = mod_node.value
+            if mod.startswith("."):
+                modules.add("exact" + mod)
+            elif mod.startswith("exact."):
+                modules.add(mod)
+        break
+    return modules
+
+
 def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> list[str]:
     """Validate the build manifest for correctness.
 
@@ -1172,6 +1213,7 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
     - Manifest entry never consumed
     - Residual package-relative imports after generation
     - Duplicate generated global collisions (statically detectable)
+    - Lazy exact export surface covered by the manifest
 
     Returns a list of error strings (empty if valid).
     """
@@ -1406,6 +1448,15 @@ def validate_build_manifest(manifest: tuple[ModuleSpec, ...] | None = None) -> l
         ast.parse(generated)
     except SyntaxError as exc:
         errors.append(f"Generated single-file source is not valid Python: {exc}")
+
+    # 13. Every module named by the exact lazy export registry must be
+    # present in the manifest, so adding an exact export without a build
+    # entry fails validation instead of silently dropping it from the
+    # single-file distribution.
+    lazy_exact = _lazy_exact_modules()
+    for mod in sorted(lazy_exact):
+        if mod not in name_set:
+            errors.append(f"Lazy exact module {mod!r} absent from manifest")
 
     return errors
 

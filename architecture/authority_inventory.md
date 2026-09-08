@@ -37,6 +37,25 @@ copies is caught by the test suites listed in the "Tests" column.
 | Loose numeric comparison | `eggcalc/exact/validate.py::_loose_version_compare` (intentionally separate; not SemVer) | `version_compare(scheme="loose")` only | `test_version_constraint`, `test_authority_consolidation` |
 | Cargo constraints | `eggcalc/exact/version.py::check_version_constraint` | — | `test_version_constraint` |
 
+## Subprocess Lifecycle Primitives
+
+| Item | Authoritative source | Adapters / policy owners | Tests |
+|------|---------------------|-------------------------|-------|
+| `SpawnPermit` (idempotent RAII guard) | `eggcalc/_process.py` | `evaluator._EvalSpawnPermit` and `mcp/tools._SpawnPermit` are aliases; limits/timeouts stay with each subsystem | `test_shared_lifecycle::TestSpawnPermit` |
+| Spawn acquire (timeout without consuming a slot) | `eggcalc/_process.py::try_acquire_spawn_permit` | `evaluator` raises `EvaluationError` on `None`; MCP tools return error envelopes on `None` | `test_shared_lifecycle::TestSpawnPermit` |
+| Queue close/join + terminate → join → kill → join → close | `eggcalc/_process.py::cleanup_child_process` (returns survivor bool) | `evaluator.evaluate_with_timeout` and `mcp/tools._cleanup_child_process` own orphan registration/caps | `test_shared_lifecycle::TestCleanupChildProcess` |
+| Process context selection | `eggcalc/_process.py::get_process_context(prefer)` | Evaluator prefers `spawn`; MCP prefers `fork` only for single-file non-`__main__` | `test_shared_lifecycle::TestProcessContext` |
+| Semaphore shutdown close | `eggcalc/_process.py::close_semaphore` | `mcp/tools._close_spawn_semaphore` wraps it (atexit) | `test_shared_lifecycle`, `test_mcp_server::TestDeferredD7SemaphoreCleanup` |
+
+Policy constants (`_MAX_CONCURRENT_EVAL_SPAWNS`, `MAX_CONCURRENT_SPAWNED`, acquire/regex/eval timeouts, orphan caps, error envelopes) remain independently tunable in their owning subsystems by design.
+
+## Exact Public Exports
+
+| Item | Authoritative source | Adapters / exports | Tests |
+|------|---------------------|-------------------|-------|
+| Lazy public names | `eggcalc/exact/__init__.py::_LAZY_IMPORTS` (single source of truth) | `__all__ = list(_LAZY_IMPORTS)` — no parallel manual list | `test_shared_lifecycle::TestExactExportAuthority` |
+| Lazy exact → build manifest coverage | `build_single.py::validate_build_manifest` (check 13 via `_lazy_exact_modules`) | Every `_LAZY_IMPORTS` submodule must be present in `MODULE_MANIFEST` | `test_shared_lifecycle::TestLazyManifestCoverage` |
+
 ## Evaluator Limits
 
 | Constant | Authoritative source | Value | Tests |
@@ -100,7 +119,6 @@ Note: `MAX_INPUT_LENGTH` in `exact/validate.py` (100 000), `exact/cargo.py` (200
 | `UnitRegistry` (structural registry) | `eggcalc/units.py:310` (built by `build_unit_registry()`) | `test_unit_dimensions` |
 
 ## Tool Definitions (MCP)
-
 | Item | Authoritative source | Tests |
 |------|---------------------|-------|
 | `TOOL_SCHEMAS` | `eggcalc/mcp/schemas.py:45` | `test_mcp_schema_lint` |

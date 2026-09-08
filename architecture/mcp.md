@@ -386,6 +386,8 @@ MAX_CONCURRENT_SPAWNED = 4            # Max concurrent child processes
 MAX_ORPHANED_REGEX_PROCESSES = 256    # Max orphaned regex child processes
 ```
 
+Spawn-permit, queue/child cleanup, and context-selection mechanics are shared with the evaluator via `eggcalc/_process.py` (single mechanism authority); `_SpawnPermit` is an alias of the shared `SpawnPermit`, and `_cleanup_child_process` delegates cleanup to it while keeping MCP orphan registration/caps. Spawn limits, acquire timeouts, and error envelopes remain MCP-owned policy.
+
 ---
 
 ## server.py — MCP Protocol Handler

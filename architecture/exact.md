@@ -73,7 +73,14 @@ exact/
 
 ## exact/__init__.py — Public API
 
-Re-exports all public functions from submodules:
+Single authority: `_LAZY_IMPORTS` maps every public name to its defining submodule, resolved lazily via `__getattr__` (zero implementation imports at import time). `__all__` is derived, not maintained in parallel:
+
+```python
+_LAZY_IMPORTS = {...}  # 213 names
+__all__ = list(_LAZY_IMPORTS)
+```
+
+Build validation (`validate_build_manifest()` check 13) requires every submodule named by `_LAZY_IMPORTS` to be present in `MODULE_MANIFEST`. Public names include:
 
 ```python
 from eggcalc.exact import (

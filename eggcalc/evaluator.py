@@ -24,6 +24,13 @@ from enum import Enum, auto
 from queue import Empty as _QueueEmpty
 from typing import Any, cast
 
+from ._process import (
+    SpawnPermit,
+    cleanup_child_process,
+    close_queue,
+    get_process_context,
+    try_acquire_spawn_permit,
+)
 from .units import (
     UNIT_ALIASES,
     UnitValue,
@@ -75,26 +82,9 @@ _EVAL_SPAWN_ACQUIRE_TIMEOUT = 10  # seconds to wait for a spawn slot before fail
 _config_generation = 0
 
 
-class _EvalSpawnPermit:
-    """RAII permit for an acquired eval spawn slot.
-
-    The underlying semaphore count is released when the permit exits
-    (including on exception or early return). This mirrors the
-    _SpawnPermit pattern used by the MCP tools and the Rust
-    WorkerPermit/ToolPermit guards.
-    """
-
-    def __init__(self, sem: Any) -> None:
-        self._sem = sem
-
-    def __enter__(self) -> _EvalSpawnPermit:
-        return self
-
-    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
-        try:
-            self._sem.release()
-        except Exception:
-            pass
+# Backward-compatible alias: the shared SpawnPermit owns eval spawn slots.
+# Policy constants above remain evaluator-owned and independently tunable.
+_EvalSpawnPermit = SpawnPermit
 
 
 MAX_EXPONENT = 10000
@@ -3389,11 +3379,9 @@ def _get_eval_multiprocessing_context() -> multiprocessing.context.BaseContext:
     # the child because locks held by other threads are left in an
     # acquired state that the child cannot release.  spawn is ~300-400ms
     # slower due to re-importing, but it is safe in all contexts.
-    if os.name != "nt" and "spawn" in multiprocessing.get_all_start_methods():
-        return multiprocessing.get_context("spawn")
-    if os.name != "nt" and "fork" in multiprocessing.get_all_start_methods():
-        return multiprocessing.get_context("fork")
-    return multiprocessing.get_context("spawn")
+    # Mechanism is shared with MCP tools via eggcalc._process; the
+    # spawn preference itself remains evaluator policy.
+    return cast(multiprocessing.context.BaseContext, get_process_context("spawn"))
 
 
 def evaluate_with_timeout(
@@ -3472,18 +3460,14 @@ def evaluate_with_timeout(
     # RAII permit for the eval spawn semaphore. Acquire (with timeout) or raise.
     # The permit's __exit__ guarantees release even if the worker is cancelled,
     # panics, or returns early before we reach the end of the block.
-    # This replaces the previous manual acquire + scattered release calls
-    # (including the unconditional release inside the finally after child cleanup).
-    if not _EVAL_SPAWN_SEMAPHORE.acquire(timeout=_EVAL_SPAWN_ACQUIRE_TIMEOUT):
+    # Mechanism is shared with MCP tools via eggcalc._process; limits and
+    # error wording remain evaluator policy.
+    permit = try_acquire_spawn_permit(_EVAL_SPAWN_SEMAPHORE, _EVAL_SPAWN_ACQUIRE_TIMEOUT)
+    if permit is None:
         raise EvaluationError(
             f"Could not acquire spawn slot after {_EVAL_SPAWN_ACQUIRE_TIMEOUT}s "
             f"(all {_MAX_CONCURRENT_EVAL_SPAWNS} slots busy)"
         )
-    try:
-        permit = _EvalSpawnPermit(_EVAL_SPAWN_SEMAPHORE)
-    except BaseException:
-        _EVAL_SPAWN_SEMAPHORE.release()
-        raise
     with permit:
         try:
             proc = ctx.Process(  # type: ignore[attr-defined]
@@ -3513,51 +3497,34 @@ def evaluate_with_timeout(
             )
             raise TimeoutError(f"Evaluation timed out after {timeout} seconds")
         finally:
-            try:
-                queue.close()
-            except Exception:
-                pass
-            try:
-                queue.join_thread()
-            except Exception:
-                pass
-            if proc is not None:
-                if proc.is_alive():
-                    proc.terminate()
-                    proc.join(timeout=2)
-                if proc.is_alive():
-                    proc.kill()
-                    proc.join(timeout=1)
-                # If the process survived terminate+kill, register it for
-                # defensive cleanup by the orphan tracker regardless of the
-                # caller's mode.
-                if proc.is_alive():
-                    with _orphaned_eval_lock:
-                        _orphaned_eval_processes.add(proc)
-                        _orphaned_eval_order.append(proc)
-                        while len(_orphaned_eval_order) > MAX_ORPHANED_PROCESSES:
-                            oldest = _orphaned_eval_order.popleft()
-                            _orphaned_eval_processes.discard(oldest)
-                            try:
-                                if oldest.is_alive():
-                                    oldest.terminate()
-                                    oldest.join(timeout=1)
-                                if oldest.is_alive():
-                                    oldest.kill()
-                                    oldest.join(timeout=1)
-                                if not oldest.is_alive():
-                                    oldest.close()
-                            except Exception:
-                                pass
-                    logging.warning(
-                        "Evaluation worker survived terminate+kill (pid=%s, exitcode=%s)",
-                        proc.pid,
-                        proc.exitcode,
-                    )
-                try:
-                    proc.close()
-                except Exception:
-                    pass
+            close_queue(queue)
+            # Shared terminate -> join -> kill -> join -> close sequence.
+            # Returns True when the child survived; orphan registration
+            # below remains evaluator policy.
+            survived = cleanup_child_process(proc, None)
+            if survived and proc is not None:
+                with _orphaned_eval_lock:
+                    _orphaned_eval_processes.add(proc)
+                    _orphaned_eval_order.append(proc)
+                    while len(_orphaned_eval_order) > MAX_ORPHANED_PROCESSES:
+                        oldest = _orphaned_eval_order.popleft()
+                        _orphaned_eval_processes.discard(oldest)
+                        try:
+                            if oldest.is_alive():
+                                oldest.terminate()
+                                oldest.join(timeout=1)
+                            if oldest.is_alive():
+                                oldest.kill()
+                                oldest.join(timeout=1)
+                            if not oldest.is_alive():
+                                oldest.close()
+                        except Exception:
+                            pass
+                logging.warning(
+                    "Evaluation worker survived terminate+kill (pid=%s, exitcode=%s)",
+                    proc.pid,
+                    proc.exitcode,
+                )
 
         if status == "error":
             raise EvaluationError(value)

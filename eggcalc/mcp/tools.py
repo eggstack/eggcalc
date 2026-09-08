@@ -17,6 +17,13 @@ from collections import deque
 from typing import Any, Literal, cast
 
 from .. import EvaluationError
+from .._process import (
+    SpawnPermit,
+    cleanup_child_process,
+    close_semaphore,
+    get_process_context,
+    try_acquire_spawn_permit,
+)
 from ..evaluator import evaluate_with_timeout
 from .schemas import TOOL_SCHEMAS, ErrorEnvelope
 
@@ -41,47 +48,19 @@ _SPAWN_ACQUIRE_TIMEOUT = 10  # seconds to wait for a spawn slot before failing
 
 def _get_process_context() -> Any:
     """Return a worker context that can execute from the single-file build."""
+    # Policy stays here (fork only for single-file non-__main__); the
+    # get_context mechanism is shared via eggcalc._process.
     if globals().get("EGGCALC_SINGLE_FILE") and __name__ != "__main__":
-        try:
-            return multiprocessing.get_context("fork")
-        except ValueError:
-            pass
-    return multiprocessing.get_context("spawn")
+        return get_process_context("fork")
+    return get_process_context("spawn")
 
 
-class _SpawnPermit:
-    """RAII permit for an acquired spawn slot.
-
-    The underlying semaphore count is released when the permit is dropped
-    (including on exception or early return). Callers should prefer this
-    over manual acquire/release so that cancellation or panic paths cannot
-    leak a slot. This mirrors the Rust WorkerPermit/ToolPermit pattern.
-    """
-
-    def __init__(self, sem: Any) -> None:
-        self._sem = sem
-        self._released = False
-
-    def __enter__(self) -> _SpawnPermit:
-        return self
-
-    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
-        self.release()
-
-    def release(self) -> None:
-        if self._released:
-            return
-        self._released = True
-        try:
-            self._sem.release()
-        except Exception:
-            pass
-
-    def __del__(self) -> None:
-        self.release()
+# Backward-compatible alias: the shared SpawnPermit owns MCP spawn slots.
+# Limits, timeouts, and error envelopes below remain MCP-owned policy.
+_SpawnPermit = SpawnPermit
 
 
-def _acquire_spawn_permit() -> _SpawnPermit:
+def _acquire_spawn_permit() -> SpawnPermit:
     """Acquire a spawn slot (with timeout) and return an RAII permit.
 
     The permit's __exit__ (and destructor) guarantees release even if the
@@ -89,15 +68,16 @@ def _acquire_spawn_permit() -> _SpawnPermit:
     caller-provided on_stall_start/on_stall_end closures or manual
     acquire/release pairs around the (potentially blocking) spawn.
     """
-    if not _SPAWN_SEMAPHORE.acquire(timeout=_SPAWN_ACQUIRE_TIMEOUT):
+    permit = try_acquire_spawn_permit(_SPAWN_SEMAPHORE, _SPAWN_ACQUIRE_TIMEOUT)
+    if permit is None:
         raise RuntimeError(
             f"Could not acquire spawn slot after {_SPAWN_ACQUIRE_TIMEOUT}s "
             f"(all {MAX_CONCURRENT_SPAWNED} slots busy)"
         )
-    return _SpawnPermit(_SPAWN_SEMAPHORE)
+    return permit
 
 
-def _try_acquire_spawn_permit() -> _SpawnPermit | None:
+def _try_acquire_spawn_permit() -> SpawnPermit | None:
     """Try to acquire a spawn slot (with timeout) and return an RAII permit, or None on timeout.
 
     Returns None if the acquire times out without consuming a slot. On success,
@@ -106,9 +86,7 @@ def _try_acquire_spawn_permit() -> _SpawnPermit | None:
     convenient for call sites that must return error envelopes instead of
     propagating exceptions (e.g., MCP tool handlers).
     """
-    if not _SPAWN_SEMAPHORE.acquire(timeout=_SPAWN_ACQUIRE_TIMEOUT):
-        return None
-    return _SpawnPermit(_SPAWN_SEMAPHORE)
+    return try_acquire_spawn_permit(_SPAWN_SEMAPHORE, _SPAWN_ACQUIRE_TIMEOUT)
 
 
 def _close_spawn_semaphore() -> None:
@@ -118,13 +96,7 @@ def _close_spawn_semaphore() -> None:
     where the resource_tracker flags unclosed multiprocessing
     semaphores.
     """
-    sem = getattr(_SPAWN_SEMAPHORE, "_semaphore", None)
-    if sem is None:
-        return
-    try:
-        sem.close()
-    except Exception:
-        pass
+    close_semaphore(_SPAWN_SEMAPHORE)
 
 
 atexit.register(_close_spawn_semaphore)
@@ -146,45 +118,20 @@ def _cleanup_child_process(
     """Terminate and clean up a child process and its queue.
 
     Shared cleanup logic for validate_regex, regex_finditer, and
-    dotenv_validate subprocess workers.
+    dotenv_validate subprocess workers. Mechanism is shared via
+    eggcalc._process; orphan registration below remains MCP policy.
     """
-    if queue is not None:
-        try:
-            queue.close()
-        except Exception:
-            pass
-        try:
-            queue.join_thread()
-        except Exception:
-            pass
-    if proc is not None:
-        if proc.is_alive():
-            try:
-                proc.terminate()
-            except Exception:
-                pass
-            proc.join(timeout=2)
-        if proc.is_alive():
-            try:
-                proc.kill()
-            except Exception:
-                pass
-            proc.join(timeout=1)
+    survived = cleanup_child_process(proc, queue)
+    if survived and proc is not None:
         # If process survived terminate+kill, register for defensive cleanup.
         # Do NOT close the handle here — it will be closed by
         # _cleanup_orphaned_processes after it finishes.
-        if proc.is_alive():
-            with _orphaned_regex_lock:
-                _orphaned_regex_processes.add(proc)
-                _orphaned_regex_order.append(proc)
-                while len(_orphaned_regex_order) > MAX_ORPHANED_REGEX_PROCESSES:
-                    oldest = _orphaned_regex_order.popleft()
-                    _orphaned_regex_processes.discard(oldest)
-        else:
-            try:
-                proc.close()
-            except Exception:
-                pass
+        with _orphaned_regex_lock:
+            _orphaned_regex_processes.add(proc)
+            _orphaned_regex_order.append(proc)
+            while len(_orphaned_regex_order) > MAX_ORPHANED_REGEX_PROCESSES:
+                oldest = _orphaned_regex_order.popleft()
+                _orphaned_regex_processes.discard(oldest)
 
 
 def _build_physical_constants() -> dict[str, dict[str, Any]]:

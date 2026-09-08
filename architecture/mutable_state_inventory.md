@@ -23,6 +23,10 @@ Every residual global is classified as one of:
 
 ---
 
+## eggcalc/_process.py
+
+Stateless by design: no module-level mutable state. `SpawnPermit` instances are caller-owned; semaphores, orphan sets, and locks remain with `evaluator.py` / `mcp/tools.py` (see below).
+
 ## eggcalc/evaluator.py
 
 | Variable | Type | Category | Status | Notes |

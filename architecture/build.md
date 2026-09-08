@@ -41,9 +41,11 @@ class ModuleSpec:
 ```
 
 Three derived views are generated from the manifest:
-- `MODULES_CALC` — core calculator modules (units, evaluator, normalize, cli, capabilities, _protocol)
+- `MODULES_CALC` — core calculator modules (`_process`, units, evaluator, normalize, cli, capabilities, _protocol)
 - `MODULES_EXACT` — 28 exact/ submodules (including `network`, `encoding`, `temporal`)
 - `MODULES_MCP` — 3 MCP server modules (schemas, tools, server)
+
+`validate_build_manifest()` is the central validation entry point. In addition to duplicates, missing files, unknown deps, cycles, reachability, and residual package-relative imports, check 13 requires every submodule named by the exact lazy export registry (`_LAZY_IMPORTS` in `exact/__init__.py`) to be present in the manifest — adding an exact export without a build entry fails validation instead of silently dropping it from the single-file distribution.
 
 ### Assembly Process
 
@@ -62,7 +64,7 @@ python3 build_single.py -o /path     # Custom output path
 
 ### Constraints
 
-- All runtime code must live in one of the six core modules or `exact/`/`mcp/` packages
+- All runtime code must live in one of the seven core modules or `exact/`/`mcp/` packages
 - No imports outside the allowed set (standard library only)
 - `__main__.py` is a thin entry point (not in the manifest)
 - `confusables.py` is auto-generated with compressed payload (~40KB) — included as-is

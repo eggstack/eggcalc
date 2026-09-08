@@ -245,6 +245,8 @@ result = await evaluate_async("five plus three")  # NL also supported
 ### `evaluate_with_timeout(expression: str, timeout: float = 5.0, allow_random: bool | None = None, allow_side_effects: bool | None = None) -> Any`
 Evaluation with timeout in seconds. Uses `multiprocessing.Process` to run evaluation in a separate process that can be reliably terminated. Concurrency is bounded by `_EVAL_SPAWN_SEMAPHORE` (4 slots, 10s acquire timeout). Raises `TimeoutError` on timeout, `EvaluationError` on invalid expressions.
 
+Spawn-permit, queue/child cleanup, and context-selection mechanics are shared with the MCP tools via `eggcalc/_process.py` (single mechanism authority); spawn limits, acquire timeouts, orphan caps, and error contracts remain evaluator-owned policy. `_EvalSpawnPermit` is an alias of the shared `SpawnPermit`.
+
 ```python
 result = evaluate_with_timeout("5 + 3", timeout=5.0)
 result = evaluate_with_timeout("five plus three", timeout=1.0)

@@ -53,6 +53,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 ### Module Organization
 
 #### Core modules (combined by build_single.py)
+- `eggcalc/_process.py` - Shared subprocess lifecycle primitives (mechanism only; policy stays with callers)
 - `eggcalc/units.py` - Unit definitions, conversions
 - `eggcalc/evaluator.py` - AST evaluation, EggCalcApp
 - `eggcalc/normalize.py` - NL processing
@@ -90,7 +91,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `temporal.py` - Fixed-offset datetime (nanosecond-exact) and cron inspection
 - `llm_hygiene.py` - LLM hygiene analysis
 - `repo_audit.py` - Repository audit tools
-- `__init__.py` - Fully lazy package exports (`_LAZY_IMPORTS` map + PEP 562)
+- `__init__.py` - Fully lazy package exports (`_LAZY_IMPORTS` is the single authority; `__all__ = list(_LAZY_IMPORTS)`)
 
 ### Result-Type Convention
 All exact/ public functions return TypedDicts — plain `dict`s at runtime. Use key access (`result["equal"]`), never attribute access. See AGENTS.md Common Pitfalls #15.

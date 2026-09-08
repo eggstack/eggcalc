@@ -10,7 +10,7 @@ Guide agents through building, testing, and releasing eggcalc.
 .venv/bin/python build_single.py
 ```
 Assembles `eggcalc/` into a single portable `eggcalc.py`. The build script:
-- Concatenates core modules (units.py, evaluator.py, normalize.py, cli.py, capabilities.py, `_protocol.py`)
+- Concatenates core modules (`_process.py`, units.py, evaluator.py, normalize.py, cli.py, capabilities.py, `_protocol.py`)
 - Concatenates exact/ and mcp/ sub-packages
 - Renames `main()` → `normalize_main()` and `mcp_main()` to avoid conflicts
 - Handles aliased imports (e.g., `count_graphemes as _count_graphemes`)

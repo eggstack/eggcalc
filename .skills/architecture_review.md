@@ -64,7 +64,7 @@ For each module, examine:
 - Missing function aliases (e.g., `mcp_main = main` at the end of server.py)
 
 ## Architecture Files Location
-- `architecture/` - Module-level documentation (38 docs including overview, authority_inventory, mutable_state_inventory)
+- `architecture/` - Module-level documentation (41 docs including overview, authority_inventory, mutable_state_inventory)
 - `docs/exact.md` - User-facing exact/ module documentation
 
 ## Documentation Maintenance
