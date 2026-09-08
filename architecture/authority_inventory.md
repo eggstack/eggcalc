@@ -13,11 +13,29 @@ copies is caught by the test suites listed in the "Tests" column.
 
 ## MCP Protocol Versions
 
-| Item | Authoritative source | Intentional duplicates | Tests |
-|------|---------------------|----------------------|-------|
-| `SUPPORTED_PROTOCOL_VERSIONS` | `eggcalc/mcp/server.py:252` | `eggcalc/capabilities.py:18` (avoids circular import with `mcp.server`) | `test_mcp_server` (protocol negotiation) |
-| `LATEST_SUPPORTED_PROTOCOL_VERSION` | `eggcalc/mcp/server.py:253` | — | `test_mcp_server` |
-| `McpServerConfig.supported_protocol_versions` | References `server.py:252` | — | `test_mcp_server` |
+| Item | Authoritative source | Adapters / imports | Tests |
+|------|---------------------|-------------------|-------|
+| `SUPPORTED_PROTOCOL_VERSIONS` | `eggcalc/_protocol.py` (single source of truth) | `eggcalc/mcp/server.py` and `eggcalc/capabilities.py` import from `_protocol`; no intentional duplicate remains | `test_authority_consolidation::TestProtocolAuthority`, `test_mcp_server` (protocol negotiation) |
+| `LATEST_SUPPORTED_PROTOCOL_VERSION` | `eggcalc/_protocol.py` | Re-exported via `mcp/server.py` and `mcp/__init__.py` | `test_authority_consolidation::TestProtocolAuthority`, `test_mcp_server` |
+| `McpServerConfig.supported_protocol_versions` | Defaults to `_protocol.SUPPORTED_PROTOCOL_VERSIONS` via `server.py` | — | `test_mcp_server` |
+
+## RFC 6901 JSON Pointer Extraction
+
+| Item | Authoritative source | Adapters / compatibility | Tests |
+|------|---------------------|-------------------------|-------|
+| RFC 6901 traversal/parser | `eggcalc/exact/validate.py::json_extract` (canonical) | `json_query` is a thin compatibility adapter delegating to `json_extract` via `_json_extract_to_query_result`; no independent traversal remains | `test_authority_consolidation::TestJsonPointerParity`, `test_mcp_server::TestJsonQuery` |
+| `JsonExtractResult` | `eggcalc/exact/validate.py` | — | `test_authority_consolidation`, `test_bugs_2026_09` |
+| `JsonQueryResult` (legacy shape) | Preserved for compatibility (`type` with integers as `"number"`) | Built only by `_json_extract_to_query_result` from the canonical result | `test_authority_consolidation::TestJsonPointerParity` |
+| MCP exposure | `json_extract` (tier 2, stable) is the preferred tool; `json_query` (tier 2, deprecated, `full` profile only) remains callable with `recommended_next_tool="json_extract"` | Schemas mark `deprecated: True`; docs Tier lists place the deprecated tool outside Tier 1 | `test_authority_consolidation::TestMcpExposure` |
+
+## SemVer Parsing and Precedence
+
+| Item | Authoritative source | Adapters / compatibility | Tests |
+|------|---------------------|-------------------------|-------|
+| SemVer parsing (`parse_version`) | `eggcalc/exact/version.py` | — | `test_version_constraint`, `test_authority_consolidation::TestSemVerAuthority` |
+| SemVer precedence (`compare_versions`, `version_less_than`, `version_equal`) | `eggcalc/exact/version.py` (build metadata ignored; pre-release sorts lower) | `exact/validate.py::version_compare(scheme="semver")` delegates via `_semver_compare`; no independent SemVer parser remains in `validate.py` | `test_authority_consolidation::TestSemVerAuthority`, `test_version_constraint` |
+| Loose numeric comparison | `eggcalc/exact/validate.py::_loose_version_compare` (intentionally separate; not SemVer) | `version_compare(scheme="loose")` only | `test_version_constraint`, `test_authority_consolidation` |
+| Cargo constraints | `eggcalc/exact/version.py::check_version_constraint` | — | `test_version_constraint` |
 
 ## Evaluator Limits
 

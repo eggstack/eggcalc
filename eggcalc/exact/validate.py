@@ -596,8 +596,9 @@ def version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareRes
         a: First version string.
         b: Second version string.
         scheme: Version scheme ("semver" or "loose").
-            - semver: strict major.minor.patch comparison; pre-release
-              identifiers are parsed but ignored in comparison (simplified).
+            - semver: strict SemVer precedence via :mod:`eggcalc.exact.version`
+              (major/minor/patch ordering, pre-release sorts lower than the
+              associated release, build metadata ignored for precedence).
             - loose: extract all numeric parts and compare sequentially.
 
     Returns:
@@ -631,25 +632,12 @@ def version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareRes
         )
 
 
-def _parse_semver(version: str) -> tuple[int, int, int] | None:
-    """Parse semver string into (major, minor, patch).
-
-    Args:
-        version: Version string like "1.2.3" or "1.2.3-beta".
-
-    Returns:
-        Tuple of (major, minor, patch) or None if invalid.
-    """
-    import re
-
-    match = re.match(r'^(\d+)\.(\d+)\.(\d+)', version.strip())
-    if not match:
-        return None
-    return int(match.group(1)), int(match.group(2)), int(match.group(3))
-
-
 def _semver_compare(a: str, b: str) -> VersionCompareResult:
-    """Compare two semver versions.
+    """Compare two semver versions via the canonical SemVer authority.
+
+    Delegates parsing and precedence to :mod:`eggcalc.exact.version`
+    (``parse_version`` + ``compare_versions``). Build metadata is ignored
+    for precedence; pre-release identifiers follow SemVer ordering.
 
     Args:
         a: First version string.
@@ -658,8 +646,11 @@ def _semver_compare(a: str, b: str) -> VersionCompareResult:
     Returns:
         VersionCompareResult with comparison, valid, scheme, summary.
     """
-    parsed_a = _parse_semver(a)
-    parsed_b = _parse_semver(b)
+    from .version import compare_versions as _compare_canonical
+    from .version import parse_version as _parse_semver_strict
+
+    parsed_a = _parse_semver_strict(a)
+    parsed_b = _parse_semver_strict(b)
 
     if parsed_a is None:
         return VersionCompareResult(
@@ -676,14 +667,12 @@ def _semver_compare(a: str, b: str) -> VersionCompareResult:
             summary=f"Invalid semver: '{b}'",
         )
 
-    if parsed_a < parsed_b:
-        comparison = -1
+    comparison = _compare_canonical(parsed_a, parsed_b)
+    if comparison < 0:
         summary = f"{a} < {b}"
-    elif parsed_a > parsed_b:
-        comparison = 1
+    elif comparison > 0:
         summary = f"{a} > {b}"
     else:
-        comparison = 0
         summary = f"{a} == {b}"
 
     return VersionCompareResult(
@@ -2964,8 +2953,65 @@ def _sort_json_keys(obj: Any) -> Any:
         return obj
 
 
+def _json_extract_to_query_result(extracted: JsonExtractResult) -> JsonQueryResult:
+    """Adapt a canonical :func:`json_extract` result to the legacy query shape.
+
+    ``JsonQueryResult`` predates ``JsonExtractResult`` and uses ``type``
+    (with ``"integer"`` folded to ``"number"`` for found numbers) instead of
+    ``value_type``. Missing-value metadata (``available_keys``,
+    ``child_keys``, ``preview``, etc.) is intentionally dropped to preserve
+    the historical contract.
+    """
+    pointer = extracted["pointer"]
+    if not extracted["valid_json"]:
+        return JsonQueryResult(
+            found=False,
+            pointer=pointer,
+            value=None,
+            type=None,
+            missing_at=None,
+            reason="invalid_json",
+            error=extracted["error"],
+            line=extracted["line"],
+            column=extracted["column"],
+        )
+    if not extracted["found"]:
+        return JsonQueryResult(
+            found=False,
+            pointer=pointer,
+            value=None,
+            type=extracted["value_type"],
+            missing_at=extracted["missing_at"],
+            reason=extracted["reason"],
+            error=None,
+            line=None,
+            column=None,
+        )
+    value_type = extracted["value_type"]
+    # Historical query contract reports all JSON numbers (int and float)
+    # as "number"; the canonical extractor distinguishes "integer".
+    query_type = "number" if value_type in ("integer", "number") else value_type
+    return JsonQueryResult(
+        found=True,
+        pointer=pointer,
+        value=extracted["value"],
+        type=query_type,
+        missing_at=None,
+        reason=None,
+        error=None,
+        line=None,
+        column=None,
+    )
+
+
 def json_query(text: str, pointer: str = "") -> JsonQueryResult:
     """Query JSON using RFC 6901 JSON Pointer.
+
+    Compatibility adapter over the canonical :func:`json_extract`
+    implementation. Traversal and parsing live in ``json_extract``; this
+    function only translates the result shape to the historical
+    ``JsonQueryResult`` contract (``type`` instead of ``value_type``,
+    integers reported as ``"number"``).
 
     Args:
         text: JSON document string.
@@ -2981,166 +3027,5 @@ def json_query(text: str, pointer: str = "") -> JsonQueryResult:
             f"Input length {len(text)} exceeds MAX_TEXT_INPUT_LENGTH {MAX_TEXT_INPUT_LENGTH}"
         )
 
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError as e:
-        return JsonQueryResult(
-            found=False,
-            pointer=pointer,
-            value=None,
-            type=None,
-            missing_at=None,
-            reason="invalid_json",
-            error=e.msg,
-            line=e.lineno,
-            column=e.colno,
-        )
-
-    if pointer == "":
-        return _build_json_query_result(parsed, pointer)
-
-    tokens = pointer.split("/")
-    if tokens and tokens[0] == "":
-        tokens = tokens[1:]
-
-    current = parsed
-    path_so_far = ""
-
-    for i, token in enumerate(tokens):
-        decoded = _decode_pointer_token(token)
-        path_so_far = "/" + "/".join(_encode_pointer_token(t) for t in tokens[: i + 1])
-
-        if isinstance(current, dict):
-            if decoded in current:
-                current = current[decoded]
-            else:
-                return JsonQueryResult(
-                    found=False,
-                    pointer=pointer,
-                    value=None,
-                    type="object",
-                    missing_at=path_so_far,
-                    reason="key_not_found",
-                    error=None,
-                    line=None,
-                    column=None,
-                )
-        elif isinstance(current, list):
-            try:
-                index = int(decoded)
-            except ValueError:
-                return JsonQueryResult(
-                    found=False,
-                    pointer=pointer,
-                    value=None,
-                    type="array",
-                    missing_at=path_so_far,
-                    reason="invalid_pointer_syntax",
-                    error=None,
-                    line=None,
-                    column=None,
-                )
-
-            if index < 0 or index >= len(current):
-                return JsonQueryResult(
-                    found=False,
-                    pointer=pointer,
-                    value=None,
-                    type="array",
-                    missing_at=path_so_far,
-                    reason="index_out_of_range",
-                    error=None,
-                    line=None,
-                    column=None,
-                )
-            current = current[index]
-        else:
-            return JsonQueryResult(
-                found=False,
-                pointer=pointer,
-                value=None,
-                type=type(current).__name__,
-                missing_at=path_so_far,
-                reason="invalid_pointer_syntax",
-                error=None,
-                line=None,
-                column=None,
-            )
-
-    return _build_json_query_result(current, pointer)
-
-
-def _build_json_query_result(value: Any, pointer: str) -> JsonQueryResult:
-    """Build a query result for a value."""
-    if isinstance(value, dict):
-        return JsonQueryResult(
-            found=True,
-            pointer=pointer,
-            value=value,
-            type="object",
-            missing_at=None,
-            reason=None,
-            error=None,
-            line=None,
-            column=None,
-        )
-    elif isinstance(value, list):
-        return JsonQueryResult(
-            found=True,
-            pointer=pointer,
-            value=value,
-            type="array",
-            missing_at=None,
-            reason=None,
-            error=None,
-            line=None,
-            column=None,
-        )
-    elif isinstance(value, str):
-        return JsonQueryResult(
-            found=True,
-            pointer=pointer,
-            value=value,
-            type="string",
-            missing_at=None,
-            reason=None,
-            error=None,
-            line=None,
-            column=None,
-        )
-    elif isinstance(value, bool):
-        return JsonQueryResult(
-            found=True,
-            pointer=pointer,
-            value=value,
-            type="boolean",
-            missing_at=None,
-            reason=None,
-            error=None,
-            line=None,
-            column=None,
-        )
-    elif value is None:
-        return JsonQueryResult(
-            found=True,
-            pointer=pointer,
-            value=None,
-            type="null",
-            missing_at=None,
-            reason=None,
-            error=None,
-            line=None,
-            column=None,
-        )
-    else:
-        return JsonQueryResult(
-            found=True,
-            pointer=pointer,
-            value=value,
-            type="number",
-            missing_at=None,
-            reason=None,
-            error=None,
-            line=None,
-            column=None,
-        )
+    extracted = json_extract(text, pointer)
+    return _json_extract_to_query_result(extracted)

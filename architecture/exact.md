@@ -167,7 +167,7 @@ from eggcalc.exact import (
 )
 ```
 
-**Note:** `regex_replace_preview`, `json_canonicalize`, and `json_query` exist in `validate.py` but are **not** re-exported from `__init__.py`. They are internal functions only.
+**Note:** `regex_replace_preview` and `json_canonicalize` exist in `validate.py` but are **not** re-exported from `__init__.py`. `json_query` is a deprecated compatibility adapter over the canonical `json_extract` (single RFC 6901 authority) and is also not re-exported; prefer `json_extract`.
 
 ---
 
@@ -528,14 +528,14 @@ UnifiedDiffValidateResult(
 | `json_extract(json_str, path)` | JsonExtractResult | Extract data from JSON using path |
 | `json_compare(a, b)` | JsonCompareResult | Compare two JSON documents |
 | `json_shape(s)` | JsonShapeResult | Analyze JSON structure |
-| `version_compare(a, b, scheme)` | VersionCompareResult | Compare version strings |
+| `version_compare(a, b, scheme)` | VersionCompareResult | Compare version strings (`semver` delegates to `exact/version.py`; `loose` owned here) |
 | `list_dedupe(lst)` | list | Remove duplicate items preserving order |
 | `list_sort(lst, ...)` | list | Sort list with normalization |
 
 **Internal functions (not exported from `__init__.py`):**
 - `regex_replace_preview(pattern, replacement, text)` — Preview regex replacement
 - `json_canonicalize(s)` — Canonicalize JSON with duplicate key detection
-- `json_query(json_str, pointer)` — RFC 6901 JSON Pointer query
+- `json_query(json_str, pointer)` — Deprecated compatibility adapter over canonical `json_extract` (see `authority_inventory.md`)
 
 ### CheckBracketsResult TypedDict
 
@@ -1319,7 +1319,8 @@ CargoInspectResult(
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `parse_version(version)` | ParsedVersion \| None | Parse strict semver version string |
+| `parse_version(version)` | ParsedVersion \| None | Parse strict semver version string (single SemVer authority) |
+| `compare_versions(a, b)` | int | SemVer precedence -1/0/1 (build ignored; used by `version_compare`) |
 | `check_version_constraint(version, constraint, scheme)` | VersionConstraintResult | Check if version satisfies constraint |
 
 ### Supported schemes

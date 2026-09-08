@@ -535,11 +535,20 @@ class TestVersionCompareSchemes:
         assert result["comparison"] == 1
         assert result["valid"] is True
 
-    def test_semver_prerelease_ignored_in_compare(self):
+    def test_semver_prerelease_ordered_per_authority(self):
+        """SemVer prerelease follows canonical precedence (alpha < beta).
+
+        Authority: eggcalc.exact.version.compare_versions. version_compare
+        with scheme="semver" delegates there; pre-release is NOT ignored.
+        """
         from eggcalc.exact.validate import version_compare
 
         result = version_compare("1.0.0-alpha", "1.0.0-beta")
-        assert result["comparison"] == 0
+        assert result["comparison"] == -1
+        assert result["valid"] is True
+
+        result = version_compare("1.0.0-alpha", "1.0.0")
+        assert result["comparison"] == -1
         assert result["valid"] is True
 
     def test_semver_build_metadata_ignored(self):

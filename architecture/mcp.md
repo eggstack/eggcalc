@@ -222,7 +222,6 @@ Registry of all available tools (83 total). Tools are organized by tier for sele
 | `line_range_extract` | text | Extract exact line ranges with fingerprints |
 | `json_compare` | json | Compare two JSON documents semantically |
 | `json_canonicalize` | json | Canonicalize JSON with deterministic formatting |
-| `json_query` | json | Query JSON using RFC 6901 JSON Pointer (deprecated) |
 | `validate_toml` | validation | Validate TOML configuration files |
 | `validate_brackets` | validation | Check balanced brackets |
 | `validate_regex` | regex | Test regex against samples |
@@ -246,7 +245,8 @@ Registry of all available tools (83 total). Tools are organized by tier for sele
 | `text_position` | text | Convert between byte offsets, codepoint indices, line/column |
 | `text_transform` | text | Apply text transformations (normalization, casefold, etc.) |
 | `text_hash` | text | Compute cryptographic hashes of text |
-| `json_extract` | json | Extract value using RFC 6901 JSON Pointer |
+| `json_extract` | json | Extract value using RFC 6901 JSON Pointer (canonical; preferred) |
+| `json_query` | json | Query JSON using RFC 6901 JSON Pointer (deprecated compatibility adapter; use `json_extract`) |
 | `structured_data_compare` | json | Composite structured data comparison |
 | `line_range_compare` | text | Compare line ranges from two texts |
 | `markdown_structure` | markdown | Parse markdown structure (headings, links, code fences) |

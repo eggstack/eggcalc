@@ -367,7 +367,7 @@ TomlShapeResult(valid=True, tables=['package', 'package.name'], ...)
 
 ### `version_compare(a: str, b: str, scheme: str = "semver") -> VersionCompareResult`
 
-Compare two version strings. Supported schemes: `semver` (strict major.minor.patch comparison; pre-release identifiers parsed but ignored), `loose` (extract all numeric parts and compare sequentially). PEP 440 is not supported (no packaging library).
+Compare two version strings. Supported schemes: `semver` (canonical SemVer precedence via `exact/version.py`: major/minor/patch ordering, pre-release sorts lower than the associated release with numeric-vs-alphanumeric ordering, build metadata ignored), `loose` (extract all numeric parts and compare sequentially). PEP 440 is not supported (no packaging library). The `semver` path delegates to `parse_version` + `compare_versions` in `exact/version.py`; `validate.py` owns only the `loose` implementation and the result envelope.
 
 ```python
 >>> version_compare("1.2.3", "1.2.4")
@@ -533,7 +533,7 @@ When `detect_duplicate_keys=True`, uses a custom `object_pairs_hook` to track du
 
 ### `json_query(text: str, pointer: str = "") -> JsonQueryResult`
 
-Query JSON using RFC 6901 JSON Pointer. Simpler than `json_extract` — returns the raw value without preview/truncation logic.
+Query JSON using RFC 6901 JSON Pointer. Compatibility adapter over the canonical `json_extract` (single RFC 6901 authority). Traversal lives in `json_extract`; `json_query` only translates the result via `_json_extract_to_query_result` to the legacy shape (`type` instead of `value_type`, integers reported as `"number"`). Prefer `json_extract` for new code. — returns the raw value without preview/truncation logic.
 
 ```python
 >>> json_query('{"foo": {"bar": "baz"}}', '/foo/bar')

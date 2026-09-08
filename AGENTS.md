@@ -159,13 +159,15 @@ CI runs `make check` (lint, format-check, typecheck, docs-check, build validatio
 ## exact/ Module Notes
 
 - `confusables.py` is **auto-generated** (~40KB) with a zlib-compressed base85 payload and lazy `_LazyConfusables` mapping (6565 entries). Data is decoded on first access, not at import time. Don't add code to it. Edit `scripts/generate_confusables.py` instead.
-- `validate.py` enforces `MAX_INPUT_LENGTH = 100_000` on `check_brackets()` and `validate_json()`.
+- `validate.py` enforces `MAX_INPUT_length = 100_000` on `check_brackets()` and `validate_json()`.
 - `visible_repr()` check order is correct: variation selector (U+FE00-FE0F) **before** combining mark check.
 - `utf8_bytes()` returns `bytes`, not an int count.
 - `manifests.py` functions (`pyproject_inspect`, `requirements_inspect`, etc.) are NOT re-exported from `__init__.py`. Import directly.
 - `cargo.py` `cargo_toml_inspect()` IS re-exported from `__init__.py`.
 - Both modules use the shared `_Finding` TypedDict from `manifests.py` for structured findings.
 - Inspection is lexical/structural, not dependency resolution. Package-manager signals are heuristic.
+- **RFC 6901 authority:** `json_extract()` in `validate.py` owns JSON Pointer traversal. `json_query()` is a thin compatibility adapter (delegates via `_json_extract_to_query_result`, preserves legacy `JsonQueryResult` shape with integers as `"number"`). Do not add a second traversal implementation.
+- **SemVer authority:** `exact/version.py` owns SemVer parsing (`parse_version`) and precedence (`compare_versions`). `validate.py::version_compare(scheme="semver")` delegates there; `loose` comparison stays in `validate.py` by design. See `architecture/authority_inventory.md`.
 
 ## TypedDict Field Conventions
 
@@ -195,7 +197,8 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 - Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Per-request `profile` param overrides in `tools/list`.
 - `mcp_main` is an alias for `main` in `server.py`.
 - **Session lifecycle:** Clients must complete `initialize` + `notifications/initialized` handshake before calling tools. Tool requests before initialization are rejected with `-32600`.
-- **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")`.
+- **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")` in `eggcalc/_protocol.py` (single source; imported by `mcp/server.py` and `capabilities.py`).
+- **Deprecated `json_query`:** tier 2, `full` profile only (not in `default`), `stability: deprecated`, `recommended_next_tool="json_extract"`. Do not re-promote it to Tier 1/default. Prefer `json_extract` for new code.
 - **Deferred exact imports:** `tools.py` uses local imports for `eggcalc.exact` modules. Implementation modules are imported on first tool invocation, not at `import eggcalc.mcp` time. Schemas remain eagerly available for `tools/list`.
 - `McpServerConfig` is a frozen dataclass. `ConfigSnapshot` fields are deeply immutable (`MappingProxyType`). See `architecture/mcp.md` for full session lifecycle, evaluator binding, timeout accounting, and config management details.
 

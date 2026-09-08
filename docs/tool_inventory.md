@@ -38,7 +38,7 @@ Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLE
 | 25 | `json_canonicalize` | json | 1 | yes | no | yes | yes | Canonicalize JSON with deterministic formatting, key ordering, duplicate key detection, and stable hashes. |
 | 26 | `json_compare` | json | 1 | yes | no | yes | yes | Compare two JSON documents semantically, ignoring formatting and key order. |
 | 27 | `json_extract` | json | 2 | yes | no | yes | yes | Extract a value from JSON using RFC 6901 JSON Pointer (e.g., /foo/bar/0). Navigate nested objects and arrays. |
-| 28 | `json_query` | json | 1 | yes | no | yes | yes | Extract a value from JSON using RFC 6901 JSON Pointer. |
+| 28 | `json_query` | json | 2 | yes | no | yes | yes | Extract a value from JSON using RFC 6901 JSON Pointer. |
 | 29 | `json_shape` | json | 3 | yes | no | yes | yes | Analyze the structure of a JSON document without returning values. |
 | 30 | `line_range_compare` | text | 2 | yes | no | yes | yes | Compare a line range from two text inputs with exact, trailing-whitespace-ignoring, or newline-normalizing comparison. |
 | 31 | `line_range_extract` | text | 1 | yes | no | yes | yes | Extract exact line ranges from text and return stable offsets, byte positions, line counts, and optional fingerprint. |

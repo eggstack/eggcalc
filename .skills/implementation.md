@@ -68,7 +68,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `diff.py` - Levenshtein, diff_spans, `__all__` exports
 - `diff_analysis.py` - Diff analysis and classification
 - `measure.py` - Line/word metrics
-- `validate.py` - Bracket/JSON/TOML/regex validation with input limits
+- `validate.py` - Bracket/JSON/TOML/regex validation with input limits (`json_extract` owns RFC 6901; `json_query` is a compatibility adapter; `version_compare(semver)` delegates to `version.py`)
 - `synthesis.py` - Text comparison/explanation
 - `unicode_policy.py` - Unicode canonicalization policies
 - `identifier.py` - Identifier table inspection
@@ -81,7 +81,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `markdown.py` - Markdown structure analysis
 - `config.py` - dotenv/INI validation
 - `cargo.py` - Cargo.toml inspection
-- `version.py` - Semver/cargo constraint checking
+- `version.py` - SemVer/cargo authority (`parse_version`, `compare_versions`, constraint checking)
 - `inspect_prompt.py` - Prompt injection detection
 - `glob.py` - Glob pattern matching
 - `manifests.py` - Manifest inspection tools

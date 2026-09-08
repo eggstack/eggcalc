@@ -188,6 +188,28 @@ def version_gt(a: ParsedVersion, b: ParsedVersion) -> bool:
     return not version_lte(a, b)
 
 
+def compare_versions(a: ParsedVersion, b: ParsedVersion) -> int:
+    """Compare two parsed versions under SemVer precedence.
+
+    Build metadata is ignored for precedence, per SemVer section 10.
+    Pre-release versions sort lower than the associated release, with
+    numeric identifiers compared numerically and alphanumeric identifiers
+    compared lexically.
+
+    Args:
+        a: First parsed version.
+        b: Second parsed version.
+
+    Returns:
+        -1 if a < b, 0 if equal, 1 if a > b.
+    """
+    if version_less_than(a, b):
+        return -1
+    if version_less_than(b, a):
+        return 1
+    return 0
+
+
 def parse_version(version: str) -> ParsedVersion | None:
     """Parse a semver version string.
 

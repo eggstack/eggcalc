@@ -247,6 +247,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ParsedVersion": (".version", "ParsedVersion"),
     "VersionConstraintResult": (".version", "VersionConstraintResult"),
     "check_version_constraint": (".version", "check_version_constraint"),
+    "compare_versions": (".version", "compare_versions"),
     "parse_version": (".version", "parse_version"),
 }
 
@@ -485,6 +486,7 @@ __all__ = [
     "CanonicalizeResultWithMapping",
     # Version
     "check_version_constraint",
+    "compare_versions",
     "parse_version",
     "ParsedVersion",
     "ParsedConstraint",

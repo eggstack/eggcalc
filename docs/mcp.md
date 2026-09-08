@@ -110,7 +110,7 @@ The server supports MCP protocol versions `2025-11-25` (latest stable) and `2024
 - If the client requests a supported version, the server responds with that version.
 - If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version (`2025-11-25`).
 
-Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS` in `eggcalc/mcp/server.py`.
+Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS` in `eggcalc/_protocol.py` (imported by `eggcalc/mcp/server.py` and `eggcalc/capabilities.py`).
 
 The draft `2026-07-28` stateless protocol revision is intentionally not supported until final publication.
 
@@ -646,15 +646,15 @@ Canonicalize JSON with deterministic formatting, key ordering, duplicate key det
 
 ---
 
-### json_query
+### json_query (deprecated — use `json_extract`)
 
-Extract a value from JSON using RFC 6901 JSON Pointer. Navigate nested objects and arrays.
+Compatibility adapter over the canonical `json_extract` (single RFC 6901 authority). Traversal lives in `json_extract`; this tool only translates the result to the legacy shape.
 
 **Arguments:**
 - `text` (string): JSON document string
 - `pointer` (string, optional): RFC 6901 JSON Pointer path (e.g., "/foo/bar/0"). Empty string means the whole document.
 
-**Tier:** 1
+**Tier:** 2
 **Tags:** `json`, `pointer`, `extraction`, `query`, `rfc6901`
 
 **Returns:**
@@ -1510,10 +1510,10 @@ Tools are categorized into tiers based on scope and context cost. See [tool_inve
 - `math_eval`, `text_equal`, `text_count`, `text_fingerprint`, `validate_json`, `path_normalize`
 
 **Tier 1:** Default coding-agent sanity tools. Exposed by default for coding agents.
-- `text_diff_explain`, `text_inspect`, `text_replace_check`, `line_range_extract`, `json_query`, `json_compare`, `validate_toml`, `glob_match`, `validate_regex`, `regex_finditer`, `regex_safety_check`, `identifier_inspect`, `escape_text`, `unescape_text`, `text_window`, `json_canonicalize`, `validate_brackets`, `list_dedupe`, `list_sort`
+- `text_diff_explain`, `text_inspect`, `text_replace_check`, `line_range_extract`, `json_compare`, `validate_toml`, `glob_match`, `validate_regex`, `regex_finditer`, `regex_safety_check`, `identifier_inspect`, `escape_text`, `unescape_text`, `text_window`, `json_canonicalize`, `validate_brackets`, `list_dedupe`, `list_sort`
 
 **Tier 2:** Heavier analysis tools. Exposed when text/unicode/config analysis is needed.
-- `text_position`, `text_hash`, `text_transform`, `text_measure`, `unit_convert`, `unit_info`, `constant_lookup`, `path_analyze`, `path_compare`, `path_scope_check`, `list_compare`, `json_extract`, `version_compare`, `toml_shape`, `markdown_structure`, `code_fence_extract`, `dotenv_validate`, `ini_validate`, `patch_apply_check`, `patch_summary`, `shell_split`, `shell_quote_join`, `argv_compare`, `unicode_policy_check`, `canonicalize_text`, `line_range_compare`, `diff_touched_paths`, `pyproject_inspect`, `repo_file_inventory`, `ip_inspect`, `cidr_inspect`, `codec_convert`, `radix_convert`, `datetime_convert`, `cron_inspect`
+- `text_position`, `text_hash`, `text_transform`, `text_measure`, `unit_convert`, `unit_info`, `constant_lookup`, `path_analyze`, `path_compare`, `path_scope_check`, `list_compare`, `json_extract`, `json_query` (deprecated; use `json_extract`), `version_compare`, `toml_shape`, `markdown_structure`, `code_fence_extract`, `dotenv_validate`, `ini_validate`, `patch_apply_check`, `patch_summary`, `shell_split`, `shell_quote_join`, `argv_compare`, `unicode_policy_check`, `canonicalize_text`, `line_range_compare`, `diff_touched_paths`, `pyproject_inspect`, `repo_file_inventory`, `ip_inspect`, `cidr_inspect`, `codec_convert`, `radix_convert`, `datetime_convert`, `cron_inspect`
 
 **Tier 3:** Domain-specific tools. Opt-in for specialized workflows.
 - `text_truncate`, `json_shape`, `identifier_analyze`, `validate_schema_light`, `version_constraint_check`, `cargo_toml_inspect`
@@ -1964,7 +1964,7 @@ Compare two version strings with explicit scheme.
 **Tags:** `text`, `version`, `semver`, `comparison`
 
 **Supported schemes:**
-- `semver`: strict major.minor.patch comparison. Pre-release identifiers are parsed but ignored in comparison (simplified behavior — use `version_constraint_check` for full pre-release ordering).
+- `semver`: strict SemVer precedence via `exact/version.py` (pre-release sorts lower than release, build metadata ignored).
 - `loose`: extract all numeric parts and compare sequentially. Non-numeric suffixes are ignored.
 
 **Note:** PEP 440 is not supported. Passing `scheme: "pep440"` returns an error.
