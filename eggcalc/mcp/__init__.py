@@ -14,7 +14,13 @@ from eggcalc._protocol import (
 )
 
 from . import tools
-from .schemas import TOOL_SCHEMAS
+from .schemas import (
+    DEFAULT_TOOL_ANNOTATIONS,
+    TOOL_ANNOTATIONS,
+    TOOL_SCHEMAS,
+    ToolAnnotations,
+    get_tool_annotations,
+)
 from .server import (
     ConfigCandidate,
     ConfigError,
@@ -29,6 +35,7 @@ from .server import (
     RuntimeContext,
     ToolExecutor,
     ToolRegistry,
+    ToolWireResult,
     close_compatibility_server,
     freeze_owned,
     handle_request,
@@ -42,6 +49,10 @@ __all__ = [
     "handle_request",
     "close_compatibility_server",
     "TOOL_SCHEMAS",
+    "TOOL_ANNOTATIONS",
+    "DEFAULT_TOOL_ANNOTATIONS",
+    "ToolAnnotations",
+    "get_tool_annotations",
     "tools",
     "McpSession",
     "McpSessionState",
@@ -54,6 +65,7 @@ __all__ = [
     "McpServer",
     "ToolRegistry",
     "ToolExecutor",
+    "ToolWireResult",
     "ConfigSnapshot",
     "ConfigManager",
     "ConfigError",

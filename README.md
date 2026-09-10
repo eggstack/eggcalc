@@ -115,7 +115,7 @@ before starting a worker process.
 
 eggcalc runs as an MCP server exposing deterministic tools across 21 categories (math, text, json, validation, regex, list, path, identifier, shell, markdown, config, version, toml, cargo, unicode, manifest, patch, repo, network, encoding, temporal). All results are deterministic — same input always produces the same output.
 
-**Protocol version:** Dual-era MCP over stdio — finalized `2026-07-28` stateless requests (per-request `params._meta` envelope, `server/discover` bootstrap, no handshake) plus legacy `2025-11-25` / `2024-11-05` handshake sessions (`initialize` before tools; pre-init tool requests are rejected). See [docs/mcp.md](docs/mcp.md) for protocol details and lifecycle requirements.
+**Protocol version:** Dual-era MCP over stdio — finalized `2026-07-28` stateless requests (per-request `params._meta` envelope, `server/discover` bootstrap, no handshake) plus legacy `2025-11-25` / `2024-11-05` handshake sessions (`initialize` before tools; pre-init tool requests are rejected). Successful `tools/call` results on both eras carry typed `structuredContent` (equal to the text envelope's `result`) alongside backward-compatible text; all tools advertise read-only/closed-world annotations and share one concise server instruction text. See [docs/mcp.md](docs/mcp.md) for protocol details and lifecycle requirements.
 
 ```bash
 calc --mcp

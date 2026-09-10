@@ -39,6 +39,7 @@ from .schemas import (
     TOOL_PROFILES,
     TOOL_SCHEMAS,
     compact_schema,
+    get_tool_annotations,
     normal_schema,
 )
 from .tools import (
@@ -553,9 +554,9 @@ def _internal_error(request_id: Any, message: str) -> dict[str, Any]:
 # here is server-owned: modern requests never touch ``McpSession`` state.
 # ---------------------------------------------------------------------------
 
-#: Concise server instructions shared by modern ``server/discover`` (and,
-#: once Plan 039 lands, the legacy ``initialize`` response).  One authority;
-#: do not maintain a second prose copy.
+#: Concise server instructions shared by modern ``server/discover`` and
+#: the legacy ``initialize`` response.  One authority; do not maintain
+#: a second prose copy.
 SERVER_INSTRUCTIONS = (
     "Prefer composite preflight tools (edit_preflight, command_preflight, "
     "config_preflight) for general safety checks and specialist primitives "
@@ -1219,14 +1220,21 @@ class ToolExecutor:
         Uses the evaluator captured from the request context when provided;
         falls back to the executor's own evaluator for backward compatibility.
 
-        When *modern* is true (2026-07-28 era), successful results also
-        carry ``resultType`` and the ``structuredContent`` compatibility
-        bridge (``structuredContent = text_envelope["result"]``), built
-        from the same in-memory handler result as the compatibility text.
-        Error envelopes stay ``isError`` without a success payload.  Plan
-        039 owns the centralized result-boundary validation; this bridge
-        only guarantees the modern path never advertises a revision with
-        known-invalid tool responses.
+        Result boundary (Plan 039): the handler return value is split once
+        via :func:`_split_tool_wire_result` into compatibility text
+        (the full envelope) and ``structuredContent``
+        (``text_envelope["result"]``) built from the same in-memory
+        object. Success payloads are validated against the declared
+        ``outputSchema`` before emission; a mismatch is a server defect
+        and returns a sanitized ``-32000`` error (never a traceback).
+        Error envelopes stay ``isError`` without a success payload.
+
+        ``structuredContent`` is emitted on both eras when the declared
+        output schema is object-rooted (all current tools); only the
+        modern (2026-07-28) path additionally carries ``resultType``.
+        The ``max_output_bytes`` bound applies to the canonical handler
+        envelope JSON (not the duplicated wire form); both
+        representations are serialized only after the envelope passes.
         """
         if self._closed:
             return {
@@ -1375,7 +1383,58 @@ class ToolExecutor:
                 "result": error_payload,
             }
 
-        serialized = json.dumps(result)
+        wire = _split_tool_wire_result(result)
+        if wire.is_error:
+            # Non-success handler shape: preserve existing error contract.
+            # (The ok=False branch above already returned; this covers
+            # non-dict handler results.) The single output bound still
+            # applies so a malformed huge payload cannot escape unbounded.
+            wire_serialized = json.dumps(wire.text_envelope)
+            if len(wire_serialized.encode("utf-8")) > self._config.max_output_bytes:
+                wire_serialized = json.dumps(
+                    {
+                        "ok": False,
+                        "tool": name,
+                        "error_type": "output_too_large",
+                        "error": (
+                            f"Output exceeds {self._config.max_output_bytes} "
+                            "bytes and was truncated"
+                        ),
+                        "hints": ["Try reducing input size or using a summary/detail option"],
+                        "warnings": ["Output was truncated due to size limit"],
+                    }
+                )
+            wire_error_payload: dict[str, Any] = {
+                "content": [{"type": "text", "text": wire_serialized}],
+                "isError": True,
+            }
+            if modern:
+                wire_error_payload["resultType"] = "complete"
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": wire_error_payload,
+            }
+
+        output_error = _validate_output_payload(
+            name, wire.structured_content, schemas=self._registry.schemas
+        )
+        if output_error is not None:
+            logging.error(
+                "Output-schema mismatch for tool %r: %s",
+                name,
+                output_error,
+            )
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32000,
+                    "message": f"Tool execution error: output validation failed for tool '{name}'",
+                },
+            }
+
+        serialized = json.dumps(wire.text_envelope)
         if len(serialized.encode("utf-8")) > self._config.max_output_bytes:
             truncated = {
                 "ok": False,
@@ -1400,8 +1459,8 @@ class ToolExecutor:
         success_payload: dict[str, Any] = {"content": [{"type": "text", "text": serialized}]}
         if modern:
             success_payload["resultType"] = "complete"
-            if isinstance(result, dict) and result.get("ok") is True and "result" in result:
-                success_payload["structuredContent"] = result["result"]
+        if _is_object_rooted_output_schema(name, schemas=self._registry.schemas):
+            success_payload["structuredContent"] = wire.structured_content
         return {
             "jsonrpc": "2.0",
             "id": request_id,
@@ -2247,6 +2306,8 @@ class McpSession:
                     "name": "eggcalc",
                     "version": __version__,
                 },
+                # Same concise authority as modern server/discover.
+                "instructions": SERVER_INSTRUCTIONS,
             },
         }
 
@@ -2802,7 +2863,11 @@ def _json_value_equal(a: Any, b: Any) -> bool:
 
 
 def _validate_value_against_schema(
-    value: Any, prop: Mapping[str, Any], path: str, max_depth: int = 10
+    value: Any,
+    prop: Mapping[str, Any],
+    path: str,
+    max_depth: int = 10,
+    allow_additional_default: bool = False,
 ) -> str | None:
     """Validate a single value against a JSON schema property definition.
 
@@ -2818,6 +2883,11 @@ def _validate_value_against_schema(
 
     Unsupported (silently ignored): oneOf, anyOf, allOf, not, $ref,
     patternProperties, dependencies.
+
+    When a schema omits ``additionalProperties``, *allow_additional_default*
+    decides: inputs use ``False`` (strict), output payloads use ``True``
+    (spec-default permissive — declared fields are still type-checked).
+    An explicit ``additionalProperties`` in the schema always wins.
     """
     if max_depth <= 0:
         return f"Schema nesting too deep at '{path}'"
@@ -2944,7 +3014,7 @@ def _validate_value_against_schema(
     if "object" in type_options and isinstance(value, dict):
         sub_props = prop.get("properties", {})
         sub_required = prop.get("required", [])
-        sub_additional = prop.get("additionalProperties", False)
+        sub_additional = prop.get("additionalProperties", allow_additional_default)
 
         # Only validate recursively if the schema actually defines sub-properties
         # or required fields. Opaque object types (no sub-schema) are accepted as-is.
@@ -2961,7 +3031,11 @@ def _validate_value_against_schema(
             for sub_key, sub_val in value.items():
                 if sub_key in sub_props:
                     err = _validate_value_against_schema(
-                        sub_val, sub_props[sub_key], f"{path}.{sub_key}", max_depth=max_depth - 1
+                        sub_val,
+                        sub_props[sub_key],
+                        f"{path}.{sub_key}",
+                        max_depth=max_depth - 1,
+                        allow_additional_default=allow_additional_default,
                     )
                     if err:
                         return err
@@ -2991,12 +3065,104 @@ def _validate_value_against_schema(
         if items_schema:
             for i, item in enumerate(value):
                 err = _validate_value_against_schema(
-                    item, items_schema, f"{path}[{i}]", max_depth=max_depth - 1
+                    item,
+                    items_schema,
+                    f"{path}[{i}]",
+                    max_depth=max_depth - 1,
+                    allow_additional_default=allow_additional_default,
                 )
                 if err:
                     return err
 
     return None
+
+
+@_dataclass(frozen=True)
+class ToolWireResult:
+    """Result-boundary mapping for one handler return value (Plan 039).
+
+    Owned by the MCP protocol layer (not per-handler knowledge):
+
+    - success ``{ok: true, result: X, ...}`` → text is the full
+      compatibility envelope, ``structured_content`` is ``X``;
+    - error ``{ok: false, ...}`` → text is the full error envelope,
+      ``structured_content`` is ``None``.
+    """
+
+    text_envelope: dict[str, Any]
+    structured_content: Any | None
+    is_error: bool
+
+
+def _split_tool_wire_result(handler_result: Any) -> ToolWireResult:
+    """Map a handler return value to its wire representations.
+
+    Both representations are built from the same in-memory object so
+    the text envelope and ``structuredContent`` cannot drift apart.
+    Non-dict or missing-``ok`` shapes are treated as errors (no success
+    payload is advertised).
+    """
+    if isinstance(handler_result, dict) and handler_result.get("ok") is True:
+        return ToolWireResult(
+            text_envelope=handler_result,
+            structured_content=handler_result.get("result"),
+            is_error=False,
+        )
+    if isinstance(handler_result, dict):
+        return ToolWireResult(
+            text_envelope=handler_result,
+            structured_content=None,
+            is_error=True,
+        )
+    return ToolWireResult(
+        text_envelope={
+            "ok": False,
+            "error_type": "internal_error",
+            "error": "Tool returned a non-dict result",
+            "hints": [],
+            "tool": None,
+            "warnings": [],
+        },
+        structured_content=None,
+        is_error=True,
+    )
+
+
+def _validate_output_payload(
+    name: str,
+    payload: Any,
+    schemas: Mapping[str, dict[str, Any]] | None = None,
+) -> str | None:
+    """Validate a success payload against its declared ``outputSchema``.
+
+    Validates ``handler_result["result"]`` (the ``structuredContent``
+    authority), not the outer compatibility envelope. Output schemas are
+    descriptive: declared fields are type-checked and ``required`` is
+    enforced, but undeclared extra fields are permitted (JSON Schema
+    default) so intentionally partial schemas do not false-positive.
+    Returns None if valid (or when no outputSchema is declared).
+    """
+    source = schemas if schemas is not None else TOOL_SCHEMAS
+    schema = source.get(name, {}).get("outputSchema")
+    if not schema:
+        return None
+    return _validate_value_against_schema(payload, schema, name, allow_additional_default=True)
+
+
+def _is_object_rooted_output_schema(name: str, schemas: Any = None) -> bool:
+    """Return True when *name* declares an object-rooted output schema.
+
+    Legacy eras define structured tool output only for object roots, so
+    this gates ``structuredContent`` emission on the legacy path. All 83
+    current tools are object-rooted; non-object or missing schemas emit
+    text-only results.
+    """
+    source = schemas if schemas is not None else TOOL_SCHEMAS
+    try:
+        schema = source.get(name, {}).get("outputSchema")
+    except Exception:
+        return False
+    return isinstance(schema, (dict, Mapping)) and schema.get("type") == "object"
 
 
 def _validate_arguments_schema(
@@ -3154,12 +3320,14 @@ def _handle_list_tools(
                 continue
 
         meta = metadata_src.get(name, {})
+        annotations = get_tool_annotations(name)
         if use_compact:
             entry = compact_schema(schema)
             entry["name"] = name
             entry["category"] = meta.get("category")
             entry["llm_exposure"] = meta.get("llm_exposure")
             entry["cost"] = meta.get("cost")
+            entry["annotations"] = annotations
         elif schema_detail == "normal":
             entry = normal_schema(schema)
             entry["name"] = name
@@ -3168,12 +3336,14 @@ def _handle_list_tools(
             entry["category"] = meta.get("category")
             entry["llm_exposure"] = meta.get("llm_exposure")
             entry["cost"] = meta.get("cost")
+            entry["annotations"] = annotations
         else:
             entry = {
                 "name": name,
                 "description": schema["description"],
                 "inputSchema": thaw_owned(schema["inputSchema"]),
                 "outputSchema": thaw_owned(schema.get("outputSchema")),
+                "annotations": annotations,
                 "tier": schema.get("tier"),
                 "tags": schema.get("tags", []),
                 "deprecated": schema.get("deprecated", False),

@@ -23,8 +23,12 @@ copies is caught by the test suites listed in the "Tests" column.
 | Reserved `_meta` key constants | `eggcalc/_protocol.py` (`PROTOCOL_VERSION_META_KEY`, `CLIENT_CAPABILITIES_META_KEY`, `CLIENT_INFO_META_KEY`, `LOG_LEVEL_META_KEY`, `SERVER_INFO_META_KEY`) | `mcp/server.py` envelope validation and `_attach_modern_server_info()` | `test_mcp_modern` (envelope validation, `_meta` stamps) |
 | `MODERN_METHODS` allowlist | `eggcalc/_protocol.py` | `_handle_modern_request()` gates `server/discover`, `tools/list`, `tools/call` | `test_mcp_modern::TestModernEnvelopeValidation` |
 | `ModernRequestContext` | `eggcalc/mcp/server.py` (frozen dataclass; request-scoped, never persisted) | Re-exported via `mcp/__init__.py` | `test_mcp_modern` |
-| `SERVER_INSTRUCTIONS` | `eggcalc/mcp/server.py` (single concise prose authority) | `server/discover` result; Plan 039 reuses it for legacy `initialize` | `test_mcp_modern::TestModernDiscover` |
-| Modern cache-hint floor (`MODERN_CACHE_TTL_MS = 0`, `MODERN_CACHE_SCOPE = "private"`) | `eggcalc/_protocol.py` | Modern `server/discover` / `tools/list` results | `test_mcp_modern` |
+| `SERVER_INSTRUCTIONS` | `eggcalc/mcp/server.py` (single concise prose authority) | Legacy `initialize` and modern `server/discover` results (identical text) | `test_mcp_structured_results::TestServerInstructions`, `test_mcp_modern::TestModernDiscover` |
+| Modern cache-hint policy (`MODERN_CACHE_TTL_MS = 0`, `MODERN_CACHE_SCOPE = "private"`) | `eggcalc/_protocol.py` (final conservative policy) | Modern `server/discover` / `tools/list` results | `test_mcp_structured_results::TestListOrderingAndCache`, `test_mcp_modern` |
+| `TOOL_ANNOTATIONS` / `get_tool_annotations()` / `DEFAULT_TOOL_ANNOTATIONS` | `eggcalc/mcp/schemas.py` (catalog authority; uniform read-only/closed-world posture) | `tools/list` emission in every schema-detail mode | `test_mcp_structured_results::TestToolAnnotations` |
+| `outputSchema` → `structuredContent` contract | `eggcalc/mcp/schemas.py` (`outputSchema` describes the inner `result`) | `ToolExecutor.call_tool()` emits `structuredContent = text_envelope["result"]` on both eras (object-rooted only) | `test_mcp_structured_results::TestResultBoundary`, `test_mcp_modern` |
+| `ToolWireResult` / `_split_tool_wire_result()` / `_validate_output_payload()` | `eggcalc/mcp/server.py` (one result-boundary mapper + validator) | Success/error wire mapping; sanitized `-32000` on output mismatch | `test_mcp_structured_results::TestResultBoundary`, `test_mcp_structured_results::TestOutputValidation` |
+| `max_output_bytes` scope | `McpServerConfig.max_output_bytes` bounds the canonical handler-envelope JSON | Both text and structured forms serialize after the envelope passes | `test_mcp_structured_results::TestSizeAccounting`, `test_mcp_modern::TestModernErrorBounds` |
 | `McpServerConfig.supported_protocol_versions` | Defaults to `_protocol.SUPPORTED_PROTOCOL_VERSIONS` via `server.py` | `server/discover` versions and `-32022` evidence | `test_mcp_server` |
 | Legacy `initialize` negotiation | `McpSession._handle_initialize()` negotiates legacy revisions only | — | `test_mcp_modern::TestLegacyPreservation`, `test_mcp_server` |
 
@@ -134,7 +138,7 @@ Note: `MAX_INPUT_LENGTH` in `exact/validate.py` (100 000), `exact/cargo.py` (200
 | `TOOL_METADATA` | `eggcalc/mcp/schemas.py:4202` | `test_mcp_schema_lint` |
 | `TOOL_PROFILES` | `eggcalc/mcp/schemas.py:5152` (built from `TOOL_METADATA`) | `test_mcp_server` |
 | `PROFILE_NAMES` | `eggcalc/mcp/schemas.py:5155` | `test_mcp_server` |
-| `tools/list` emission order | Canonical sorted-name order in `_handle_list_tools()` (stable across source reorderings) | `test_mcp_modern::TestModernToolsList` |
+| `tools/list` emission order | Canonical sorted-name order in `_handle_list_tools()` (stable across source reorderings, both eras) | `test_mcp_structured_results::TestListOrderingAndCache`, `test_mcp_modern::TestModernToolsList` |
 
 ## CLI Command Metadata
 

@@ -415,8 +415,8 @@ Authority and dispatch rules:
 - `eggcalc/_protocol.py` is the sole version/era authority (`LEGACY_PROTOCOL_VERSIONS`, `MODERN_PROTOCOL_VERSIONS`, `SUPPORTED_PROTOCOL_VERSIONS`, `protocol_era()` plus the reserved `_meta` key constants, conservative cache-hint constants, and the `MODERN_METHODS` allowlist). No other module defines version tuples.
 - `_classify_request_era()` is the one classifier. A request is a modern candidate only when `params._meta` carries a reserved `io.modelcontextprotocol/` key — the method name alone (including `server/discover`) never selects the era. Unsupported revisions yield `-32022` and never fall into the legacy state machine; a modern envelope naming a supported legacy revision is served by the legacy path.
 - `McpServer.handle_request()` classifies before any session logic. Modern requests go to `_handle_modern_request()` (server-owned dispatch over the captured `RuntimeContext`, no `McpSession` involved, no fake READY sessions constructed); everything else follows the legacy `McpSession` lifecycle. Modern notifications produce no response and mutate nothing.
-- `server/discover` is generated from existing authorities: supported versions from the server config, protocol-only capabilities (`{"tools": {"listChanged": False}}` — runtime diagnostics from `detect_capabilities()` are intentionally excluded), identity via the `_meta` stamp (never a body field), `SERVER_INSTRUCTIONS`, and conservative `ttlMs: 0` / `cacheScope: "private"`.
-- Modern `tools/list` reuses the registry/profile/schema-detail machinery, emits canonical sorted-name order, and adds `resultType`/`ttlMs`/`cacheScope`/`_meta`. Modern `tools/call` reuses the same `ToolExecutor` and profile authority with no session cancellation sets, and adds the `structuredContent = text_envelope["result"]` compatibility bridge plus `resultType` (see `ToolExecutor.call_tool(..., modern=True)`; Plan 039 centralizes result-boundary validation).
+- `server/discover` is generated from existing authorities: supported versions from the server config, protocol-only capabilities (`{"tools": {"listChanged": False}}` — runtime diagnostics from `detect_capabilities()` are intentionally excluded), identity via the `_meta` stamp (never a body field), `SERVER_INSTRUCTIONS`, and conservative `ttlMs: 0` / `cacheScope: "private"` (final policy, not a floor).
+- Modern `tools/list` reuses the registry/profile/schema-detail machinery, emits canonical sorted-name order, and adds `resultType`/`ttlMs`/`cacheScope`/`_meta`. `tools/call` on both eras reuses the same `ToolExecutor` and profile authority (modern: no session cancellation sets) and adds the `structuredContent = text_envelope["result"]` compatibility bridge; only the modern path additionally carries `resultType` (see `ToolExecutor.call_tool()` and `ToolWireResult`; output validation via `_validate_output_payload()` rejects defective payloads with sanitized `-32000`).
 - `_attach_modern_server_info()` is the single response-finalization helper; JSON-RPC errors carry no `_meta`.
 - `SERVER_INSTRUCTIONS` is the one concise instruction authority, currently wired to `server/discover` (Plan 039 reuses it for legacy `initialize` where protocol-appropriate).
 
@@ -696,7 +696,15 @@ Centralized error helpers (`_jsonrpc_error`, `_parse_error`, `_invalid_request`,
 }
 ```
 
-Modern-era results add `resultType: "complete"`, the server-identity `_meta` stamp, and — for `tools/list` / `server/discover` — `ttlMs` / `cacheScope` on top of these shapes; successful modern `tools/call` results additionally carry `structuredContent` equal to the text envelope's `result` member. Legacy results keep the shapes above byte-compatible (see [Dual-Era Model](#dual-era-model-authoritative)).
+Modern-era results add `resultType: "complete"`, the server-identity `_meta` stamp, and — for `tools/list` / `server/discover` — `ttlMs` / `cacheScope` on top of these shapes. Successful `tools/call` results on **both** eras carry `structuredContent` equal to the text envelope's `result` member when the declared output schema is object-rooted (all 83 current tools); only the modern path adds `resultType`. Error, timeout, and output-too-large shapes stay `isError` with no structured payload on both eras. Legacy `initialize` results additionally carry the shared `SERVER_INSTRUCTIONS` text (identical to modern `server/discover`). See [Dual-Era Model](#dual-era-model-authoritative).
+
+### Structured-Result Boundary (Plan 039)
+
+`ToolWireResult` (frozen dataclass in `server.py`) is the one extraction helper mapping a handler return value to wire form: success `{ok: true, result: X, ...}` → text = full envelope + `structuredContent = X`; error `{ok: false, ...}` (or non-dict) → text = full envelope, no structured payload. Both representations come from the same in-memory object. `TOOL_SCHEMAS[name]["outputSchema"]` describes `structuredContent` (the inner `result`), never the outer compatibility envelope. Success payloads are validated via `_validate_output_payload()` (which reuses `_validate_value_against_schema()` with output-permissive `additionalProperties` defaulting) before emission; mismatches log locally and return sanitized `-32000`. `max_output_bytes` bounds the canonical envelope JSON; both representations serialize only after it passes, so the limit is not halved.
+
+### Tool Annotations and Instructions
+
+`ToolAnnotations` / `TOOL_ANNOTATIONS` / `get_tool_annotations()` in `schemas.py` own the standard MCP annotations (uniform `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`; per-tool overrides merge over the default for Plan 040 migration). `tools/list` emits `annotations` in every schema-detail mode. Annotations are hints only — profile/evaluator policy never consults them. `SERVER_INSTRUCTIONS` is the one concise prose authority, emitted identically by legacy `initialize` and modern `server/discover`.
 
 ---
 
@@ -733,7 +741,7 @@ Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it d
 
 ### Schema Detail
 
-`EGGCALC_MCP_SCHEMA_DETAIL` (default `"full"`) controls schema verbosity globally. Overridden per-request via `schema_detail` parameter in `tools/list`:
+`EGGCALC_MCP_SCHEMA_DETAIL` (default `"full"`) controls schema verbosity globally. Overridden per-request via `schema_detail` parameter in `tools/list`. All modes preserve standard `annotations` (small and useful); eggcalc-specific keys (`tier`, `tags`, `category`, `llm_exposure`, `cost`) ride alongside the standard shape and pass the official SDK wire schemas (see `scripts/mcp_interop_probe.mjs`):
 
 - **`full`**: Raw schemas with all fields
 - **`normal`**: Truncated descriptions (240 chars), compact output schema (`normal_schema()`). Input properties truncated to 120 chars. Includes tier, tags, category, llm_exposure, cost.

@@ -20,18 +20,18 @@ return {"result": str(value), "type": type(value).__name__}
 return _error_response("ErrorType", error_message, hints)
 ```
 
-**In `McpSession._handle_call_tool_server()` (legacy era)**, results are wrapped in MCP format:
-```python
-return {
-    "jsonrpc": "2.0",
-    "id": request.get("id"),
-    "result": {
-        "content": [{"type": "text", "text": json.dumps(result)}]
-    },
-}
-```
+**In `ToolExecutor.call_tool()` (both eras)**, handler results are split once via `_split_tool_wire_result()` into compatibility text (the full `{ok, tool, result, ...}` envelope) plus `structuredContent` (equals the envelope's `result` member) when the declared `outputSchema` is object-rooted. Success payloads are validated via `_validate_output_payload()` (sanitized `-32000` on mismatch). Error envelopes stay `isError` with no structured payload. `max_output_bytes` bounds the envelope JSON; both forms serialize after it passes.
 
-**On the modern (`2026-07-28`) path** (`ToolExecutor.call_tool(..., modern=True)` + `_attach_modern_server_info()`), successful results additionally carry `resultType: "complete"`, `structuredContent` (equals the text envelope's `result` member), and server identity in `result._meta`. Do not hand-build these fields — go through the executor + finalizer.
+- **Legacy era** (`McpSession._handle_call_tool_server()`): `{"content": [...]}` plus `structuredContent`, no `resultType`.
+- **Modern (`2026-07-28`) path** (`call_tool(..., modern=True)` + `_attach_modern_server_info()`): additionally `resultType: "complete"` and server identity in `result._meta`.
+
+Do not hand-build these fields — go through the executor + finalizer.
+
+### Annotations, Instructions, Cache Hints
+
+- Annotations live in `TOOL_ANNOTATIONS` / `get_tool_annotations()` in `schemas.py` (uniform read-only/closed-world; hints only, never policy). `tools/list` emits `annotations` in every schema-detail mode.
+- `SERVER_INSTRUCTIONS` in `server.py` is the one prose authority, shared by legacy `initialize` and modern `server/discover`.
+- Modern `tools/list` / `server/discover` carry conservative `ttlMs: 0`, `cacheScope: "private"` from `eggcalc/_protocol.py` (final policy); `tools/list` order is canonical sorted-name on both eras.
 
 ### Protocol Eras
 

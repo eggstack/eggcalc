@@ -31,9 +31,11 @@ LOG_LEVEL_META_KEY = "io.modelcontextprotocol/logLevel"
 SERVER_INFO_META_KEY = "io.modelcontextprotocol/serverInfo"
 
 # Modern-era wire constants (SEP-2549 cache hints).  Conservative
-# ``ttlMs = 0`` / ``cacheScope = "private"`` until a later pass proves a
-# nonzero catalog TTL safe.  Plan 039 owns the centralized cache policy;
-# this is the conformance floor, not the final policy.
+# ``ttlMs = 0`` / ``cacheScope = "private"`` is the centralized cache
+# policy (Plan 039): a nonzero catalog TTL would require proving registry
+# immutability plus profile/detail selection as cache keys across
+# compatibility-server invalidation, which is not established — so the
+# conformance floor is also the final policy.
 MODERN_CACHE_TTL_MS = 0
 MODERN_CACHE_SCOPE = "private"
 

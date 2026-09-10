@@ -28,7 +28,7 @@ The MCP server exposes several rate-limiting and resource-guard constants that c
 | Environment Variable | Default | Min | Max | Description |
 |----------------------|---------|-----|-----|-------------|
 | `EGGCALC_MCP_MAX_REQUEST_BYTES` | 1,000,000 | 1,000 | 100,000,000 | Maximum size of a single JSON-RPC request in bytes |
-| `EGGCALC_MCP_MAX_OUTPUT_BYTES` | 1,000,000 | 1,000 | 100,000,000 | Maximum size of a single tool response in bytes |
+| `EGGCALC_MCP_MAX_OUTPUT_BYTES` | 1,000,000 | 1,000 | 100,000,000 | Maximum size of a single tool response envelope in bytes (bounds the handler envelope; the wire form with duplicated `structuredContent` is larger — see Output size accounting) |
 | `EGGCALC_MCP_MAX_REQUESTS_PER_SECOND` | 10 | 0.1 | 1,000 | Rate limit for incoming requests (float) |
 | `EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS` | 30 | 1 | 300 | Maximum time in seconds a tool call may run |
 | `EGGCALC_MCP_MAX_CANCELLED_REQUESTS` | 10,000 | 100 | 1,000,000 | Size of the cancellation-record ring buffer |
@@ -156,9 +156,35 @@ Modern clients skip the handshake entirely. Each request is self-describing:
                        "io.modelcontextprotocol/clientCapabilities": {}}}}
 ```
 
-Modern responses carry `resultType: "complete"`, conservative cache hints (`ttlMs: 0`, `cacheScope: "private"`), and server identity in `result._meta`. Modern `tools/list` results are in canonical sorted-name order and honor the same profile/tier/tags/names/schema-detail filters as legacy. Modern `tools/call` results include the `structuredContent` compatibility bridge (`structuredContent` equals the `result` member of the JSON text envelope) while keeping the full text content for backward compatibility.
+Modern responses carry `resultType: "complete"`, conservative cache hints (`ttlMs: 0`, `cacheScope: "private"`), and server identity in `result._meta`. Modern `tools/list` results are in canonical sorted-name order and honor the same profile/tier/tags/names/schema-detail filters as legacy. `tools/call` results on **both** eras include the `structuredContent` compatibility bridge (`structuredContent` equals the `result` member of the JSON text envelope) while keeping the full text content for backward compatibility; only the modern path additionally carries `resultType`. Legacy results have no `resultType` or cache-hint fields.
 
 Only `server/discover`, `tools/list`, and `tools/call` are served in the modern era. `initialize`, `notifications/initialized`, `ping` (not defined for the modern era), and the eggcalc-specific `profiles/list` are rejected with `-32601` when sent as explicitly modern requests. Tool profile restrictions and output-size/timeout error behavior are identical across both eras.
+
+### Structured results
+
+Every tool with an `outputSchema` emits conforming `structuredContent` on success. The authority is explicit: `TOOL_SCHEMAS[name]["outputSchema"]` describes `structuredContent`, which equals the `result` member of the existing `{ok, tool, result, ...}` text compatibility envelope (both are built from the same in-memory handler object, so they cannot drift). The full envelope — including `warnings`, `findings`, `machine_code`, and `recommended_next_tool` — stays in the JSON text content for backward compatibility. Domain/tool errors stay `isError: true` with no success payload. A success payload that fails output validation is a server defect and returns a sanitized `-32000` error (no traceback); see `tests/test_mcp_structured_results.py`.
+
+### Tool annotations
+
+All tools advertise uniform standard annotations (hints only — never security enforcement):
+
+```json
+{"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
+```
+
+The authority is `TOOL_ANNOTATIONS` / `get_tool_annotations()` in `eggcalc/mcp/schemas.py` (uniform closed-world posture; per-tool overrides merge over the default). Annotations are emitted in `tools/list` in every schema-detail mode (`compact`, `normal`, `full`). Profile permissions and evaluator side-effect policy remain authoritative and never consult these hints.
+
+### Server instructions
+
+One concise instruction string (`SERVER_INSTRUCTIONS` in `eggcalc/mcp/server.py`) is reused across eras: legacy `initialize` results and modern `server/discover` results carry the identical text. It directs agents to composite preflight tools, `json_extract` over deprecated `json_query`, and `math_eval` for deterministic calculations.
+
+### Cache hints and ordering
+
+`tools/list` emits canonical sorted-name order on both eras (stable across source reorderings). Modern `server/discover` and `tools/list` carry conservative `ttlMs: 0`, `cacheScope: "private"` from the single policy authority (`MODERN_CACHE_TTL_MS` / `MODERN_CACHE_SCOPE` in `eggcalc/_protocol.py`). Zero TTL is the final policy: a nonzero catalog TTL would require proving registry immutability plus profile/detail selection as cache keys, which is not established.
+
+### Output size accounting
+
+`EGGCALC_MCP_MAX_OUTPUT_BYTES` bounds the canonical handler-envelope JSON. Both the text and `structuredContent` representations are serialized only after the envelope passes the bound, so the limit is not halved by dual representation. The final wire form (with `resultType` / `_meta` / duplicated structured payload) is larger than the bounded envelope by construction.
 
 ### Notification Handling
 

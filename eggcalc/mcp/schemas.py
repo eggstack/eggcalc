@@ -43,6 +43,54 @@ class ErrorEnvelope(TypedDict):
     warnings: list[str]
 
 
+class ToolAnnotations(TypedDict, total=False):
+    """Standard MCP tool annotations (hints, not security enforcement).
+
+    All eggcalc tools are local, deterministic, closed-world operations
+    over caller-supplied arguments (no network, filesystem writes, or
+    destructive mutations). The uniform posture below reflects that;
+    profile permissions and evaluator side-effect policy remain the
+    authoritative enforcement and never consult these hints.
+    """
+
+    title: str
+    readOnlyHint: bool
+    destructiveHint: bool
+    idempotentHint: bool
+    openWorldHint: bool
+
+
+#: Uniform annotation posture for every tool. Stored alongside the
+#: catalog authority (TOOL_SCHEMAS/TOOL_METADATA) so Plan 040 can migrate
+#: it mechanically into a consolidated catalog record.
+DEFAULT_TOOL_ANNOTATIONS: ToolAnnotations = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
+
+
+def get_tool_annotations(name: str) -> ToolAnnotations:
+    """Return the standard MCP annotations for *name*.
+
+    Currently uniform across the catalog; per-tool overrides (if a
+    future tool performs I/O) belong here, not in server emission code.
+    """
+    override = TOOL_ANNOTATIONS.get(name)
+    if override is not None:
+        merged = dict(DEFAULT_TOOL_ANNOTATIONS)
+        merged.update(override)
+        return merged  # type: ignore[return-value]
+    return dict(DEFAULT_TOOL_ANNOTATIONS)  # type: ignore[return-value]
+
+
+#: Per-tool annotation overrides. Empty while every tool shares the
+#: uniform read-only/closed-world posture; entries here merge over
+#: DEFAULT_TOOL_ANNOTATIONS via get_tool_annotations().
+TOOL_ANNOTATIONS: dict[str, ToolAnnotations] = {}
+
+
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "math_eval": {
         "description": "Evaluate arithmetic, unit conversions, constants, and scientific expressions deterministically. State-mutating functions (setvar, store, etc.) and non-deterministic functions (random, randint, gauss, etc.) are disabled. Use for math and unit tasks instead of asking the model to calculate.",
@@ -420,6 +468,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "normalization": {"type": ["string", "null"]},
                 "text_length_codepoints": {"type": "integer"},
             },
+            "additionalProperties": True,
         },
     },
     "text_truncate": {
@@ -1974,8 +2023,8 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 },
                 "diff_summary": {"type": "string", "description": "Human-readable diff summary"},
                 "first_difference": {
-                    "type": "object",
-                    "description": "First differing line (if any)",
+                    "type": ["object", "null"],
+                    "description": "First differing line (null when ranges are equal)",
                 },
             },
         },
@@ -2133,7 +2182,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "description": "Resolved right argv",
                 },
                 "first_difference": {
-                    "type": "integer",
+                    "type": ["integer", "null"],
                     "description": "Index of first differing token, or null if equal",
                 },
                 "findings": {
@@ -2915,8 +2964,8 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "description": "SHA-256 of canonicalized text",
                 },
                 "mapping": {
-                    "type": "array",
-                    "description": "Character mapping if return_mapping was True",
+                    "type": ["array", "null"],
+                    "description": "Character mapping if return_mapping was True (null otherwise)",
                 },
                 "findings": {
                     "type": "array",
@@ -3038,10 +3087,13 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "type": "boolean",
                     "description": "Whether the version satisfies the constraint",
                 },
-                "parsed_version": {"type": "object", "description": "Parsed version components"},
+                "parsed_version": {
+                    "type": ["object", "null"],
+                    "description": "Parsed version components (null when unparseable)",
+                },
                 "parsed_constraint": {
-                    "type": "object",
-                    "description": "Parsed constraint components",
+                    "type": ["object", "null"],
+                    "description": "Parsed constraint components (null when unparseable)",
                 },
                 "scheme": {"type": "string", "description": "Versioning scheme used"},
                 "explanation": {"type": "string", "description": "Human-readable explanation"},
@@ -3182,8 +3234,8 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "summary": {"type": "string", "description": "Human-readable summary"},
                 "risk_score": {"type": "integer", "description": "Deterministic risk score"},
                 "recommended_next_tool": {
-                    "type": ["string", "array"],
-                    "description": "Recommended follow-up tool(s)",
+                    "type": ["string", "array", "null"],
+                    "description": "Recommended follow-up tool(s) (null when none)",
                 },
                 "text_length": {"type": "integer", "description": "Input text length"},
                 "checks_run": {
@@ -3599,9 +3651,9 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "parse_ok": {"type": "boolean"},
-                "module_path": {"type": "string"},
-                "go_version": {"type": "string"},
-                "toolchain": {"type": "string"},
+                "module_path": {"type": ["string", "null"]},
+                "go_version": {"type": ["string", "null"]},
+                "toolchain": {"type": ["string", "null"]},
                 "require_count": {"type": "integer"},
                 "replace_directives": {"type": "array"},
                 "exclude_directives": {"type": "array"},
@@ -3652,7 +3704,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "parse_ok": {"type": "boolean"},
                 "detected_kind": {"type": "string"},
-                "ecosystem": {"type": "string"},
+                "ecosystem": {"type": ["string", "null"]},
                 "approximate_package_count": {"type": "integer"},
                 "warnings": {"type": "array"},
                 "findings": {
