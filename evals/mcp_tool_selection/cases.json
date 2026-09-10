@@ -1,0 +1,2126 @@
+{
+  "cases": [
+    {
+      "acceptable_primary_tools": [
+        "math_eval"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "math"
+      ],
+      "id": "math-001",
+      "notes": "Single arithmetic expression; specialist math helpers cannot evaluate.",
+      "prompt": "What is 15% of 240 plus the square root of 144?",
+      "required_capabilities": [
+        "arithmetic evaluation"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "math_eval"
+      ],
+      "acceptable_supporting_tools": [
+        "unit_convert"
+      ],
+      "domains": [
+        "math"
+      ],
+      "id": "math-002",
+      "notes": "Mixed-unit expression needs math_eval; unit_convert only handles single known pairs.",
+      "prompt": "Convert 30 meters plus 100 feet into meters.",
+      "required_capabilities": [
+        "unit-aware arithmetic"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "unit_convert",
+        "math_eval"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "math"
+      ],
+      "id": "math-003",
+      "notes": "Single known unit pair; either the converter or full evaluation is acceptable.",
+      "prompt": "How many joules are in 500 kilocalories?",
+      "required_capabilities": [
+        "unit conversion"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "constant_lookup",
+        "math_eval"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "math"
+      ],
+      "id": "math-004",
+      "notes": "Constant metadata lookup; math_eval also resolves named constants.",
+      "prompt": "What is the value of the Avogadro constant?",
+      "required_capabilities": [
+        "constant lookup"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "math_eval"
+      ],
+      "acceptable_supporting_tools": [
+        "constant_lookup"
+      ],
+      "domains": [
+        "math"
+      ],
+      "id": "math-005",
+      "notes": "Expression over constants requires evaluation; lookup alone cannot multiply.",
+      "prompt": "What is Planck's constant times the speed of light?",
+      "required_capabilities": [
+        "arithmetic over constants"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "unit_info"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "math"
+      ],
+      "id": "math-006",
+      "notes": "Category/canonical lookup, not a conversion.",
+      "prompt": "Is 'furlong per fortnight' a known unit, and what category is it in?",
+      "required_capabilities": [
+        "unit metadata"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "unit_convert",
+        "math_eval"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "math"
+      ],
+      "id": "math-007",
+      "notes": "Temperature offset conversion; either path is acceptable.",
+      "prompt": "Convert 212 degrees Fahrenheit to Celsius.",
+      "required_capabilities": [
+        "temperature conversion"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "math_eval"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "math"
+      ],
+      "id": "math-008",
+      "notes": "Natural-language arithmetic is a math_eval task, not a guess.",
+      "prompt": "How much is five plus three times two?",
+      "required_capabilities": [
+        "natural-language arithmetic"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_replace_check"
+      ],
+      "acceptable_supporting_tools": [
+        "edit_preflight"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-001",
+      "notes": "Single-replacement safety question; the composite is heavier than needed.",
+      "prompt": "I want to replace 'foo' with 'bar' in main.py, but only if it occurs exactly once. Is it safe?",
+      "required_capabilities": [
+        "validate proposed edit"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "edit_preflight"
+      ],
+      "acceptable_supporting_tools": [
+        "patch_apply_check",
+        "text_diff_explain",
+        "text_replace_check"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-002",
+      "notes": "Vague pre-apply validation maps to the edit composite front door.",
+      "prompt": "Validate this proposed edit to README.md before I apply it.",
+      "required_capabilities": [
+        "edit approval verdict"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "patch_apply_check"
+      ],
+      "acceptable_supporting_tools": [
+        "edit_preflight",
+        "unified_diff_validate"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-003",
+      "notes": "Dry-run application against in-memory files is the specialist task.",
+      "prompt": "Will this unified diff apply cleanly against these file contents?",
+      "required_capabilities": [
+        "dry-run patch application"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "unified_diff_validate"
+      ],
+      "acceptable_supporting_tools": [
+        "patch_apply_check"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-004",
+      "notes": "Syntax well-formedness, not application.",
+      "prompt": "Is this diff syntactically well-formed?",
+      "required_capabilities": [
+        "diff syntax validation"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "patch_summary"
+      ],
+      "acceptable_supporting_tools": [
+        "diff_touched_paths"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-005",
+      "notes": "Counts and per-file stats without applying.",
+      "prompt": "Summarize what this pull-request diff changes.",
+      "required_capabilities": [
+        "diff summary"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "diff_touched_paths"
+      ],
+      "acceptable_supporting_tools": [
+        "patch_summary"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-006",
+      "notes": "File classification, not counts.",
+      "prompt": "Which files does this diff touch, and are they added, deleted, or renamed?",
+      "required_capabilities": [
+        "touched-file classification"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "diff_hunk_ranges"
+      ],
+      "acceptable_supporting_tools": [
+        "diff_touched_paths"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-007",
+      "notes": "Hunk ranges per file is the specialist output.",
+      "prompt": "Give me the hunk line ranges per file for this diff.",
+      "required_capabilities": [
+        "hunk range extraction"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "diff_file_headers"
+      ],
+      "acceptable_supporting_tools": [
+        "diff_touched_paths"
+      ],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-008",
+      "notes": "Header metadata (git/index/mode/rename/binary).",
+      "prompt": "Did this diff rename any files or change file modes?",
+      "required_capabilities": [
+        "diff header metadata"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "patch_conflict_markers_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "patch"
+      ],
+      "id": "patch-009",
+      "notes": "Conflict-marker detection, not diff validation.",
+      "prompt": "Does this file still contain unresolved merge conflict markers?",
+      "required_capabilities": [
+        "conflict marker detection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "line_range_extract"
+      ],
+      "acceptable_supporting_tools": [
+        "text_window"
+      ],
+      "domains": [
+        "patch",
+        "text"
+      ],
+      "id": "patch-010",
+      "notes": "Exact line ranges with stable offsets.",
+      "prompt": "Extract lines 40-60 from server.py with stable offsets.",
+      "required_capabilities": [
+        "line range extraction"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "line_range_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "line_range_extract",
+        "text_diff_explain"
+      ],
+      "domains": [
+        "patch",
+        "text"
+      ],
+      "id": "patch-011",
+      "notes": "Same-range comparison across two texts.",
+      "prompt": "Do lines 10-20 match between these two versions of the file?",
+      "required_capabilities": [
+        "line range comparison"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_diff_explain"
+      ],
+      "acceptable_supporting_tools": [
+        "text_equal"
+      ],
+      "domains": [
+        "patch",
+        "text"
+      ],
+      "id": "patch-012",
+      "notes": "Explanation of differences, not a boolean verdict.",
+      "prompt": "Explain why these two paragraphs differ.",
+      "required_capabilities": [
+        "difference explanation"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "command_preflight"
+      ],
+      "acceptable_supporting_tools": [
+        "shell_split"
+      ],
+      "domains": [
+        "shell"
+      ],
+      "id": "shell-001",
+      "notes": "Approval verdict before execution; never execute.",
+      "prompt": "Is `rm -rf $DIR/tmp` safe to run?",
+      "required_capabilities": [
+        "command approval verdict"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "shell_split"
+      ],
+      "acceptable_supporting_tools": [
+        "command_preflight"
+      ],
+      "domains": [
+        "shell"
+      ],
+      "id": "shell-002",
+      "notes": "Raw token parsing plus risky-operator flags.",
+      "prompt": "Parse `grep -r \"foo\" --include='*.py' .` into argv tokens and flag risky operators.",
+      "required_capabilities": [
+        "shell parsing"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "shell_quote_join"
+      ],
+      "acceptable_supporting_tools": [
+        "shell_split"
+      ],
+      "domains": [
+        "shell"
+      ],
+      "id": "shell-003",
+      "notes": "Quoting tokens into a safe shell string.",
+      "prompt": "Quote these arguments into a safe shell command string.",
+      "required_capabilities": [
+        "shell quoting"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "argv_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "shell_split"
+      ],
+      "domains": [
+        "shell"
+      ],
+      "id": "shell-004",
+      "notes": "Parsed-token comparison, not raw text.",
+      "prompt": "Are `ls -la /tmp` and `ls  -la /tmp/` the same command?",
+      "required_capabilities": [
+        "command comparison"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "validate_regex"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "shell",
+        "regex"
+      ],
+      "id": "shell-005",
+      "notes": "Pattern behavior against samples.",
+      "prompt": "Test the regex `^(\\d+)-(\\d+)$` against ['123-4567', 'hello'].",
+      "required_capabilities": [
+        "regex behavior test"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "regex_finditer"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_regex"
+      ],
+      "domains": [
+        "shell",
+        "regex"
+      ],
+      "id": "shell-006",
+      "notes": "All matches with spans and groups.",
+      "prompt": "Find all email addresses in this log with their line numbers and capture groups.",
+      "required_capabilities": [
+        "regex search with positions"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "regex_safety_check"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_regex"
+      ],
+      "domains": [
+        "shell",
+        "regex"
+      ],
+      "id": "shell-007",
+      "notes": "Backtracking risk, not match behavior.",
+      "prompt": "Could the pattern `(a+)+$` cause catastrophic backtracking?",
+      "required_capabilities": [
+        "regex risk scoring"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "command_preflight"
+      ],
+      "acceptable_supporting_tools": [
+        "regex_safety_check",
+        "shell_split"
+      ],
+      "domains": [
+        "shell"
+      ],
+      "id": "shell-008",
+      "notes": "Composite verdict covering command and embedded patterns.",
+      "prompt": "Check this deployment command and its regex filters before I approve it.",
+      "required_capabilities": [
+        "command approval verdict"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "argv_compare"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "shell"
+      ],
+      "id": "shell-009",
+      "notes": "String-vs-argv equivalence.",
+      "prompt": "Compare `docker run --rm -it img` given as a string versus as an argv list.",
+      "required_capabilities": [
+        "command comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "validate_regex"
+      ],
+      "acceptable_supporting_tools": [
+        "regex_finditer"
+      ],
+      "domains": [
+        "regex"
+      ],
+      "id": "shell-010",
+      "notes": "Match/no-match against samples.",
+      "prompt": "Does this regex match any of these sample error lines?",
+      "required_capabilities": [
+        "regex behavior test"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "config_preflight"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_json",
+        "validate_toml"
+      ],
+      "domains": [
+        "config"
+      ],
+      "id": "config-001",
+      "notes": "Unknown-format generated config maps to the auto-detecting composite.",
+      "prompt": "Is this generated config file valid, whatever format it is?",
+      "required_capabilities": [
+        "config validation verdict"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "validate_json"
+      ],
+      "acceptable_supporting_tools": [
+        "llm_json_output_check"
+      ],
+      "domains": [
+        "config"
+      ],
+      "id": "config-002",
+      "notes": "Syntax error location for known JSON.",
+      "prompt": "Validate this JSON document and show me exactly where it breaks.",
+      "required_capabilities": [
+        "JSON syntax validation"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "validate_toml"
+      ],
+      "acceptable_supporting_tools": [
+        "toml_shape"
+      ],
+      "domains": [
+        "config"
+      ],
+      "id": "config-003",
+      "notes": "Syntax check for a TOML snippet.",
+      "prompt": "Validate this Cargo.toml snippet.",
+      "required_capabilities": [
+        "TOML syntax validation"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "toml_shape"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_toml"
+      ],
+      "domains": [
+        "config"
+      ],
+      "id": "config-004",
+      "notes": "Structure view, not error location.",
+      "prompt": "What tables and keys does this TOML file define?",
+      "required_capabilities": [
+        "TOML structure"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "dotenv_validate"
+      ],
+      "acceptable_supporting_tools": [
+        "config_preflight"
+      ],
+      "domains": [
+        "config"
+      ],
+      "id": "config-005",
+      "notes": "Known .env format maps to the specialist.",
+      "prompt": "Check this .env file for bad keys and duplicates.",
+      "required_capabilities": [
+        "dotenv validation"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "ini_validate"
+      ],
+      "acceptable_supporting_tools": [
+        "config_preflight"
+      ],
+      "domains": [
+        "config"
+      ],
+      "id": "config-006",
+      "notes": "Known INI format maps to the specialist.",
+      "prompt": "Check this INI file for duplicate sections and malformed lines.",
+      "required_capabilities": [
+        "INI validation"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "validate_schema_light"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_json"
+      ],
+      "domains": [
+        "config",
+        "validation"
+      ],
+      "id": "config-007",
+      "notes": "Structural schema conformance, not syntax.",
+      "prompt": "Does this JSON satisfy the required-fields schema?",
+      "required_capabilities": [
+        "schema validation"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_compare",
+        "structured_data_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "json_canonicalize"
+      ],
+      "domains": [
+        "config"
+      ],
+      "id": "config-008",
+      "notes": "Semantic equality ignoring formatting.",
+      "prompt": "Compare the rendered config against the golden file. Are they semantically equal?",
+      "required_capabilities": [
+        "structured comparison"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_extract"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "json"
+      ],
+      "id": "json-001",
+      "notes": "Single-pointer extraction.",
+      "prompt": "Get the value at /server/port from this JSON.",
+      "required_capabilities": [
+        "JSON pointer extraction"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "structured_data_compare"
+      ],
+      "domains": [
+        "json"
+      ],
+      "id": "json-002",
+      "notes": "Whole-document semantic comparison.",
+      "prompt": "Are these two API responses semantically identical?",
+      "required_capabilities": [
+        "JSON comparison"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_canonicalize"
+      ],
+      "acceptable_supporting_tools": [
+        "text_hash"
+      ],
+      "domains": [
+        "json"
+      ],
+      "id": "json-003",
+      "notes": "Deterministic form plus stable hash.",
+      "prompt": "Canonicalize this JSON for a stable cache key.",
+      "required_capabilities": [
+        "JSON canonicalization"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_shape"
+      ],
+      "acceptable_supporting_tools": [
+        "json_extract"
+      ],
+      "domains": [
+        "json"
+      ],
+      "id": "json-004",
+      "notes": "Structure without values.",
+      "prompt": "Show me the shape of this large JSON without dumping its values.",
+      "required_capabilities": [
+        "JSON structure analysis"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "llm_json_output_check"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_json"
+      ],
+      "domains": [
+        "json"
+      ],
+      "id": "json-005",
+      "notes": "LLM-output failure modes (fences, prose, trailing commas).",
+      "prompt": "The model returned fenced JSON with trailing prose. What is wrong with it?",
+      "required_capabilities": [
+        "LLM output diagnosis"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_compare"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "json"
+      ],
+      "id": "json-006",
+      "notes": "Order-sensitive array comparison with order-insensitive objects.",
+      "prompt": "Compare two JSON configs ignoring key order but not array order.",
+      "required_capabilities": [
+        "JSON comparison"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_extract"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "json"
+      ],
+      "id": "json-007",
+      "notes": "Nested array pointer.",
+      "prompt": "Extract /items/0/name from this document.",
+      "required_capabilities": [
+        "JSON pointer extraction"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "json_extract"
+      ],
+      "acceptable_supporting_tools": [
+        "json_query"
+      ],
+      "domains": [
+        "json"
+      ],
+      "id": "json-008",
+      "notes": "Migration case: json_query is deprecated but callable; json_extract is preferred.",
+      "prompt": "Our legacy code calls json_query with an RFC 6901 pointer. What should it use instead?",
+      "required_capabilities": [
+        "JSON pointer extraction"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "structured_data_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "json_compare",
+        "json_shape"
+      ],
+      "domains": [
+        "json"
+      ],
+      "id": "json-009",
+      "notes": "Multi-tool verdict across compare/canonicalize/shape.",
+      "prompt": "Diff expected versus actual structured output and give me a verdict.",
+      "required_capabilities": [
+        "structured comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "validate_json"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "json"
+      ],
+      "id": "json-010",
+      "notes": "Syntax plus top-level keys.",
+      "prompt": "Is this string valid JSON, and what are its top-level keys?",
+      "required_capabilities": [
+        "JSON syntax validation"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_equal"
+      ],
+      "acceptable_supporting_tools": [
+        "text_diff_explain"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-001",
+      "notes": "Boolean equality under normalization.",
+      "prompt": "Are 'cafe' in NFC and NFD the same string?",
+      "required_capabilities": [
+        "string equality"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_diff_explain"
+      ],
+      "acceptable_supporting_tools": [
+        "text_equal",
+        "text_inspect"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-002",
+      "notes": "Looks-identical-but-unequal needs confusable/invisible analysis.",
+      "prompt": "Why do these two identifiers look identical but compare unequal?",
+      "required_capabilities": [
+        "difference explanation"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_measure"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "text"
+      ],
+      "id": "text-003",
+      "notes": "Aggregate size metrics.",
+      "prompt": "How many words, lines, and bytes is this document?",
+      "required_capabilities": [
+        "text measurement"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_count"
+      ],
+      "acceptable_supporting_tools": [
+        "text_measure"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-004",
+      "notes": "Per-character counts and positions.",
+      "prompt": "How many times does 'e' appear in this text, and where?",
+      "required_capabilities": [
+        "character counting"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_truncate"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "text"
+      ],
+      "id": "text-005",
+      "notes": "Grapheme-safe truncation preserving emoji.",
+      "prompt": "Shorten this label to 12 visible characters without breaking emoji.",
+      "required_capabilities": [
+        "grapheme truncation"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_transform"
+      ],
+      "acceptable_supporting_tools": [
+        "canonicalize_text"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-006",
+      "notes": "Ad-hoc operation list, not a named profile.",
+      "prompt": "Normalize this text to NFC and strip trailing whitespace.",
+      "required_capabilities": [
+        "text transformation"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_window"
+      ],
+      "acceptable_supporting_tools": [
+        "line_range_extract",
+        "text_position"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-007",
+      "notes": "Context lines around a position.",
+      "prompt": "Show me the lines around line 42 with context.",
+      "required_capabilities": [
+        "context window"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_position"
+      ],
+      "acceptable_supporting_tools": [
+        "text_window"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-008",
+      "notes": "Offset-system conversion.",
+      "prompt": "Convert byte offset 128 to line and column in this file.",
+      "required_capabilities": [
+        "offset conversion"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_hash"
+      ],
+      "acceptable_supporting_tools": [
+        "text_fingerprint"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-009",
+      "notes": "Raw multi-algorithm hashes.",
+      "prompt": "Hash this artifact with sha256 for dedup.",
+      "required_capabilities": [
+        "text hashing"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_fingerprint"
+      ],
+      "acceptable_supporting_tools": [
+        "text_hash"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-010",
+      "notes": "Canonicalized stable identity.",
+      "prompt": "Fingerprint this source file canonically for identity.",
+      "required_capabilities": [
+        "text fingerprinting"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "list_compare"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "text",
+        "list"
+      ],
+      "id": "text-011",
+      "notes": "Set-mode list comparison.",
+      "prompt": "Are these two dependency lists the same ignoring order?",
+      "required_capabilities": [
+        "list comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "list_dedupe",
+        "list_sort"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "text",
+        "list"
+      ],
+      "id": "text-012",
+      "notes": "Both dedupe and ordering requested; either order of operations is fine.",
+      "prompt": "Dedupe and sort this tag list.",
+      "required_capabilities": [
+        "list normalization"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "escape_text"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "text"
+      ],
+      "id": "text-013",
+      "notes": "Output-format escaping.",
+      "prompt": "Escape this string for a POSIX shell single-quoted context.",
+      "required_capabilities": [
+        "text escaping"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "unescape_text"
+      ],
+      "acceptable_supporting_tools": [
+        "escape_text"
+      ],
+      "domains": [
+        "text"
+      ],
+      "id": "text-014",
+      "notes": "Decoding, not encoding.",
+      "prompt": "Decode this percent-encoded URL component.",
+      "required_capabilities": [
+        "text unescaping"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "validate_brackets"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "text",
+        "validation"
+      ],
+      "id": "text-015",
+      "notes": "Delimiter balance with positions.",
+      "prompt": "Are the delimiters balanced in this snippet?",
+      "required_capabilities": [
+        "delimiter validation"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "text_security_inspect"
+      ],
+      "domains": [
+        "unicode",
+        "text"
+      ],
+      "id": "unicode-001",
+      "notes": "Single-string hidden-character detail.",
+      "prompt": "Does this username contain hidden or confusable characters?",
+      "required_capabilities": [
+        "hidden-character inspection"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_security_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "prompt_input_inspect",
+        "text_inspect",
+        "unicode_policy_check"
+      ],
+      "domains": [
+        "unicode",
+        "text"
+      ],
+      "id": "unicode-002",
+      "notes": "Verdict across checks, not raw findings.",
+      "prompt": "Give me a verdict: is this pasted prompt text safe to feed the agent?",
+      "required_capabilities": [
+        "text safety verdict"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "unicode_policy_check"
+      ],
+      "acceptable_supporting_tools": [
+        "text_inspect"
+      ],
+      "domains": [
+        "unicode"
+      ],
+      "id": "unicode-003",
+      "notes": "Named-policy application.",
+      "prompt": "Apply the identifier_strict Unicode policy to this symbol.",
+      "required_capabilities": [
+        "policy check"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "prompt_input_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "text_security_inspect"
+      ],
+      "domains": [
+        "unicode",
+        "text"
+      ],
+      "id": "unicode-004",
+      "notes": "Observable red flags, explicitly not an injection verdict.",
+      "prompt": "Scan this markdown for hidden Unicode and instruction-like lines.",
+      "required_capabilities": [
+        "prompt inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "identifier_analyze"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "unicode",
+        "identifier"
+      ],
+      "id": "unicode-005",
+      "notes": "Single-identifier classification.",
+      "prompt": "Is 'my-var' a valid Python identifier, and what naming style is it?",
+      "required_capabilities": [
+        "identifier analysis"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "identifier_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "identifier_table_inspect"
+      ],
+      "domains": [
+        "unicode",
+        "identifier"
+      ],
+      "id": "unicode-006",
+      "notes": "Few identifiers; the table tool is for bulk analysis.",
+      "prompt": "Check these three proposed names for confusables and collisions.",
+      "required_capabilities": [
+        "identifier inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "identifier_table_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "identifier_inspect"
+      ],
+      "domains": [
+        "unicode",
+        "identifier"
+      ],
+      "id": "unicode-007",
+      "notes": "Bulk collision and style analysis.",
+      "prompt": "Audit this exported symbol table for collisions and reserved words.",
+      "required_capabilities": [
+        "identifier table audit"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "canonicalize_text"
+      ],
+      "acceptable_supporting_tools": [
+        "text_transform"
+      ],
+      "domains": [
+        "unicode",
+        "text"
+      ],
+      "id": "unicode-008",
+      "notes": "Named canonicalization profile.",
+      "prompt": "Canonicalize these filenames for comparison.",
+      "required_capabilities": [
+        "canonicalization"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "path_normalize"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "path"
+      ],
+      "id": "path-001",
+      "notes": "Single-path cleanup.",
+      "prompt": "Clean up this path with redundant dot segments.",
+      "required_capabilities": [
+        "path normalization"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "path_analyze"
+      ],
+      "acceptable_supporting_tools": [
+        "path_normalize"
+      ],
+      "domains": [
+        "path"
+      ],
+      "id": "path-002",
+      "notes": "Component breakdown.",
+      "prompt": "Break this filepath into directory, stem, and extensions.",
+      "required_capabilities": [
+        "path analysis"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "path_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "path_normalize"
+      ],
+      "domains": [
+        "path"
+      ],
+      "id": "path-003",
+      "notes": "Two-path equivalence under rules.",
+      "prompt": "Are 'a/./b' and 'a/b' the same path?",
+      "required_capabilities": [
+        "path comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "path_scope_check"
+      ],
+      "acceptable_supporting_tools": [
+        "path_analyze"
+      ],
+      "domains": [
+        "path"
+      ],
+      "id": "path-004",
+      "notes": "Lexical containment; symlinks explicitly out of scope.",
+      "prompt": "Can this user-supplied path escape /srv/data?",
+      "required_capabilities": [
+        "path scope check"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "glob_match"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "path"
+      ],
+      "id": "path-005",
+      "notes": "Glob semantics including **.",
+      "prompt": "Does '**/*.py' match 'src/a/b.py'?",
+      "required_capabilities": [
+        "glob matching"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "path_normalize"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "path"
+      ],
+      "id": "path-006",
+      "notes": "Platform-specific normalization.",
+      "prompt": "Normalize this Windows path.",
+      "required_capabilities": [
+        "path normalization"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "path_analyze"
+      ],
+      "acceptable_supporting_tools": [
+        "path_scope_check"
+      ],
+      "domains": [
+        "path"
+      ],
+      "id": "path-007",
+      "notes": "Traversal and hidden-segment signals.",
+      "prompt": "Does this path contain traversal or hidden segments?",
+      "required_capabilities": [
+        "path analysis"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "version_compare"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "version"
+      ],
+      "id": "version-001",
+      "notes": "Concrete A-vs-B precedence.",
+      "prompt": "Is 2.0.0-rc.1 older than 2.0.0 under semver?",
+      "required_capabilities": [
+        "version comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "version_constraint_check"
+      ],
+      "acceptable_supporting_tools": [
+        "version_compare"
+      ],
+      "domains": [
+        "version"
+      ],
+      "id": "version-002",
+      "notes": "Range satisfaction, not ordering.",
+      "prompt": "Does version 1.4.2 satisfy the constraint ^1.2.0?",
+      "required_capabilities": [
+        "constraint satisfaction"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "version_compare"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "version"
+      ],
+      "id": "version-003",
+      "notes": "Non-strict comparison.",
+      "prompt": "Compare these two loose version strings.",
+      "required_capabilities": [
+        "version comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "version_constraint_check"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "version"
+      ],
+      "id": "version-004",
+      "notes": "Multi-clause range.",
+      "prompt": "Does 2.0.0 satisfy >=1.0.0,<2.0.0?",
+      "required_capabilities": [
+        "constraint satisfaction"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "version_compare"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "version"
+      ],
+      "id": "version-005",
+      "notes": "Numeric-part ordering trap (10 > 9).",
+      "prompt": "Which of 1.10.0 vs 1.9.0 is newer?",
+      "required_capabilities": [
+        "version comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "pyproject_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_toml"
+      ],
+      "domains": [
+        "manifest"
+      ],
+      "id": "manifest-001",
+      "notes": "Manifest semantics, not syntax.",
+      "prompt": "What are this project's dependencies in pyproject.toml?",
+      "required_capabilities": [
+        "manifest inspection"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "package_json_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_json"
+      ],
+      "domains": [
+        "manifest"
+      ],
+      "id": "manifest-002",
+      "notes": "Manifest semantics.",
+      "prompt": "List the scripts and engines from this package.json.",
+      "required_capabilities": [
+        "manifest inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "requirements_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "manifest"
+      ],
+      "id": "manifest-003",
+      "notes": "Line-level spec analysis.",
+      "prompt": "Parse this requirements.txt for pinned versus loose specs.",
+      "required_capabilities": [
+        "manifest inspection"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "go_mod_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "manifest"
+      ],
+      "id": "manifest-004",
+      "notes": "Module metadata.",
+      "prompt": "What module and Go version does this go.mod declare?",
+      "required_capabilities": [
+        "manifest inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "lockfile_summary"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "manifest"
+      ],
+      "id": "manifest-005",
+      "notes": "Shallow kind/count overview.",
+      "prompt": "What kind of lockfile is this, and how big is it?",
+      "required_capabilities": [
+        "lockfile summary"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "cargo_toml_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "validate_toml"
+      ],
+      "domains": [
+        "manifest"
+      ],
+      "id": "manifest-006",
+      "notes": "Dependency-form semantics.",
+      "prompt": "Inspect this Cargo.toml's dependency forms.",
+      "required_capabilities": [
+        "manifest inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "package_json_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "manifest"
+      ],
+      "id": "manifest-007",
+      "notes": "Workspace field.",
+      "prompt": "Does this package.json declare workspaces?",
+      "required_capabilities": [
+        "manifest inspection"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "list_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "pyproject_inspect",
+        "requirements_inspect"
+      ],
+      "domains": [
+        "manifest",
+        "list"
+      ],
+      "id": "manifest-008",
+      "notes": "Cross-file dependency-set comparison.",
+      "prompt": "Compare the pyproject versus requirements dependency sets.",
+      "required_capabilities": [
+        "list comparison"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "codec_convert"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "encoding"
+      ],
+      "id": "encoding-001",
+      "notes": "Text codec decoding.",
+      "prompt": "Decode this base64 blob.",
+      "required_capabilities": [
+        "codec conversion"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "codec_convert"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "encoding"
+      ],
+      "id": "encoding-002",
+      "notes": "Text codec encoding.",
+      "prompt": "Hex-encode this token.",
+      "required_capabilities": [
+        "codec conversion"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "radix_convert"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "encoding"
+      ],
+      "id": "encoding-003",
+      "notes": "Integer base conversion, not text codecs.",
+      "prompt": "Convert 0xFF00 to decimal and binary.",
+      "required_capabilities": [
+        "radix conversion"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "radix_convert"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "encoding"
+      ],
+      "id": "encoding-004",
+      "notes": "Small-integer bases.",
+      "prompt": "What is 255 in base 16 and base 2?",
+      "required_capabilities": [
+        "radix conversion"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "ip_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "network"
+      ],
+      "id": "network-001",
+      "notes": "Single-address validity.",
+      "prompt": "Is 192.168.1.300 a valid IP address?",
+      "required_capabilities": [
+        "IP inspection"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "cidr_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "ip_inspect"
+      ],
+      "domains": [
+        "network"
+      ],
+      "id": "network-002",
+      "notes": "Range bounds and exact address count.",
+      "prompt": "What range does 10.0.0.0/22 cover, and how many addresses is that?",
+      "required_capabilities": [
+        "CIDR inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "ip_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "network"
+      ],
+      "id": "network-003",
+      "notes": "Mapped-address detail.",
+      "prompt": "Is ::ffff:192.0.2.1 an IPv4-mapped IPv6 address?",
+      "required_capabilities": [
+        "IP inspection"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "cidr_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "network"
+      ],
+      "id": "network-004",
+      "notes": "Same-family containment.",
+      "prompt": "Does 192.168.1.50 fall inside 192.168.1.0/24?",
+      "required_capabilities": [
+        "CIDR containment"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "datetime_convert"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "temporal"
+      ],
+      "id": "temporal-001",
+      "notes": "Timestamp conversion.",
+      "prompt": "Convert 2026-09-10T12:00:00Z to Unix seconds.",
+      "required_capabilities": [
+        "datetime conversion"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "cron_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "temporal"
+      ],
+      "id": "temporal-002",
+      "notes": "Schedule runs.",
+      "prompt": "What do the next runs of '0 9 * * MON' look like?",
+      "required_capabilities": [
+        "cron inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "datetime_convert"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "temporal"
+      ],
+      "id": "temporal-003",
+      "notes": "Fixed-offset parsing; no DST database.",
+      "prompt": "Parse this RFC3339 timestamp with a +05:30 offset.",
+      "required_capabilities": [
+        "datetime conversion"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "cron_inspect"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "temporal"
+      ],
+      "id": "temporal-004",
+      "notes": "Satisfiability plus run listing.",
+      "prompt": "Is '*/15 9-17 * * 1-5' satisfiable, and when does it fire?",
+      "required_capabilities": [
+        "cron inspection"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "markdown_structure"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "markdown"
+      ],
+      "id": "markdown-001",
+      "notes": "Document outline.",
+      "prompt": "Outline the headings and frontmatter of this doc.",
+      "required_capabilities": [
+        "markdown structure"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "code_fence_extract"
+      ],
+      "acceptable_supporting_tools": [
+        "markdown_structure"
+      ],
+      "domains": [
+        "markdown"
+      ],
+      "id": "markdown-002",
+      "notes": "Code-block extraction with language filter.",
+      "prompt": "Extract all Python code blocks from this markdown.",
+      "required_capabilities": [
+        "code fence extraction"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "markdown_link_check_lexical"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "markdown"
+      ],
+      "id": "markdown-003",
+      "notes": "Lexical only; no network.",
+      "prompt": "Are there broken or malformed links in this README?",
+      "required_capabilities": [
+        "markdown link check"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "code_fence_extract"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "markdown"
+      ],
+      "id": "markdown-004",
+      "notes": "Fence inventory.",
+      "prompt": "List the fenced code blocks and their languages.",
+      "required_capabilities": [
+        "code fence extraction"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "repo_file_inventory"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "repo"
+      ],
+      "id": "repo-001",
+      "notes": "Ecosystem signals from a file listing.",
+      "prompt": "What languages and ecosystems are in this file listing?",
+      "required_capabilities": [
+        "repo inventory"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "repo_file_inventory"
+      ],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "repo"
+      ],
+      "id": "repo-002",
+      "notes": "Generated/vendor classification.",
+      "prompt": "Flag generated and vendor files in this inventory.",
+      "required_capabilities": [
+        "repo inventory"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "general"
+      ],
+      "id": "ambig-001",
+      "notes": "Pure chat; no deterministic tool applies.",
+      "prompt": "Tell me a joke about databases.",
+      "required_capabilities": [
+        "no tool needed"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "general"
+      ],
+      "id": "ambig-002",
+      "notes": "Open-ended writing task; no tool call is correct.",
+      "prompt": "Summarize this paragraph in French.",
+      "required_capabilities": [
+        "no tool needed"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "general"
+      ],
+      "id": "ambig-003",
+      "notes": "Creative task; tools add nothing.",
+      "prompt": "Write a haiku about code review.",
+      "required_capabilities": [
+        "no tool needed"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [],
+      "acceptable_supporting_tools": [],
+      "domains": [
+        "general"
+      ],
+      "id": "ambig-004",
+      "notes": "Approval question without artifacts; the correct behavior is a clarifying question, not a tool call.",
+      "prompt": "Should I approve this edit?",
+      "required_capabilities": [
+        "no tool needed"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_security_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "text_inspect"
+      ],
+      "domains": [
+        "general",
+        "text"
+      ],
+      "id": "ambig-005",
+      "notes": "Vague safety prompt with text attached; the general composite beats primitives.",
+      "prompt": "Something looks off in this pasted text. Can you check it?",
+      "required_capabilities": [
+        "text safety verdict"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "edit_preflight"
+      ],
+      "acceptable_supporting_tools": [
+        "config_preflight",
+        "patch_apply_check"
+      ],
+      "domains": [
+        "general",
+        "patch"
+      ],
+      "id": "ambig-006",
+      "notes": "Vague pre-merge prompt; composite front doors preferred over guessing primitives.",
+      "prompt": "Validate everything before we merge this change.",
+      "required_capabilities": [
+        "edit approval verdict"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "edit_preflight"
+      ],
+      "acceptable_supporting_tools": [
+        "patch_apply_check",
+        "patch_summary",
+        "text_replace_check"
+      ],
+      "domains": [
+        "patch",
+        "multi_step"
+      ],
+      "id": "multi-001",
+      "notes": "One composite replaces the primitive chain.",
+      "prompt": "Validate this patch, tell me if it applies, and summarize what it does.",
+      "required_capabilities": [
+        "edit approval verdict"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "command_preflight"
+      ],
+      "acceptable_supporting_tools": [
+        "regex_safety_check",
+        "shell_split"
+      ],
+      "domains": [
+        "shell",
+        "multi_step"
+      ],
+      "id": "multi-002",
+      "notes": "One composite covers command plus embedded patterns.",
+      "prompt": "Check this shell command and the regex filters inside it.",
+      "required_capabilities": [
+        "command approval verdict"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "structured_data_compare"
+      ],
+      "acceptable_supporting_tools": [
+        "json_canonicalize",
+        "json_compare",
+        "json_shape"
+      ],
+      "domains": [
+        "json",
+        "multi_step"
+      ],
+      "id": "multi-003",
+      "notes": "Composite verdict across compare/canonicalize/shape.",
+      "prompt": "Compare expected versus actual JSON output, including shape, and give a verdict.",
+      "required_capabilities": [
+        "structured comparison"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "text_security_inspect"
+      ],
+      "acceptable_supporting_tools": [
+        "canonicalize_text",
+        "prompt_input_inspect",
+        "text_inspect",
+        "unicode_policy_check"
+      ],
+      "domains": [
+        "unicode",
+        "multi_step"
+      ],
+      "id": "multi-004",
+      "notes": "Composite hygiene verdict replaces four primitive calls.",
+      "prompt": "Screen this user input: hidden characters, policy compliance, and canonical form.",
+      "required_capabilities": [
+        "text safety verdict"
+      ],
+      "split": "held_out"
+    },
+    {
+      "acceptable_primary_tools": [
+        "unified_diff_validate"
+      ],
+      "acceptable_supporting_tools": [
+        "diff_hunk_ranges",
+        "diff_touched_paths"
+      ],
+      "domains": [
+        "patch",
+        "multi_step"
+      ],
+      "id": "multi-005",
+      "notes": "Report needs three distinct specialist outputs; a composite would collapse them.",
+      "prompt": "Validate this diff's syntax, then list hunks per file and touched paths separately for the report.",
+      "required_capabilities": [
+        "diff syntax validation"
+      ],
+      "split": "development"
+    },
+    {
+      "acceptable_primary_tools": [
+        "regex_finditer"
+      ],
+      "acceptable_supporting_tools": [
+        "text_position",
+        "text_window"
+      ],
+      "domains": [
+        "regex",
+        "multi_step"
+      ],
+      "id": "multi-006",
+      "notes": "Positions plus context require distinct specialist outputs.",
+      "prompt": "Give me the exact byte offsets, line/column positions, and surrounding context for every match.",
+      "required_capabilities": [
+        "regex search with positions"
+      ],
+      "split": "held_out"
+    }
+  ]
+}

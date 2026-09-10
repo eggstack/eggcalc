@@ -15,9 +15,11 @@ import logging
 import math
 import multiprocessing
 import os
+import re
 import sys
 import threading
 import time
+import unicodedata
 import warnings
 import weakref
 from collections import deque
@@ -27,7 +29,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass as _dataclass
 from dataclasses import field as _field
 from types import MappingProxyType
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 from .. import __version__
 from .. import evaluator as _evaluator
@@ -35,6 +37,9 @@ from ..capabilities import detect_capabilities
 from .schemas import (
     PROFILE_NAMES,
     SCHEMA_DETAIL_FULL,
+    SELECTION_KEYWORD_MAX_LENGTH,
+    SELECTION_KEYWORDS_MAX_COUNT,
+    SELECTION_SUMMARY_MAX_LENGTH,
     TOOL_METADATA,
     TOOL_PROFILES,
     TOOL_SCHEMAS,
@@ -749,6 +754,187 @@ def thaw_owned(value: Any) -> Any:
     return value
 
 
+class ToolMatch(TypedDict):
+    """Deterministic lexical match for harness-side tool discovery (Plan 041).
+
+    Returned by :meth:`ToolRegistry.search_tools`. Carries ranking evidence
+    (``score``/``matched_on``) but never full input/output schemas — the
+    harness loads those via the registry or ``tools/list(names=[...])`` only
+    for shortlisted names. Discovery never changes call authorization.
+    """
+
+    name: str
+    score: int
+    category: str
+    selection_summary: str
+    matched_on: list[str]
+
+
+#: Maximum query text examined by ToolRegistry.search_tools (Plan 041: 2-4 KiB).
+MAX_SEARCH_QUERY_LENGTH = 4096
+#: Minimum/maximum result counts accepted by ToolRegistry.search_tools.
+MIN_SEARCH_LIMIT = 1
+MAX_SEARCH_LIMIT = 20
+
+#: Integer ranking weights for deterministic lexical discovery (Plan 041
+#: Workstream D). Higher evidence tiers strictly outrank lower ones so exact
+#: name/alias lookups always beat weak description overlap. The exact-match
+#: weights sit above the stacking ceiling of all lower tiers combined
+#: (60 + 45 + 20 + 40 + 10 + 10 = 185), so an exact lookup can never lose
+#: to accumulated weak overlap.
+_SEARCH_WEIGHT_NAME_EXACT = 300
+_SEARCH_WEIGHT_ALIAS_EXACT = 250
+_SEARCH_WEIGHT_NAME_TOKEN = 60
+_SEARCH_WEIGHT_NAME_PREFIX = 50
+_SEARCH_WEIGHT_KEYWORD_PHRASE = 45
+_SEARCH_WEIGHT_KEYWORD_TOKEN = 15
+_SEARCH_WEIGHT_KEYWORD_TOKEN_CAP = 45
+_SEARCH_WEIGHT_CATEGORY = 20
+_SEARCH_WEIGHT_SUMMARY_TOKEN = 8
+_SEARCH_WEIGHT_SUMMARY_TOKEN_CAP = 40
+_SEARCH_WEIGHT_DESCRIPTION_TOKEN = 2
+_SEARCH_WEIGHT_DESCRIPTION_TOKEN_CAP = 10
+_SEARCH_WEIGHT_TAG_TOKEN = 2
+_SEARCH_WEIGHT_TAG_TOKEN_CAP = 10
+
+
+def _normalize_search_text(text: str) -> str:
+    """NFKC-normalize and casefold search text (stdlib only, bounded)."""
+    return unicodedata.normalize("NFKC", text).casefold()
+
+
+def _tokenize_search_text(text: str) -> list[str]:
+    """Split normalized text into alphanumeric tokens.
+
+    Tokenizes on whitespace, punctuation, and underscore/hyphen boundaries
+    so ``patch_apply_check``, ``patch-apply-check``, and ``patch apply
+    check`` all produce the same token stream. Single-character tokens
+    (stray digits, articles) are dropped as noise.
+    """
+    return [tok for tok in re.findall(r"[a-z0-9]+", _normalize_search_text(text)) if len(tok) >= 2]
+
+
+def _score_search_tool(
+    query: str,
+    query_tokens: list[str],
+    query_token_set: set[str],
+    name: str,
+    meta: Mapping[str, Any],
+    description: str,
+) -> tuple[int, list[str]]:
+    """Score one catalog tool against a normalized query.
+
+    Returns ``(score, matched_on)`` with integer weights and evidence
+    strings. Score 0 means no evidence matched.
+    """
+    score = 0
+    matched_on: list[str] = []
+    normalized_query = _normalize_search_text(query).strip()
+
+    name_tokens = name.casefold().replace("-", "_").split("_")
+    name_token_set = set(name_tokens)
+
+    # 1. Exact tool-name match (separator-insensitive).
+    name_flat = _normalize_search_text(name).replace("_", "").replace("-", "")
+    query_flat = re.sub(r"[^a-z0-9]", "", normalized_query)
+    if query_flat and query_flat == name_flat:
+        score += _SEARCH_WEIGHT_NAME_EXACT
+        matched_on.append("name:exact")
+        return score, matched_on
+
+    # 2. Exact alias match.
+    aliases = meta.get("aliases", []) or []
+    for alias in aliases:
+        if not isinstance(alias, str):
+            continue
+        alias_flat = re.sub(r"[^a-z0-9]", "", _normalize_search_text(alias))
+        if query_flat and query_flat == alias_flat:
+            score += _SEARCH_WEIGHT_ALIAS_EXACT
+            matched_on.append(f"alias:{alias}")
+            return score, matched_on
+
+    # 3. Tool-name token/prefix match.
+    token_hits = query_token_set & name_token_set
+    if token_hits:
+        score += _SEARCH_WEIGHT_NAME_TOKEN
+        matched_on.append(f"name-token:{sorted(token_hits)[0]}")
+    else:
+        for qtok in query_token_set:
+            if len(qtok) < 3:
+                continue
+            for ntok in name_token_set:
+                if ntok.startswith(qtok) or qtok.startswith(ntok):
+                    score += _SEARCH_WEIGHT_NAME_PREFIX
+                    matched_on.append(f"name-prefix:{qtok}")
+                    break
+            else:
+                continue
+            break
+
+    # 4. Keyword phrase/token match (authored discovery synonyms).
+    keywords = meta.get("keywords", []) or []
+    phrase_hit = False
+    for keyword in keywords:
+        if not isinstance(keyword, str) or not keyword:
+            continue
+        norm_kw = _normalize_search_text(keyword).strip()
+        if norm_kw and norm_kw in normalized_query:
+            score += _SEARCH_WEIGHT_KEYWORD_PHRASE
+            matched_on.append(f"keyword:{keyword}")
+            phrase_hit = True
+            break
+    if not phrase_hit:
+        kw_token_hits = 0
+        for keyword in keywords:
+            if not isinstance(keyword, str):
+                continue
+            for ktok in _tokenize_search_text(keyword):
+                if ktok in query_token_set:
+                    kw_token_hits += 1
+        if kw_token_hits:
+            capped = min(
+                kw_token_hits * _SEARCH_WEIGHT_KEYWORD_TOKEN, _SEARCH_WEIGHT_KEYWORD_TOKEN_CAP
+            )
+            score += capped
+            matched_on.append(f"keyword-tokens:+{kw_token_hits}")
+
+    # 5. Category match.
+    category = str(meta.get("category", ""))
+    if category:
+        cat_tokens = set(_tokenize_search_text(category))
+        if query_token_set & cat_tokens:
+            score += _SEARCH_WEIGHT_CATEGORY
+            matched_on.append(f"category:{category}")
+
+    # 6. Selection-summary token overlap (authored selection signal).
+    summary = str(meta.get("selection_summary", ""))
+    if summary:
+        overlap = len(query_token_set & set(_tokenize_search_text(summary)))
+        if overlap:
+            score += min(overlap * _SEARCH_WEIGHT_SUMMARY_TOKEN, _SEARCH_WEIGHT_SUMMARY_TOKEN_CAP)
+            matched_on.append(f"summary:+{overlap}")
+
+    # 7. Full description/tags as low-weight fallback.
+    if description:
+        overlap = len(query_token_set & set(_tokenize_search_text(description)))
+        if overlap:
+            score += min(
+                overlap * _SEARCH_WEIGHT_DESCRIPTION_TOKEN,
+                _SEARCH_WEIGHT_DESCRIPTION_TOKEN_CAP,
+            )
+            matched_on.append(f"description:+{overlap}")
+    tags = meta.get("tags", []) or []
+    tag_overlap = 0
+    for tag in tags:
+        if isinstance(tag, str):
+            tag_overlap += len(query_token_set & set(_tokenize_search_text(tag)))
+    if tag_overlap:
+        score += min(tag_overlap * _SEARCH_WEIGHT_TAG_TOKEN, _SEARCH_WEIGHT_TAG_TOKEN_CAP)
+        matched_on.append(f"tags:+{tag_overlap}")
+
+    return score, matched_on
+
+
 class ToolRegistry:
     """Explicit ownership of tool definitions.
 
@@ -885,6 +1071,26 @@ class ToolRegistry:
                 tags = meta.get("tags")
                 if not isinstance(tags, (list, tuple)) or not all(isinstance(t, str) for t in tags):
                     raise ValueError(f"Tool {name!r} has invalid tags: must be list[str]")
+            if "selection_summary" in meta:
+                summary = meta.get("selection_summary")
+                if not isinstance(summary, str) or not summary:
+                    raise ValueError(f"Tool {name!r} has missing/empty selection_summary")
+                if len(summary) > SELECTION_SUMMARY_MAX_LENGTH:
+                    raise ValueError(
+                        f"Tool {name!r} selection_summary exceeds "
+                        f"{SELECTION_SUMMARY_MAX_LENGTH} chars"
+                    )
+            if "keywords" in meta:
+                keywords = meta.get("keywords")
+                if not isinstance(keywords, (list, tuple)) or not all(
+                    isinstance(k, str) for k in keywords
+                ):
+                    raise ValueError(f"Tool {name!r} has invalid keywords: must be list[str]")
+                if len(keywords) > SELECTION_KEYWORDS_MAX_COUNT:
+                    raise ValueError(f"Tool {name!r} has too many keywords")
+                for keyword in keywords:
+                    if not keyword or len(keyword) > SELECTION_KEYWORD_MAX_LENGTH:
+                        raise ValueError(f"Tool {name!r} has invalid keyword {keyword!r}")
             if "tier" in meta and meta.get("tier") not in self._VALID_TIERS:
                 raise ValueError(f"Tool {name!r} has invalid tier {meta.get('tier')!r}")
             if "category" in meta and meta.get("category") not in self._VALID_CATEGORIES:
@@ -1028,6 +1234,84 @@ class ToolRegistry:
     def find_close_match(self, name: str) -> str | None:
         """Find a case-insensitive close match for a tool name."""
         return _find_close_match(name, self._handlers)
+
+    def search_tools(
+        self,
+        query: str,
+        *,
+        profile: str = "full",
+        limit: int = 5,
+    ) -> list[ToolMatch]:
+        """Rank catalog tools against natural-language task text (Plan 041).
+
+        Deterministic stdlib-only lexical ranking over the fixed catalog —
+        no embeddings, no network, no model. Intended for aware harnesses
+        (e.g. codegg) implementing progressive disclosure: start from a
+        small core profile, search with the user task text, then load full
+        definitions for the shortlisted names via the registry or
+        ``tools/list(names=[...])``.
+
+        Scoring evidence tiers (highest first): exact tool-name match,
+        exact alias match, tool-name token/prefix match, keyword
+        phrase/token match, category match, selection-summary token
+        overlap, full description/tags fallback. Ties break by canonical
+        tool name, so results are identical across runs and processes.
+
+        The query is truncated to ``MAX_SEARCH_QUERY_LENGTH`` chars and
+        ``limit`` is clamped to ``MIN_SEARCH_LIMIT..MAX_SEARCH_LIMIT``.
+        Only tools visible under ``profile`` are ranked; search results
+        never make a tool callable outside the configured profile —
+        discovery and call authorization stay separate. Tools scoring
+        zero are omitted, so an unrelated query returns ``[]``.
+        """
+        if not isinstance(query, str):
+            raise ValueError(f"search query must be str, got {type(query).__name__}")
+        if not isinstance(limit, int) or isinstance(limit, bool):
+            raise ValueError(f"search limit must be int, got {limit!r}")
+        if limit < MIN_SEARCH_LIMIT or limit > MAX_SEARCH_LIMIT:
+            raise ValueError(
+                f"search limit must be {MIN_SEARCH_LIMIT}..{MAX_SEARCH_LIMIT}, " f"got {limit!r}"
+            )
+        candidates = self.get_profile_tools(profile)
+        truncated = query[:MAX_SEARCH_QUERY_LENGTH]
+        if not truncated.strip():
+            return []
+        query_tokens = _tokenize_search_text(truncated)
+        if not query_tokens:
+            return []
+        query_token_set = set(query_tokens)
+
+        scored: list[tuple[int, str, ToolMatch]] = []
+        for name in candidates:
+            meta = self._metadata.get(name, {})
+            schema = self._schemas.get(name, {})
+            description = ""
+            if isinstance(schema, Mapping):
+                raw_desc = schema.get("description", "")
+                if isinstance(raw_desc, str):
+                    description = raw_desc
+            score, matched_on = _score_search_tool(
+                truncated, query_tokens, query_token_set, name, meta, description
+            )
+            if score <= 0:
+                continue
+            category = meta.get("category", "")
+            summary = meta.get("selection_summary", "")
+            scored.append(
+                (
+                    score,
+                    name,
+                    ToolMatch(
+                        name=name,
+                        score=score,
+                        category=category if isinstance(category, str) else "",
+                        selection_summary=summary if isinstance(summary, str) else "",
+                        matched_on=matched_on,
+                    ),
+                )
+            )
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [match for _, _, match in scored[:limit]]
 
 
 class ReservationState(enum.Enum):
@@ -3305,14 +3589,30 @@ def _handle_list_tools(
         meta = metadata_src.get(name, {})
         annotations = get_tool_annotations(name)
         if use_compact:
-            entry = compact_schema(schema)
+            # Plan 041: compact descriptions carry the authored selection
+            # signal, not a truncation of the full description.
+            selection_summary = meta.get("selection_summary")
+            # thaw_owned: registry schemas are frozen (MappingProxyType);
+            # compact_schema passes some values (e.g. items) through by
+            # reference, so thaw before the entry reaches the JSON wire.
+            entry = thaw_owned(
+                compact_schema(
+                    schema,
+                    (
+                        selection_summary
+                        if isinstance(selection_summary, str) and selection_summary
+                        else None
+                    ),
+                )
+            )
             entry["name"] = name
             entry["category"] = meta.get("category")
             entry["llm_exposure"] = meta.get("llm_exposure")
             entry["cost"] = meta.get("cost")
             entry["annotations"] = annotations
         elif schema_detail == "normal":
-            entry = normal_schema(schema)
+            # See compact branch: thaw frozen registry values before wiring.
+            entry = thaw_owned(normal_schema(schema))
             entry["name"] = name
             entry["tier"] = meta.get("tier")
             entry["tags"] = list(meta.get("tags", []))

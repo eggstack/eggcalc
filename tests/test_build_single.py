@@ -246,6 +246,56 @@ print("OK")
         assert pkg.returncode == 0 and single.returncode == 0
         assert pkg.stdout == single.stdout
 
+    def test_agent_core_and_search_parity_with_package(self, single_file_path):
+        """Single-file registry search/profile output must match the package.
+
+        Plan 041: search is runtime API, so the generated file must rank
+        identically. Runs in a fresh subprocess: importing the build
+        in-process makes _get_process_context() pick fork, which is unsafe
+        inside the multi-threaded pytest process.
+        """
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path_str = str(single_file_path).replace("\\", "/")
+        script = f"""
+import importlib.util
+import sys
+
+sys.path.insert(0, {repo_root!r})
+spec = importlib.util.spec_from_file_location("eggcalc_single_041", r"{path_str}")
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+from eggcalc.mcp.server import ToolRegistry as PkgRegistry
+
+single_reg = module.ToolRegistry()
+pkg_reg = PkgRegistry()
+assert single_reg.tool_names == pkg_reg.tool_names
+assert module.TOOL_PROFILES["agent_core"] == PkgRegistry().get_profile_tools("agent_core")
+queries = [
+    "validate this unified diff patch before applying",
+    "convert 5 km to miles",
+    "compare two JSON documents ignoring key order",
+    "is this cron schedule going to run soon",
+    "math_eval",
+]
+for query in queries:
+    single_hits = [(t["name"], t["score"]) for t in single_reg.search_tools(query, limit=5)]
+    pkg_hits = [(t["name"], t["score"]) for t in pkg_reg.search_tools(query, limit=5)]
+    assert single_hits == pkg_hits, (query, single_hits, pkg_hits)
+print("OK")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert (
+            result.returncode == 0 and result.stdout.strip() == "OK"
+        ), f"Search parity failed: {result.stderr}"
+
     @pytest.mark.parametrize(
         "expr",
         [

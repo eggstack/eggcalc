@@ -8880,7 +8880,14 @@ class TestCompactSchemaMode:
         assert "type" in props["a"]
         assert "enum" in props["normalization"]
 
-    def test_compact_mode_truncates_descriptions(self):
+    def test_compact_mode_uses_selection_summaries(self):
+        # Plan 041: compact descriptions carry the authored selection signal
+        # (bounded by SELECTION_SUMMARY_MAX_LENGTH), not 120-char truncation.
+        from eggcalc.mcp.schemas import (
+            SELECTION_SUMMARY_MAX_LENGTH,
+            get_tool_selection_summary,
+        )
+
         response = handle_request(
             {
                 "jsonrpc": "2.0",
@@ -8890,9 +8897,14 @@ class TestCompactSchemaMode:
             }
         )
         tools = response["result"]["tools"]
+        assert len(tools) > 0
         for tool in tools:
             desc = tool.get("description", "")
-            assert len(desc) <= 120, f"Description too long in compact mode: {tool['name']}"
+            assert desc == get_tool_selection_summary(tool["name"]), (
+                f"Compact description for {tool['name']!r} must be its "
+                "authored selection_summary"
+            )
+            assert len(desc) <= SELECTION_SUMMARY_MAX_LENGTH
 
     def test_compact_mode_smaller_than_full(self):
         full_response = handle_request(
@@ -8911,16 +8923,18 @@ class TestCompactSchemaMode:
                 "params": {"schema_detail": "compact"},
             }
         )
-        # Compare per-tool: each compact tool should have shorter descriptions
-        # and stripped defaults compared to its full counterpart.
+        # Compare per-tool: each compact tool should carry the authored
+        # selection signal (Plan 041) and stripped defaults compared to
+        # its full counterpart.
         full_tools = {t["name"]: t for t in full_response["result"]["tools"]}
         compact_tools = {t["name"]: t for t in compact_response["result"]["tools"]}
         for name in compact_tools:
             if name not in full_tools:
                 continue
             ct = compact_tools[name]
-            # Descriptions should be <= 120 chars in compact
-            assert len(ct.get("description", "")) <= 120
+            # Descriptions are the authored selection signal, not truncation.
+            assert ct.get("description", ""), f"Missing compact description: {name}"
+            assert len(ct.get("description", "")) <= 240
             # Input schema should not have defaults
             for prop_def in ct.get("inputSchema", {}).get("properties", {}).values():
                 if isinstance(prop_def, dict):

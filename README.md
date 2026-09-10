@@ -123,6 +123,8 @@ calc --mcp
 
 **Programmatic multi-instance usage:** Each `McpServer` instance owns its own `McpServerConfig`, `ToolRegistry`, `ToolExecutor`, evaluator, and session set. Multiple servers in one process are fully isolated. See [docs/mcp.md](docs/mcp.md#programmatic-multi-instance-usage) for embedding examples.
 
+**Agent exposure:** general agents should start from the small `agent_core` profile (10 front-door tools) and discover specialists deterministically via `ToolRegistry.search_tools()` plus `tools/list(names=[...])` — see [docs/mcp.md](docs/mcp.md#progressive-disclosure-for-agents). `full` remains the default for backward compatibility. Exposure costs and the provider-neutral selection corpus live in `evals/mcp_tool_selection/` (`agent_core/compact` ≈ 11.7 KB vs `full/full` ≈ 118.4 KB).
+
 See [docs/tool_inventory.md](docs/tool_inventory.md) for the complete generated tool inventory. See [docs/mcp.md](docs/mcp.md) for protocol usage, configuration, profiles, schema detail, and selected tool examples.
 
 ### Runtime Capabilities

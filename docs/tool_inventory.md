@@ -268,6 +268,18 @@ Canonical reference for all MCP tools in the runtime catalog (`eggcalc.mcp.schem
 |----------|-------|
 | math | `constant_lookup`, `math_eval`, `unit_convert`, `unit_info` |
 
+### agent_core (10 tools)
+
+| Category | Tools |
+|----------|-------|
+| config | `config_preflight` |
+| math | `math_eval` |
+| patch | `edit_preflight` |
+| path | `path_normalize` |
+| shell | `command_preflight` |
+| text | `text_diff_explain`, `text_equal`, `text_replace_check`, `text_security_inspect` |
+| validation | `validate_json` |
+
 ## Schema Detail Levels
 
 | Level | Description |

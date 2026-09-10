@@ -1632,7 +1632,7 @@ The `EGGCALC_MCP_SCHEMA_DETAIL` environment variable controls the default schema
 |-------|----------|
 | `"full"` (default) | Complete schema with descriptions, examples, defaults, and verbose help |
 | `"normal"` | Truncated descriptions (240 chars), compact output schema, preserves input schema structure |
-| `"compact"` | Tool names, types, required fields, enums only. Drops descriptions and defaults for minimal context |
+| `"compact"` | Authored selection summary as the description (when should an agent choose this tool over its neighbors), plus types, required fields, and enums only. Drops defaults and nested detail for minimal context |
 
 ---
 
@@ -1655,6 +1655,16 @@ Core coding-agent tools (22 tools). Recommended for general-purpose coding agent
 **Tools:** `cargo_toml_inspect`, `command_preflight`, `config_preflight`, `edit_preflight`, `go_mod_inspect`, `identifier_inspect`, `llm_json_output_check`, `lockfile_summary`, `markdown_link_check_lexical`, `package_json_inspect`, `path_normalize`, `pyproject_inspect`, `requirements_inspect`, `structured_data_compare`, `text_diff_explain`, `text_equal`, `text_fingerprint`, `text_inspect`, `text_replace_check`, `text_security_inspect`, `validate_json`, `validate_toml`
 
 **Use when:** You want the standard set of tools for code editing, text inspection, diff analysis, path manipulation, JSON comparison, and TOML validation.
+
+### `agent_core`
+
+Minimal general-agent front doors (10 tools). Recommended initial surface for general agents, paired with lexical discovery (see Progressive disclosure below) for specialist tasks.
+
+**Tools:** `command_preflight`, `config_preflight`, `edit_preflight`, `math_eval`, `path_normalize`, `text_diff_explain`, `text_equal`, `text_replace_check`, `text_security_inspect`, `validate_json`
+
+**Use when:** You want the smallest high-value surface: math, edit/shell/config safety verdicts, text security and equality, diff explanation, replacement safety, path normalization, and JSON validation. At `compact` detail this is ~11.7 KB of tool definitions versus ~118.4 KB for `full/full` (90.1% reduction; see `evals/mcp_tool_selection/reports/baseline_2026_09_10.md`).
+
+The `full` profile remains the server default for backward compatibility; opt into `agent_core` explicitly with `EGGCALC_MCP_PROFILE=agent_core` or per-request `profile` in `tools/list`.
 
 ### `codegg_preflight`
 
@@ -1756,6 +1766,7 @@ A `profiles/list` request returns all available profile names, their tool lists,
       "default": {"tools": ["escape_text", "glob_match", ...], "tool_count": 26},
       "codegg_core_min": {"tools": ["command_preflight", ...], "tool_count": 6},
       "codegg_core": {"tools": ["cargo_toml_inspect", ...], "tool_count": 22},
+      "agent_core": {"tools": ["command_preflight", ...], "tool_count": 10},
       "codegg_preflight": {"tools": ["command_preflight", ...], "tool_count": 10},
       "codegg_patch": {"tools": ["diff_file_headers", ...], "tool_count": 12},
       "codegg_config": {"tools": ["config_preflight", ...], "tool_count": 17},
@@ -1767,6 +1778,56 @@ A `profiles/list` request returns all available profile names, their tool lists,
   }
 }
 ```
+
+---
+
+## Progressive disclosure for agents
+
+Ordinary MCP clients request `tools/list` once and place the returned
+definitions into model context, so the broad `full` profile imposes a
+large up-front decision/context surface. The recommended pattern is
+progressive disclosure — a small core plus deterministic specialist
+discovery — without deleting any capability:
+
+1. The host starts with `agent_core` tool definitions (10 front-door
+   tools, `compact` detail).
+2. The user task indicates a specialist capability may be needed.
+3. The host ranks the catalog with `ToolRegistry.search_tools()` using
+   the task/subtask text — a deterministic stdlib-only lexical ranker
+   (exact name/alias, name tokens, authored keywords, category,
+   selection-summary overlap, description/tags fallback; ties break by
+   tool name). No embeddings, no network, no model call.
+4. The host selects the top N relevant specialist names.
+5. The host loads only those full definitions via the registry or
+   `tools/list` with `names=[...]`.
+6. The model receives the core tools plus those specialists.
+7. Every `tools/call` still passes normal server profile/argument
+   validation — discovery never widens what is callable.
+
+```python
+from eggcalc.mcp.server import ToolRegistry
+
+registry = ToolRegistry()
+for match in registry.search_tools("validate this unified diff", limit=3):
+    print(match["name"], match["score"], match["matched_on"])
+# unified_diff_validate  ... ['name-token:diff', 'keyword:unified diff', ...]
+```
+
+Selection metadata backing this flow lives in the catalog authority
+(`TOOL_METADATA` in `eggcalc/mcp/schemas.py`): every tool carries an
+authored `selection_summary` (when to choose it over its neighbors; also
+used as the `compact` description) and a small `keywords` list of
+concepts users actually say. Bounds (`<=240` chars,
+`<=8` keywords of `<=48` chars) are enforced at import and in tests.
+
+This is a harness/library facility, not a claim of protocol-standard
+progressive discovery: the MCP working group is still designing that
+standard, and eggcalc will adapt this boundary onto it when it lands.
+Measure exposure costs with `python scripts/measure_mcp_tool_surface.py`;
+the provider-neutral evaluation corpus, interchange format, and scorer
+live in `evals/mcp_tool_selection/` (see its README). Held-out
+agent-evaluation evidence is still pending; until it lands, `full`
+remains the default and `agent_core` is opt-in.
 
 ---
 

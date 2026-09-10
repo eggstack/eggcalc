@@ -8,11 +8,28 @@ Guide agents on MCP server implementation and tool definitions.
 ### Tool Registration (Plan 040 authority model)
 Catalog authority is `TOOL_METADATA` in `schemas.py` (canonical name +
 `handler` locator + category/tier/tags/profiles/exposure/cost/stability/
-composite); protocol shape is `TOOL_SCHEMAS` (description/inputSchema/
-outputSchema/deprecated only). `TOOL_HANDLERS` in `server.py` is derived
-via `_build_tool_handlers()` — never hand-edit the mapping. `TOOL_PROFILES`
-is derived via `_build_profiles()`. The JSON fixture is a compatibility
-snapshot, not a registry; `docs/tool_inventory.md` is generated.
+composite + `selection_summary`/`keywords`); protocol shape is `TOOL_SCHEMAS`
+(description/inputSchema/outputSchema/deprecated only). `TOOL_HANDLERS` in
+`server.py` is derived via `_build_tool_handlers()` — never hand-edit the
+mapping. `TOOL_PROFILES` is derived via `_build_profiles()`. The JSON fixture
+is a compatibility snapshot, not a registry; `docs/tool_inventory.md` is
+generated. Read selection metadata via `get_tool_selection_summary()` /
+`get_tool_keywords()`.
+
+### Discovery and Profiles (Plan 041)
+
+- 12 profiles; `agent_core` (10 front doors) is the recommended general-agent
+  surface (opt-in; `full` stays the default). Never silently remap profile names.
+- `ToolRegistry.search_tools(query, *, profile="full", limit=5)` ranks via
+  exact name (300) / alias (250) / name-token / keyword / category / summary /
+  description fallback with canonical-name tie-break. Returns `ToolMatch`
+  (no schemas, no authorization). Query truncates to 4096 chars; limit 1–20.
+- Compact `tools/list` descriptions are the authored `selection_summary`
+  (≤240 chars). Thaw compact/normal entries with `thaw_owned()` before
+  emission — frozen registry values crash JSON serialization.
+- Corpus + scorer: `evals/mcp_tool_selection/` (121 cases, dev/held_out
+  splits), `scripts/measure_mcp_tool_surface.py`,
+  `scripts/score_mcp_tool_selection.py`. Tune on `development` only.
 
 ### Response Conventions
 
@@ -62,9 +79,9 @@ Error messages should be sanitized to remove non-ASCII characters before returni
 ### Adding a New Tool
 1. Add protocol shape to `TOOL_SCHEMAS` in `schemas.py` (description/inputSchema/outputSchema only — no tier/tags)
 2. Add handler function in `tools.py` (deferred exact imports inside the function body)
-3. Add catalog entry to `TOOL_METADATA` in `schemas.py` (`handler` + category/tier/tags/profiles/exposure/cost/stability/composite)
+3. Add catalog entry to `TOOL_METADATA` in `schemas.py` (`handler` + category/tier/tags/profiles/exposure/cost/stability/composite + `selection_summary` ≤240 chars + `keywords` ≤8 items of ≤48 chars; add to `agent_core` only if it earns permanent context)
 4. Run `python scripts/generate_mcp_docs.py` and update the compatibility fixture intentionally (`tests/fixtures/mcp_tool_registry_expected.json`)
-5. Add test in `test_mcp_server.py` (and `test_tool_inventory.py` covers authority parity automatically)
+5. Add test in `test_mcp_server.py` (and `test_tool_inventory.py` covers authority parity automatically); reference the tool from `evals/mcp_tool_selection/cases.json` if it fills a selection gap
 
 ### Tool Function Signature
 ```python

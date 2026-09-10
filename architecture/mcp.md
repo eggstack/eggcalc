@@ -28,6 +28,7 @@ MCP server providing AI agent tool access to eggcalc's text analysis functions v
   - [Profile Selection](#profile-selection)
   - [Enforcement](#enforcement)
   - [Schema Detail](#schema-detail)
+  - [Progressive Disclosure (Plan 041)](#progressive-disclosure-plan-041)
 - [Usage](#usage)
 - [State Isolation (Release 5)](#state-isolation-release-5)
   - [McpServerConfig](#mcpserverconfig)
@@ -112,12 +113,15 @@ session = server.create_session()
 
 ### ToolRegistry
 
-Owns tool handlers, schemas, metadata, and profiles. Wraps the module-level `TOOL_HANDLERS`, `TOOL_SCHEMAS`, etc. Provides lookup by name, profile filtering, and close-match suggestions without relying on module globals. Internal state is deeply immutable after construction via `freeze_owned()` — nested dicts, lists, and profile lists are `MappingProxyType`/`tuple`/`frozenset` so callers cannot mutate the registry through constructor inputs or accessor return values. `tool_names` returns `tuple[str, ...]` (not `list`).
+Owns tool handlers, schemas, metadata, and profiles. Wraps the module-level `TOOL_HANDLERS`, `TOOL_SCHEMAS`, etc. Provides lookup by name, profile filtering, close-match suggestions, and deterministic lexical discovery (`search_tools()`, Plan 041) without relying on module globals. Internal state is deeply immutable after construction via `freeze_owned()` — nested dicts, lists, and profile lists are `MappingProxyType`/`tuple`/`frozenset` so callers cannot mutate the registry through constructor inputs or accessor return values. `tool_names` returns `tuple[str, ...]` (not `list`).
 
 Validates at construction time:
 - Duplicate handler names
 - Schemas/metadata without corresponding handlers
 - Unsupported `llm_exposure` values
+- Malformed `selection_summary`/`keywords` (when present; the canonical
+  catalog is strictly validated at import by
+  `schemas._validate_catalog_metadata()`)
 - Empty profile names
 - Profiles referencing unknown tools
 
@@ -182,9 +186,13 @@ Two authorities, different concerns (see `authority_inventory.md`):
 
 - `TOOL_METADATA` — catalog/selection authority: canonical name, `handler`
   locator (attribute in `mcp/tools.py`), category/tier/tags/profiles/aliases/
-  exposure/harness/cost/stability/composite. Validated at import by
+  exposure/harness/cost/stability/composite, plus Plan 041 selection fields:
+  `selection_summary` (authored "choose this over neighbors" signal,
+  `<= SELECTION_SUMMARY_MAX_LENGTH` chars) and `keywords` (authored discovery
+  synonyms, `<= SELECTION_KEYWORDS_MAX_COUNT` items of
+  `<= SELECTION_KEYWORD_MAX_LENGTH` chars). Validated at import by
   `_validate_catalog_metadata()`; read via `get_tool_tier()`/`get_tool_tags()`/
-  `get_tool_handler_name()`.
+  `get_tool_handler_name()`/`get_tool_selection_summary()`/`get_tool_keywords()`.
 - `TOOL_SCHEMAS` — protocol-schema authority only:
   description/inputSchema/outputSchema/deprecated. No authored tier/tags copies.
 
@@ -663,12 +671,12 @@ Profiles are named subsets of tools that control which tools are available via `
 
 ### Data Structures
 
-**`TOOL_METADATA`** (schemas.py:4202–5131): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile.
+**`TOOL_METADATA`** (schemas.py): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile. `agent_core` (10 front-door tools) is the recommended general-agent exposure; `full` remains the default.
 
-**`TOOL_PROFILES`** (schemas.py:5152): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
+**`TOOL_PROFILES`** (schemas.py): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
 
-**`PROFILE_NAMES`** (schemas.py:5155–5168): Canonical list of all 11 profile names:
-`full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
+**`PROFILE_NAMES`** (schemas.py): Canonical list of all 12 profile names:
+`full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`, `agent_core`.
 
 ### Profile Selection
 
@@ -694,7 +702,36 @@ Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it d
 
 - **`full`**: Raw schemas with all fields
 - **`normal`**: Truncated descriptions (240 chars), compact output schema (`normal_schema()`). Input properties truncated to 120 chars. Includes tier, tags, category, llm_exposure, cost.
-- **`compact`**: Types and required fields only (`compact_schema()`). Descriptions truncated to 120 chars (tool) / 80 chars (properties). Includes category, llm_exposure, cost.
+- **`compact`**: Types and required fields only (`compact_schema()`). Descriptions are the authored `selection_summary` (Plan 041 selection signal, not truncation); input properties truncated to 80 chars. Includes category, llm_exposure, cost.
+
+### Progressive Disclosure (Plan 041)
+
+`ToolRegistry.search_tools(query, *, profile="full", limit=5) -> list[ToolMatch]`
+is the harness-side discovery primitive: a deterministic stdlib-only
+lexical ranker (NFKC + casefold normalization, alphanumeric tokenization,
+integer weights, canonical-name tie-break) over the fixed catalog. Evidence
+tiers: exact tool-name match (300), exact alias match (250), name
+token/prefix match, keyword phrase/token match, category match,
+selection-summary token overlap, description/tags fallback. Queries truncate
+to `MAX_SEARCH_QUERY_LENGTH` (4096) chars; `limit` is bounded to 1–20;
+zero-score tools are omitted.
+
+`ToolMatch` carries `name`/`score`/`category`/`selection_summary`/
+`matched_on` — never full schemas. Search defaults to the `full` callable
+catalog and accepts a `profile` restriction; results never widen call
+authorization (enforced separately by profile filtering in `tools/list` and
+`tools/call`). Wire compact entries are `thaw_owned()` before emission so
+frozen registry values never reach JSON serialization.
+
+Intended aware-harness flow: start from `agent_core` definitions → search
+with task text → load full definitions for shortlisted names via the
+registry or `tools/list(names=[...])` → call under normal validation.
+Deterministic cost evidence lives in
+`evals/mcp_tool_selection/reports/baseline_2026_09_10.md`
+(`agent_core/compact` ≈ 11.7 KB vs `full/full` ≈ 118.4 KB, −90.1%);
+provider-neutral rollout scoring via
+`scripts/score_mcp_tool_selection.py`. This is a harness/library facility
+pending a standardized MCP progressive-discovery primitive.
 
 ---
 

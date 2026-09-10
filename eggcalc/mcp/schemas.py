@@ -4083,6 +4083,15 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 #   tier        – 0 = ultra-common, 1 = default coding, 2 = contextual, 3 = specialized
 #   tags        – selection/discovery keywords (sole authored authority;
 #                 TOOL_SCHEMAS no longer carries tier/tags copies)
+#   selection_summary – one-line authored selection signal answering "when
+#                 should an agent choose this tool rather than a neighbor?"
+#                 (Plan 041; <= SELECTION_SUMMARY_MAX_LENGTH chars; used as
+#                 the compact description and search/ranking material, never
+#                 a truncation of the full description)
+#   keywords    – small authored synonym/concept list for lexical discovery
+#                 (Plan 041; <= SELECTION_KEYWORDS_MAX_COUNT items, each
+#                 <= SELECTION_KEYWORD_MAX_LENGTH chars; true alternate names
+#                 still belong in aliases)
 #   profiles    – named profiles that include this tool
 #   aliases     – alternative names (future use)
 #   llm_exposure – default | contextual | expert_only | harness_only | hidden
@@ -4104,7 +4113,20 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "math",
         "tier": 0,
         "tags": ["math", "evaluation", "arithmetic", "units", "constants"],
-        "profiles": ["full", "default", "human_math"],
+        "selection_summary": (
+            'Evaluate math, unit-conversion, and physical-constant expressions; use '
+            'unit_convert for one known unit pair or constant_lookup for constant '
+            'metadata.'
+        ),
+        "keywords": [
+            'calculate',
+            'arithmetic',
+            'unit conversion',
+            'expression',
+            'square root',
+            'percent',
+        ],
+        "profiles": ["full", "default", "human_math", "agent_core"],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["none"],
@@ -4117,7 +4139,12 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 0,
         "tags": ["text", "comparison", "equality", "unicode"],
-        "profiles": ["full", "default", "codegg_core"],
+        "selection_summary": (
+            'Test whether two strings are equal under normalization/casefold/trim '
+            'modes; use text_diff_explain to explain why they differ.'
+        ),
+        "keywords": ['compare strings', 'string equality'],
+        "profiles": ["full", "default", "codegg_core", "agent_core"],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["none"],
@@ -4130,6 +4157,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 0,
         "tags": ["text", "count", "character", "frequency"],
+        "selection_summary": (
+            'Count occurrences of a character or build a frequency table; use '
+            'text_measure for aggregate size metrics.'
+        ),
+        "keywords": ['count characters', 'frequency', 'character count'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4143,6 +4175,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 0,
         "tags": ["text", "measurement", "unicode", "metrics"],
+        "selection_summary": (
+            'Measure text size and shape (bytes, words, lines, normalization state); '
+            'use text_inspect for hidden-character security analysis.'
+        ),
+        "keywords": ['text length', 'word count', 'measure text'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4156,6 +4193,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 0,
         "tags": ["text", "hash", "fingerprint", "sha256", "identity", "canonicalization"],
+        "selection_summary": (
+            'Fingerprint text with canonicalization options for stable identity; use '
+            'text_hash for raw multi-algorithm hashes.'
+        ),
+        "keywords": ['fingerprint', 'identity hash', 'canonical hash'],
         "profiles": ["full", "default", "codegg_core", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4169,7 +4211,19 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "validation",
         "tier": 0,
         "tags": ["validation", "json", "structured-data"],
-        "profiles": ["full", "default", "codegg_core", "codegg_core_min", "codegg_config"],
+        "selection_summary": (
+            'Validate JSON syntax and report parse errors; use json_extract to read '
+            'values or json_compare to diff two documents.'
+        ),
+        "keywords": ['json valid', 'parse json', 'validate json'],
+        "profiles": [
+            "full",
+            "default",
+            "codegg_core",
+            "codegg_core_min",
+            "codegg_config",
+            "agent_core",
+        ],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["config_preflight"],
@@ -4182,7 +4236,12 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "path",
         "tier": 0,
         "tags": ["text", "path", "filesystem", "normalize"],
-        "profiles": ["full", "default", "codegg_core"],
+        "selection_summary": (
+            'Normalize one path (dot segments, separators); use path_compare to '
+            'compare two paths or path_analyze for components.'
+        ),
+        "keywords": ['normalize path', 'clean path'],
+        "profiles": ["full", "default", "codegg_core", "agent_core"],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["path_preflight"],
@@ -4196,7 +4255,12 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "diff", "comparison", "unicode"],
-        "profiles": ["full", "default", "codegg_core", "codegg_patch"],
+        "selection_summary": (
+            'Explain why two strings differ (spans, confusables, invisibles); use '
+            'text_equal for a boolean equality verdict.'
+        ),
+        "keywords": ['why different', 'string diff', 'diff explain'],
+        "profiles": ["full", "default", "codegg_core", "codegg_patch", "agent_core"],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["edit_preflight"],
@@ -4209,6 +4273,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "unicode", "inspection", "security"],
+        "selection_summary": (
+            'Inspect one string for hidden characters, confusables, and mixed '
+            'scripts; use text_security_inspect for a policy verdict across checks.'
+        ),
+        "keywords": ['hidden characters', 'confusable', 'inspect text', 'invisible'],
         "profiles": ["full", "default", "codegg_core", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4222,7 +4291,19 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "replace", "edit", "safety", "check"],
-        "profiles": ["full", "default", "codegg_core", "codegg_core_min", "codegg_patch"],
+        "selection_summary": (
+            'Check whether a text replacement would apply cleanly (match count, '
+            'ambiguity, preview); use edit_preflight for a full approval verdict.'
+        ),
+        "keywords": ['replace check', 'safe edit', 'find and replace', 'edit preview'],
+        "profiles": [
+            "full",
+            "default",
+            "codegg_core",
+            "codegg_core_min",
+            "codegg_patch",
+            "agent_core",
+        ],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["edit_preflight"],
@@ -4235,6 +4316,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "line", "range", "extract", "offset"],
+        "selection_summary": (
+            'Extract exact line ranges with stable offsets and fingerprints; use '
+            'line_range_compare to diff ranges.'
+        ),
+        "keywords": ['extract lines', 'line range', 'get lines'],
         "profiles": ["full", "default", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4248,6 +4334,12 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "json",
         "tier": 1,
         "tags": ["json", "structured-data", "comparison", "config"],
+        "selection_summary": (
+            'Semantically diff two JSON documents ignoring formatting; use '
+            'json_extract for one value or structured_data_compare for a multi-tool '
+            'verdict.'
+        ),
+        "keywords": ['compare json', 'json diff'],
         "profiles": ["full", "default", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4261,6 +4353,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "json",
         "tier": 1,
         "tags": ["json", "canonical", "hash", "deterministic", "format"],
+        "selection_summary": (
+            'Canonicalize JSON (sorted keys, stable hash, duplicate detection); use '
+            'json_compare to diff two docs.'
+        ),
+        "keywords": ['canonical json', 'sort keys', 'stable hash', 'normalize json'],
         "profiles": ["full", "default", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4274,6 +4371,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "json",
         "tier": 2,
         "tags": ["json", "pointer", "extraction", "query", "rfc6901"],
+        "selection_summary": (
+            'Deprecated RFC 6901 extractor; use json_extract for richer output with '
+            'available_keys and detail levels.'
+        ),
+        "keywords": ['json pointer (deprecated)'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4287,6 +4389,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "validation",
         "tier": 1,
         "tags": ["validation", "structured-data", "toml", "config", "rust", "python"],
+        "selection_summary": (
+            'Validate TOML syntax with error locations; use toml_shape for structure '
+            'or pyproject_inspect for manifest semantics.'
+        ),
+        "keywords": ['validate toml', 'toml parse'],
         "profiles": ["full", "default", "codegg_core", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4300,6 +4407,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "validation",
         "tier": 1,
         "tags": ["validation", "brackets", "delimiters"],
+        "selection_summary": (
+            'Check delimiter balance with unmatched positions; use validate_json or '
+            'validate_toml for format-aware validation.'
+        ),
+        "keywords": ['brackets', 'balanced', 'parentheses'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4313,6 +4425,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "regex",
         "tier": 1,
         "tags": ["text", "regex", "validation", "pattern"],
+        "selection_summary": (
+            'Test a regex against sample strings (match spans and groups); use '
+            'regex_safety_check for backtracking risk.'
+        ),
+        "keywords": ['test regex', 'regex match'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4326,6 +4443,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "regex",
         "tier": 1,
         "tags": ["text", "regex", "search", "find", "pattern"],
+        "selection_summary": (
+            'Find all regex matches with spans and groups; use validate_regex to test '
+            'a pattern against samples first.'
+        ),
+        "keywords": ['find regex', 'search pattern', 'regex matches'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4339,6 +4461,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "regex",
         "tier": 1,
         "tags": ["text", "regex", "safety", "security", "backtracking"],
+        "selection_summary": (
+            'Score a regex for catastrophic-backtracking risk; use validate_regex to '
+            'test what it matches.'
+        ),
+        "keywords": ['regex safe', 'backtracking', 'ReDoS', 'regex risk'],
         "profiles": ["full", "default", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4352,6 +4479,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "path",
         "tier": 1,
         "tags": ["text", "glob", "pattern", "path", "wildcard"],
+        "selection_summary": (
+            'Test a glob pattern against a path (*, **, ? semantics); use '
+            'regex_finditer for regex search.'
+        ),
+        "keywords": ['glob', 'wildcard', 'fnmatch', 'pattern match'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4365,6 +4497,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "identifier",
         "tier": 1,
         "tags": ["text", "identifier", "collision", "confusable", "security", "validation"],
+        "selection_summary": (
+            'Inspect one/few identifier strings; use identifier_table_inspect for '
+            'collision analysis across a table.'
+        ),
+        "keywords": ['identifier check', 'name collision', 'confusable name'],
         "profiles": ["full", "default", "codegg_core", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4378,6 +4515,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "escape", "encoding", "shell", "json", "regex"],
+        "selection_summary": (
+            'Escape text for json/python/rust/shell/regex/markdown/html/url output; '
+            'use unescape_text for the reverse.'
+        ),
+        "keywords": ['escape', 'quote', 'shell escape'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4391,6 +4533,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "escape", "encoding", "shell", "json", "regex"],
+        "selection_summary": (
+            'Decode escaped text (json/python/unicode/url); use escape_text to encode '
+            'for an output format.'
+        ),
+        "keywords": ['unescape', 'decode escapes', 'unquote'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4404,6 +4551,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "position", "context", "unicode", "window"],
+        "selection_summary": (
+            'Show a text window with context lines around a position; use '
+            'text_position for offset conversion.'
+        ),
+        "keywords": ['context lines', 'show around', 'text window'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4417,6 +4569,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "list",
         "tier": 1,
         "tags": ["list", "dedupe", "unique", "normalization"],
+        "selection_summary": (
+            'Remove duplicate list items preserving order; use list_sort to order or '
+            'list_compare to diff.'
+        ),
+        "keywords": ['dedupe', 'unique list', 'remove duplicates'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4430,6 +4587,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "list",
         "tier": 1,
         "tags": ["list", "sort", "order", "normalization"],
+        "selection_summary": (
+            'Sort string lists with normalization/casefold options; use list_dedupe '
+            'to drop duplicates first.'
+        ),
+        "keywords": ['sort list', 'order list'],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4444,6 +4606,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "math",
         "tier": 2,
         "tags": ["math", "units", "conversion"],
+        "selection_summary": (
+            'Convert one value between two known units; use math_eval for full '
+            'expressions mixing values and units.'
+        ),
+        "keywords": ['convert units', 'km to m', 'unit conversion'],
         "profiles": ["full", "human_math"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4457,6 +4624,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "math",
         "tier": 2,
         "tags": ["math", "units", "information"],
+        "selection_summary": (
+            "Look up a unit's canonical name and category; use unit_convert to "
+            'convert values between units.'
+        ),
+        "keywords": ['unit info', 'unit category', 'canonical unit'],
         "profiles": ["full", "human_math"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4470,6 +4642,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "math",
         "tier": 2,
         "tags": ["math", "constants", "physics", "lookup"],
+        "selection_summary": (
+            "Look up a physical constant's value and symbol; use math_eval to compute "
+            'expressions containing constants.'
+        ),
+        "keywords": ['physical constant', 'avogadro', 'planck', 'speed of light'],
         "profiles": ["full", "human_math"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4483,6 +4660,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "json",
         "tier": 2,
         "tags": ["json", "structured-data", "extraction", "config", "pointer"],
+        "selection_summary": (
+            'Extract one value via RFC 6901 pointer; use json_shape for '
+            'structure-only views or json_compare for whole-document diffs.'
+        ),
+        "keywords": ['json pointer', 'extract json', 'get json value'],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4496,6 +4678,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "list",
         "tier": 2,
         "tags": ["text", "list", "comparison", "set"],
+        "selection_summary": (
+            'Compare two string lists as ordered/set/multiset with missing/extra '
+            'deltas; use list_dedupe or list_sort to normalize one list.'
+        ),
+        "keywords": ['compare lists', 'list diff'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4509,6 +4696,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 2,
         "tags": ["text", "line", "range", "compare", "diff"],
+        "selection_summary": (
+            'Compare the same line range across two texts; use line_range_extract to '
+            'read one range.'
+        ),
+        "keywords": ['compare lines', 'diff lines'],
         "profiles": ["full", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4522,6 +4714,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "markdown",
         "tier": 2,
         "tags": ["markdown", "structure", "headings", "code-fences", "links", "frontmatter"],
+        "selection_summary": (
+            'Parse markdown headings/fences/links/comments/frontmatter lexically; use '
+            'code_fence_extract for code blocks only.'
+        ),
+        "keywords": ['markdown structure', 'headings', 'frontmatter'],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4535,6 +4732,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "markdown",
         "tier": 2,
         "tags": ["markdown", "code-fences", "extraction", "fingerprint"],
+        "selection_summary": (
+            'Extract fenced code blocks with line ranges and fingerprints; use '
+            'markdown_structure for full outline.'
+        ),
+        "keywords": ['code fence', 'extract code', 'code block'],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4548,6 +4750,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 2,
         "tags": ["patch", "diff", "unified", "validation", "apply"],
+        "selection_summary": (
+            'Dry-run apply a unified diff against in-memory files; use edit_preflight '
+            'for an approval verdict.'
+        ),
+        "keywords": ['apply patch', 'dry run patch', 'patch applicability'],
         "profiles": ["full", "codegg_preflight", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4561,6 +4768,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 2,
         "tags": ["patch", "diff", "unified", "summary", "statistics"],
+        "selection_summary": (
+            'Summarize a diff (files, hunks, +/- counts) without applying; use '
+            'patch_apply_check to test application.'
+        ),
+        "keywords": ['patch summary', 'diff stats', 'diffstat'],
         "profiles": ["full", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4574,6 +4786,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 2,
         "tags": ["patch", "diff", "unified", "classification", "files"],
+        "selection_summary": (
+            'List files touched by a diff (added/deleted/renamed/modified); use '
+            'patch_summary for counts.'
+        ),
+        "keywords": ['touched files', 'changed files', 'diff files'],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4587,6 +4804,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 2,
         "tags": ["patch", "diff", "unified", "hunks", "ranges"],
+        "selection_summary": (
+            'Extract per-file hunk line ranges from a diff; use diff_touched_paths '
+            'for file lists.'
+        ),
+        "keywords": ['hunk ranges', 'diff hunks', 'hunk lines'],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4600,6 +4822,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 2,
         "tags": ["patch", "diff", "unified", "headers", "metadata"],
+        "selection_summary": (
+            'Extract diff file-header metadata (git/index/mode/rename/binary); use '
+            'patch_summary for change counts.'
+        ),
+        "keywords": ['diff headers', 'git diff metadata', 'rename detect'],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4613,6 +4840,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 2,
         "tags": ["patch", "diff", "conflict", "markers", "merge"],
+        "selection_summary": (
+            'Detect merge-conflict markers and their balance/locations; use '
+            'unified_diff_validate for diff syntax.'
+        ),
+        "keywords": ['conflict markers', 'merge conflict', 'merge markers'],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4626,6 +4858,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 2,
         "tags": ["patch", "diff", "unified", "validation", "lint"],
+        "selection_summary": (
+            'Validate unified-diff syntax (hunks, counts, stray lines); use '
+            'patch_apply_check to test application.'
+        ),
+        "keywords": ['validate diff', 'unified diff', 'diff lint'],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4639,6 +4876,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "path",
         "tier": 2,
         "tags": ["text", "path", "filesystem", "lexical"],
+        "selection_summary": (
+            'Break a path into components, extension, and hidden/traversal signals; '
+            'use path_normalize to collapse it first.'
+        ),
+        "keywords": ['analyze path', 'path parts', 'extension'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4652,6 +4894,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "path",
         "tier": 2,
         "tags": ["text", "path", "filesystem", "comparison"],
+        "selection_summary": (
+            'Compare two paths under explicit normalization rules; use path_normalize '
+            'for single-path cleanup.'
+        ),
+        "keywords": ['compare paths', 'same path'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4665,6 +4912,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "path",
         "tier": 2,
         "tags": ["text", "path", "filesystem", "security", "scope"],
+        "selection_summary": (
+            'Check a target stays lexically inside a root (no symlink resolution); '
+            'use path_analyze for component detail.'
+        ),
+        "keywords": ['path traversal', 'inside root', 'scope check', 'sandbox'],
         "profiles": ["full", "codegg_preflight"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4678,6 +4930,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "shell",
         "tier": 2,
         "tags": ["shell", "argv", "parsing", "security", "sanity"],
+        "selection_summary": (
+            'Parse a shell command into argv tokens and flag risky operators; use '
+            'command_preflight for an approval verdict.'
+        ),
+        "keywords": ['parse shell', 'split command', 'argv'],
         "profiles": ["full", "codegg_preflight", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4691,6 +4948,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "shell",
         "tier": 2,
         "tags": ["shell", "argv", "quoting", "safety"],
+        "selection_summary": (
+            'Quote argv tokens into a safe shell string; use shell_split to parse or '
+            'argv_compare to compare.'
+        ),
+        "keywords": ['quote shell', 'join argv', 'shell quoting'],
         "profiles": ["full", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4704,6 +4966,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "shell",
         "tier": 2,
         "tags": ["shell", "argv", "comparison", "sanity"],
+        "selection_summary": (
+            'Compare two commands by parsed argv tokens, not raw text; use '
+            'shell_split to inspect one command.'
+        ),
+        "keywords": ['compare commands', 'argv diff'],
         "profiles": ["full", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4717,6 +4984,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "validation",
         "tier": 3,
         "tags": ["validation", "json", "schema", "structured-data"],
+        "selection_summary": (
+            'Validate JSON against a small structural schema; use validate_json for '
+            'syntax-only checks.'
+        ),
+        "keywords": ['json schema', 'validate structure', 'required fields'],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4730,6 +5002,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "toml",
         "tier": 2,
         "tags": ["toml", "structure", "shape", "config", "validation"],
+        "selection_summary": (
+            'Show TOML structure (keys, tables, nesting); use validate_toml for ' 'syntax errors.'
+        ),
+        "keywords": ['toml structure', 'toml shape'],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4743,6 +5019,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "version",
         "tier": 2,
         "tags": ["version", "semver", "comparison"],
+        "selection_summary": (
+            'Compare two concrete versions; use version_constraint_check for '
+            'range/constraint satisfaction.'
+        ),
+        "keywords": ['compare versions', 'semver', 'newer version'],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4756,6 +5037,12 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "unicode",
         "tier": 2,
         "tags": ["text", "unicode", "policy", "security", "validation"],
+        "selection_summary": (
+            'Apply a named Unicode safety policy '
+            '(identifier/filename/source/human/key/domain); use text_inspect for raw '
+            'finding detail.'
+        ),
+        "keywords": ['unicode policy', 'identifier strict', 'filename safe'],
         "profiles": ["full", "codegg_preflight", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4769,6 +5056,12 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "unicode",
         "tier": 2,
         "tags": ["text", "unicode", "canonicalization", "normalization", "identity"],
+        "selection_summary": (
+            'Canonicalize text under a named profile '
+            '(identifier/file/label/key/path); use text_transform for ad-hoc '
+            'operation lists.'
+        ),
+        "keywords": ['canonicalize', 'normalize profile', 'identifier compare'],
         "profiles": ["full", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4782,6 +5075,12 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 2,
         "tags": ["text", "security", "inspection", "prompt", "unicode", "hidden"],
+        "selection_summary": (
+            'Report observable prompt-text red flags (hidden chars, ANSI, '
+            'instruction-like lines); not an injection verdict — use '
+            'text_security_inspect for a verdict.'
+        ),
+        "keywords": ['prompt inspect', 'hidden prompt', 'injection screen'],
         "profiles": ["full", "codegg_unicode_security", "codegg_preflight"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4795,6 +5094,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 2,
         "tags": ["text", "hash", "identity", "security"],
+        "selection_summary": (
+            'Hash text (sha256/sha1/md5/crc32) for identity checks; use '
+            'text_fingerprint for canonicalized fingerprints.'
+        ),
+        "keywords": ['hash text', 'sha256', 'checksum'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4808,6 +5112,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 2,
         "tags": ["text", "position", "offset", "unicode", "lsp"],
+        "selection_summary": (
+            'Convert between byte/codepoint/line-column/UTF-16 offsets; use '
+            'text_window for surrounding context lines.'
+        ),
+        "keywords": ['offset', 'line column', 'codepoint', 'byte offset'],
         "profiles": ["full", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4821,6 +5130,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 2,
         "tags": ["text", "unicode", "transform", "normalization", "sanitation"],
+        "selection_summary": (
+            'Apply normalization/casefold/trim/newline transforms to text; use '
+            'canonicalize_text for a named canonicalization profile.'
+        ),
+        "keywords": ['normalize text', 'casefold', 'trim', 'transform text'],
         "profiles": ["full", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4834,6 +5148,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "config",
         "tier": 2,
         "tags": ["validation", "config", "env", "dotenv"],
+        "selection_summary": (
+            'Validate .env key=value text (keys, duplicates, quoting); use '
+            'config_preflight for auto-detected config formats.'
+        ),
+        "keywords": ['dotenv', 'env file', 'validate env'],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4847,6 +5166,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "config",
         "tier": 2,
         "tags": ["validation", "config", "ini"],
+        "selection_summary": (
+            'Validate INI text (sections, keys, duplicates); use config_preflight for '
+            'auto-detected config formats.'
+        ),
+        "keywords": ['ini file', 'validate ini', 'config'],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4861,6 +5185,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "identifier",
         "tier": 3,
         "tags": ["text", "identifier", "naming", "validation", "language"],
+        "selection_summary": (
+            "Classify one identifier's naming convention and language validity; use "
+            'identifier_table_inspect for collision analysis across many names.'
+        ),
+        "keywords": ['identifier', 'variable name', 'naming convention'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4874,6 +5203,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "identifier",
         "tier": 3,
         "tags": ["text", "identifier", "collision", "naming", "style", "reserved", "validation"],
+        "selection_summary": (
+            'Analyze a table of identifiers for collisions and style drift; use '
+            'identifier_inspect for one or few names.'
+        ),
+        "keywords": ['identifier table', 'collision analysis', 'naming audit'],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4887,6 +5221,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "json",
         "tier": 3,
         "tags": ["json", "structured-data", "shape", "schema"],
+        "selection_summary": (
+            'Show JSON structure (types/keys) without returning values; use '
+            'json_extract to read values.'
+        ),
+        "keywords": ['json structure', 'json shape', 'schema of json'],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4900,6 +5239,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 3,
         "tags": ["text", "truncation", "grapheme", "unicode"],
+        "selection_summary": (
+            'Truncate to N grapheme clusters without splitting emoji or combining '
+            'marks; use line_range_extract for line-based slicing.'
+        ),
+        "keywords": ['truncate', 'grapheme', 'shorten text'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4913,6 +5257,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "version",
         "tier": 3,
         "tags": ["version", "semver", "cargo", "constraint", "satisfiability"],
+        "selection_summary": (
+            'Test a version against a semver/cargo range constraint; use '
+            'version_compare for direct A-vs-B ordering.'
+        ),
+        "keywords": ['version range', 'constraint', 'caret', 'satisfies version'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4926,6 +5275,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "cargo",
         "tier": 3,
         "tags": ["rust", "cargo", "toml", "dependencies", "workspace", "inspection"],
+        "selection_summary": (
+            'Inspect Cargo.toml semantics (package, workspace, dependency forms); use '
+            'validate_toml for syntax-only checks.'
+        ),
+        "keywords": ['cargo.toml', 'rust manifest', 'cargo dependencies'],
         "profiles": ["full", "codegg_core", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4939,12 +5293,19 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 1,
         "tags": ["text", "unicode", "security", "composite", "prompt", "inspection"],
+        "selection_summary": (
+            'Composite text-hygiene verdict (allow/review/block) across '
+            'inspect/policy/canonicalize/prompt checks; use text_inspect for '
+            'single-string detail.'
+        ),
+        "keywords": ['text security', 'prompt safety', 'unicode verdict'],
         "profiles": [
             "full",
             "codegg_core",
             "codegg_core_min",
             "codegg_preflight",
             "codegg_unicode_security",
+            "agent_core",
         ],
         "aliases": [],
         "llm_exposure": "default",
@@ -4958,7 +5319,25 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "patch",
         "tier": 1,
         "tags": ["patch", "edit", "preflight", "composite", "text"],
-        "profiles": ["full", "codegg_core", "codegg_core_min", "codegg_preflight", "codegg_patch"],
+        "selection_summary": (
+            'Composite edit verdict (ok_to_apply) for a proposed text or patch edit; '
+            'use text_replace_check for one replacement or patch_apply_check for '
+            'dry-run apply.'
+        ),
+        "keywords": [
+            'edit check',
+            'safe to edit',
+            'preflight edit',
+            'apply patch safely',
+        ],
+        "profiles": [
+            "full",
+            "codegg_core",
+            "codegg_core_min",
+            "codegg_preflight",
+            "codegg_patch",
+            "agent_core",
+        ],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["edit_preflight"],
@@ -4971,7 +5350,25 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "shell",
         "tier": 1,
         "tags": ["shell", "command", "preflight", "composite", "security"],
-        "profiles": ["full", "codegg_core", "codegg_core_min", "codegg_preflight", "codegg_shell"],
+        "selection_summary": (
+            'Composite command verdict before approval/execution (argv, operators, '
+            'regex risk); use shell_split for raw token parsing.'
+        ),
+        "keywords": [
+            'command check',
+            'safe command',
+            'preflight command',
+            'approve shell',
+            'safe to run',
+        ],
+        "profiles": [
+            "full",
+            "codegg_core",
+            "codegg_core_min",
+            "codegg_preflight",
+            "codegg_shell",
+            "agent_core",
+        ],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["command_preflight"],
@@ -4984,7 +5381,20 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "config",
         "tier": 1,
         "tags": ["config", "validation", "json", "toml", "preflight", "composite"],
-        "profiles": ["full", "codegg_core", "codegg_core_min", "codegg_preflight", "codegg_config"],
+        "selection_summary": (
+            'Composite config verdict with auto-detected format; use '
+            'validate_json/validate_toml/dotenv_validate/ini_validate for a known '
+            'format.'
+        ),
+        "keywords": ['config check', 'validate config', 'preflight config'],
+        "profiles": [
+            "full",
+            "codegg_core",
+            "codegg_core_min",
+            "codegg_preflight",
+            "codegg_config",
+            "agent_core",
+        ],
         "aliases": [],
         "llm_exposure": "default",
         "harness_use": ["config_preflight"],
@@ -4997,6 +5407,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "json",
         "tier": 2,
         "tags": ["json", "comparison", "config", "structured-data", "composite"],
+        "selection_summary": (
+            'Composite verdict comparing structured data via '
+            'compare/canonicalize/shape; use json_compare for a single pairwise diff.'
+        ),
+        "keywords": ['compare config', 'structured diff', 'data compare'],
         "profiles": ["full", "codegg_core", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5011,6 +5426,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "manifest",
         "tier": 2,
         "tags": ["python", "pyproject", "toml", "manifest", "dependencies", "inspection"],
+        "selection_summary": (
+            'Inspect pyproject.toml semantics (project, backend, deps, scripts); use '
+            'validate_toml for syntax-only checks.'
+        ),
+        "keywords": ['pyproject.toml', 'python manifest', 'project dependencies'],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5024,6 +5444,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "manifest",
         "tier": 2,
         "tags": ["node", "npm", "package.json", "manifest", "dependencies", "inspection"],
+        "selection_summary": (
+            'Inspect package.json semantics (scripts, deps, engines, workspaces); use '
+            'validate_json for syntax-only checks.'
+        ),
+        "keywords": ['package.json', 'npm manifest', 'node dependencies'],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5037,6 +5462,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "manifest",
         "tier": 2,
         "tags": ["python", "requirements", "pip", "dependencies", "inspection"],
+        "selection_summary": (
+            'Inspect requirements.txt lines (specs, URLs, markers); use manifest '
+            'inspectors for other ecosystems.'
+        ),
+        "keywords": ['requirements.txt', 'pip dependencies', 'python requirements'],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5050,6 +5480,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "manifest",
         "tier": 2,
         "tags": ["go", "golang", "go.mod", "manifest", "dependencies", "inspection"],
+        "selection_summary": (
+            'Inspect go.mod semantics (module, go version, requires); use '
+            'lockfile_summary for lockfile-level overview.'
+        ),
+        "keywords": ['go.mod', 'go dependencies', 'golang manifest'],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5063,6 +5498,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "manifest",
         "tier": 2,
         "tags": ["lockfile", "dependencies", "package-manager", "inspection"],
+        "selection_summary": (
+            'Identify lockfile kind and approximate package counts (shallow); use '
+            'manifest inspectors for per-file semantics.'
+        ),
+        "keywords": ['lockfile', 'package lock', 'dependency count'],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5077,6 +5517,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 2,
         "tags": ["text", "json", "llm", "hygiene", "validation", "preflight"],
+        "selection_summary": (
+            'Diagnose LLM JSON output failures (fences, prose, trailing commas); use '
+            'validate_json for plain syntax checks.'
+        ),
+        "keywords": ['llm json', 'json fix', 'fenced json', 'json repair hints'],
         "profiles": ["full", "default", "codegg_preflight", "codegg_core"],
         "aliases": [],
         "llm_exposure": "default",
@@ -5091,6 +5536,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "text",
         "tier": 2,
         "tags": ["text", "markdown", "links", "validation", "hygiene"],
+        "selection_summary": (
+            'Lexically validate markdown links (no network); use markdown_structure '
+            'for full document structure.'
+        ),
+        "keywords": ['markdown links', 'broken links', 'link check'],
         "profiles": ["full", "codegg_core", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5105,6 +5555,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "repo",
         "tier": 2,
         "tags": ["repo", "audit", "inventory", "filesystem", "structure"],
+        "selection_summary": (
+            'Summarize repo file signals (languages, config/vendor/generated, '
+            'suspicious paths); use manifest inspectors for file semantics.'
+        ),
+        "keywords": ['repo audit', 'file inventory', 'repo structure'],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5119,6 +5574,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "network",
         "tier": 2,
         "tags": ["network", "ip", "inspection", "address"],
+        "selection_summary": (
+            'Inspect one IP address (family, bytes, numeric, special-use); use '
+            'cidr_inspect for ranges.'
+        ),
+        "keywords": ['ip address', 'ipv4', 'ipv6', 'inspect ip'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5132,6 +5592,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "network",
         "tier": 2,
         "tags": ["network", "ip", "cidr", "inspection", "range"],
+        "selection_summary": (
+            'Inspect a CIDR range (network, bounds, address count, containment); use '
+            'ip_inspect for single addresses.'
+        ),
+        "keywords": ['cidr', 'subnet', 'network range', 'prefix'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5145,6 +5610,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "encoding",
         "tier": 2,
         "tags": ["encoding", "codec", "conversion", "base64", "hex"],
+        "selection_summary": (
+            'Convert text between utf8/hex/base64/base64url; use radix_convert for '
+            'integer base conversion.'
+        ),
+        "keywords": ['base64', 'hex encode', 'codec', 'decode base64'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5158,6 +5628,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "encoding",
         "tier": 2,
         "tags": ["encoding", "radix", "conversion", "base", "integer"],
+        "selection_summary": (
+            'Convert an integer between bases 2-36 (capped at 2**128-1); use '
+            'codec_convert for text codecs.'
+        ),
+        "keywords": ['base convert', 'hex to decimal', 'radix', 'binary'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5171,6 +5646,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "temporal",
         "tier": 2,
         "tags": ["temporal", "datetime", "conversion", "timestamp", "rfc3339"],
+        "selection_summary": (
+            'Convert between RFC3339 and Unix seconds/millis/nanos (fixed offsets '
+            'only); use cron_inspect for schedules.'
+        ),
+        "keywords": ['timestamp', 'unix time', 'rfc3339', 'datetime convert'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5184,6 +5664,11 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "category": "temporal",
         "tier": 2,
         "tags": ["temporal", "cron", "inspection", "schedule"],
+        "selection_summary": (
+            'Inspect a cron expression and list upcoming runs; use datetime_convert '
+            'for timestamp conversion.'
+        ),
+        "keywords": ['cron', 'schedule', 'next run'],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5225,6 +5710,13 @@ _VALID_LLM_EXPOSURE = frozenset({"default", "contextual", "expert_only", "harnes
 _VALID_COST = frozenset({"cheap", "moderate", "heavy"})
 _VALID_STABILITY = frozenset({"stable", "experimental", "deprecated"})
 
+#: Bound for authored `selection_summary` text (Plan 041 Workstream C).
+SELECTION_SUMMARY_MAX_LENGTH = 240
+#: Bound for authored `keywords` list length (Plan 041 Workstream C).
+SELECTION_KEYWORDS_MAX_COUNT = 8
+#: Bound for each authored keyword (Plan 041 Workstream C).
+SELECTION_KEYWORD_MAX_LENGTH = 48
+
 
 def _validate_catalog_metadata() -> None:
     """Fail fast on malformed catalog metadata (Plan 040 Workstream F).
@@ -5246,6 +5738,28 @@ def _validate_catalog_metadata() -> None:
         tags = meta.get("tags")
         if not isinstance(tags, (list, tuple)) or not all(isinstance(t, str) for t in tags):
             raise ValueError(f"Tool {name!r} has invalid tags: must be list[str]")
+        summary = meta.get("selection_summary")
+        if not isinstance(summary, str) or not summary:
+            raise ValueError(f"Tool {name!r} has missing/empty selection_summary")
+        if len(summary) > SELECTION_SUMMARY_MAX_LENGTH:
+            raise ValueError(
+                f"Tool {name!r} selection_summary exceeds "
+                f"{SELECTION_SUMMARY_MAX_LENGTH} chars ({len(summary)})"
+            )
+        keywords = meta.get("keywords")
+        if not isinstance(keywords, (list, tuple)) or not all(isinstance(k, str) for k in keywords):
+            raise ValueError(f"Tool {name!r} has invalid keywords: must be list[str]")
+        if len(keywords) > SELECTION_KEYWORDS_MAX_COUNT:
+            raise ValueError(
+                f"Tool {name!r} has too many keywords ({len(keywords)} > "
+                f"{SELECTION_KEYWORDS_MAX_COUNT})"
+            )
+        for keyword in keywords:
+            if not keyword or len(keyword) > SELECTION_KEYWORD_MAX_LENGTH:
+                raise ValueError(
+                    f"Tool {name!r} has invalid keyword {keyword!r}: must be "
+                    f"1..{SELECTION_KEYWORD_MAX_LENGTH} chars"
+                )
         if meta.get("tier") not in _VALID_TIERS:
             raise ValueError(f"Tool {name!r} has invalid tier {meta.get('tier')!r}")
         if meta.get("category") not in _VALID_CATEGORIES:
@@ -5288,6 +5802,20 @@ def get_tool_handler_name(name: str) -> str:
     return str(TOOL_METADATA[name]["handler"])
 
 
+def get_tool_selection_summary(name: str) -> str:
+    """Return the authored selection summary for *name* (authority: TOOL_METADATA).
+
+    The summary answers "when should an agent choose this tool rather than a
+    neighboring tool?" It backs compact descriptions and lexical discovery.
+    """
+    return str(TOOL_METADATA[name]["selection_summary"])
+
+
+def get_tool_keywords(name: str) -> list[str]:
+    """Return a copy of the authored discovery keywords for *name*."""
+    return list(TOOL_METADATA[name].get("keywords", []))
+
+
 # ---------------------------------------------------------------------------
 # Profile definitions.  A profile is a named set of tool names computed
 # from TOOL_METADATA.  Each entry maps a profile name to the sorted
@@ -5321,6 +5849,7 @@ PROFILE_NAMES: list[str] = [
     "codegg_shell",
     "codegg_repo_audit",
     "human_math",
+    "agent_core",
 ]
 
 # Schema detail levels
@@ -5329,13 +5858,17 @@ SCHEMA_DETAIL_NORMAL = "normal"
 SCHEMA_DETAIL_COMPACT = "compact"
 
 
-def compact_schema(schema: dict[str, Any]) -> dict[str, Any]:
+def compact_schema(schema: dict[str, Any], selection_summary: str | None = None) -> dict[str, Any]:
     """Produce a compact version of a tool schema.
 
     Compact mode preserves:
-    - Tool name, description (truncated to 120 chars), required args, types, enums
+    - Tool name, description, required args, types, enums
     - Input/output schema structure
     - Output property keys and types (top-level only) for composite tools
+
+    The compact description is the authored ``selection_summary`` when
+    provided (Plan 041: selection signal, not truncation); otherwise the
+    full description is truncated to 120 chars as a fallback.
 
     Compact mode removes:
     - Long description text, examples, verbose help
@@ -5346,10 +5879,13 @@ def compact_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """
     result: dict[str, Any] = {}
 
-    # Description: truncate to 120 chars
-    desc = schema.get("description", "")
-    if len(desc) > 120:
-        desc = desc[:117] + "..."
+    # Description: authored selection signal when available, else truncate.
+    if selection_summary:
+        desc = selection_summary
+    else:
+        desc = schema.get("description", "")
+        if len(desc) > 120:
+            desc = desc[:117] + "..."
     result["description"] = desc
 
     # Deprecated flag
