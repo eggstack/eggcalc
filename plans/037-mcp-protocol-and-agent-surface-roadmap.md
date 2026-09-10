@@ -1,6 +1,6 @@
 # MCP Protocol and Agent Surface Roadmap
 
-Status: planned  
+Status: implementation complete; agent-surface recommendation remains gated by held-out evidence
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `dcd0c5eb427c28712e6fffb75b58b78c8a935494`  
 Date: 2026-09-10  
@@ -19,7 +19,9 @@ The desired end state is:
 - publish accurate tool annotations, deterministic/cacheable list responses where the negotiated protocol supports them, and concise server instructions;
 - reduce tool-definition change amplification and eliminate ambiguity over which registry/fixture is authoritative;
 - keep every existing tool directly callable under an appropriate profile;
-- provide a small recommended agent-facing profile while preserving `full` for compatibility and expert/harness use;
+- provide a small candidate agent-facing profile, promoted to recommended only
+  when held-out evidence supports it, while preserving `full` for
+  compatibility and expert/harness use;
 - make specialist tools searchable/discoverable using deterministic stdlib-only catalog metadata, without pretending that a proprietary search RPC is standardized MCP progressive discovery;
 - evaluate tool-selection quality and context footprint before and after exposure changes;
 - retain zero production runtime dependencies and generated single-file parity.

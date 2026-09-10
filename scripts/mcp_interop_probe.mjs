@@ -1,7 +1,8 @@
 /* Dev-only interop probe: validates eggcalc's dual-era MCP transcripts
  * against the official @modelcontextprotocol/core wire schemas (v2 SDK,
  * bundled with the published MCP Inspector). Not part of the test suite;
- * requires Node 20+. See docs/mcp.md "Interoperability" for the command.
+ * requires Node 22.19+ with the current official Inspector bundle. See
+ * docs/mcp.md "Interoperability" for the command.
  *
  * Usage: MCP_CORE_DIR=<path-to-core> node scripts/mcp_interop_probe.mjs <server-command...>
  * Example: MCP_CORE_DIR="$CORE" node scripts/mcp_interop_probe.mjs .venv/bin/python -m eggcalc --mcp

@@ -1,6 +1,6 @@
 # MCP Tool Catalog Authority Consolidation
 
-Status: planned  
+Status: complete; authority checks reconfirmed in Plan 042
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `dcd0c5eb427c28712e6fffb75b58b78c8a935494`  
 Date: 2026-09-10  

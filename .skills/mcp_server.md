@@ -18,8 +18,10 @@ generated. Read selection metadata via `get_tool_selection_summary()` /
 
 ### Discovery and Profiles (Plan 041)
 
-- 12 profiles; `agent_core` (10 front doors) is the recommended general-agent
-  surface (opt-in; `full` stays the default). Never silently remap profile names.
+- 12 profiles; `agent_core` (10 front doors) is an opt-in candidate surface,
+  not a validated general-agent recommendation (the 2026-09-10 held-out
+  closure report found selection regression). `full` stays the default. Never
+  silently remap profile names.
 - `ToolRegistry.search_tools(query, *, profile="full", limit=5)` ranks via
   exact name (300) / alias (250) / name-token / keyword / category / summary /
   description fallback with canonical-name tie-break. Returns `ToolMatch`
@@ -29,7 +31,11 @@ generated. Read selection metadata via `get_tool_selection_summary()` /
   emission — frozen registry values crash JSON serialization.
 - Corpus + scorer: `evals/mcp_tool_selection/` (121 cases, dev/held_out
   splits), `scripts/measure_mcp_tool_surface.py`,
-  `scripts/score_mcp_tool_selection.py`. Tune on `development` only.
+  `scripts/score_mcp_tool_selection.py`. Tune on `development` only. The
+  current cross-model evidence is recorded in
+  `reports/closure_2026_09_10.md`; do not describe `agent_core` as recommended
+  until a later held-out run passes non-inferiority and specialist-recovery
+  gates.
 
 ### Response Conventions
 

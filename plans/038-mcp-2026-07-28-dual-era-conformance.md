@@ -1,6 +1,6 @@
 # MCP 2026-07-28 Dual-Era Conformance
 
-Status: planned  
+Status: complete; official Inspector/SDK interop verified in Plan 042
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `dcd0c5eb427c28712e6fffb75b58b78c8a935494`  
 Date: 2026-09-10  

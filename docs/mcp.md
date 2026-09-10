@@ -211,17 +211,17 @@ Unknown notifications are silently ignored per the JSON-RPC 2.0 spec. The server
 
 Dual-era behavior was verified against the official Tier-1 SDK wire schemas (`@modelcontextprotocol/core` v2, via the published MCP Inspector bundle): `server/discover`, modern `tools/list` / `tools/call`, and legacy `initialize` responses all validate, for both package and single-file servers. The captured transcript lives in `tests/fixtures/mcp_2026_07_28_interop_transcript.json` (slimmed to the schema-critical responses; the full 83-tool list is covered by `tests/fixtures/mcp_tool_registry_expected.json`).
 
-To re-run the external check manually (dev-only; adds no runtime dependency — requires Node 20+):
+To re-run the external check manually (dev-only; adds no runtime dependency — use Node 22.19+ for the current Inspector bundle):
 
 ```bash
 # 1. Fetch the inspector bundle once (provides @modelcontextprotocol/core)
 npx -y @modelcontextprotocol/inspector --help >/dev/null
-# 2. Run the dev-only probe (requires Node 20+)
-CORE=$(echo ~/.npm/_npx/*/node_modules/@modelcontextprotocol/core | tr ' ' '\n' | head -1)
-MCP_CORE_DIR="$CORE" node scripts/mcp_interop_probe.mjs .venv/bin/python -m eggcalc --mcp
+# 2. Run the dev-only probe (requires Node 22.19+)
+CORE=$(find ~/.npm/_npx -path '*/node_modules/@modelcontextprotocol/core' -type d -print -quit)
+MCP_CORE_DIR="$CORE" npx -y node@22.19.0 scripts/mcp_interop_probe.mjs .venv/bin/python -m eggcalc --mcp
 ```
 
-The probe script is dev-only tooling (not part of the test suite); the transcript fixture above is the durable evidence. The authoritative automated suite remains the stdlib-only pytest suite (`tests/test_mcp_modern.py`).
+The probe script is dev-only tooling (not part of the test suite); the transcript fixture above is the durable schema-critical evidence. The current official interop results and SDK/Inspector versions are recorded in [the closure report](../evals/mcp_tool_selection/reports/closure_2026_09_10.md). The authoritative automated suite remains the stdlib-only pytest suite (`tests/test_mcp_modern.py`).
 
 ### Migration Notes
 
@@ -1658,11 +1658,14 @@ Core coding-agent tools (22 tools). Recommended for general-purpose coding agent
 
 ### `agent_core`
 
-Minimal general-agent front doors (10 tools). Recommended initial surface for general agents, paired with lexical discovery (see Progressive disclosure below) for specialist tasks.
+Minimal general-agent front doors (10 tools). Opt-in candidate surface,
+paired with lexical discovery (see Progressive disclosure below) for
+specialist tasks; the current held-out evidence does not validate it as the
+general-agent recommendation.
 
 **Tools:** `command_preflight`, `config_preflight`, `edit_preflight`, `math_eval`, `path_normalize`, `text_diff_explain`, `text_equal`, `text_replace_check`, `text_security_inspect`, `validate_json`
 
-**Use when:** You want the smallest high-value surface: math, edit/shell/config safety verdicts, text security and equality, diff explanation, replacement safety, path normalization, and JSON validation. At `compact` detail this is ~11.7 KB of tool definitions versus ~118.4 KB for `full/full` (90.1% reduction; see `evals/mcp_tool_selection/reports/baseline_2026_09_10.md`).
+**Use when:** You want the smallest high-value experimental surface: math, edit/shell/config safety verdicts, text security and equality, diff explanation, replacement safety, path normalization, and JSON validation. At `compact` detail this is ~11.7 KB of tool definitions versus ~118.4 KB for `full/full` (90.1% reduction); selection results and limitations are in `evals/mcp_tool_selection/reports/closure_2026_09_10.md`.
 
 The `full` profile remains the server default for backward compatibility; opt into `agent_core` explicitly with `EGGCALC_MCP_PROFILE=agent_core` or per-request `profile` in `tools/list`.
 
@@ -1820,14 +1823,15 @@ used as the `compact` description) and a small `keywords` list of
 concepts users actually say. Bounds (`<=240` chars,
 `<=8` keywords of `<=48` chars) are enforced at import and in tests.
 
-This is a harness/library facility, not a claim of protocol-standard
-progressive discovery: the MCP working group is still designing that
-standard, and eggcalc will adapt this boundary onto it when it lands.
+This is a harness/library facility, not a claim that MCP standardizes
+profile-aware tool search or tool-definition expansion. Modern MCP
+`server/discover` is the protocol bootstrap, while this host-side lexical
+selection remains an eggcalc integration boundary.
 Measure exposure costs with `python scripts/measure_mcp_tool_surface.py`;
 the provider-neutral evaluation corpus, interchange format, and scorer
-live in `evals/mcp_tool_selection/` (see its README). Held-out
-agent-evaluation evidence is still pending; until it lands, `full`
-remains the default and `agent_core` is opt-in.
+live in `evals/mcp_tool_selection/` (see its README). The 2026-09-10
+held-out cross-model run did not validate `agent_core` as the general-agent
+recommendation; `full` remains the default and `agent_core` is opt-in.
 
 ---
 

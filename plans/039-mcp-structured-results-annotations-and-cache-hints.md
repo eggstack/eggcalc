@@ -1,6 +1,6 @@
 # MCP Structured Results, Annotations, and Cache Hints
 
-Status: planned  
+Status: complete; wire-contract evidence recorded in Plan 042
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `dcd0c5eb427c28712e6fffb75b58b78c8a935494`  
 Date: 2026-09-10  

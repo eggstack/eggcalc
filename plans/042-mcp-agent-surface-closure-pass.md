@@ -1,6 +1,6 @@
 # MCP Protocol and Agent-Surface Closure Pass
 
-Status: planned  
+Status: partially complete; protocol gate passed, agent_core recommendation gate not met
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `e093bfb3e675e486cc7c8bf3299c168088e87e35`  
 Date: 2026-09-10  
@@ -36,7 +36,10 @@ This plan must remain narrow. If the evidence passes, the correct implementation
 
 ### 2.1 Plan 041 implementation is ahead of its final evidence gate
 
-`evals/mcp_tool_selection/reports/baseline_2026_09_10.md` records strong deterministic results, but explicitly states that external held-out rollouts on at least two materially different model families are pending.
+At plan start, `evals/mcp_tool_selection/reports/baseline_2026_09_10.md`
+recorded strong deterministic results but explicitly stated that external
+held-out rollouts on at least two materially different model families were
+pending. This closure report records those rollouts and their outcome.
 
 The deterministic lexical proxy currently reports approximately:
 
@@ -465,7 +468,8 @@ Do not treat this list as a requirement to modify production code.
 13. Regenerate docs/inventory and run focused MCP/discovery tests.
 14. Run `make check`, `make package-check`, and single-file validation.
 15. Push and verify the primary + compatibility GitHub Actions workflows.
-16. Mark Plan 042 complete only after both the protocol-interoperability and agent-evaluation gates are evidenced.
+16. Record Plan 042's outcome after both gates are exercised; do not mark the
+    agent surface recommended when the held-out gate fails.
 
 ## 11. Acceptance criteria
 
@@ -510,3 +514,19 @@ Do not use this closure pass to:
 - refactor evaluator, exact-tool implementations, CLI behavior, or unit semantics unrelated to a demonstrated closure defect.
 
 The desired endpoint is deliberately boring: the same broad deterministic toolbox, a verified modern/legacy MCP wire implementation, a much smaller opt-in agent context surface with evidence that it does not materially degrade task performance, and no additional architectural machinery unless testing proves it necessary.
+
+## 13. Closure outcome (2026-09-10)
+
+The official protocol gate passed. Legacy and modern stdio behavior was
+accepted by MCP Inspector 2.6.0, `@modelcontextprotocol/core` 2.0.0, and
+`@modelcontextprotocol/client` 2.0.0 using Node 22.19.0; see the raw probe
+and [the closure report](../evals/mcp_tool_selection/reports/closure_2026_09_10.md).
+
+The held-out gate was exercised completely on two materially different model
+families across all five required catalog configurations. The 90.1%
+`agent_core/compact` context reduction passed, but `agent_core/compact` was
+below `full/compact` on both families and `agent_core + discovery` did not
+recover specialist selection closely enough to pass Plan 041's gate. No
+invalid-argument or repeated-call regression justified a catalog correction,
+and no new front-door tool was added. Documentation now describes
+`agent_core` as an opt-in candidate; `full` remains the compatibility default.

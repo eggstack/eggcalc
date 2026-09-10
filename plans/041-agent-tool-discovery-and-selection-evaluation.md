@@ -1,6 +1,6 @@
 # Agent Tool Discovery and Selection Evaluation
 
-Status: planned  
+Status: implementation complete; recommendation gate failed on 2026-09-10 held-out evaluation
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `dcd0c5eb427c28712e6fffb75b58b78c8a935494`  
 Date: 2026-09-10  
@@ -16,10 +16,12 @@ Eggcalc currently exposes 83 deterministic tools. The server already supports pr
 The solution under this plan is **progressive disclosure by policy and harness integration**, not capability deletion:
 
 - every existing tool remains directly callable through `full` or another appropriate profile;
-- general agents get a small, high-value recommended `agent_core` profile;
+- general agents get a small, high-value candidate `agent_core` profile,
+  promoted to recommended status only if held-out evidence supports it;
 - specialist tools gain compact selection metadata and deterministic lexical discovery for aware harnesses such as codegg;
 - existing `tools/list` `names`/profile/schema-detail filtering becomes the expansion mechanism for those harnesses;
-- no proprietary mechanism is presented as the final MCP progressive-discovery standard while the MCP working group is still designing that standard;
+- no host-side profile/search mechanism is presented as a standardized MCP
+  progressive-discovery primitive;
 - profile membership and any new front-door composite tools are chosen from empirical agent evaluations rather than architectural intuition alone.
 
 ## 2. Research basis
@@ -598,4 +600,8 @@ Do not use this plan to:
 - optimize only for one model family;
 - redesign tool implementations that already have clear distinct semantics.
 
-The pass should end with the same broad toolbox, a much smaller recommended initial surface, deterministic specialist discovery for aware harnesses, and evidence showing whether those changes actually improve agent behavior.
+The implementation ended with the same broad toolbox, a much smaller opt-in
+candidate surface, deterministic specialist discovery for aware harnesses,
+and evidence that the current `agent_core` selection behavior is not yet
+non-inferior to the compact full baseline. Promotion remains future work; see
+`evals/mcp_tool_selection/reports/closure_2026_09_10.md`.

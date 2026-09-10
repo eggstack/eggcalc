@@ -671,7 +671,7 @@ Profiles are named subsets of tools that control which tools are available via `
 
 ### Data Structures
 
-**`TOOL_METADATA`** (schemas.py): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile. `agent_core` (10 front-door tools) is the recommended general-agent exposure; `full` remains the default.
+**`TOOL_METADATA`** (schemas.py): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile. `agent_core` (10 front-door tools) is an opt-in candidate exposure; the 2026-09-10 held-out cross-model evaluation did not validate it as the recommended general-agent exposure. `full` remains the default.
 
 **`TOOL_PROFILES`** (schemas.py): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
 
@@ -730,8 +730,13 @@ Deterministic cost evidence lives in
 `evals/mcp_tool_selection/reports/baseline_2026_09_10.md`
 (`agent_core/compact` ≈ 11.7 KB vs `full/full` ≈ 118.4 KB, −90.1%);
 provider-neutral rollout scoring via
-`scripts/score_mcp_tool_selection.py`. This is a harness/library facility
-pending a standardized MCP progressive-discovery primitive.
+`scripts/score_mcp_tool_selection.py`. This is a harness/library facility,
+not a claim that MCP standardizes profile-aware tool search or tool-definition
+expansion. Modern MCP `server/discover` is the protocol bootstrap; the current
+empirical result is recorded in
+`evals/mcp_tool_selection/reports/closure_2026_09_10.md`: the 90.1% footprint
+reduction passes, but selection non-inferiority and specialist recovery do
+not. Keep the profile opt-in until a later held-out run supports promotion.
 
 ---
 
