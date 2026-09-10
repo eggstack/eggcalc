@@ -11144,11 +11144,12 @@ class TestProtocolVersionNegotiation:
 
         assert "2024-11-05" in SUPPORTED_PROTOCOL_VERSIONS
         assert "2025-11-25" in SUPPORTED_PROTOCOL_VERSIONS
+        assert "2026-07-28" in SUPPORTED_PROTOCOL_VERSIONS
 
-    def test_latest_version_is_2025_11_25(self):
+    def test_latest_version_is_2026_07_28(self):
         from eggcalc.mcp.server import LATEST_SUPPORTED_PROTOCOL_VERSION
 
-        assert LATEST_SUPPORTED_PROTOCOL_VERSION == "2025-11-25"
+        assert LATEST_SUPPORTED_PROTOCOL_VERSION == "2026-07-28"
 
 
 class TestInitializeValidation:

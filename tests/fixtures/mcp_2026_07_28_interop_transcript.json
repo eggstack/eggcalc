@@ -1,0 +1,550 @@
+{
+  "description": "Captured dual-era MCP transcript validated against official @modelcontextprotocol/core wire schemas (v2 SDK). See docs/mcp.md Interoperability.",
+  "sdk": "@modelcontextprotocol/inspector@2.6.0 bundled @modelcontextprotocol/client@2.0.0 / @modelcontextprotocol/core",
+  "server": "eggcalc package mode (.venv/bin/python -m eggcalc --mcp)",
+  "requests": [
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "server/discover",
+      "params": {
+        "_meta": {
+          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+          "io.modelcontextprotocol/clientCapabilities": {},
+          "io.modelcontextprotocol/clientInfo": {
+            "name": "interop-probe",
+            "version": "0.0.1"
+          }
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "tools/list",
+      "params": {
+        "_meta": {
+          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+          "io.modelcontextprotocol/clientCapabilities": {},
+          "io.modelcontextprotocol/clientInfo": {
+            "name": "interop-probe",
+            "version": "0.0.1"
+          }
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "tools/call",
+      "params": {
+        "name": "math_eval",
+        "arguments": {
+          "expression": "5+3"
+        },
+        "_meta": {
+          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+          "io.modelcontextprotocol/clientCapabilities": {},
+          "io.modelcontextprotocol/clientInfo": {
+            "name": "interop-probe",
+            "version": "0.0.1"
+          }
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "initialize",
+      "params": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "clientInfo": {
+          "name": "interop-probe",
+          "version": "0.0.1"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "notifications/initialized",
+      "params": {}
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "tools/list",
+      "params": {}
+    }
+  ],
+  "responses": [
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "resultType": "complete",
+        "supportedVersions": [
+          "2024-11-05",
+          "2025-11-25",
+          "2026-07-28"
+        ],
+        "capabilities": {
+          "tools": {
+            "listChanged": false
+          }
+        },
+        "instructions": "Prefer composite preflight tools (edit_preflight, command_preflight, config_preflight) for general safety checks and specialist primitives when exact domain evidence is required. Prefer json_extract over the deprecated json_query. Use math_eval for deterministic calculations and unit expressions rather than model arithmetic. All tools are local and deterministic; they do not access the network or filesystem.",
+        "ttlMs": 0,
+        "cacheScope": "private",
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "eggcalc",
+            "version": "1.1.10"
+          }
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": {
+        "resultType": "complete",
+        "tools": {
+          "count": 83,
+          "names": [
+            "argv_compare",
+            "canonicalize_text",
+            "cargo_toml_inspect",
+            "cidr_inspect",
+            "code_fence_extract",
+            "codec_convert",
+            "command_preflight",
+            "config_preflight",
+            "constant_lookup",
+            "cron_inspect",
+            "datetime_convert",
+            "diff_file_headers",
+            "diff_hunk_ranges",
+            "diff_touched_paths",
+            "dotenv_validate",
+            "edit_preflight",
+            "escape_text",
+            "glob_match",
+            "go_mod_inspect",
+            "identifier_analyze",
+            "identifier_inspect",
+            "identifier_table_inspect",
+            "ini_validate",
+            "ip_inspect",
+            "json_canonicalize",
+            "json_compare",
+            "json_extract",
+            "json_query",
+            "json_shape",
+            "line_range_compare",
+            "line_range_extract",
+            "list_compare",
+            "list_dedupe",
+            "list_sort",
+            "llm_json_output_check",
+            "lockfile_summary",
+            "markdown_link_check_lexical",
+            "markdown_structure",
+            "math_eval",
+            "package_json_inspect",
+            "patch_apply_check",
+            "patch_conflict_markers_inspect",
+            "patch_summary",
+            "path_analyze",
+            "path_compare",
+            "path_normalize",
+            "path_scope_check",
+            "prompt_input_inspect",
+            "pyproject_inspect",
+            "radix_convert",
+            "regex_finditer",
+            "regex_safety_check",
+            "repo_file_inventory",
+            "requirements_inspect",
+            "shell_quote_join",
+            "shell_split",
+            "structured_data_compare",
+            "text_count",
+            "text_diff_explain",
+            "text_equal",
+            "text_fingerprint",
+            "text_hash",
+            "text_inspect",
+            "text_measure",
+            "text_position",
+            "text_replace_check",
+            "text_security_inspect",
+            "text_transform",
+            "text_truncate",
+            "text_window",
+            "toml_shape",
+            "unescape_text",
+            "unicode_policy_check",
+            "unified_diff_validate",
+            "unit_convert",
+            "unit_info",
+            "validate_brackets",
+            "validate_json",
+            "validate_regex",
+            "validate_schema_light",
+            "validate_toml",
+            "version_compare",
+            "version_constraint_check"
+          ],
+          "first_tool": {
+            "name": "argv_compare",
+            "description": "Compare two command strings or argv lists by parsed argv tokens rather than raw text. Supports command strings, pre-parsed argv lists, or both.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "left_command": {
+                  "type": "string",
+                  "description": "Left command string to parse and compare"
+                },
+                "right_command": {
+                  "type": "string",
+                  "description": "Right command string to parse and compare"
+                },
+                "left_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Left pre-parsed argv list",
+                  "maxItems": 10000
+                },
+                "right_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Right pre-parsed argv list",
+                  "maxItems": 10000
+                },
+                "shell": {
+                  "type": "string",
+                  "enum": [
+                    "posix"
+                  ],
+                  "default": "posix",
+                  "description": "Shell dialect (only posix is supported)"
+                }
+              },
+              "required": []
+            },
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "argv_equal": {
+                  "type": "boolean",
+                  "description": "True if parsed argv lists are identical"
+                },
+                "left_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Resolved left argv"
+                },
+                "right_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Resolved right argv"
+                },
+                "first_difference": {
+                  "type": "integer",
+                  "description": "Index of first differing token, or null if equal"
+                },
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Analysis notes"
+                }
+              }
+            },
+            "tier": 2,
+            "tags": [
+              "shell",
+              "argv",
+              "comparison",
+              "sanity"
+            ],
+            "deprecated": false,
+            "category": "shell",
+            "llm_exposure": "contextual",
+            "cost": "cheap"
+          },
+          "note": "full 83-tool definitions elided; see mcp_tool_registry_expected.json"
+        },
+        "ttlMs": 0,
+        "cacheScope": "private",
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "eggcalc",
+            "version": "1.1.10"
+          }
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"ok\": true, \"tool\": \"math_eval\", \"result\": {\"value\": \"8\", \"type\": \"int\"}}"
+          }
+        ],
+        "resultType": "complete",
+        "structuredContent": {
+          "value": "8",
+          "type": "int"
+        },
+        "_meta": {
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "eggcalc",
+            "version": "1.1.10"
+          }
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "result": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {
+          "tools": {
+            "listChanged": false
+          },
+          "runtime": {
+            "python_version": [
+              3,
+              12,
+              3
+            ],
+            "platform": "linux",
+            "implementation": "cpython",
+            "has_tomllib": true,
+            "has_math_cbrt": true,
+            "supports_fork": true,
+            "supports_spawn": true,
+            "supports_posix_paths": true,
+            "supports_windows_paths": false,
+            "eggcalc_version": "1.1.10",
+            "supported_protocol_versions": [
+              "2024-11-05",
+              "2025-11-25",
+              "2026-07-28"
+            ],
+            "multiprocessing_start_method": "fork",
+            "mode": "package"
+          }
+        },
+        "serverInfo": {
+          "name": "eggcalc",
+          "version": "1.1.10"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "result": {
+        "tools": {
+          "count": 83,
+          "names": [
+            "argv_compare",
+            "canonicalize_text",
+            "cargo_toml_inspect",
+            "cidr_inspect",
+            "code_fence_extract",
+            "codec_convert",
+            "command_preflight",
+            "config_preflight",
+            "constant_lookup",
+            "cron_inspect",
+            "datetime_convert",
+            "diff_file_headers",
+            "diff_hunk_ranges",
+            "diff_touched_paths",
+            "dotenv_validate",
+            "edit_preflight",
+            "escape_text",
+            "glob_match",
+            "go_mod_inspect",
+            "identifier_analyze",
+            "identifier_inspect",
+            "identifier_table_inspect",
+            "ini_validate",
+            "ip_inspect",
+            "json_canonicalize",
+            "json_compare",
+            "json_extract",
+            "json_query",
+            "json_shape",
+            "line_range_compare",
+            "line_range_extract",
+            "list_compare",
+            "list_dedupe",
+            "list_sort",
+            "llm_json_output_check",
+            "lockfile_summary",
+            "markdown_link_check_lexical",
+            "markdown_structure",
+            "math_eval",
+            "package_json_inspect",
+            "patch_apply_check",
+            "patch_conflict_markers_inspect",
+            "patch_summary",
+            "path_analyze",
+            "path_compare",
+            "path_normalize",
+            "path_scope_check",
+            "prompt_input_inspect",
+            "pyproject_inspect",
+            "radix_convert",
+            "regex_finditer",
+            "regex_safety_check",
+            "repo_file_inventory",
+            "requirements_inspect",
+            "shell_quote_join",
+            "shell_split",
+            "structured_data_compare",
+            "text_count",
+            "text_diff_explain",
+            "text_equal",
+            "text_fingerprint",
+            "text_hash",
+            "text_inspect",
+            "text_measure",
+            "text_position",
+            "text_replace_check",
+            "text_security_inspect",
+            "text_transform",
+            "text_truncate",
+            "text_window",
+            "toml_shape",
+            "unescape_text",
+            "unicode_policy_check",
+            "unified_diff_validate",
+            "unit_convert",
+            "unit_info",
+            "validate_brackets",
+            "validate_json",
+            "validate_regex",
+            "validate_schema_light",
+            "validate_toml",
+            "version_compare",
+            "version_constraint_check"
+          ],
+          "first_tool": {
+            "name": "argv_compare",
+            "description": "Compare two command strings or argv lists by parsed argv tokens rather than raw text. Supports command strings, pre-parsed argv lists, or both.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "left_command": {
+                  "type": "string",
+                  "description": "Left command string to parse and compare"
+                },
+                "right_command": {
+                  "type": "string",
+                  "description": "Right command string to parse and compare"
+                },
+                "left_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Left pre-parsed argv list",
+                  "maxItems": 10000
+                },
+                "right_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Right pre-parsed argv list",
+                  "maxItems": 10000
+                },
+                "shell": {
+                  "type": "string",
+                  "enum": [
+                    "posix"
+                  ],
+                  "default": "posix",
+                  "description": "Shell dialect (only posix is supported)"
+                }
+              },
+              "required": []
+            },
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "argv_equal": {
+                  "type": "boolean",
+                  "description": "True if parsed argv lists are identical"
+                },
+                "left_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Resolved left argv"
+                },
+                "right_argv": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Resolved right argv"
+                },
+                "first_difference": {
+                  "type": "integer",
+                  "description": "Index of first differing token, or null if equal"
+                },
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Analysis notes"
+                }
+              }
+            },
+            "tier": 2,
+            "tags": [
+              "shell",
+              "argv",
+              "comparison",
+              "sanity"
+            ],
+            "deprecated": false,
+            "category": "shell",
+            "llm_exposure": "contextual",
+            "cost": "cheap"
+          },
+          "note": "full 83-tool definitions elided; see mcp_tool_registry_expected.json"
+        }
+      }
+    }
+  ],
+  "validation": {
+    "DiscoverResultSchema": "pass",
+    "ListToolsResultSchema": "pass",
+    "CallToolResultSchema": "pass",
+    "InitializeResultSchema": "pass",
+    "modern wire obligations (resultType/supportedVersions/cache hints/serverInfo _meta)": "pass"
+  }
+}

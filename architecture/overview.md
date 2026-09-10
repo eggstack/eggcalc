@@ -334,7 +334,7 @@ primitives.py          ← foundation (no exact/ deps)
 
 ## MCP Server
 
-stdio JSON-RPC server exposing deterministic tools to AI agents. Protocol versions supported: `2024-11-05` and `2025-11-25` (latest).
+stdio JSON-RPC server exposing deterministic tools to AI agents. Dual-era: finalized `2026-07-28` stateless requests plus legacy `2024-11-05` / `2025-11-25` handshake sessions (see [mcp.md](mcp.md), Dual-Era Model).
 
 ### Tool Categories (83 tools, 21 categories)
 

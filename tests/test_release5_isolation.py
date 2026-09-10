@@ -123,7 +123,7 @@ class TestMcpServerConfig:
         assert cfg.max_tool_workers == 16
         assert cfg.allow_random is False
         assert cfg.allow_side_effects is False
-        assert cfg.supported_protocol_versions == ("2024-11-05", "2025-11-25")
+        assert cfg.supported_protocol_versions == ("2024-11-05", "2025-11-25", "2026-07-28")
 
     def test_config_from_environment(self):
         env = {
@@ -199,7 +199,7 @@ class TestMcpServerConfig:
 
     def test_config_latest_protocol_version(self):
         cfg = McpServerConfig()
-        assert cfg.latest_protocol_version == "2025-11-25"
+        assert cfg.latest_protocol_version == "2026-07-28"
 
 
 # ---------------------------------------------------------------------------

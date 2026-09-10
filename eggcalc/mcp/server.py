@@ -257,8 +257,24 @@ MAX_CANCELLED_REQUESTS = _parse_env_int(
 )
 
 from eggcalc._protocol import (
-    LATEST_SUPPORTED_PROTOCOL_VERSION,
+    CLIENT_CAPABILITIES_META_KEY,
+    CLIENT_INFO_META_KEY,
+    LATEST_LEGACY_PROTOCOL_VERSION,
+    # LATEST_SUPPORTED_PROTOCOL_VERSION and MODERN_PROTOCOL_VERSIONS are
+    # re-exported for compatibility, see architecture/authority_inventory.md.
+    # They stay inside this parenthesized block on purpose: build_single.py
+    # strips top-level multi-line imports, while single-line eggcalc imports
+    # would survive into the single-file build as live package imports.
+    LATEST_SUPPORTED_PROTOCOL_VERSION,  # noqa: F401
+    LEGACY_PROTOCOL_VERSIONS,
+    MODERN_CACHE_SCOPE,
+    MODERN_CACHE_TTL_MS,
+    MODERN_METHODS,
+    MODERN_PROTOCOL_VERSIONS,  # noqa: F401
+    PROTOCOL_VERSION_META_KEY,
+    SERVER_INFO_META_KEY,
     SUPPORTED_PROTOCOL_VERSIONS,
+    protocol_era,
 )
 
 SUPPORTED_SCHEMA_KEYWORDS = frozenset(
@@ -525,6 +541,203 @@ def _invalid_params(request_id: Any, message: str) -> dict[str, Any]:
 def _internal_error(request_id: Any, message: str) -> dict[str, Any]:
     """Build JSON-RPC internal error (-32603)."""
     return _jsonrpc_error(request_id, -32603, f"Internal error: {message}")
+
+
+# ---------------------------------------------------------------------------
+# Modern (2026-07-28) stateless era
+#
+# The modern era has no initialize handshake and no protocol-level session.
+# Each request carries its protocol version and client capabilities in
+# ``params._meta`` under reserved ``io.modelcontextprotocol/*`` keys, and
+# every result carries server identity in ``result._meta``.  All dispatch
+# here is server-owned: modern requests never touch ``McpSession`` state.
+# ---------------------------------------------------------------------------
+
+#: Concise server instructions shared by modern ``server/discover`` (and,
+#: once Plan 039 lands, the legacy ``initialize`` response).  One authority;
+#: do not maintain a second prose copy.
+SERVER_INSTRUCTIONS = (
+    "Prefer composite preflight tools (edit_preflight, command_preflight, "
+    "config_preflight) for general safety checks and specialist primitives "
+    "when exact domain evidence is required. Prefer json_extract over the "
+    "deprecated json_query. Use math_eval for deterministic calculations "
+    "and unit expressions rather than model arithmetic. All tools are local "
+    "and deterministic; they do not access the network or filesystem."
+)
+
+#: Bounds for request-local modern metadata (defense in depth on top of the
+#: request-size boundary; the envelope is never persisted).
+_MAX_MODERN_META_KEYS = 64
+_MAX_MODERN_CAPABILITY_KEYS = 64
+_MAX_MODERN_CLIENT_INFO_FIELD = 256
+
+
+def _modern_server_info() -> dict[str, str]:
+    """Return the self-reported server identity stamp for modern results."""
+    return {"name": "eggcalc", "version": __version__}
+
+
+def _attach_modern_server_info(result: dict[str, Any]) -> dict[str, Any]:
+    """Stamp a modern result with server identity in ``_meta``.
+
+    A handler-authored ``_meta`` mapping wins on key conflicts except for
+    the reserved server-identity key, which always reflects this server.
+    """
+    meta = result.get("_meta")
+    if not isinstance(meta, dict):
+        meta = {}
+    else:
+        meta = dict(meta)
+    meta[SERVER_INFO_META_KEY] = _modern_server_info()
+    result["_meta"] = meta
+    return result
+
+
+@_dataclass(frozen=True)
+class ModernRequestContext:
+    """Request-scoped modern client metadata.
+
+    Immutable and never persisted: modern behavior must not depend on a
+    previous request from the same stdio process.  Holds only the
+    request-scoped information eggcalc needs (protocol version, client
+    capabilities, optional validated client info).
+    """
+
+    protocol_version: str = "2026-07-28"
+    client_capabilities: Mapping[str, Any] = _field(default_factory=lambda: MappingProxyType({}))
+    client_info: Mapping[str, Any] | None = None
+
+
+def _unsupported_version_error(
+    request_id: Any, requested: Any, supported: tuple[str, ...] | None = None
+) -> dict[str, Any]:
+    """Build the spec-defined unsupported-version error (-32022).
+
+    Carries ``data.supported`` so the client can retry with a mutually
+    supported revision instead of falling back silently.  Defaults to the
+    authoritative ``SUPPORTED_PROTOCOL_VERSIONS``; pass the owning
+    server's configured versions when serving a real request.
+    """
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "error": {
+            "code": -32022,
+            "message": f"Unsupported protocol version: {requested}",
+            "data": {
+                "supported": list(
+                    supported if supported is not None else SUPPORTED_PROTOCOL_VERSIONS
+                ),
+                "requested": requested,
+            },
+        },
+    }
+
+
+def _validate_modern_envelope(
+    request: dict[str, Any],
+    supported_versions: tuple[str, ...] | None = None,
+) -> tuple[ModernRequestContext | None, dict[str, Any] | None]:
+    """Validate the modern ``params._meta`` envelope of a candidate request.
+
+    Returns ``(context, None)`` on success or ``(None, error_response)``
+    when the envelope is malformed (``-32602``) or names a revision the
+    server does not serve (``-32022``).  Missing ``clientInfo`` is
+    accepted (SHOULD, not MUST); present-but-malformed ``clientInfo`` is
+    rejected.
+    """
+    request_id = request.get("id")
+    supported = (
+        supported_versions if supported_versions is not None else SUPPORTED_PROTOCOL_VERSIONS
+    )
+    params = request.get("params")
+    if not isinstance(params, dict):
+        return None, _invalid_params(request_id, "Modern requests require params object")
+    meta = params.get("_meta")
+    if not isinstance(meta, dict):
+        return None, _invalid_params(request_id, "Modern requests require params._meta object")
+    if len(meta) > _MAX_MODERN_META_KEYS:
+        return None, _invalid_params(request_id, "Modern params._meta has too many entries")
+
+    version = meta.get(PROTOCOL_VERSION_META_KEY)
+    if not isinstance(version, str) or not version.strip():
+        return None, _invalid_params(
+            request_id, "Modern params._meta requires 'io.modelcontextprotocol/protocolVersion'"
+        )
+    if version not in supported:
+        return None, _unsupported_version_error(request_id, version, supported)
+
+    capabilities = meta.get(CLIENT_CAPABILITIES_META_KEY)
+    if not isinstance(capabilities, dict):
+        return None, _invalid_params(
+            request_id,
+            "Modern params._meta requires 'io.modelcontextprotocol/clientCapabilities'",
+        )
+    if len(capabilities) > _MAX_MODERN_CAPABILITY_KEYS:
+        return None, _invalid_params(request_id, "Modern clientCapabilities has too many entries")
+
+    raw_info = meta.get(CLIENT_INFO_META_KEY)
+    client_info: Mapping[str, Any] | None = None
+    if raw_info is not None:
+        if not isinstance(raw_info, dict):
+            return None, _invalid_params(request_id, "Modern clientInfo must be an object")
+        name = raw_info.get("name")
+        if not isinstance(name, str) or not name.strip():
+            return None, _invalid_params(
+                request_id, "Modern clientInfo.name must be a non-empty string"
+            )
+        if len(name) > _MAX_MODERN_CLIENT_INFO_FIELD:
+            return None, _invalid_params(request_id, "Modern clientInfo.name is too long")
+        version_info = raw_info.get("version", "")
+        if not isinstance(version_info, str):
+            return None, _invalid_params(request_id, "Modern clientInfo.version must be a string")
+        if len(version_info) > _MAX_MODERN_CLIENT_INFO_FIELD:
+            return None, _invalid_params(request_id, "Modern clientInfo.version is too long")
+        client_info = MappingProxyType({"name": name, "version": version_info})
+
+    return (
+        ModernRequestContext(
+            protocol_version=version,
+            client_capabilities=MappingProxyType(dict(capabilities)),
+            client_info=client_info,
+        ),
+        None,
+    )
+
+
+def _classify_request_era(
+    request: Any,
+    supported_versions: tuple[str, ...] | None = None,
+) -> tuple[str | None, dict[str, Any] | None, ModernRequestContext | None]:
+    """Classify an incoming request into exactly one protocol era.
+
+    Returns ``(era, error, context)`` where *era* is ``"modern"``,
+    ``"legacy"``, or ``None`` when classification itself failed.  A
+    request is a modern candidate only when ``params._meta`` carries a
+    reserved ``io.modelcontextprotocol/`` key — the method name alone
+    (including ``server/discover``) never selects the modern era.  An
+    explicitly unsupported protocol revision yields a ``-32022`` error
+    and never falls through into the legacy state machine.  A modern
+    envelope naming a supported *legacy* revision is served by the
+    legacy session path (the handshake era owns those revisions).
+    """
+    if not isinstance(request, dict):
+        return "legacy", None, None
+    params = request.get("params")
+    if not isinstance(params, dict):
+        return "legacy", None, None
+    meta = params.get("_meta")
+    if not isinstance(meta, dict):
+        return "legacy", None, None
+    if not any(isinstance(key, str) and key.startswith("io.modelcontextprotocol/") for key in meta):
+        return "legacy", None, None
+    context, error = _validate_modern_envelope(request, supported_versions)
+    if error is not None:
+        return None, error, None
+    assert context is not None
+    if protocol_era(context.protocol_version) == "modern":
+        return "modern", None, context
+    return "legacy", None, None
 
 
 @_dataclass(frozen=True)
@@ -999,11 +1212,21 @@ class ToolExecutor:
         cancelled_order: deque[Any] | None = None,
         cancelled_lock: threading.Lock | None = None,
         evaluator: _evaluator.Evaluator | None = None,
+        modern: bool = False,
     ) -> dict[str, Any]:
         """Execute a tool call with validation, timeout, and cancellation.
 
         Uses the evaluator captured from the request context when provided;
         falls back to the executor's own evaluator for backward compatibility.
+
+        When *modern* is true (2026-07-28 era), successful results also
+        carry ``resultType`` and the ``structuredContent`` compatibility
+        bridge (``structuredContent = text_envelope["result"]``), built
+        from the same in-memory handler result as the compatibility text.
+        Error envelopes stay ``isError`` without a success payload.  Plan
+        039 owns the centralized result-boundary validation; this bridge
+        only guarantees the modern path never advertises a revision with
+        known-invalid tool responses.
         """
         if self._closed:
             return {
@@ -1112,35 +1335,44 @@ class ToolExecutor:
             }
 
         if timed_out:
+            result_payload: dict[str, Any] = {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "ok": False,
+                                "error": f"Tool '{name}' execution timed out after {self._config.max_tool_timeout_seconds}s",
+                                "error_type": "timeout",
+                                "hints": ["Try a simpler input or shorter text"],
+                                "tool": name,
+                                "warnings": [],
+                            }
+                        ),
+                    }
+                ],
+                "isError": True,
+            }
+            if modern:
+                result_payload["resultType"] = "complete"
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(
-                                {
-                                    "ok": False,
-                                    "error": f"Tool '{name}' execution timed out after {self._config.max_tool_timeout_seconds}s",
-                                    "error_type": "timeout",
-                                    "hints": ["Try a simpler input or shorter text"],
-                                    "tool": name,
-                                    "warnings": [],
-                                }
-                            ),
-                        }
-                    ],
-                    "isError": True,
-                },
+                "result": result_payload,
             }
 
         if isinstance(result, dict) and result.get("ok") is False:
             serialized = json.dumps(result)
+            error_payload: dict[str, Any] = {
+                "content": [{"type": "text", "text": serialized}],
+                "isError": True,
+            }
+            if modern:
+                error_payload["resultType"] = "complete"
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {"content": [{"type": "text", "text": serialized}], "isError": True},
+                "result": error_payload,
             }
 
         serialized = json.dumps(result)
@@ -1153,19 +1385,27 @@ class ToolExecutor:
                 "hints": ["Try reducing input size or using a summary/detail option"],
                 "warnings": ["Output was truncated due to size limit"],
             }
+            truncated_payload: dict[str, Any] = {
+                "content": [{"type": "text", "text": json.dumps(truncated)}],
+                "isError": True,
+            }
+            if modern:
+                truncated_payload["resultType"] = "complete"
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [{"type": "text", "text": json.dumps(truncated)}],
-                    "isError": True,
-                },
+                "result": truncated_payload,
             }
 
+        success_payload: dict[str, Any] = {"content": [{"type": "text", "text": serialized}]}
+        if modern:
+            success_payload["resultType"] = "complete"
+            if isinstance(result, dict) and result.get("ok") is True and "result" in result:
+                success_payload["structuredContent"] = result["result"]
         return {
             "jsonrpc": "2.0",
             "id": request_id,
-            "result": {"content": [{"type": "text", "text": serialized}]},
+            "result": success_payload,
         }
 
     def _tool_not_found(self, request_id: Any, name: str) -> dict[str, Any]:
@@ -1966,16 +2206,21 @@ class McpSession:
 
         client_version = client_info.get("version", "")
 
-        # Version negotiation: use server config when available
-        supported_versions = (
+        # Version negotiation: the handshake era negotiates legacy revisions
+        # only.  Modern revisions are served statelessly via the per-request
+        # _meta envelope and never via initialize; a handshake asking for a
+        # modern (or unknown) revision falls back to the latest legacy
+        # revision, matching the historical unsupported-version behavior.
+        configured_versions = (
             server.config.supported_protocol_versions
             if server is not None
             else SUPPORTED_PROTOCOL_VERSIONS
         )
+        legacy_supported = tuple(v for v in configured_versions if v in LEGACY_PROTOCOL_VERSIONS)
         latest_version = (
-            supported_versions[-1] if supported_versions else LATEST_SUPPORTED_PROTOCOL_VERSION
+            legacy_supported[-1] if legacy_supported else (LATEST_LEGACY_PROTOCOL_VERSION)
         )
-        if protocol_version in supported_versions:
+        if protocol_version in legacy_supported:
             negotiated = protocol_version
         else:
             negotiated = latest_version
@@ -2166,6 +2411,12 @@ class McpServer:
         request has one stable semantic context from validation through
         execution, even if a new configuration publishes while it is queued.
 
+        Dual-era dispatch: requests carrying a modern (2026-07-28)
+        ``params._meta`` envelope are served statelessly without touching
+        any session, so one server process serves both eras concurrently
+        with no cross-era state leakage.  All other requests follow the
+        legacy ``McpSession`` lifecycle.
+
         Validation mirrors the module-level handle_request shim: JSON-RPC
         version, id type/length, and method presence/type are enforced here
         so direct library calls get the same protocol conformance as the
@@ -2222,6 +2473,22 @@ class McpServer:
                 request.get("id"),
                 "Invalid Request: 'method' must be a string",
             )
+
+        # Era classification precedes all session logic: modern requests
+        # are server-owned and must not mutate session state, while
+        # malformed modern traffic receives a deterministic protocol
+        # error instead of falling into the legacy state machine.
+        # Modern notifications produce no response on either path.
+        era, modern_error, modern_ctx = _classify_request_era(
+            request, self._config.supported_protocol_versions
+        )
+        if era == "modern" or modern_error is not None:
+            if "id" not in request:
+                return None
+            if modern_error is not None:
+                return modern_error
+            assert modern_ctx is not None
+            return _handle_modern_request(request, self, modern_ctx)
 
         if session is None:
             session = self.create_session()
@@ -2771,11 +3038,21 @@ def _validate_arguments_schema(
     return None
 
 
-def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None) -> dict[str, Any]:
+def _handle_list_tools(
+    request: dict[str, Any],
+    server: McpServer | None = None,
+    modern: ModernRequestContext | None = None,
+) -> dict[str, Any]:
     """Handle a tools/list MCP request with optional filtering.
 
     When *server* is provided, its config and registry are used instead
     of module-level globals, giving callers full state isolation.
+
+    Tools are emitted in canonical sorted-name order so the catalog is
+    stable across unrelated source reorderings.  When *modern* is
+    provided (2026-07-28 era), the result also carries the required
+    ``resultType``/cache-hint wire fields and the server-identity
+    ``_meta`` stamp; legacy results keep their historical shape.
     """
     params = request.get("params", {})
     request_id = request.get("id")
@@ -2859,7 +3136,7 @@ def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None)
     metadata_src = server.registry.metadata if server is not None else TOOL_METADATA
 
     tools = []
-    for name, schema in schemas_src.items():
+    for name, schema in sorted(schemas_src.items()):
         if name not in profile_tools:
             continue
 
@@ -2906,10 +3183,19 @@ def _handle_list_tools(request: dict[str, Any], server: McpServer | None = None)
             }
         tools.append(entry)
 
+    list_result: dict[str, Any] = {"tools": tools}
+    if modern is not None:
+        list_result = {
+            "resultType": "complete",
+            "tools": tools,
+            "ttlMs": MODERN_CACHE_TTL_MS,
+            "cacheScope": MODERN_CACHE_SCOPE,
+        }
+        list_result = _attach_modern_server_info(list_result)
     return {
         "jsonrpc": "2.0",
         "id": request.get("id"),
-        "result": {"tools": tools},
+        "result": list_result,
     }
 
 
@@ -2955,6 +3241,112 @@ def _handle_list_profiles(
             "available_profiles": list(available_profiles),
         },
     }
+
+
+def _handle_discover(request: dict[str, Any], server: McpServer) -> dict[str, Any]:
+    """Handle server/discover on the modern path (no session required).
+
+    Discovery data comes from existing authorities: supported versions
+    from the server config (defaulting to ``_protocol``), protocol-only
+    capabilities (never runtime diagnostics), server identity via the
+    result ``_meta`` stamp, and the shared ``SERVER_INSTRUCTIONS``
+    authority.
+    """
+    result: dict[str, Any] = {
+        "resultType": "complete",
+        "supportedVersions": list(server.config.supported_protocol_versions),
+        "capabilities": {"tools": {"listChanged": False}},
+        "instructions": SERVER_INSTRUCTIONS,
+        "ttlMs": MODERN_CACHE_TTL_MS,
+        "cacheScope": MODERN_CACHE_SCOPE,
+    }
+    result = _attach_modern_server_info(result)
+    return {"jsonrpc": "2.0", "id": request.get("id"), "result": result}
+
+
+def _handle_call_tool_modern(
+    request: dict[str, Any], server: McpServer, context: RuntimeContext | None = None
+) -> dict[str, Any]:
+    """Handle tools/call on the modern path using server-owned state only.
+
+    Identical profile/handler admission to the legacy session path, but
+    never consults legacy session cancellation sets or negotiated client
+    state.  Only request-local metadata and immutable server state apply.
+    """
+    params = request.get("params", {})
+    if not isinstance(params, dict):
+        return _invalid_params(request.get("id"), "Invalid params: expected object")
+
+    name = params.get("name", "")
+    arguments = params.get("arguments", {})
+    if not isinstance(name, str) or not name:
+        return _invalid_params(request.get("id"), "Invalid params: missing tool name")
+    if not isinstance(arguments, dict):
+        return _invalid_params(request.get("id"), "Invalid arguments: expected object")
+
+    # Check handler existence first (returns -32601 for unknown tools)
+    if not server.registry.has_tool(name):
+        close = server.registry.find_close_match(name)
+        msg = f"Unknown tool: {name}"
+        if close:
+            msg += f". Did you mean: {close}?"
+        return _jsonrpc_error(request.get("id"), -32601, msg)
+
+    # Enforce server profile authority before executor submission
+    profile = server.config.profile
+    try:
+        profile_tools = server.registry.get_profile_tools(profile)
+    except ValueError as e:
+        return _jsonrpc_error(request.get("id"), -32602, str(e))
+    if name not in profile_tools:
+        return _jsonrpc_error(
+            request.get("id"),
+            -32602,
+            (
+                f"Tool '{name}' is not available in profile '{profile}'. "
+                f"Use tools/list to see available tools, or switch profile."
+            ),
+        )
+
+    evaluator = context.evaluator if context is not None else server.evaluator
+    response = server._executor.call_tool(
+        name=name,
+        arguments=arguments,
+        request_id=request.get("id"),
+        evaluator=evaluator,
+        modern=True,
+    )
+    if isinstance(response.get("result"), dict):
+        response["result"] = _attach_modern_server_info(response["result"])
+    return response
+
+
+def _handle_modern_request(
+    request: dict[str, Any], server: McpServer, modern_ctx: ModernRequestContext
+) -> dict[str, Any] | None:
+    """Dispatch a validated modern request without touching session state.
+
+    Captures one immutable ``RuntimeContext`` before tool admission so the
+    request sees a single evaluator/config generation from validation
+    through execution.  Only the methods in ``MODERN_METHODS`` are served;
+    legacy lifecycle methods (``initialize``,
+    ``notifications/initialized``), liveness ``ping`` (not defined for the
+    modern era), and eggcalc-specific legacy methods are rejected as
+    unknown on this path.
+    """
+    if "id" not in request:
+        return None
+    request_id = request.get("id")
+    method = request.get("method", "")
+    if method not in MODERN_METHODS:
+        display = method[:100] + "..." if len(method) > 100 else method
+        return _method_not_found(request_id, display)
+    context = server._runtime_context
+    if method == "server/discover":
+        return _handle_discover(request, server)
+    if method == "tools/list":
+        return _handle_list_tools(request, server=server, modern=modern_ctx)
+    return _handle_call_tool_modern(request, server, context)
 
 
 _compat_server: McpServer | None = None

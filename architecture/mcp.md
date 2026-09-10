@@ -394,9 +394,35 @@ Spawn-permit, queue/child cleanup, and context-selection mechanics are shared wi
 
 stdio-based JSON-RPC 2.0 server implementation with bounded thread pool, rate limiting, and orphaned process cleanup.
 
-### Session Lifecycle
+### Dual-Era Model (authoritative)
 
-The MCP server uses `McpSession` and `McpSessionState` to manage protocol lifecycle:
+This section is the single detailed description of the two-era model; other docs link here instead of repeating the lifecycle matrix.
+
+MCP has two protocol eras, and one stdio server process speaks both:
+
+| | Legacy era | Modern era |
+|---|---|---|
+| Revisions | `2024-11-05`, `2025-11-25` | `2026-07-28` (finalized) |
+| Bootstrap | `initialize` → `notifications/initialized` → READY `McpSession` | Per-request `params._meta` envelope; optional `server/discover` |
+| Client context | Negotiated once per session | `ModernRequestContext` per request (never persisted) |
+| Served methods | All registered methods | `server/discover`, `tools/list`, `tools/call` only |
+| Liveness | `ping` | Not defined (`ping` is `-32601` here) |
+| Identity | `serverInfo` in the `initialize` result | `result._meta["io.modelcontextprotocol/serverInfo"]` on every result |
+| Errors | `-32600`/`-32601`/`-32602`/`-32603`/`-32000` | Plus `-32022` unsupported-version (with `data.supported`/`data.requested`) |
+
+Authority and dispatch rules:
+
+- `eggcalc/_protocol.py` is the sole version/era authority (`LEGACY_PROTOCOL_VERSIONS`, `MODERN_PROTOCOL_VERSIONS`, `SUPPORTED_PROTOCOL_VERSIONS`, `protocol_era()` plus the reserved `_meta` key constants, conservative cache-hint constants, and the `MODERN_METHODS` allowlist). No other module defines version tuples.
+- `_classify_request_era()` is the one classifier. A request is a modern candidate only when `params._meta` carries a reserved `io.modelcontextprotocol/` key — the method name alone (including `server/discover`) never selects the era. Unsupported revisions yield `-32022` and never fall into the legacy state machine; a modern envelope naming a supported legacy revision is served by the legacy path.
+- `McpServer.handle_request()` classifies before any session logic. Modern requests go to `_handle_modern_request()` (server-owned dispatch over the captured `RuntimeContext`, no `McpSession` involved, no fake READY sessions constructed); everything else follows the legacy `McpSession` lifecycle. Modern notifications produce no response and mutate nothing.
+- `server/discover` is generated from existing authorities: supported versions from the server config, protocol-only capabilities (`{"tools": {"listChanged": False}}` — runtime diagnostics from `detect_capabilities()` are intentionally excluded), identity via the `_meta` stamp (never a body field), `SERVER_INSTRUCTIONS`, and conservative `ttlMs: 0` / `cacheScope: "private"`.
+- Modern `tools/list` reuses the registry/profile/schema-detail machinery, emits canonical sorted-name order, and adds `resultType`/`ttlMs`/`cacheScope`/`_meta`. Modern `tools/call` reuses the same `ToolExecutor` and profile authority with no session cancellation sets, and adds the `structuredContent = text_envelope["result"]` compatibility bridge plus `resultType` (see `ToolExecutor.call_tool(..., modern=True)`; Plan 039 centralizes result-boundary validation).
+- `_attach_modern_server_info()` is the single response-finalization helper; JSON-RPC errors carry no `_meta`.
+- `SERVER_INSTRUCTIONS` is the one concise instruction authority, currently wired to `server/discover` (Plan 039 reuses it for legacy `initialize` where protocol-appropriate).
+
+### Session Lifecycle (legacy era)
+
+The MCP server uses `McpSession` and `McpSessionState` to manage the legacy handshake-era lifecycle (unchanged by modern support):
 
 ```
 UNINITIALIZED --initialize request--> INITIALIZING
@@ -415,14 +441,7 @@ Tool requests before initialization return `-32600` ("Server not initialized"). 
 
 ### Protocol Version Negotiation
 
-Supported versions are defined in `eggcalc/_protocol.py` (imported by `server.py`): `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")` with `LATEST_SUPPORTED_PROTOCOL_VERSION = "2025-11-25"`. The `initialize` handler inspects the client's `protocolVersion`:
-
-- If the client requests a supported version, the server responds with that version.
-- If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version.
-
-This avoids breaking clients that depend on a specific version string while keeping the server future-proof.
-
-The draft `2026-07-28` stateless MCP protocol revision is intentionally out of scope until final publication and a separate migration plan. The current stdio lifecycle implementation remains stateful.
+Supported versions are defined in `eggcalc/_protocol.py` (imported by `server.py`): `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25", "2026-07-28")` with `LATEST_SUPPORTED_PROTOCOL_VERSION = "2026-07-28"`, split into `LEGACY_PROTOCOL_VERSIONS` and `MODERN_PROTOCOL_VERSIONS` with `protocol_era()` as the single version→era mapping. The legacy `initialize` handler negotiates legacy revisions only (unknown or modern revisions fall back to `LATEST_LEGACY_PROTOCOL_VERSION = "2025-11-25"`); modern revisions are negotiated per-request via the `_meta` envelope, with mismatches answered by `-32022`. See [Dual-Era Model](#dual-era-model-authoritative) above.
 
 ### Notification Dispatch
 
@@ -456,13 +475,16 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
 
 | Method | Handler | Description |
 |--------|---------|-------------|
-| `initialize` | `McpSession._handle_initialize()` | Initialize connection, return capabilities |
-| `notifications/initialized` | None (returns None) | Client acknowledgment |
-| `tools/list` | `_handle_list_tools()` | List available tools (with filtering) |
-| `tools/call` | `McpSession._handle_call_tool_server()` | Execute a tool |
-| `profiles/list` | `_handle_list_profiles()` | List all profiles and their tools |
-| `notifications/cancelled` | None (records cancellation) | Client-side request cancellation |
-| `ping` | Inline response | Health check, returns empty result |
+| `initialize` | `McpSession._handle_initialize()` | Initialize connection, return capabilities (legacy era only; negotiates legacy revisions) |
+| `notifications/initialized` | None (returns None) | Client acknowledgment (legacy era only) |
+| `server/discover` | `_handle_discover()` | Modern bootstrap: versions, capabilities, instructions, cache hints (modern era only) |
+| `tools/list` | `_handle_list_tools()` | List available tools (with filtering); modern calls add `resultType`/cache hints/`_meta` |
+| `tools/call` | `McpSession._handle_call_tool_server()` (legacy) / `_handle_call_tool_modern()` (modern) | Execute a tool; modern results add `resultType`/`structuredContent`/`_meta` |
+| `profiles/list` | `_handle_list_profiles()` | List all profiles and their tools (legacy era only; `-32601` on the modern path) |
+| `notifications/cancelled` | None (records cancellation) | Client-side request cancellation (legacy session state; modern notifications are dropped silently) |
+| `ping` | Inline response | Health check, returns empty result (legacy era only; `-32601` on the modern path) |
+
+`McpServer.handle_request()` classifies the era before session dispatch (see [Dual-Era Model](#dual-era-model-authoritative)): modern-enveloped requests never reach `McpSession`, and legacy requests never receive modern-only response fields.
 
 ### Tool Handler Map
 
@@ -584,9 +606,11 @@ Two layers of validation before tool execution:
 | -32700 | ParseError | Invalid JSON |
 | -32600 | InvalidRequest | Invalid JSON-RPC request (batch requests rejected, rate limit, server already initialized, not initialized) |
 | -32601 | MethodNotFound | Unknown method or tool |
-| -32602 | InvalidParams | Invalid method parameters, profile violation, schema validation error |
+| -32602 | InvalidParams | Invalid method parameters, malformed modern `_meta` envelope, profile violation, schema validation error |
 | -32603 | InternalError | Internal error (unhandled exceptions) |
 | -32000 | ToolError | Tool execution error (handler exception) |
+| -32021 | MissingRequiredClientCapability | Reserved: processing needs an undeclared client capability (eggcalc tools currently require none) |
+| -32022 | UnsupportedProtocolVersion | Modern request names an unserved revision (`data.supported` / `data.requested`) |
 
 Centralized error helpers (`_jsonrpc_error`, `_parse_error`, `_invalid_request`, `_method_not_found`, `_invalid_params`, `_internal_error`) prevent code drift across return paths.
 
@@ -671,6 +695,8 @@ Centralized error helpers (`_jsonrpc_error`, `_parse_error`, `_invalid_request`,
     }
 }
 ```
+
+Modern-era results add `resultType: "complete"`, the server-identity `_meta` stamp, and — for `tools/list` / `server/discover` — `ttlMs` / `cacheScope` on top of these shapes; successful modern `tools/call` results additionally carry `structuredContent` equal to the text envelope's `result` member. Legacy results keep the shapes above byte-compatible (see [Dual-Era Model](#dual-era-model-authoritative)).
 
 ---
 

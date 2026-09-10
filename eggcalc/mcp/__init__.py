@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from eggcalc._protocol import (
     LATEST_SUPPORTED_PROTOCOL_VERSION,
+    LEGACY_PROTOCOL_VERSIONS,
+    MODERN_PROTOCOL_VERSIONS,
     SUPPORTED_PROTOCOL_VERSIONS,
 )
 
@@ -23,6 +25,7 @@ from .server import (
     McpServerConfig,
     McpSession,
     McpSessionState,
+    ModernRequestContext,
     RuntimeContext,
     ToolExecutor,
     ToolRegistry,
@@ -42,7 +45,10 @@ __all__ = [
     "tools",
     "McpSession",
     "McpSessionState",
+    "ModernRequestContext",
     "SUPPORTED_PROTOCOL_VERSIONS",
+    "LEGACY_PROTOCOL_VERSIONS",
+    "MODERN_PROTOCOL_VERSIONS",
     "LATEST_SUPPORTED_PROTOCOL_VERSION",
     "McpServerConfig",
     "McpServer",

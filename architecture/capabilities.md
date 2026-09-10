@@ -54,4 +54,6 @@ print(caps.mode)             # "package" or "single-file"
 - **CLI diagnostics**: `capability_summary()` prints a human-readable snapshot
 - **Build validation**: `scripts/smoke_release_surfaces.py` checks capabilities in installed wheel and single-file distributions
 
+Runtime capabilities are eggcalc diagnostics, not MCP protocol capabilities: the modern `server/discover` result advertises only protocol capabilities (`{"tools": {"listChanged": false}}`), while the legacy `initialize` response keeps the `runtime` diagnostics key for backward compatibility.
+
 See also: [overview.md](overview.md) for module placement, [mcp.md](mcp.md) for MCP integration.

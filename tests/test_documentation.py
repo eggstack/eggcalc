@@ -422,14 +422,25 @@ class TestProtocolVersionParity:
         import re
 
         proto_src = pathlib.Path("eggcalc/_protocol.py").read_text()
-        m = re.search(r"SUPPORTED_PROTOCOL_VERSIONS.*?=.*?\(([^)]+)\)", proto_src)
-        assert m, "Could not find SUPPORTED_PROTOCOL_VERSIONS in _protocol.py"
-        proto_versions = tuple(
-            v.strip().strip('"').strip("'")
-            for v in m.group(1).split(",")
-            if v.strip().strip('"').strip("'")
-        )
-        assert len(proto_versions) >= 2, f"Expected >=2 protocol versions, got {proto_versions}"
+
+        def _tuple_literals(name: str) -> tuple[str, ...]:
+            m = re.search(rf"{name}.*?=.*?\(([^)]+)\)", proto_src)
+            assert m, f"Could not find {name} in _protocol.py"
+            return tuple(
+                v.strip().strip('"').strip("'")
+                for v in m.group(1).split(",")
+                if v.strip().strip('"').strip("'")
+            )
+
+        legacy = _tuple_literals("LEGACY_PROTOCOL_VERSIONS")
+        modern = _tuple_literals("MODERN_PROTOCOL_VERSIONS")
+        assert len(legacy) >= 1, f"Expected >=1 legacy versions, got {legacy}"
+        assert len(modern) >= 1, f"Expected >=1 modern versions, got {modern}"
+
+        from eggcalc._protocol import SUPPORTED_PROTOCOL_VERSIONS
+
+        assert tuple(SUPPORTED_PROTOCOL_VERSIONS) == tuple(legacy) + tuple(modern)
+        assert len(SUPPORTED_PROTOCOL_VERSIONS) >= 2
 
     def test_server_imports_from_protocol(self):
         import pathlib

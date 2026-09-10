@@ -105,18 +105,18 @@ The server uses JSON-RPC 2.0 over stdio:
 
 ### Supported Protocol Versions
 
-The server supports MCP protocol versions `2025-11-25` (latest stable) and `2024-11-05` (legacy compatibility). Version negotiation happens during the `initialize` handshake:
+The server is dual-era: it speaks the finalized MCP `2026-07-28` stateless revision alongside the legacy handshake revisions `2025-11-25` and `2024-11-05` over the same stdio transport. One server process serves both eras concurrently with no cross-era state leakage.
 
-- If the client requests a supported version, the server responds with that version.
-- If the client omits `protocolVersion` or requests an unsupported version, the server responds with the latest supported version (`2025-11-25`).
+- **Modern (`2026-07-28`)** — no `initialize` handshake and no session. Every request carries its protocol version and client capabilities in `params._meta` under reserved `io.modelcontextprotocol/*` keys (`protocolVersion` and `clientCapabilities` are required; `clientInfo` is optional). `server/discover` is the bootstrap RPC (optional; clients may call any method inline). Every result carries server identity in `result._meta["io.modelcontextprotocol/serverInfo"]` plus the required `resultType` and cache-hint fields.
+- **Legacy (`2025-11-25`, `2024-11-05`)** — the `initialize` → `notifications/initialized` handshake negotiates a session as before. The handshake negotiates legacy revisions only; asking for `2026-07-28` via `initialize` falls back to `2025-11-25`.
 
-Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS` in `eggcalc/_protocol.py` (imported by `eggcalc/mcp/server.py` and `eggcalc/capabilities.py`).
+Supported versions are defined in `SUPPORTED_PROTOCOL_VERSIONS` in `eggcalc/_protocol.py` (with `LEGACY_PROTOCOL_VERSIONS` / `MODERN_PROTOCOL_VERSIONS` era tuples and the `protocol_era()` classifier as the single version→era authority; imported by `eggcalc/mcp/server.py` and `eggcalc/capabilities.py`).
 
-The draft `2026-07-28` stateless protocol revision is intentionally not supported until final publication.
+Request classification is per-request: a request whose `params._meta` carries a reserved `io.modelcontextprotocol/` key is validated as modern (malformed envelopes get `-32602`, unknown revisions get `-32022` with the supported list — never a silent legacy fallback). All other requests follow the legacy session path. A modern request never mutates session state, and a legacy `initialize` never changes how a later modern request is interpreted.
 
-### Session Lifecycle
+### Session Lifecycle (legacy era)
 
-Clients **must** complete the full initialization handshake before calling tools:
+Legacy clients **must** complete the full initialization handshake before calling tools:
 
 1. Send an `initialize` request with `protocolVersion`, `capabilities`, and `clientInfo`.
 2. Receive the `initialize` response with `protocolVersion`, `capabilities`, and `serverInfo`.
@@ -132,6 +132,33 @@ READY         --EOF/shutdown/close--> CLOSED
 Tool requests (`tools/list`, `tools/call`) before the session reaches READY state return JSON-RPC error `-32600` ("Server not initialized"). Duplicate `initialize` requests return `-32600` ("Server already initialized").
 
 **Note:** Calling `handle_request()` without an explicit `McpSession` uses a legacy compatibility path that bypasses the initialization handshake. This path is deprecated and will be removed in a future version. Production stdio usage always creates an uninitialized session.
+
+### Modern Stateless Requests (`2026-07-28`)
+
+Modern clients skip the handshake entirely. Each request is self-describing:
+
+```bash
+# Discover server versions, capabilities, and instructions (no session needed)
+{"jsonrpc": "2.0", "id": 1, "method": "server/discover",
+ "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                       "io.modelcontextprotocol/clientCapabilities": {},
+                       "io.modelcontextprotocol/clientInfo": {"name": "my-client", "version": "1.0.0"}}}}
+
+# List tools without a session
+{"jsonrpc": "2.0", "id": 2, "method": "tools/list",
+ "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                       "io.modelcontextprotocol/clientCapabilities": {}}}}
+
+# Call a tool without a session
+{"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+ "params": {"name": "math_eval", "arguments": {"expression": "5 + 3"},
+            "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                       "io.modelcontextprotocol/clientCapabilities": {}}}}
+```
+
+Modern responses carry `resultType: "complete"`, conservative cache hints (`ttlMs: 0`, `cacheScope: "private"`), and server identity in `result._meta`. Modern `tools/list` results are in canonical sorted-name order and honor the same profile/tier/tags/names/schema-detail filters as legacy. Modern `tools/call` results include the `structuredContent` compatibility bridge (`structuredContent` equals the `result` member of the JSON text envelope) while keeping the full text content for backward compatibility.
+
+Only `server/discover`, `tools/list`, and `tools/call` are served in the modern era. `initialize`, `notifications/initialized`, `ping` (not defined for the modern era), and the eggcalc-specific `profiles/list` are rejected with `-32601` when sent as explicitly modern requests. Tool profile restrictions and output-size/timeout error behavior are identical across both eras.
 
 ### Notification Handling
 
@@ -149,9 +176,26 @@ Unknown notifications are silently ignored per the JSON-RPC 2.0 spec. The server
 | `-32700` | Parse error | Invalid JSON in request |
 | `-32600` | Invalid request | Non-object request, missing `jsonrpc`/`method`, invalid ID type, batch requests, server already initialized, server not initialized |
 | `-32601` | Method not found | Unknown top-level method (e.g., `foo/bar`) |
-| `-32602` | Invalid params | Invalid method parameters, profile violation, schema validation error |
+| `-32602` | Invalid params | Invalid method parameters, malformed modern `_meta` envelope, profile violation, schema validation error |
 | `-32603` | Internal error | Unhandled server exception |
 | `-32000` | Tool error | Tool execution failure (handler exception, timeout) |
+| `-32022` | Unsupported protocol version | Modern request names a revision the server does not serve (`data.supported` lists versions, `data.requested` echoes the request) |
+
+### Interoperability
+
+Dual-era behavior was verified against the official Tier-1 SDK wire schemas (`@modelcontextprotocol/core` v2, via the published MCP Inspector bundle): `server/discover`, modern `tools/list` / `tools/call`, and legacy `initialize` responses all validate, for both package and single-file servers. The captured transcript lives in `tests/fixtures/mcp_2026_07_28_interop_transcript.json` (slimmed to the schema-critical responses; the full 83-tool list is covered by `tests/fixtures/mcp_tool_registry_expected.json`).
+
+To re-run the external check manually (dev-only; adds no runtime dependency — requires Node 20+):
+
+```bash
+# 1. Fetch the inspector bundle once (provides @modelcontextprotocol/core)
+npx -y @modelcontextprotocol/inspector --help >/dev/null
+# 2. Run the dev-only probe (requires Node 20+)
+CORE=$(echo ~/.npm/_npx/*/node_modules/@modelcontextprotocol/core | tr ' ' '\n' | head -1)
+MCP_CORE_DIR="$CORE" node scripts/mcp_interop_probe.mjs .venv/bin/python -m eggcalc --mcp
+```
+
+The probe script is dev-only tooling (not part of the test suite); the transcript fixture above is the durable evidence. The authoritative automated suite remains the stdlib-only pytest suite (`tests/test_mcp_modern.py`).
 
 ### Migration Notes
 
