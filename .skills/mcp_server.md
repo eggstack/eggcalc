@@ -5,8 +5,14 @@ Guide agents on MCP server implementation and tool definitions.
 
 ## MCP Server Structure
 
-### Tool Registration
-Tools are defined in `TOOL_SCHEMAS` (in `schemas.py`) and registered via `TOOL_HANDLERS` (in `server.py`).
+### Tool Registration (Plan 040 authority model)
+Catalog authority is `TOOL_METADATA` in `schemas.py` (canonical name +
+`handler` locator + category/tier/tags/profiles/exposure/cost/stability/
+composite); protocol shape is `TOOL_SCHEMAS` (description/inputSchema/
+outputSchema/deprecated only). `TOOL_HANDLERS` in `server.py` is derived
+via `_build_tool_handlers()` — never hand-edit the mapping. `TOOL_PROFILES`
+is derived via `_build_profiles()`. The JSON fixture is a compatibility
+snapshot, not a registry; `docs/tool_inventory.md` is generated.
 
 ### Response Conventions
 
@@ -54,10 +60,11 @@ Error messages should be sanitized to remove non-ASCII characters before returni
 ## Common Patterns
 
 ### Adding a New Tool
-1. Add schema to `TOOL_SCHEMAS` in `schemas.py`
-2. Add handler function in `tools.py`
-3. Register in `TOOL_HANDLERS` dict in `server.py`
-4. Add test in `test_mcp_server.py`
+1. Add protocol shape to `TOOL_SCHEMAS` in `schemas.py` (description/inputSchema/outputSchema only — no tier/tags)
+2. Add handler function in `tools.py` (deferred exact imports inside the function body)
+3. Add catalog entry to `TOOL_METADATA` in `schemas.py` (`handler` + category/tier/tags/profiles/exposure/cost/stability/composite)
+4. Run `python scripts/generate_mcp_docs.py` and update the compatibility fixture intentionally (`tests/fixtures/mcp_tool_registry_expected.json`)
+5. Add test in `test_mcp_server.py` (and `test_tool_inventory.py` covers authority parity automatically)
 
 ### Tool Function Signature
 ```python

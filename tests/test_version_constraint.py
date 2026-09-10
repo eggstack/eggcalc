@@ -496,11 +496,13 @@ class TestToolInventory:
     """Verify tool is properly registered."""
 
     def test_tool_in_schemas(self):
-        from eggcalc.mcp.schemas import TOOL_SCHEMAS
+        from eggcalc.mcp.schemas import TOOL_METADATA, TOOL_SCHEMAS
 
         assert "version_constraint_check" in TOOL_SCHEMAS
+        assert "version_constraint_check" in TOOL_METADATA
+        assert TOOL_METADATA["version_constraint_check"]["tier"] == 3
         schema = TOOL_SCHEMAS["version_constraint_check"]
-        assert schema["tier"] == 3
+        assert "tier" not in schema
         assert "semver" in str(schema["inputSchema"])
         assert "cargo" in str(schema["inputSchema"])
 

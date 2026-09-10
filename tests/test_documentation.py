@@ -521,8 +521,8 @@ class TestPackageSingleFileParity:
         import subprocess
         import sys
 
-        # Package counts
-        from eggcalc.mcp.tools import TOOL_SCHEMAS
+        # Package counts (canonical authority: eggcalc.mcp.schemas)
+        from eggcalc.mcp.schemas import TOOL_SCHEMAS
 
         pkg_schema_count = len(TOOL_SCHEMAS)
 
@@ -541,8 +541,7 @@ class TestPackageSingleFileParity:
             mod = importlib.util.module_from_spec(spec)
             sys.modules["eggcalc_single"] = mod
             spec.loader.exec_module(mod)
-            from eggcalc.mcp.tools import TOOL_SCHEMAS
-            print(len(TOOL_SCHEMAS))
+            print(len(mod.TOOL_SCHEMAS))
         """)
         result = subprocess.run(
             [sys.executable, "-c", code],

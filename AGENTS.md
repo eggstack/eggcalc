@@ -201,7 +201,7 @@ When adding or modifying TypedDict classes in the `exact/` package, use these fi
 
 ## MCP Server
 
-- 83 tools across 21 categories. Tool names unified via `TOOL_SCHEMAS` in `schemas.py` and `server.py`.
+- 83 tools across 21 categories. Catalog authority is `TOOL_METADATA` in `schemas.py` (canonical name + `handler` locator + category/tier/tags/profiles/exposure/cost/stability/composite); protocol shape is `TOOL_SCHEMAS` (description/inputSchema/outputSchema/deprecated only, no tier/tags). `TOOL_HANDLERS` in `server.py` is derived via `_build_tool_handlers()` (never hand-edit); `TOOL_PROFILES` is derived via `_build_profiles()`. Fixture `tests/fixtures/mcp_tool_registry_expected.json` is a compatibility snapshot (schema_version/tool_count/sorted tools), not a registry; `docs/tool_inventory.md` is generated from the runtime catalog. Use `get_tool_tier()`/`get_tool_tags()` — never `TOOL_SCHEMAS[name]["tier"]`.
 - 11 tool profiles: `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`.
 - Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Per-request `profile` param overrides in `tools/list`.
 - `mcp_main` is an alias for `main` in `server.py`.

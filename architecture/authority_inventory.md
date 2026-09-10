@@ -131,14 +131,19 @@ Note: `MAX_INPUT_LENGTH` in `exact/validate.py` (100 000), `exact/cargo.py` (200
 | `TEMPERATURE_CONVERSIONS` | `eggcalc/units.py:1505` | `test_unit_dimensions` |
 | `UnitRegistry` (structural registry) | `eggcalc/units.py:310` (built by `build_unit_registry()`) | `test_unit_dimensions` |
 
-## Tool Definitions (MCP)
-| Item | Authoritative source | Tests |
-|------|---------------------|-------|
-| `TOOL_SCHEMAS` | `eggcalc/mcp/schemas.py:45` | `test_mcp_schema_lint` |
-| `TOOL_METADATA` | `eggcalc/mcp/schemas.py:4202` | `test_mcp_schema_lint` |
-| `TOOL_PROFILES` | `eggcalc/mcp/schemas.py:5152` (built from `TOOL_METADATA`) | `test_mcp_server` |
-| `PROFILE_NAMES` | `eggcalc/mcp/schemas.py:5155` | `test_mcp_server` |
-| `tools/list` emission order | Canonical sorted-name order in `_handle_list_tools()` (stable across source reorderings, both eras) | `test_mcp_structured_results::TestListOrderingAndCache`, `test_mcp_modern::TestModernToolsList` |
+## Tool Definitions (MCP) — Plan 040 consolidated authorities
+| Item | Authoritative source | Adapters / derived views | Tests |
+|------|---------------------|--------------------------|-------|
+| Catalog: names + handler locators + selection metadata (category/tier/tags/profiles/aliases/exposure/harness/cost/stability/composite) | `eggcalc/mcp/schemas.py::TOOL_METADATA` (validated by `_validate_catalog_metadata()`) | `TOOL_HANDLERS` derived via `server._build_tool_handlers()`; `get_tool_tier()`/`get_tool_tags()`/`get_tool_handler_name()` accessors | `test_tool_inventory` (catalog/protocol key parity, handler identity, tier/tag single authority) |
+| Protocol shape: description/inputSchema/outputSchema/deprecated | `eggcalc/mcp/schemas.py::TOOL_SCHEMAS` (no tier/tags copies) | `compact_schema()`/`normal_schema()` transforms; `tools/list` full/normal/compact rendering | `test_mcp_schema_lint`, `test_tool_inventory::TestTierConsistency`, `test_tool_inventory::TestStandardToolShape` |
+| Runtime handlers | Derived `eggcalc/mcp/server.py::TOOL_HANDLERS` compatibility view (eager `getattr(tools)` + `_mcp_` single-file fallback, fail-fast) | `ToolRegistry.handlers` (frozen); `ToolExecutor` dispatch | `test_tool_inventory`, `test_mcp_server`, `test_build_single` (package/single-file parity) |
+| Profile lists | Derived `eggcalc/mcp/schemas.py::TOOL_PROFILES` via `_build_profiles()` from catalog | `ToolRegistry.profiles` (frozen); `get_profile_tools()` | `test_tool_inventory`, `test_mcp_server` |
+| `PROFILE_NAMES` | `eggcalc/mcp/schemas.py` (recommended order) | — | `test_mcp_server` |
+| Annotations | `eggcalc/mcp/schemas.py::TOOL_ANNOTATIONS`/`get_tool_annotations()` (uniform posture; not duplicated in metadata) | `tools/list` emission in every schema-detail mode | `test_mcp_structured_results::TestToolAnnotations` |
+| Public-name golden fixture | `tests/fixtures/mcp_tool_registry_expected.json` — compatibility snapshot only (`schema_version`, `tool_count`, sorted `tools`) | Never constructs runtime behavior; CI diff makes additions/removals explicit | `test_tool_inventory::TestSourceOfTruthConsistency`, `TestToolRegistryFixture` |
+| Generated inventory | `docs/tool_inventory.md` — documentation artifact only, generated from runtime catalog via `scripts/generate_mcp_docs.py` | `generate_mcp_docs.py --check` in CI | `test_tool_inventory::TestDocGenerator` |
+| `tools/list` emission order | Canonical sorted-name order in `_handle_list_tools()` (stable across source reorderings, both eras) | — | `test_mcp_structured_results::TestListOrderingAndCache`, `test_mcp_modern::TestModernToolsList` |
+| Standard Tool keys | `name`/`description`/`inputSchema`/`annotations` at standard locations (both eras; selection metadata from catalog) | `tier`/`tags`/`category`/`llm_exposure`/`cost` still emitted top-level for backward compat, sourced from metadata | `test_tool_inventory::TestStandardToolShape` |
 
 ## CLI Command Metadata
 

@@ -204,9 +204,9 @@ All functions are deterministic, side-effect-free, and independently testable. N
 
 | Module | Lines | Role | Key Exports | Deep Dive |
 |--------|------:|------|-------------|-----------|
-| `schemas.py` | 5,422 | 83 tool definitions with JSON Schemas, metadata, tiers, profiles | `TOOL_SCHEMAS`, `TOOL_METADATA`, `TOOL_PROFILES` | [mcp.md](mcp.md#schemaspy--tool-schemas) |
-| `tools.py` | 6,536 | Tool handler implementations; lazily imports exact/ functions inside each handler; bounded input pre-checks | all 83 handlers | [mcp.md](mcp.md#toolspy--tool-implementations) |
-| `server.py` | 3,185 | stdio JSON-RPC server, sessions, config management, executor | `McpServer`, `McpSession`, `McpServerConfig`, `ConfigSnapshot`, `ConfigManager`, `ToolRegistry`, `ToolExecutor`, `EvaluationPolicy`, `RuntimeContext` | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) |
+| `schemas.py` | 5,589 | 83 tool protocol schemas (shape only) + catalog metadata (handler/tier/tags/profiles) | `TOOL_SCHEMAS`, `TOOL_METADATA`, `TOOL_PROFILES` | [mcp.md](mcp.md#schemaspy--tool-schemas) |
+| `tools.py` | 6,488 | Tool handler implementations; lazily imports exact/ functions inside each handler; bounded input pre-checks | all 83 handlers | [mcp.md](mcp.md#toolspy--tool-implementations) |
+| `server.py` | 3,766 | stdio JSON-RPC server, sessions, config management, executor; derived `TOOL_HANDLERS` via `_build_tool_handlers()` | `McpServer`, `McpSession`, `McpServerConfig`, `ConfigSnapshot`, `ConfigManager`, `ToolRegistry`, `ToolExecutor`, `EvaluationPolicy`, `RuntimeContext` | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) |
 
 ---
 
@@ -465,7 +465,7 @@ mcp/server.py ──► schemas, tools, evaluator, capabilities
 | `TimeoutError` (custom) | evaluator.py | Raised by `evaluate_with_timeout()` |
 | `EggCalcApp` | evaluator.py | Thread-safe app wrapper: instance-local evaluator + LRU cache |
 | `CommandSpec` / `COMMANDS` | cli.py | TypedDict metadata for the 9 text subcommands |
-| `TOOL_SCHEMAS` / `TOOL_METADATA` / `TOOL_PROFILES` | mcp/schemas.py | 83 tool schemas/metadata/tiers, 11 profiles |
+| `TOOL_METADATA` / `TOOL_SCHEMAS` / `TOOL_PROFILES` | mcp/schemas.py | Catalog authority (handler/tier/tags) + protocol shape, 83 tools, 11 profiles; `TOOL_HANDLERS` derived |
 | `McpServerConfig` / `ConfigSnapshot` / `ConfigManager` | mcp/server.py | Frozen config, deeply-immutable snapshots, atomic generation-numbered replacement |
 | `ToolRegistry` / `ToolExecutor` | mcp/server.py | Validated tool tables; bounded worker pool + reservation state machine |
 | `McpSession` / `McpSessionState` | mcp/server.py | Per-connection lifecycle (`UNINITIALIZED`→`READY`→`CLOSED`), cancellation records |

@@ -1,8 +1,17 @@
-"""Tests for MCP tool registry consistency.
+"""Tests for MCP tool registry consistency (Plan 040 authority model).
 
-Ensures that the canonical tool list, runtime handlers, and schemas
-stay in sync. Fails fast if documented tool names diverge from the
-actual registry.
+Ensures that the catalog metadata authority, protocol schemas, derived
+handlers, and compatibility snapshot stay in sync.
+
+Authority model:
+- TOOL_METADATA owns canonical names, handler locators, and
+  selection metadata (tier/tags/category/profiles/...).
+- TOOL_SCHEMAS owns protocol shape only (description/inputSchema/
+  outputSchema/deprecated).
+- TOOL_HANDLERS is derived from TOOL_METADATA handler locators.
+- tests/fixtures/mcp_tool_registry_expected.json is a golden
+  compatibility snapshot (review-visible public-name set), not runtime
+  source of truth.
 """
 
 import json
@@ -22,10 +31,14 @@ _MCP_DOC = FIXTURES.parent.parent / "docs" / "mcp.md"
 
 
 class TestToolRegistryFixture:
-    """Verify the fixture itself is well-formed."""
+    """Verify the fixture itself is well-formed (compatibility snapshot)."""
 
     def test_fixture_has_tools_key(self):
         assert "tools" in EXPECTED_REGISTRY
+
+    def test_fixture_has_schema_version_and_count(self):
+        assert EXPECTED_REGISTRY.get("schema_version") == 1
+        assert EXPECTED_REGISTRY.get("tool_count") == len(EXPECTED_TOOLS)
 
     def test_fixture_has_at_least_one_tool(self):
         assert len(EXPECTED_TOOLS) > 0
@@ -76,17 +89,40 @@ class TestSchemaConsistency:
 
 
 class TestTierConsistency:
-    """Verify tier values are valid integers."""
+    """Verify tier/tags live in TOOL_METADATA only (Plan 040 single authority)."""
 
     def test_all_tiers_are_valid(self):
-        for name, schema in TOOL_SCHEMAS.items():
-            tier = schema.get("tier", 3)
+        for name, meta in TOOL_METADATA.items():
+            tier = meta.get("tier")
             assert isinstance(tier, int), f"Tier for '{name}' is not int: {tier}"
             assert 0 <= tier <= 3, f"Tier for '{name}' out of range: {tier}"
 
+    def test_all_tags_are_string_lists(self):
+        for name, meta in TOOL_METADATA.items():
+            tags = meta.get("tags")
+            assert isinstance(tags, list), f"Tags for '{name}' must be list"
+            assert all(isinstance(t, str) for t in tags), f"Tags for '{name}'"
+
+    def test_schemas_have_no_tier_or_tags(self):
+        for name, schema in TOOL_SCHEMAS.items():
+            assert "tier" not in schema, (
+                f"Schema for '{name}' must not contain authored 'tier' "
+                "(authority: TOOL_METADATA)"
+            )
+            assert "tags" not in schema, (
+                f"Schema for '{name}' must not contain authored 'tags' "
+                "(authority: TOOL_METADATA)"
+            )
+
 
 class TestSourceOfTruthConsistency:
-    """Verify that TOOL_HANDLERS, TOOL_SCHEMAS, and fixture agree on tool names."""
+    """Compatibility snapshot checks (Plan 040 Workstream D).
+
+    Runtime names come from the TOOL_METADATA catalog authority. The JSON
+    fixture is a golden compatibility snapshot: CI compares the derived
+    set against it so public additions/removals are explicit in review.
+    It never constructs runtime behavior.
+    """
 
     def test_handlers_and_schemas_match(self):
         handler_keys = set(TOOL_HANDLERS.keys())
@@ -243,13 +279,33 @@ class TestToolMetadata:
         extra = metadata_keys - handler_keys
         assert not extra, f"Metadata for non-existent tools: {sorted(extra)}"
 
-    def test_metadata_tiers_match_schemas(self):
+    def test_catalog_and_protocol_key_sets_agree(self):
+        assert set(TOOL_METADATA.keys()) == set(TOOL_SCHEMAS.keys()), (
+            "TOOL_METADATA (catalog authority) and TOOL_SCHEMAS (protocol "
+            "authority) must agree on the public tool-name set"
+        )
+        assert set(TOOL_HANDLERS.keys()) == set(
+            TOOL_METADATA.keys()
+        ), "Derived TOOL_HANDLERS must equal the catalog metadata key set"
+
+    def test_handler_locators_valid_and_resolve(self):
+        from eggcalc.mcp import tools as _tools
+
         for name, meta in TOOL_METADATA.items():
-            schema_tier = TOOL_SCHEMAS.get(name, {}).get("tier")
-            if schema_tier is not None:
-                assert (
-                    meta["tier"] == schema_tier
-                ), f"Tier mismatch for '{name}': metadata={meta['tier']}, schema={schema_tier}"
+            handler_attr = meta.get("handler")
+            assert (
+                isinstance(handler_attr, str) and handler_attr
+            ), f"Tool '{name}' missing handler locator"
+            assert (
+                handler_attr.isidentifier()
+            ), f"Tool '{name}' handler {handler_attr!r} must be an identifier"
+            resolved = getattr(_tools, handler_attr, None)
+            assert callable(
+                resolved
+            ), f"Tool '{name}' handler {handler_attr!r} not callable in tools"
+            assert (
+                TOOL_HANDLERS[name] is resolved
+            ), f"Derived TOOL_HANDLERS['{name}'] identity mismatch"
 
     def test_metadata_categories_are_valid(self):
         for name, meta in TOOL_METADATA.items():
@@ -461,6 +517,72 @@ class TestProfileInvariants:
         assert (
             not actual_violations
         ), f"composite/harness_only tools in human_math profile: {sorted(actual_violations)}"
+
+
+class TestStandardToolShape:
+    """Strict standard Tool object keys (Plan 040 Workstream C).
+
+    tools/list emits standard MCP fields (name/description/inputSchema)
+    at standard locations on both eras. Eggcalc selection metadata
+    (tier/tags/category/...) remains available for filtering but is
+    sourced from TOOL_METADATA, not authored in TOOL_SCHEMAS.
+    """
+
+    def _legacy_tools(self):
+        from eggcalc.mcp.server import handle_request
+
+        resp = handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": {"profile": "full", "schema_detail": "full"},
+            }
+        )
+        assert "result" in resp, resp
+        return resp["result"]["tools"]
+
+    def test_standard_keys_present_legacy(self):
+        for tool in self._legacy_tools():
+            assert isinstance(tool.get("name"), str) and tool["name"]
+            assert isinstance(tool.get("description"), str) and tool["description"]
+            assert isinstance(tool.get("inputSchema"), dict)
+            assert tool["inputSchema"].get("type") == "object"
+            assert isinstance(tool.get("annotations"), dict)
+            # Selection metadata still emitted (from catalog authority).
+            assert isinstance(tool.get("tier"), int)
+            assert isinstance(tool.get("tags"), list)
+            assert isinstance(tool.get("category"), str)
+
+    def test_standard_keys_present_modern(self):
+        from eggcalc.mcp.server import McpServer
+
+        server = McpServer()
+        try:
+            resp = server.handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/list",
+                    "params": {
+                        "profile": "full",
+                        "schema_detail": "full",
+                        "_meta": {
+                            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                            "io.modelcontextprotocol/clientCapabilities": {},
+                        },
+                    },
+                }
+            )
+            assert "result" in resp, resp
+            assert resp["result"].get("resultType") == "complete"
+            for tool in resp["result"]["tools"]:
+                assert isinstance(tool.get("name"), str) and tool["name"]
+                assert isinstance(tool.get("description"), str)
+                assert isinstance(tool.get("inputSchema"), dict)
+                assert isinstance(tool.get("annotations"), dict)
+        finally:
+            server.close()
 
 
 class TestDocGenerator:

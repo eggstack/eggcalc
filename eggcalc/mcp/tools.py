@@ -25,7 +25,10 @@ from .._process import (
     try_acquire_spawn_permit,
 )
 from ..evaluator import evaluate_with_timeout
-from .schemas import TOOL_SCHEMAS, ErrorEnvelope
+from .schemas import TOOL_METADATA, TOOL_SCHEMAS, ErrorEnvelope  # noqa: F401
+
+# TOOL_SCHEMAS re-exported for backward compatibility (canonical location is
+# eggcalc.mcp.schemas; Plan 040 keeps this name importable from tools).
 
 MAX_TEXT_LENGTH = 100_000
 MAX_EXPRESSION_LENGTH = 10_000
@@ -344,8 +347,11 @@ def _sanitize_error(message: str) -> str:
 
 
 def _get_tool_tier(name: str) -> int:
-    """Get the tier for a tool (1, 2, or 3)."""
-    return int(TOOL_SCHEMAS.get(name, {}).get("tier", 3))
+    """Get the tier for a tool (0, 1, 2, or 3).
+
+    Plan 040: tier authority is TOOL_METADATA (catalog), not TOOL_SCHEMAS.
+    """
+    return int(TOOL_METADATA.get(name, {}).get("tier", 3))
 
 
 def _require_str(value: Any, name: str, tool: str) -> dict | None:

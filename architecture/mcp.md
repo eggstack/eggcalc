@@ -176,9 +176,21 @@ The global evaluation cache (`_cache` in evaluator.py) is generation-keyed: `_cl
 
 Module-level `handle_request()` continues to work but emits `DeprecationWarning` when called without an explicit session. It routes through a compatibility path that does not affect explicitly constructed servers.
 
-## schemas.py — Tool Schemas
+## schemas.py — Tool Schemas (Plan 040 authority model)
 
-Defines input/output schemas for each MCP tool. Also contains `TOOL_METADATA`, `TOOL_PROFILES`, and `PROFILE_NAMES`.
+Two authorities, different concerns (see `authority_inventory.md`):
+
+- `TOOL_METADATA` — catalog/selection authority: canonical name, `handler`
+  locator (attribute in `mcp/tools.py`), category/tier/tags/profiles/aliases/
+  exposure/harness/cost/stability/composite. Validated at import by
+  `_validate_catalog_metadata()`; read via `get_tool_tier()`/`get_tool_tags()`/
+  `get_tool_handler_name()`.
+- `TOOL_SCHEMAS` — protocol-schema authority only:
+  description/inputSchema/outputSchema/deprecated. No authored tier/tags copies.
+
+Also contains `TOOL_PROFILES` (derived via `_build_profiles()`), `PROFILE_NAMES`,
+`TOOL_ANNOTATIONS`/`get_tool_annotations()`, and `compact_schema()`/
+`normal_schema()` transforms.
 
 ### Error Envelope
 
@@ -194,7 +206,10 @@ class ErrorEnvelope(TypedDict):
 
 ### TOOL_SCHEMAS
 
-Registry of all available tools (83 total). Tools are organized by tier for selective exposure. The tiers reflect actual schema definitions:
+Protocol-shape registry of all available tools (83 total). Each entry owns
+description/inputSchema/outputSchema (plus `deprecated` where applicable).
+Tier/tags live in `TOOL_METADATA` — see tier tables below, which reflect the
+catalog authority, not schema copies:
 
 #### Tier 0 — Ultra-common (minimal schema)
 
@@ -301,16 +316,24 @@ Registry of all available tools (83 total). Tools are organized by tier for sele
 
 ### TOOL_METADATA
 
-Per-tool metadata used for profile building and exposure control. Each entry includes:
+Catalog authority used for profile building, exposure control, handler
+binding, and selection metadata. Each entry includes:
 
+- `handler` — Attribute name in `mcp/tools.py` (narrow locator, not an import path). Resolved by `server._build_tool_handlers()` into `TOOL_HANDLERS`.
 - `category` — Tool category (math, text, path, validation, regex, identifier, json, list, shell, config, unicode, markdown, patch, toml, version, manifest, cargo, repo, network, encoding, temporal)
-- `tier` — Tier level (0–3)
+- `tier` — Tier level (0–3; sole authored authority, read via `get_tool_tier()`)
+- `tags` — Selection/discovery keywords (sole authored authority, read via `get_tool_tags()`)
 - `profiles` — List of named profiles that include this tool
-- `llm_exposure` — Exposure level: `"default"`, `"contextual"`, `"harness_only"`, or `"expert_only"`. Tools with `"hidden"` are excluded from the `full` profile.
+- `aliases` — Alternative names (future use)
+- `llm_exposure` — Exposure level: `"default"`, `"contextual"`, `"harness_only"`, `"expert_only"`, or `"hidden"`. Tools with `"hidden"` are excluded from the `full` profile.
 - `harness_use` — How the tool is used by the harness (e.g., `"edit_preflight"`, `"command_preflight"`, `"config_preflight"`, `"prompt_input_preflight"`, `"path_preflight"`, `"repo_audit"`, `"reasoning_only"`, `"none"`)
 - `cost` — Approximate cost: `"cheap"`, `"moderate"`, or `"heavy"`
-- `stability` — Stability level: `"stable"` or `"deprecated"`
+- `stability` — Stability level: `"stable"`, `"experimental"`, or `"deprecated"`
 - `composite` — Whether the tool is a composite (calls multiple sub-tools)
+
+Annotations stay in `TOOL_ANNOTATIONS`/`get_tool_annotations()` (uniform
+posture) and are not duplicated here. Tier/tag helpers: `_get_tool_tier()`
+in `tools.py` reads `TOOL_METADATA`.
 
 ---
 
@@ -486,97 +509,23 @@ def handle_request(request: Any, session: McpSession | None = None) -> dict | No
 
 `McpServer.handle_request()` classifies the era before session dispatch (see [Dual-Era Model](#dual-era-model-authoritative)): modern-enveloped requests never reach `McpSession`, and legacy requests never receive modern-only response fields.
 
-### Tool Handler Map
+### Tool Handler Map (derived, Plan 040)
 
-`TOOL_HANDLERS` in server.py maps tool names to handler functions (83 entries). All tools are registered alphabetically:
+`TOOL_HANDLERS` in server.py is derived from the catalog, not hand-maintained
+(83 entries). Each `TOOL_METADATA[name]["handler"]` names an attribute in
+`mcp/tools.py`; `server._build_tool_handlers()` resolves it eagerly with
+`getattr` (plus a `_mcp_` fallback for single-file conflict renames) and
+fails fast on missing/non-callable bindings:
 
 ```python
-TOOL_HANDLERS: dict[str, Any] = {
-    "argv_compare": shell_argv_compare,
-    "canonicalize_text": canonicalize_text_mcp,
-    "cargo_toml_inspect": cargo_toml_inspect_mcp,
-    "cidr_inspect": cidr_inspect_mcp,
-    "code_fence_extract": code_fence_extract_mcp,
-    "codec_convert": codec_convert_mcp,
-    "command_preflight": command_preflight,
-    "config_preflight": config_preflight,
-    "constant_lookup": constant_lookup,
-    "cron_inspect": cron_inspect_mcp,
-    "datetime_convert": datetime_convert_mcp,
-    "diff_file_headers": diff_file_headers_mcp,
-    "diff_hunk_ranges": diff_hunk_ranges_mcp,
-    "diff_touched_paths": diff_touched_paths_mcp,
-    "dotenv_validate": dotenv_validate_mcp,
-    "edit_preflight": edit_preflight,
-    "escape_text": escape_text,
-    "glob_match": glob_match_mcp,
-    "go_mod_inspect": go_mod_inspect_mcp,
-    "ip_inspect": ip_inspect_mcp,
-    "identifier_analyze": identifier_analyze,
-    "identifier_inspect": identifier_inspect_mcp,
-    "identifier_table_inspect": identifier_table_inspect_mcp,
-    "ini_validate": ini_validate_mcp,
-    "json_canonicalize": json_canonicalize,
-    "json_compare": json_compare,
-    "json_extract": json_extract,
-    "json_query": json_query,
-    "json_shape": json_shape,
-    "line_range_compare": line_range_compare,
-    "line_range_extract": line_range_extract,
-    "list_compare": list_compare,
-    "list_dedupe": list_dedupe_mcp,
-    "list_sort": list_sort_mcp,
-    "llm_json_output_check": llm_json_output_check_mcp,
-    "lockfile_summary": lockfile_summary_mcp,
-    "markdown_link_check_lexical": markdown_link_check_lexical_mcp,
-    "markdown_structure": markdown_structure_mcp,
-    "math_eval": math_eval,
-    "package_json_inspect": package_json_inspect_mcp,
-    "patch_apply_check": patch_apply_check_mcp,
-    "patch_conflict_markers_inspect": patch_conflict_markers_inspect_mcp,
-    "patch_summary": patch_summary_mcp,
-    "path_analyze": path_analyze_mcp,
-    "path_compare": path_compare_mcp,
-    "path_normalize": path_normalize,
-    "path_scope_check": path_scope_check_mcp,
-    "prompt_input_inspect": prompt_input_inspect_mcp,
-    "pyproject_inspect": pyproject_inspect_mcp,
-    "radix_convert": radix_convert_mcp,
-    "regex_finditer": regex_finditer,
-    "regex_safety_check": regex_safety_check,
-    "repo_file_inventory": repo_file_inventory_mcp,
-    "requirements_inspect": requirements_inspect_mcp,
-    "shell_quote_join": shell_quote_join,
-    "shell_split": shell_split,
-    "structured_data_compare": structured_data_compare,
-    "text_count": text_count,
-    "text_diff_explain": text_diff_explain,
-    "text_equal": text_equal,
-    "text_fingerprint": text_fingerprint_mcp,
-    "text_hash": text_hash,
-    "text_inspect": text_inspect,
-    "text_measure": text_measure,
-    "text_position": text_position,
-    "text_replace_check": text_replace_check,
-    "text_security_inspect": text_security_inspect,
-    "text_transform": text_transform,
-    "text_truncate": text_truncate,
-    "text_window": text_window,
-    "toml_shape": toml_shape_mcp,
-    "unescape_text": unescape_text,
-    "unicode_policy_check": unicode_policy_check_mcp,
-    "unified_diff_validate": unified_diff_validate_mcp,
-    "unit_convert": unit_convert,
-    "unit_info": unit_info,
-    "validate_brackets": validate_brackets,
-    "validate_json": validate_json,
-    "validate_regex": validate_regex,
-    "validate_schema_light": validate_schema_light,
-    "validate_toml": validate_toml,
-    "version_compare": version_compare_mcp,
-    "version_constraint_check": version_constraint_check_mcp,
-}
+TOOL_HANDLERS: dict[str, Any] = _build_tool_handlers(TOOL_METADATA)
+# e.g. "math_eval" -> math_eval, "argv_compare" -> shell_argv_compare,
+#      "canonicalize_text" -> canonicalize_text_mcp
 ```
+
+Do not add per-tool imports or mapping entries here — add `handler` + `tags`
+to `TOOL_METADATA` and the protocol shape to `TOOL_SCHEMAS`. See
+`authority_inventory.md` and `.skills/mcp_server.md` for the checklist.
 
 ### Close Match Suggestions
 
@@ -735,7 +684,7 @@ Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it d
 
 ### Enforcement
 
-- **`tools/list`** (server.py:1006–1106): Filters `TOOL_SCHEMAS` by `get_profile_tools(profile_filter)`. When a `McpServer` is available, `McpSession.handle_message()` passes `server=server` and the handler uses `server.config.*` and `server.registry.*` instead of module-level globals. Additional filters (`tier`, `tags`, `names`) are applied after profile selection.
+- **`tools/list`**: Iterates `TOOL_SCHEMAS` in sorted-name order for protocol shape, filters by `get_profile_tools(profile_filter)`, then by catalog `tier`/`tags`/`names` from `TOOL_METADATA` (registry-aware when a `McpServer` is available). Wire entries carry standard `name`/`description`/`inputSchema`/`annotations` plus catalog `tier`/`tags`/`category`/`llm_exposure`/`cost` for backward compat (see `TestStandardToolShape`).
 - **`tools/call`** (server.py:807–831): Rejects tools not in the active profile with JSON-RPC error `-32602` before the handler executes.
 - **`profiles/list`**: Returns all profile names, their tool lists, and tool counts. When a `McpServer` is available, routes through `server.registry.*` instead of module-level globals.
 

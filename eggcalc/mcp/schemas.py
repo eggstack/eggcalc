@@ -94,8 +94,6 @@ TOOL_ANNOTATIONS: dict[str, ToolAnnotations] = {}
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "math_eval": {
         "description": "Evaluate arithmetic, unit conversions, constants, and scientific expressions deterministically. State-mutating functions (setvar, store, etc.) and non-deterministic functions (random, randint, gauss, etc.) are disabled. Use for math and unit tasks instead of asking the model to calculate.",
-        "tier": 0,
-        "tags": ["math", "evaluation", "arithmetic", "units", "constants"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -125,8 +123,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "unit_convert": {
         "description": "Convert a numeric value from one unit to another using pre-defined conversion factors.",
-        "tier": 2,
-        "tags": ["math", "units", "conversion"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -157,8 +153,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "unit_info": {
         "description": "Get information about a unit including its canonical form and category.",
-        "tier": 2,
-        "tags": ["math", "units", "information"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -184,8 +178,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "constant_lookup": {
         "description": "Look up physical constant values and symbols (Avogadro, Planck, speed of light, etc.).",
-        "tier": 2,
-        "tags": ["math", "constants", "physics", "lookup"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -211,8 +203,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_measure": {
         "description": "Measure exact text properties: UTF-8 byte length, codepoint count, words, lines, whitespace, newline style, Unicode normalization state, invisibles, and mixed-script signals.",
-        "tier": 0,
-        "tags": ["text", "measurement", "unicode", "metrics"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -262,8 +252,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_equal": {
         "description": "Compare two strings under raw, Unicode-normalized, casefolded, or trimmed modes and report exact equality evidence.",
-        "tier": 0,
-        "tags": ["text", "comparison", "equality", "unicode"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -323,8 +311,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_diff_explain": {
         "description": "Explain why two strings differ, including spans, codepoints, Unicode names, normalization equivalence, confusables, invisibles, and agent-facing classification.",
-        "tier": 1,
-        "tags": ["text", "diff", "comparison", "unicode"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -372,8 +358,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_inspect": {
         "description": "Inspect a string for hidden characters, Unicode confusables, mixed scripts, normalization state, and display-safe representation. Can report both original and normalized text analysis.",
-        "tier": 1,
-        "tags": ["text", "unicode", "inspection", "security"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -432,8 +416,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_count": {
         "description": "Count exact characters or produce a character frequency table with codepoint positions, grapheme clusters, bytes, or substring matches.",
-        "tier": 0,
-        "tags": ["text", "count", "character", "frequency"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -473,8 +455,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_truncate": {
         "description": "Truncate a string to a specified number of grapheme clusters (user-perceived characters). Preserves emoji, combining sequences, and flag sequences intact. Useful for AI agent prompts where visual length matters.",
-        "tier": 3,
-        "tags": ["text", "truncation", "grapheme", "unicode"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -506,8 +486,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_transform": {
         "description": "Apply deterministic text transformations: Unicode normalization (NFC/NFD/NFKC/NFKD), casefold, trim, newline normalization, zero-width removal, bidi control stripping, and visible representation.",
-        "tier": 2,
-        "tags": ["text", "unicode", "transform", "normalization", "sanitation"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -540,8 +518,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "validate_brackets": {
         "description": "Check whether delimiters are structurally balanced and report unmatched delimiters with line/column positions.",
-        "tier": 1,
-        "tags": ["validation", "brackets", "delimiters"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -564,8 +540,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "validate_json": {
         "description": "Validate JSON and report precise parse errors or top-level structure information.",
-        "tier": 0,
-        "tags": ["validation", "json", "structured-data"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -588,8 +562,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "validate_regex": {
         "description": "Test a Python regular expression against sample strings and report match/fullmatch status, spans, groups, and errors.",
-        "tier": 1,
-        "tags": ["text", "regex", "validation", "pattern"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -645,8 +617,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "list_compare": {
         "description": "Compare two lists with explicit modes: ordered ( LCS-based alignment), set (presence only), multiset (count deltas). Near matches are optional and never replace exact missing/extra results.",
-        "tier": 2,
-        "tags": ["text", "list", "comparison", "set"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -737,8 +707,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "validate_toml": {
         "description": "Validate TOML configuration files (Cargo.toml, pyproject.toml, etc.) and report parse errors with line/column positions.",
-        "tier": 1,
-        "tags": ["validation", "structured-data", "toml", "config", "rust", "python"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -767,8 +735,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "json_extract": {
         "description": "Extract a value from JSON using RFC 6901 JSON Pointer (e.g., /foo/bar/0). Navigate nested objects and arrays.",
-        "tier": 2,
-        "tags": ["json", "structured-data", "extraction", "config", "pointer"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -811,8 +777,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "json_compare": {
         "description": "Compare two JSON documents semantically, ignoring formatting and key order.",
-        "tier": 1,
-        "tags": ["json", "structured-data", "comparison", "config"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -848,8 +812,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_position": {
         "description": "Convert between byte offsets, codepoint indices, line/column positions, and UTF-16 offsets.",
-        "tier": 2,
-        "tags": ["text", "position", "offset", "unicode", "lsp"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -891,8 +853,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_hash": {
         "description": "Compute cryptographic hashes of text for identity checking.",
-        "tier": 2,
-        "tags": ["text", "hash", "identity", "security"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -927,8 +887,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "escape_text": {
         "description": "Escape text for various output formats.",
-        "tier": 1,
-        "tags": ["text", "escape", "encoding", "shell", "json", "regex"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -967,8 +925,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "unescape_text": {
         "description": "Unescape text from various formats.",
-        "tier": 1,
-        "tags": ["text", "escape", "encoding", "shell", "json", "regex"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -998,8 +954,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "identifier_analyze": {
         "description": "Classify and validate identifier naming conventions across languages.",
-        "tier": 3,
-        "tags": ["text", "identifier", "naming", "validation", "language"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1039,8 +993,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "regex_finditer": {
         "description": "Find all regex matches in text with positions, line/column info, and capture groups.",
-        "tier": 1,
-        "tags": ["text", "regex", "search", "find", "pattern"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1091,8 +1043,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "regex_safety_check": {
         "description": "Heuristic check for potential catastrophic backtracking risks in regex patterns. Flags nested quantifiers, repeated alternations, ambiguous dot-star, and backreferences.",
-        "tier": 1,
-        "tags": ["text", "regex", "safety", "security", "backtracking"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1122,8 +1072,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "validate_schema_light": {
         "description": "Validate JSON against a simple schema format with type, required, enum, pattern, and nested constraints.",
-        "tier": 3,
-        "tags": ["validation", "json", "schema", "structured-data"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1161,8 +1109,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "path_normalize": {
         "description": "Normalize a path using posixpath or ntpath semantics. Collapse dot segments, resolve components.",
-        "tier": 0,
-        "tags": ["text", "path", "filesystem", "normalize"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1198,8 +1144,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "path_analyze": {
         "description": "Analyze path components, extensions, hidden status, and traversal without filesystem access.",
-        "tier": 2,
-        "tags": ["text", "path", "filesystem", "lexical"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1239,8 +1183,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "path_compare": {
         "description": "Compare two paths under explicit normalization rules: separator normalization, dot-segment collapsing, and optional case-insensitive comparison.",
-        "tier": 2,
-        "tags": ["text", "path", "filesystem", "comparison"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1286,8 +1228,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "path_scope_check": {
         "description": "Determine whether a target path remains lexically inside a declared root. Lexical only, does not resolve symlinks.",
-        "tier": 2,
-        "tags": ["text", "path", "filesystem", "security", "scope"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1331,8 +1271,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "json_shape": {
         "description": "Analyze the structure of a JSON document without returning values. Shows type, keys, and nested structure with configurable depth limits.",
-        "tier": 3,
-        "tags": ["json", "structured-data", "shape", "schema"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1377,8 +1315,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_window": {
         "description": "Get a window around a position in text with context lines. Shows line at position with surrounding context, position metrics, and character details.",
-        "tier": 1,
-        "tags": ["text", "position", "context", "unicode", "window"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1465,8 +1401,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "json_canonicalize": {
         "description": "Canonicalize JSON with deterministic formatting, key ordering, duplicate key detection, and stable hashes.",
-        "tier": 1,
-        "tags": ["json", "canonical", "hash", "deterministic", "format"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1517,8 +1451,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "json_query": {
         "description": "Extract a value from JSON using RFC 6901 JSON Pointer. Navigate nested objects and arrays. Deprecated: use json_extract instead, which provides richer output including available_keys, missing_at, and detail levels.",
         "deprecated": True,
-        "tier": 2,
-        "tags": ["json", "pointer", "extraction", "query", "rfc6901"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1548,8 +1480,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "glob_match": {
         "description": "Match a glob pattern against a path with explicit semantics: * matches within one segment, ** matches zero or more segments, ? matches one char. Python fnmatch limitations around ** are documented.",
-        "tier": 1,
-        "tags": ["text", "glob", "pattern", "path", "wildcard"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1586,8 +1516,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_fingerprint": {
         "description": "Compute a deterministic SHA-256 fingerprint of text with canonicalization options for Unicode normalization, newline style, casefold, and final newline trimming.",
-        "tier": 0,
-        "tags": ["text", "hash", "fingerprint", "sha256", "identity", "canonicalization"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1632,8 +1560,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "identifier_inspect": {
         "description": "Inspect identifiers for validity and collisions. Detects confusables, mixed scripts, normalization issues, and casefold collisions across a list of identifiers.",
-        "tier": 1,
-        "tags": ["text", "identifier", "collision", "confusable", "security", "validation"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1684,8 +1610,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "version_compare": {
         "description": "Compare two version strings with explicit scheme. Supports semver (strict SemVer precedence: pre-release sorts lower than release, build metadata ignored) and loose (numeric parts only). PEP 440 is not supported.",
-        "tier": 2,
-        "tags": ["version", "semver", "comparison"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1718,8 +1642,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "toml_shape": {
         "description": "Analyze the structure of a TOML document: top-level keys, tables, and nesting hierarchy.",
-        "tier": 2,
-        "tags": ["toml", "structure", "shape", "config", "validation"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1752,8 +1674,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "list_dedupe": {
         "description": "Remove duplicates from a list while preserving order. Supports Unicode normalization and casefolding.",
-        "tier": 1,
-        "tags": ["list", "dedupe", "unique", "normalization"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1793,8 +1713,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "list_sort": {
         "description": "Sort a list of strings with Unicode normalization and casefold support.",
-        "tier": 1,
-        "tags": ["list", "sort", "order", "normalization"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1838,8 +1756,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_replace_check": {
         "description": "Check whether a text replacement would apply cleanly before an agent attempts to edit. Reports match count, positions, ambiguity, and optional preview of before/after.",
-        "tier": 1,
-        "tags": ["text", "replace", "edit", "safety", "check"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1911,8 +1827,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "line_range_extract": {
         "description": "Extract exact line ranges from text and return stable offsets, byte positions, line counts, and optional fingerprint.",
-        "tier": 1,
-        "tags": ["text", "line", "range", "extract", "offset"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1971,8 +1885,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "line_range_compare": {
         "description": "Compare a line range from two text inputs with exact, trailing-whitespace-ignoring, or newline-normalizing comparison.",
-        "tier": 2,
-        "tags": ["text", "line", "range", "compare", "diff"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2031,8 +1943,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "shell_split": {
         "description": "Parse a shell-like command string into argv tokens and report risky lexical features (pipes, redirections, command substitution, variable expansion, globs, control operators). Lexical POSIX-like parsing only, not full shell evaluation.",
-        "tier": 2,
-        "tags": ["shell", "argv", "parsing", "security", "sanity"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2090,8 +2000,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "shell_quote_join": {
         "description": "Safely quote a list of argv tokens into a POSIX-like shell string. Verifies round-trip safety with shell_split.",
-        "tier": 2,
-        "tags": ["shell", "argv", "quoting", "safety"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2128,8 +2036,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "argv_compare": {
         "description": "Compare two command strings or argv lists by parsed argv tokens rather than raw text. Supports command strings, pre-parsed argv lists, or both.",
-        "tier": 2,
-        "tags": ["shell", "argv", "comparison", "sanity"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2195,8 +2101,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "markdown_structure": {
         "description": "Parse Markdown structure with a deterministic line scanner: headings (level, text, slug), code fences (language, open/close state), links (visible vs target mismatch), HTML comments, frontmatter detection, and table detection. Not a full CommonMark parser.",
-        "tier": 2,
-        "tags": ["markdown", "structure", "headings", "code-fences", "links", "frontmatter"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2261,8 +2165,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "code_fence_extract": {
         "description": "Extract fenced code blocks from Markdown with exact line ranges, optional language filter, content, and SHA-256 fingerprints. Reports unclosed fences.",
-        "tier": 2,
-        "tags": ["markdown", "code-fences", "extraction", "fingerprint"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2297,8 +2199,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "dotenv_validate": {
         "description": "Validate .env-style key=value configuration text. Detects invalid keys, duplicate keys, missing quotes, and variable expansion syntax. Line-by-line parser, no shell evaluation.",
-        "tier": 2,
-        "tags": ["validation", "config", "env", "dotenv"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2353,8 +2253,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "ini_validate": {
         "description": "Validate simple INI-style configuration files. Supports [section] headers, key=value and key:value lines, comments. Detects duplicate sections, duplicate keys, and malformed lines.",
-        "tier": 2,
-        "tags": ["validation", "config", "ini"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2389,8 +2287,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "patch_apply_check": {
         "description": "Validate and simulate a unified diff against provided in-memory files/text without touching the filesystem. Reports parse status, application success, failed hunks with context, and optional result fingerprint.",
-        "tier": 2,
-        "tags": ["patch", "diff", "unified", "validation", "apply"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2489,8 +2385,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "patch_summary": {
         "description": "Summarize a unified diff without applying it. Reports file counts, hunk counts, additions, deletions, renames, and line ranges by file.",
-        "tier": 2,
-        "tags": ["patch", "diff", "unified", "summary", "statistics"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2550,8 +2444,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "diff_touched_paths": {
         "description": "Classify files in a unified diff as added, deleted, renamed, or modified. Also detects binary diffs and file mode changes.",
-        "tier": 2,
-        "tags": ["patch", "diff", "unified", "classification", "files"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2624,8 +2516,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "diff_hunk_ranges": {
         "description": "Extract hunk ranges per file with line count classification (added/deleted/context) from a unified diff.",
-        "tier": 2,
-        "tags": ["patch", "diff", "unified", "hunks", "ranges"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2681,8 +2571,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "diff_file_headers": {
         "description": "Extract metadata from diff file headers: diff --git line, index hash, mode changes, rename/copy directives, and binary indicators.",
-        "tier": 2,
-        "tags": ["patch", "diff", "unified", "headers", "metadata"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2767,8 +2655,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "patch_conflict_markers_inspect": {
         "description": "Detect and analyze conflict markers (<<<<<<<, =======, >>>>>>>) in text. Reports counts, balance, nesting, and line locations.",
-        "tier": 2,
-        "tags": ["patch", "diff", "conflict", "markers", "merge"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2825,8 +2711,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "unified_diff_validate": {
         "description": "Validate the structural integrity of a unified diff. Checks parse success, hunk header format, line count consistency, and stray lines.",
-        "tier": 2,
-        "tags": ["patch", "diff", "unified", "validation", "lint"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2871,8 +2755,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "unicode_policy_check": {
         "description": "Apply a named deterministic Unicode safety policy to input text. Policies include identifier_strict (mixed scripts, bidi, confusables), filename_safe (control chars, path separators, reserved names), source_code, human_text (warn-only), json_key, and domain_like.",
-        "tier": 2,
-        "tags": ["text", "unicode", "policy", "security", "validation"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2924,8 +2806,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "canonicalize_text": {
         "description": "Apply a named text canonicalization profile. Profiles include source_file_identity (NFC + LF + newline), identifier_compare (NFC + casefold), human_label_compare (NFC + casefold + whitespace collapse), json_key_compare (NFC + casefold), and path_segment_compare (NFC + lowercase + LF).",
-        "tier": 2,
-        "tags": ["text", "unicode", "canonicalization", "normalization", "identity"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -2977,8 +2857,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "identifier_table_inspect": {
         "description": "Inspect a table of identifiers for casefold collisions, normalization collisions, confusable/near-collisions, style variants, reserved keyword hits, and mixed naming style groups. Accepts structured entries with name, kind, file, and line metadata.",
-        "tier": 3,
-        "tags": ["text", "identifier", "collision", "naming", "style", "reserved", "validation"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3058,8 +2936,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "version_constraint_check": {
         "description": "Check whether a version satisfies a constraint under a declared versioning scheme. Supports semver exact/comparison/range constraints and cargo caret, tilde, and wildcard constraints.",
-        "tier": 3,
-        "tags": ["version", "semver", "cargo", "constraint", "satisfiability"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3107,8 +2983,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "cargo_toml_inspect": {
         "description": "Inspect Cargo.toml text without network or filesystem access. Reports package metadata, workspace configuration, dependency forms (version/path/git/workspace), path dependencies, suspicious or confusable dependency names, and structural findings.",
-        "tier": 3,
-        "tags": ["rust", "cargo", "toml", "dependencies", "workspace", "inspection"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3192,8 +3066,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "prompt_input_inspect": {
         "description": "Deterministically inspect text for red flags that may influence agents or humans unexpectedly. Detects hidden Unicode characters, bidirectional controls, HTML comments, Markdown link mismatches, ANSI escapes, terminal controls, base64-like blobs, instruction-like phrases, and very long minified lines. This is NOT a prompt-injection detector -- it reports observable features only, not intent.",
-        "tier": 2,
-        "tags": ["text", "security", "inspection", "prompt", "unicode", "hidden"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3252,8 +3124,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "text_security_inspect": {
         "description": "Composite security-oriented text hygiene pass. Runs text_inspect, unicode_policy_check, canonicalize_text, prompt_input_inspect, and identifier_inspect depending on policy. Returns a verdict (allow/review/block) plus structured findings and machine codes.",
-        "tier": 1,
-        "tags": ["text", "unicode", "security", "composite", "prompt", "inspection"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3300,8 +3170,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "edit_preflight": {
         "description": "Composite: validate a proposed edit before applying it. Calls text_replace_check, patch_apply_check, line_range_extract, text_fingerprint, and text_diff_explain as needed. Returns ok_to_apply verdict with findings and machine codes.",
-        "tier": 1,
-        "tags": ["patch", "edit", "preflight", "composite", "text"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3347,8 +3215,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "command_preflight": {
         "description": "Composite: analyze a command before user approval or execution. Calls shell_split and regex_safety_check. Returns parsed argv, shell operators, risk findings, and a verdict. Must not execute anything.",
-        "tier": 1,
-        "tags": ["shell", "command", "preflight", "composite", "security"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3388,8 +3254,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "config_preflight": {
         "description": "Composite: validate generated config text. Auto-detects format and runs the appropriate validator. Returns valid/invalid, detected format, parse error location, and machine code.",
-        "tier": 1,
-        "tags": ["config", "validation", "json", "toml", "preflight", "composite"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3424,8 +3288,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "structured_data_compare": {
         "description": "Composite: compare structured config/data output. Calls json_compare, json_canonicalize, and json_shape. Returns equal/not-equal verdict with structured diffs.",
-        "tier": 2,
-        "tags": ["json", "comparison", "config", "structured-data", "composite"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3471,8 +3333,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     # ── Manifest / package inspection tools ─────────────────────────────────
     "pyproject_inspect": {
         "description": "Inspect pyproject.toml text: project name/version, build backend, dependencies, optional groups, scripts, tool sections, package-manager signals. Deterministic, no network.",
-        "tier": 2,
-        "tags": ["python", "pyproject", "toml", "manifest", "dependencies", "inspection"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3535,8 +3395,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "package_json_inspect": {
         "description": "Inspect package.json text: name, version, scripts, dependency counts, engines, packageManager, workspaces. Deterministic, no network.",
-        "tier": 2,
-        "tags": ["node", "npm", "package.json", "manifest", "dependencies", "inspection"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3576,8 +3434,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "requirements_inspect": {
         "description": "Inspect requirements.txt-style text: package specs, editable refs, direct URLs, VCS refs, comments, environment markers, suspicious lines. Deterministic, no network.",
-        "tier": 2,
-        "tags": ["python", "requirements", "pip", "dependencies", "inspection"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3638,8 +3494,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "go_mod_inspect": {
         "description": "Inspect go.mod text: module path, go version, toolchain, require count, replace/exclude directives. Deterministic, no network.",
-        "tier": 2,
-        "tags": ["go", "golang", "go.mod", "manifest", "dependencies", "inspection"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3675,8 +3529,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "lockfile_summary": {
         "description": "Shallow lockfile summary: detect kind (npm/pnpm/yarn/poetry/uv/cargo/go), approximate package count, ecosystem. Intentionally shallow, no full parse.",
-        "tier": 2,
-        "tags": ["lockfile", "dependencies", "package-manager", "inspection"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3726,8 +3578,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     # ── LLM output hygiene tools ──────────────────────────────────────────
     "llm_json_output_check": {
         "description": "Detect and diagnose common LLM JSON output issues: fenced code blocks, leading/trailing prose, parse errors with location, fix hints for trailing commas/single quotes/unquoted keys, and multiple concatenated objects.",
-        "tier": 2,
-        "tags": ["text", "json", "llm", "hygiene", "validation", "preflight"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3794,8 +3644,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     # ── Markdown link check tools ─────────────────────────────────────────
     "markdown_link_check_lexical": {
         "description": "Lexical markdown link validation (no network). Detects malformed links, duplicate anchors, unresolved relative links, and counts external/image links.",
-        "tier": 2,
-        "tags": ["text", "markdown", "links", "validation", "hygiene"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3860,8 +3708,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     # ── Repo audit tools ──────────────────────────────────────────────────
     "repo_file_inventory": {
         "description": "Analyze file inventory for repo structure signals (no filesystem access). Detects language/ecosystem signals, counts files by category, identifies config/vendor/generated files, and finds suspicious paths.",
-        "tier": 2,
-        "tags": ["repo", "audit", "inventory", "filesystem", "structure"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -3955,8 +3801,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     # ── Network utilities ─────────────────────────────────────────────────
     "ip_inspect": {
         "description": "Inspect a single IPv4 or IPv6 address: canonical text, family, packed bytes, numeric value, and explicit special-use tags. Pure computation, no network access.",
-        "tier": 2,
-        "tags": ["network", "ip", "inspection", "address"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -4003,8 +3847,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "cidr_inspect": {
         "description": "Inspect a CIDR range: canonical network, prefix/host bits, range bounds, exact address count, and optional same-family containment. Pure computation, no network access.",
-        "tier": 2,
-        "tags": ["network", "ip", "cidr", "inspection", "range"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -4054,8 +3896,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     # ── Encoding utilities ────────────────────────────────────────────────
     "codec_convert": {
         "description": "Convert text between utf8, hex, base64, and base64url codecs with strict validation and canonical outputs.",
-        "tier": 2,
-        "tags": ["encoding", "codec", "conversion", "base64", "hex"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -4092,8 +3932,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "radix_convert": {
         "description": "Convert a signed ASCII integer between bases 2 and 36. Magnitude is capped at 2**128 - 1 for cross-implementation parity.",
-        "tier": 2,
-        "tags": ["encoding", "radix", "conversion", "base", "integer"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -4140,8 +3978,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     # ── Temporal utilities ────────────────────────────────────────────────
     "datetime_convert": {
         "description": "Convert between RFC3339 timestamps and Unix seconds/milliseconds/nanoseconds with exact nanosecond precision and fixed offsets. No named timezones or DST database.",
-        "tier": 2,
-        "tags": ["temporal", "datetime", "conversion", "timestamp", "rfc3339"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -4183,8 +4019,6 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "cron_inspect": {
         "description": "Inspect a five-field cron expression and list strictly-later runs at a fixed offset. Corrected Vixie/Cronie DOM/DOW star-syntax semantics; bounded search over one 400-year Gregorian cycle.",
-        "tier": 2,
-        "tags": ["temporal", "cron", "inspection", "schedule"],
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -4235,13 +4069,20 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 }
 
 # ---------------------------------------------------------------------------
-# Tool metadata for profile filtering, LLM exposure control, and
-# machine-readable catalog. Every key in TOOL_HANDLERS must have a
-# corresponding entry here.
+# Catalog metadata authority (Plan 040).
+#
+# TOOL_METADATA is the single authored authority for catalog/selection
+# concerns: canonical public tool name, handler binding, and
+# agent-selection metadata. TOOL_SCHEMAS owns only protocol shape
+# (description, inputSchema, outputSchema, deprecated/title).
 #
 # Fields:
+#   handler     – attribute name in eggcalc.mcp.tools (narrow locator, not
+#                 an arbitrary import path). Resolved by server._build_tool_handlers.
 #   category    – tool domain (math, text, json, path, shell, etc.)
 #   tier        – 0 = ultra-common, 1 = default coding, 2 = contextual, 3 = specialized
+#   tags        – selection/discovery keywords (sole authored authority;
+#                 TOOL_SCHEMAS no longer carries tier/tags copies)
 #   profiles    – named profiles that include this tool
 #   aliases     – alternative names (future use)
 #   llm_exposure – default | contextual | expert_only | harness_only | hidden
@@ -4249,13 +4090,20 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 #   cost        – cheap | moderate | heavy
 #   stability   – stable | experimental | deprecated
 #   composite   – True if this tool wraps other primitives
+#
+# Annotations remain owned by TOOL_ANNOTATIONS / get_tool_annotations()
+# (uniform read-only/closed-world posture); they are not duplicated here.
+# Every key in TOOL_METADATA must have a corresponding entry in TOOL_SCHEMAS,
+# and TOOL_HANDLERS is derived from these handler locators.
 # ---------------------------------------------------------------------------
 
 TOOL_METADATA: dict[str, dict[str, Any]] = {
     # ── Tier 0: Ultra-common ──────────────────────────────────────────────
     "math_eval": {
+        "handler": "math_eval",
         "category": "math",
         "tier": 0,
+        "tags": ["math", "evaluation", "arithmetic", "units", "constants"],
         "profiles": ["full", "default", "human_math"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4265,8 +4113,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_equal": {
+        "handler": "text_equal",
         "category": "text",
         "tier": 0,
+        "tags": ["text", "comparison", "equality", "unicode"],
         "profiles": ["full", "default", "codegg_core"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4276,8 +4126,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_count": {
+        "handler": "text_count",
         "category": "text",
         "tier": 0,
+        "tags": ["text", "count", "character", "frequency"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4287,8 +4139,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_measure": {
+        "handler": "text_measure",
         "category": "text",
         "tier": 0,
+        "tags": ["text", "measurement", "unicode", "metrics"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4298,8 +4152,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_fingerprint": {
+        "handler": "text_fingerprint_mcp",
         "category": "text",
         "tier": 0,
+        "tags": ["text", "hash", "fingerprint", "sha256", "identity", "canonicalization"],
         "profiles": ["full", "default", "codegg_core", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4309,8 +4165,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "validate_json": {
+        "handler": "validate_json",
         "category": "validation",
         "tier": 0,
+        "tags": ["validation", "json", "structured-data"],
         "profiles": ["full", "default", "codegg_core", "codegg_core_min", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4320,8 +4178,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "path_normalize": {
+        "handler": "path_normalize",
         "category": "path",
         "tier": 0,
+        "tags": ["text", "path", "filesystem", "normalize"],
         "profiles": ["full", "default", "codegg_core"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4332,8 +4192,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── Tier 1: Default coding-agent sanity ───────────────────────────────
     "text_diff_explain": {
+        "handler": "text_diff_explain",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "diff", "comparison", "unicode"],
         "profiles": ["full", "default", "codegg_core", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4343,8 +4205,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_inspect": {
+        "handler": "text_inspect",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "unicode", "inspection", "security"],
         "profiles": ["full", "default", "codegg_core", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4354,8 +4218,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_replace_check": {
+        "handler": "text_replace_check",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "replace", "edit", "safety", "check"],
         "profiles": ["full", "default", "codegg_core", "codegg_core_min", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4365,8 +4231,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "line_range_extract": {
+        "handler": "line_range_extract",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "line", "range", "extract", "offset"],
         "profiles": ["full", "default", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4376,8 +4244,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "json_compare": {
+        "handler": "json_compare",
         "category": "json",
         "tier": 1,
+        "tags": ["json", "structured-data", "comparison", "config"],
         "profiles": ["full", "default", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4387,8 +4257,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "json_canonicalize": {
+        "handler": "json_canonicalize",
         "category": "json",
         "tier": 1,
+        "tags": ["json", "canonical", "hash", "deterministic", "format"],
         "profiles": ["full", "default", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4398,8 +4270,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "json_query": {
+        "handler": "json_query",
         "category": "json",
         "tier": 2,
+        "tags": ["json", "pointer", "extraction", "query", "rfc6901"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4409,8 +4283,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "validate_toml": {
+        "handler": "validate_toml",
         "category": "validation",
         "tier": 1,
+        "tags": ["validation", "structured-data", "toml", "config", "rust", "python"],
         "profiles": ["full", "default", "codegg_core", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4420,8 +4296,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "validate_brackets": {
+        "handler": "validate_brackets",
         "category": "validation",
         "tier": 1,
+        "tags": ["validation", "brackets", "delimiters"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4431,8 +4309,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "validate_regex": {
+        "handler": "validate_regex",
         "category": "regex",
         "tier": 1,
+        "tags": ["text", "regex", "validation", "pattern"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4442,8 +4322,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "regex_finditer": {
+        "handler": "regex_finditer",
         "category": "regex",
         "tier": 1,
+        "tags": ["text", "regex", "search", "find", "pattern"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4453,8 +4335,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "regex_safety_check": {
+        "handler": "regex_safety_check",
         "category": "regex",
         "tier": 1,
+        "tags": ["text", "regex", "safety", "security", "backtracking"],
         "profiles": ["full", "default", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4464,8 +4348,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "glob_match": {
+        "handler": "glob_match_mcp",
         "category": "path",
         "tier": 1,
+        "tags": ["text", "glob", "pattern", "path", "wildcard"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4475,8 +4361,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "identifier_inspect": {
+        "handler": "identifier_inspect_mcp",
         "category": "identifier",
         "tier": 1,
+        "tags": ["text", "identifier", "collision", "confusable", "security", "validation"],
         "profiles": ["full", "default", "codegg_core", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4486,8 +4374,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "escape_text": {
+        "handler": "escape_text",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "escape", "encoding", "shell", "json", "regex"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4497,8 +4387,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "unescape_text": {
+        "handler": "unescape_text",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "escape", "encoding", "shell", "json", "regex"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4508,8 +4400,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_window": {
+        "handler": "text_window",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "position", "context", "unicode", "window"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4519,8 +4413,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "list_dedupe": {
+        "handler": "list_dedupe_mcp",
         "category": "list",
         "tier": 1,
+        "tags": ["list", "dedupe", "unique", "normalization"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4530,8 +4426,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "list_sort": {
+        "handler": "list_sort_mcp",
         "category": "list",
         "tier": 1,
+        "tags": ["list", "sort", "order", "normalization"],
         "profiles": ["full", "default"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4542,8 +4440,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── Tier 2: Contextual / heavier analysis ─────────────────────────────
     "unit_convert": {
+        "handler": "unit_convert",
         "category": "math",
         "tier": 2,
+        "tags": ["math", "units", "conversion"],
         "profiles": ["full", "human_math"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4553,8 +4453,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "unit_info": {
+        "handler": "unit_info",
         "category": "math",
         "tier": 2,
+        "tags": ["math", "units", "information"],
         "profiles": ["full", "human_math"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4564,8 +4466,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "constant_lookup": {
+        "handler": "constant_lookup",
         "category": "math",
         "tier": 2,
+        "tags": ["math", "constants", "physics", "lookup"],
         "profiles": ["full", "human_math"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4575,8 +4479,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "json_extract": {
+        "handler": "json_extract",
         "category": "json",
         "tier": 2,
+        "tags": ["json", "structured-data", "extraction", "config", "pointer"],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4586,8 +4492,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "list_compare": {
+        "handler": "list_compare",
         "category": "list",
         "tier": 2,
+        "tags": ["text", "list", "comparison", "set"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4597,8 +4505,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "line_range_compare": {
+        "handler": "line_range_compare",
         "category": "text",
         "tier": 2,
+        "tags": ["text", "line", "range", "compare", "diff"],
         "profiles": ["full", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4608,8 +4518,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "markdown_structure": {
+        "handler": "markdown_structure_mcp",
         "category": "markdown",
         "tier": 2,
+        "tags": ["markdown", "structure", "headings", "code-fences", "links", "frontmatter"],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4619,8 +4531,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "code_fence_extract": {
+        "handler": "code_fence_extract_mcp",
         "category": "markdown",
         "tier": 2,
+        "tags": ["markdown", "code-fences", "extraction", "fingerprint"],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4630,8 +4544,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "patch_apply_check": {
+        "handler": "patch_apply_check_mcp",
         "category": "patch",
         "tier": 2,
+        "tags": ["patch", "diff", "unified", "validation", "apply"],
         "profiles": ["full", "codegg_preflight", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4641,8 +4557,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "patch_summary": {
+        "handler": "patch_summary_mcp",
         "category": "patch",
         "tier": 2,
+        "tags": ["patch", "diff", "unified", "summary", "statistics"],
         "profiles": ["full", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4652,8 +4570,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "diff_touched_paths": {
+        "handler": "diff_touched_paths_mcp",
         "category": "patch",
         "tier": 2,
+        "tags": ["patch", "diff", "unified", "classification", "files"],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4663,8 +4583,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "diff_hunk_ranges": {
+        "handler": "diff_hunk_ranges_mcp",
         "category": "patch",
         "tier": 2,
+        "tags": ["patch", "diff", "unified", "hunks", "ranges"],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4674,8 +4596,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "diff_file_headers": {
+        "handler": "diff_file_headers_mcp",
         "category": "patch",
         "tier": 2,
+        "tags": ["patch", "diff", "unified", "headers", "metadata"],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4685,8 +4609,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "patch_conflict_markers_inspect": {
+        "handler": "patch_conflict_markers_inspect_mcp",
         "category": "patch",
         "tier": 2,
+        "tags": ["patch", "diff", "conflict", "markers", "merge"],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4696,8 +4622,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "unified_diff_validate": {
+        "handler": "unified_diff_validate_mcp",
         "category": "patch",
         "tier": 2,
+        "tags": ["patch", "diff", "unified", "validation", "lint"],
         "profiles": ["full", "codegg_patch", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4707,8 +4635,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "path_analyze": {
+        "handler": "path_analyze_mcp",
         "category": "path",
         "tier": 2,
+        "tags": ["text", "path", "filesystem", "lexical"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4718,8 +4648,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "path_compare": {
+        "handler": "path_compare_mcp",
         "category": "path",
         "tier": 2,
+        "tags": ["text", "path", "filesystem", "comparison"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4729,8 +4661,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "path_scope_check": {
+        "handler": "path_scope_check_mcp",
         "category": "path",
         "tier": 2,
+        "tags": ["text", "path", "filesystem", "security", "scope"],
         "profiles": ["full", "codegg_preflight"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4740,8 +4674,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "shell_split": {
+        "handler": "shell_split",
         "category": "shell",
         "tier": 2,
+        "tags": ["shell", "argv", "parsing", "security", "sanity"],
         "profiles": ["full", "codegg_preflight", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4751,8 +4687,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "shell_quote_join": {
+        "handler": "shell_quote_join",
         "category": "shell",
         "tier": 2,
+        "tags": ["shell", "argv", "quoting", "safety"],
         "profiles": ["full", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4762,8 +4700,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "argv_compare": {
+        "handler": "shell_argv_compare",
         "category": "shell",
         "tier": 2,
+        "tags": ["shell", "argv", "comparison", "sanity"],
         "profiles": ["full", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4773,8 +4713,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "validate_schema_light": {
+        "handler": "validate_schema_light",
         "category": "validation",
         "tier": 3,
+        "tags": ["validation", "json", "schema", "structured-data"],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4784,8 +4726,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "toml_shape": {
+        "handler": "toml_shape_mcp",
         "category": "toml",
         "tier": 2,
+        "tags": ["toml", "structure", "shape", "config", "validation"],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4795,8 +4739,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "version_compare": {
+        "handler": "version_compare_mcp",
         "category": "version",
         "tier": 2,
+        "tags": ["version", "semver", "comparison"],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4806,8 +4752,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "unicode_policy_check": {
+        "handler": "unicode_policy_check_mcp",
         "category": "unicode",
         "tier": 2,
+        "tags": ["text", "unicode", "policy", "security", "validation"],
         "profiles": ["full", "codegg_preflight", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4817,8 +4765,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "canonicalize_text": {
+        "handler": "canonicalize_text_mcp",
         "category": "unicode",
         "tier": 2,
+        "tags": ["text", "unicode", "canonicalization", "normalization", "identity"],
         "profiles": ["full", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4828,8 +4778,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "prompt_input_inspect": {
+        "handler": "prompt_input_inspect_mcp",
         "category": "text",
         "tier": 2,
+        "tags": ["text", "security", "inspection", "prompt", "unicode", "hidden"],
         "profiles": ["full", "codegg_unicode_security", "codegg_preflight"],
         "aliases": [],
         "llm_exposure": "harness_only",
@@ -4839,8 +4791,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_hash": {
+        "handler": "text_hash",
         "category": "text",
         "tier": 2,
+        "tags": ["text", "hash", "identity", "security"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4850,8 +4804,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_position": {
+        "handler": "text_position",
         "category": "text",
         "tier": 2,
+        "tags": ["text", "position", "offset", "unicode", "lsp"],
         "profiles": ["full", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4861,8 +4817,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_transform": {
+        "handler": "text_transform",
         "category": "text",
         "tier": 2,
+        "tags": ["text", "unicode", "transform", "normalization", "sanitation"],
         "profiles": ["full", "codegg_unicode_security"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4872,8 +4830,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "dotenv_validate": {
+        "handler": "dotenv_validate_mcp",
         "category": "config",
         "tier": 2,
+        "tags": ["validation", "config", "env", "dotenv"],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4883,8 +4843,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "ini_validate": {
+        "handler": "ini_validate_mcp",
         "category": "config",
         "tier": 2,
+        "tags": ["validation", "config", "ini"],
         "profiles": ["full", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -4895,8 +4857,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── Tier 3: Specialized / domain-specific ──────────────────────────────
     "identifier_analyze": {
+        "handler": "identifier_analyze",
         "category": "identifier",
         "tier": 3,
+        "tags": ["text", "identifier", "naming", "validation", "language"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4906,8 +4870,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "identifier_table_inspect": {
+        "handler": "identifier_table_inspect_mcp",
         "category": "identifier",
         "tier": 3,
+        "tags": ["text", "identifier", "collision", "naming", "style", "reserved", "validation"],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4917,8 +4883,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "json_shape": {
+        "handler": "json_shape",
         "category": "json",
         "tier": 3,
+        "tags": ["json", "structured-data", "shape", "schema"],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4928,8 +4896,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_truncate": {
+        "handler": "text_truncate",
         "category": "text",
         "tier": 3,
+        "tags": ["text", "truncation", "grapheme", "unicode"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4939,8 +4909,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "version_constraint_check": {
+        "handler": "version_constraint_check_mcp",
         "category": "version",
         "tier": 3,
+        "tags": ["version", "semver", "cargo", "constraint", "satisfiability"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4950,8 +4922,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "cargo_toml_inspect": {
+        "handler": "cargo_toml_inspect_mcp",
         "category": "cargo",
         "tier": 3,
+        "tags": ["rust", "cargo", "toml", "dependencies", "workspace", "inspection"],
         "profiles": ["full", "codegg_core", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "expert_only",
@@ -4961,8 +4935,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "text_security_inspect": {
+        "handler": "text_security_inspect",
         "category": "text",
         "tier": 1,
+        "tags": ["text", "unicode", "security", "composite", "prompt", "inspection"],
         "profiles": [
             "full",
             "codegg_core",
@@ -4978,8 +4954,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": True,
     },
     "edit_preflight": {
+        "handler": "edit_preflight",
         "category": "patch",
         "tier": 1,
+        "tags": ["patch", "edit", "preflight", "composite", "text"],
         "profiles": ["full", "codegg_core", "codegg_core_min", "codegg_preflight", "codegg_patch"],
         "aliases": [],
         "llm_exposure": "default",
@@ -4989,8 +4967,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": True,
     },
     "command_preflight": {
+        "handler": "command_preflight",
         "category": "shell",
         "tier": 1,
+        "tags": ["shell", "command", "preflight", "composite", "security"],
         "profiles": ["full", "codegg_core", "codegg_core_min", "codegg_preflight", "codegg_shell"],
         "aliases": [],
         "llm_exposure": "default",
@@ -5000,8 +4980,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": True,
     },
     "config_preflight": {
+        "handler": "config_preflight",
         "category": "config",
         "tier": 1,
+        "tags": ["config", "validation", "json", "toml", "preflight", "composite"],
         "profiles": ["full", "codegg_core", "codegg_core_min", "codegg_preflight", "codegg_config"],
         "aliases": [],
         "llm_exposure": "default",
@@ -5011,8 +4993,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": True,
     },
     "structured_data_compare": {
+        "handler": "structured_data_compare",
         "category": "json",
         "tier": 2,
+        "tags": ["json", "comparison", "config", "structured-data", "composite"],
         "profiles": ["full", "codegg_core", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5023,8 +5007,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── Manifest / package inspection tools ─────────────────────────────────
     "pyproject_inspect": {
+        "handler": "pyproject_inspect_mcp",
         "category": "manifest",
         "tier": 2,
+        "tags": ["python", "pyproject", "toml", "manifest", "dependencies", "inspection"],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5034,8 +5020,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "package_json_inspect": {
+        "handler": "package_json_inspect_mcp",
         "category": "manifest",
         "tier": 2,
+        "tags": ["node", "npm", "package.json", "manifest", "dependencies", "inspection"],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5045,8 +5033,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "requirements_inspect": {
+        "handler": "requirements_inspect_mcp",
         "category": "manifest",
         "tier": 2,
+        "tags": ["python", "requirements", "pip", "dependencies", "inspection"],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5056,8 +5046,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "go_mod_inspect": {
+        "handler": "go_mod_inspect_mcp",
         "category": "manifest",
         "tier": 2,
+        "tags": ["go", "golang", "go.mod", "manifest", "dependencies", "inspection"],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5067,8 +5059,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "lockfile_summary": {
+        "handler": "lockfile_summary_mcp",
         "category": "manifest",
         "tier": 2,
+        "tags": ["lockfile", "dependencies", "package-manager", "inspection"],
         "profiles": ["full", "codegg_core", "codegg_repo_audit", "codegg_config"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5079,8 +5073,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── LLM output hygiene tools ──────────────────────────────────────────
     "llm_json_output_check": {
+        "handler": "llm_json_output_check_mcp",
         "category": "text",
         "tier": 2,
+        "tags": ["text", "json", "llm", "hygiene", "validation", "preflight"],
         "profiles": ["full", "default", "codegg_preflight", "codegg_core"],
         "aliases": [],
         "llm_exposure": "default",
@@ -5091,8 +5087,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── Markdown link check tools ─────────────────────────────────────────
     "markdown_link_check_lexical": {
+        "handler": "markdown_link_check_lexical_mcp",
         "category": "text",
         "tier": 2,
+        "tags": ["text", "markdown", "links", "validation", "hygiene"],
         "profiles": ["full", "codegg_core", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5103,8 +5101,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── Repo audit tools ──────────────────────────────────────────────────
     "repo_file_inventory": {
+        "handler": "repo_file_inventory_mcp",
         "category": "repo",
         "tier": 2,
+        "tags": ["repo", "audit", "inventory", "filesystem", "structure"],
         "profiles": ["full", "codegg_repo_audit"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5115,8 +5115,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
     },
     # ── Network / encoding / temporal utilities (full-only contextual) ────
     "ip_inspect": {
+        "handler": "ip_inspect_mcp",
         "category": "network",
         "tier": 2,
+        "tags": ["network", "ip", "inspection", "address"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5126,8 +5128,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "cidr_inspect": {
+        "handler": "cidr_inspect_mcp",
         "category": "network",
         "tier": 2,
+        "tags": ["network", "ip", "cidr", "inspection", "range"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5137,8 +5141,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "codec_convert": {
+        "handler": "codec_convert_mcp",
         "category": "encoding",
         "tier": 2,
+        "tags": ["encoding", "codec", "conversion", "base64", "hex"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5148,8 +5154,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "radix_convert": {
+        "handler": "radix_convert_mcp",
         "category": "encoding",
         "tier": 2,
+        "tags": ["encoding", "radix", "conversion", "base", "integer"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5159,8 +5167,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "datetime_convert": {
+        "handler": "datetime_convert_mcp",
         "category": "temporal",
         "tier": 2,
+        "tags": ["temporal", "datetime", "conversion", "timestamp", "rfc3339"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5170,8 +5180,10 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
     "cron_inspect": {
+        "handler": "cron_inspect_mcp",
         "category": "temporal",
         "tier": 2,
+        "tags": ["temporal", "cron", "inspection", "schedule"],
         "profiles": ["full"],
         "aliases": [],
         "llm_exposure": "contextual",
@@ -5181,6 +5193,99 @@ TOOL_METADATA: dict[str, dict[str, Any]] = {
         "composite": False,
     },
 }
+
+
+_VALID_CATEGORIES = frozenset(
+    {
+        "math",
+        "text",
+        "json",
+        "toml",
+        "config",
+        "regex",
+        "path",
+        "shell",
+        "patch",
+        "identifier",
+        "markdown",
+        "version",
+        "cargo",
+        "list",
+        "validation",
+        "unicode",
+        "manifest",
+        "repo",
+        "network",
+        "encoding",
+        "temporal",
+    }
+)
+_VALID_TIERS = frozenset({0, 1, 2, 3})
+_VALID_LLM_EXPOSURE = frozenset({"default", "contextual", "expert_only", "harness_only", "hidden"})
+_VALID_COST = frozenset({"cheap", "moderate", "heavy"})
+_VALID_STABILITY = frozenset({"stable", "experimental", "deprecated"})
+
+
+def _validate_catalog_metadata() -> None:
+    """Fail fast on malformed catalog metadata (Plan 040 Workstream F).
+
+    Checks handler locators are non-empty valid Python identifiers,
+    tags are string lists, and tier/category/exposure/cost/stability
+    come from bounded vocabularies. Called once at import time so bad
+    catalog bindings fail deterministically, not on first agent call.
+    """
+    for name, meta in TOOL_METADATA.items():
+        handler = meta.get("handler")
+        if not isinstance(handler, str) or not handler:
+            raise ValueError(f"Tool {name!r} has missing/empty handler locator")
+        if not handler.isidentifier():
+            raise ValueError(
+                f"Tool {name!r} has invalid handler locator {handler!r}: "
+                "must be a Python attribute identifier in eggcalc.mcp.tools"
+            )
+        tags = meta.get("tags")
+        if not isinstance(tags, (list, tuple)) or not all(isinstance(t, str) for t in tags):
+            raise ValueError(f"Tool {name!r} has invalid tags: must be list[str]")
+        if meta.get("tier") not in _VALID_TIERS:
+            raise ValueError(f"Tool {name!r} has invalid tier {meta.get('tier')!r}")
+        if meta.get("category") not in _VALID_CATEGORIES:
+            raise ValueError(f"Tool {name!r} has invalid category {meta.get('category')!r}")
+        if meta.get("llm_exposure") not in _VALID_LLM_EXPOSURE:
+            raise ValueError(f"Tool {name!r} has invalid llm_exposure {meta.get('llm_exposure')!r}")
+        if meta.get("cost") not in _VALID_COST:
+            raise ValueError(f"Tool {name!r} has invalid cost {meta.get('cost')!r}")
+        if meta.get("stability") not in _VALID_STABILITY:
+            raise ValueError(f"Tool {name!r} has invalid stability {meta.get('stability')!r}")
+        if not isinstance(meta.get("profiles"), list):
+            raise ValueError(f"Tool {name!r} has invalid profiles: must be list")
+        if not isinstance(meta.get("aliases"), list):
+            raise ValueError(f"Tool {name!r} has invalid aliases: must be list")
+        if not isinstance(meta.get("harness_use"), list):
+            raise ValueError(f"Tool {name!r} has invalid harness_use: must be list")
+        if not isinstance(meta.get("composite"), bool):
+            raise ValueError(f"Tool {name!r} has invalid composite: must be bool")
+
+
+_validate_catalog_metadata()
+
+
+def get_tool_tier(name: str) -> int:
+    """Return the catalog tier for *name* (sole authored authority: TOOL_METADATA).
+
+    Compatibility accessor so callers never read tier from TOOL_SCHEMAS,
+    which owns only protocol shape since Plan 040.
+    """
+    return int(TOOL_METADATA[name]["tier"])
+
+
+def get_tool_tags(name: str) -> list[str]:
+    """Return a copy of the catalog tags for *name* (authority: TOOL_METADATA)."""
+    return list(TOOL_METADATA[name].get("tags", []))
+
+
+def get_tool_handler_name(name: str) -> str:
+    """Return the handler locator for *name* (attribute in eggcalc.mcp.tools)."""
+    return str(TOOL_METADATA[name]["handler"])
 
 
 # ---------------------------------------------------------------------------
@@ -5235,7 +5340,8 @@ def compact_schema(schema: dict[str, Any]) -> dict[str, Any]:
     Compact mode removes:
     - Long description text, examples, verbose help
     - Default values (they're handled by Python kwargs)
-    - Redundant tags and tier (available at tool level)
+    - Catalog selection metadata (tier/tags live in TOOL_METADATA,
+      surfaced by tools/list from the registry, not from this schema)
     - Nested output schema detail
     """
     result: dict[str, Any] = {}
@@ -5270,7 +5376,8 @@ def normal_schema(schema: dict[str, Any]) -> dict[str, Any]:
     - Required args, types, enums, constraints (minLength, maxLength, minimum, etc.)
     - Input property descriptions (truncated to 120 chars)
     - Output schema structure (top-level property keys, types, descriptions)
-    - Tier, tags, deprecated flag
+    - Deprecated flag (protocol field; tier/tags are catalog metadata
+      in TOOL_METADATA and are added by tools/list, not here)
 
     Normal mode removes:
     - Verbose examples and long help text

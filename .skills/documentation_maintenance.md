@@ -48,11 +48,12 @@ When modifying TypedDict classes in `exact/`:
 
 ### MCP Tool Changes
 When adding/removing MCP tools:
-1. Update `architecture/mcp.md` TOOL_HANDLERS map
+1. `TOOL_METADATA` catalog entry + `TOOL_SCHEMAS` protocol shape are the two edit sites (`TOOL_HANDLERS`/`TOOL_PROFILES` derive automatically — do not hand-edit the map in `architecture/mcp.md`)
 2. Update `docs/mcp.md` tool reference
-3. Update `docs/tool_inventory.md` inventory table
-4. Update tool count in `README.md` and `docs/index.md`
-5. Run `tests/test_tool_inventory.py` to verify consistency
+3. Regenerate `docs/tool_inventory.md` (`python scripts/generate_mcp_docs.py`) — never hand-edit
+4. Update the compatibility fixture intentionally (`tests/fixtures/mcp_tool_registry_expected.json`)
+5. Update tool count in `README.md` and `docs/index.md` (only if count changed)
+6. Run `tests/test_tool_inventory.py` to verify consistency
 
 ## Documentation Accuracy Rules
 

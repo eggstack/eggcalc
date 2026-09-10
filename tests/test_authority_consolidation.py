@@ -226,12 +226,18 @@ class TestMcpExposure:
     """Deprecated json_query must not be preferred over json_extract."""
 
     def test_tier_not_preferred(self):
-        from eggcalc.mcp.schemas import TOOL_METADATA, TOOL_SCHEMAS
+        from eggcalc.mcp.schemas import TOOL_METADATA, get_tool_tags, get_tool_tier
 
-        assert TOOL_SCHEMAS["json_query"]["tier"] >= TOOL_SCHEMAS["json_extract"]["tier"]
+        assert get_tool_tier("json_query") >= get_tool_tier("json_extract")
         assert TOOL_METADATA["json_query"]["tier"] >= TOOL_METADATA["json_extract"]["tier"]
         assert TOOL_METADATA["json_query"]["stability"] == "deprecated"
+        assert isinstance(get_tool_tags("json_query"), list)
+        from eggcalc.mcp.schemas import TOOL_SCHEMAS
+
         assert TOOL_SCHEMAS["json_query"].get("deprecated") is True
+        # Protocol schemas must not carry selection metadata (Plan 040).
+        assert "tier" not in TOOL_SCHEMAS["json_query"]
+        assert "tags" not in TOOL_SCHEMAS["json_query"]
 
     def test_json_query_not_in_default_profile(self):
         from eggcalc.mcp.schemas import TOOL_METADATA

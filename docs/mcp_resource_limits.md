@@ -1,6 +1,6 @@
 # MCP Resource Limits Audit
 
-This document tracks resource bounds for every MCP tool. Generated from `TOOL_HANDLERS` and `TOOL_SCHEMAS` in the codebase.
+This document tracks resource bounds for every MCP tool. Generated from the runtime catalog (`TOOL_METADATA` for category/tier, `TOOL_HANDLERS` for handlers, `TOOL_SCHEMAS` for input shape) in the codebase.
 
 ## Server-Level Limits
 

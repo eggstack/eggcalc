@@ -91,14 +91,15 @@ class TestUtilityRegistry:
 
     def test_tier_two_full_only_contextual(self):
         for name in SIX_TOOLS:
-            schema = _schemas.TOOL_SCHEMAS[name]
             meta = _schemas.TOOL_METADATA[name]
-            assert schema["tier"] == 2, f"{name}: schema tier {schema['tier']!r} != 2"
             assert meta["tier"] == 2, f"{name}: metadata tier {meta['tier']!r} != 2"
             assert meta["profiles"] == ["full"], f"{name}: profiles {meta['profiles']!r}"
             assert meta["llm_exposure"] == "contextual", f"{name}: exposure"
             assert meta["aliases"] == [], f"{name}: unexpected aliases"
             assert name in _schemas.TOOL_PROFILES["full"]
+            # Protocol schemas own shape only (Plan 040): no tier/tags copies.
+            assert "tier" not in _schemas.TOOL_SCHEMAS[name]
+            assert "tags" not in _schemas.TOOL_SCHEMAS[name]
 
     def test_categories(self):
         assert _schemas.TOOL_METADATA["ip_inspect"]["category"] == "network"

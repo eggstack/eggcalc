@@ -142,7 +142,9 @@ def _header() -> list[str]:
     return [
         "# MCP Tool Inventory",
         "",
-        "Canonical reference for all MCP tools exposed by `eggcalc.mcp.server.TOOL_HANDLERS`.",
+        "Canonical reference for all MCP tools in the runtime catalog "
+        "(`eggcalc.mcp.schemas.TOOL_METADATA`; handlers derived as "
+        "`eggcalc.mcp.server.TOOL_HANDLERS`).",
         "",
         f"**Total: {total} tools**",
         "",
@@ -157,8 +159,8 @@ def _inventory_table() -> list[str]:
     lines = [
         "## Inventory Table",
         "",
-        "| # | Tool Name | Category | Tier | Implemented | README | docs/mcp.md | Tests | Notes |",
-        "|---|-----------|----------|------|-------------|--------|-------------|-------|-------|",
+        "| # | Tool Name | Category | Tier | Implemented | README | docs/mcp.md | Tests | Notes | Exposure | Cost | Stability | Composite |",
+        "|---|-----------|----------|------|-------------|--------|-------------|-------|-------|----------|------|-----------|-----------|",
     ]
     for i, name in enumerate(tools, 1):
         meta = TOOL_METADATA[name]
@@ -169,9 +171,17 @@ def _inventory_table() -> list[str]:
         in_mcp_doc = "yes" if _tool_in_file(name, "docs/mcp.md") else "no"
         has_test = "yes" if _tool_has_test(name) else "no"
         desc = _tool_description(name)
+        exposure = meta.get("llm_exposure", "?")
+        cost = meta.get("cost", "?")
+        stability = meta.get("stability", "?")
+        # Deprecated protocol flag lives in TOOL_SCHEMAS; surface it here.
+        if TOOL_SCHEMAS.get(name, {}).get("deprecated") and stability == "stable":
+            stability = "deprecated"
+        composite = "yes" if meta.get("composite") else "no"
         lines.append(
             f"| {i} | `{name}` | {cat} | {tier} | {implemented} | {in_readme} "
-            f"| {in_mcp_doc} | {has_test} | {desc} |"
+            f"| {in_mcp_doc} | {has_test} | {desc} | {exposure} "
+            f"| {cost} | {stability} | {composite} |"
         )
     lines.append("")
     return lines
@@ -251,7 +261,7 @@ def _schema_detail_section() -> list[str]:
         "",
         "| Level | Description |",
         "|-------|-------------|",
-        "| `compact` | Description + tier + tags only (smallest) |",
+        "| `compact` | Description + input/output structure only (smallest; tier/tags come from the catalog, not the schema) |",
         "| `normal` | Adds input types, enums, constraints, output structure |",
         "| `full` | Complete JSON Schema with all property descriptions |",
         "",
@@ -260,10 +270,20 @@ def _schema_detail_section() -> list[str]:
 
 def _source_of_truth() -> list[str]:
     return [
-        "## Source of Truth",
+        "## Catalog Authority (Plan 040)",
         "",
-        "The canonical tool list lives in `tests/fixtures/mcp_tool_registry_expected.json`.",
-        "The test at `tests/test_tool_inventory.py` enforces that `TOOL_HANDLERS` keys match this fixture.",
+        "Canonical public tool names, handler locators, and selection",
+        "metadata (category/tier/tags/profiles/exposure/cost/stability/composite)",
+        "live in `eggcalc/mcp/schemas.py::TOOL_METADATA`.",
+        "Protocol shape (description/inputSchema/outputSchema/deprecated) lives in",
+        "`TOOL_SCHEMAS`. Runtime handlers (`TOOL_HANDLERS`) and profiles",
+        "(`TOOL_PROFILES`) are derived from the catalog; this document is",
+        "generated from those runtime authorities.",
+        "",
+        "`tests/fixtures/mcp_tool_registry_expected.json` is a golden",
+        "compatibility snapshot of the public tool-name set. CI compares the",
+        "derived catalog against it so additions/removals are explicit in",
+        "review; it never constructs runtime behavior.",
         "",
     ]
 

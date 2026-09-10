@@ -260,10 +260,10 @@ class TestModernToolsList:
         server = McpServer()
         try:
             response = server.handle_request(_modern_request("tools/list", params={"tier": 0}))
-            from eggcalc.mcp.schemas import TOOL_SCHEMAS
+            from eggcalc.mcp.schemas import TOOL_METADATA
 
             for tool in response["result"]["tools"]:
-                assert TOOL_SCHEMAS[tool["name"]].get("tier") == 0
+                assert TOOL_METADATA[tool["name"]].get("tier") == 0
         finally:
             server.close()
 

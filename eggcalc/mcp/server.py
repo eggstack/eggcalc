@@ -42,178 +42,50 @@ from .schemas import (
     get_tool_annotations,
     normal_schema,
 )
-from .tools import (
-    _sanitize_error,
-    canonicalize_text_mcp,
-    cargo_toml_inspect_mcp,
-    cidr_inspect_mcp,
-    code_fence_extract_mcp,
-    codec_convert_mcp,
-    command_preflight,
-    config_preflight,
-    constant_lookup,
-    cron_inspect_mcp,
-    datetime_convert_mcp,
-    diff_file_headers_mcp,
-    diff_hunk_ranges_mcp,
-    diff_touched_paths_mcp,
-    dotenv_validate_mcp,
-    edit_preflight,
-    escape_text,
-    glob_match_mcp,
-    go_mod_inspect_mcp,
-    identifier_analyze,
-    identifier_inspect_mcp,
-    identifier_table_inspect_mcp,
-    ini_validate_mcp,
-    ip_inspect_mcp,
-    json_canonicalize,
-    json_compare,
-    json_extract,
-    json_query,
-    json_shape,
-    line_range_compare,
-    line_range_extract,
-    list_compare,
-    list_dedupe_mcp,
-    list_sort_mcp,
-    llm_json_output_check_mcp,
-    lockfile_summary_mcp,
-    markdown_link_check_lexical_mcp,
-    markdown_structure_mcp,
-    math_eval,
-    package_json_inspect_mcp,
-    patch_apply_check_mcp,
-    patch_conflict_markers_inspect_mcp,
-    patch_summary_mcp,
-    path_analyze_mcp,
-    path_compare_mcp,
-    path_normalize,
-    path_scope_check_mcp,
-    prompt_input_inspect_mcp,
-    pyproject_inspect_mcp,
-    radix_convert_mcp,
-    regex_finditer,
-    regex_safety_check,
-    repo_file_inventory_mcp,
-    requirements_inspect_mcp,
-    shell_argv_compare,
-    shell_quote_join,
-    shell_split,
-    structured_data_compare,
-    text_count,
-    text_diff_explain,
-    text_equal,
-    text_fingerprint_mcp,
-    text_hash,
-    text_inspect,
-    text_measure,
-    text_position,
-    text_replace_check,
-    text_security_inspect,
-    text_transform,
-    text_truncate,
-    text_window,
-    toml_shape_mcp,
-    unescape_text,
-    unicode_policy_check_mcp,
-    unified_diff_validate_mcp,
-    unit_convert,
-    unit_info,
-    validate_brackets,
-    validate_json,
-    validate_regex,
-    validate_schema_light,
-    validate_toml,
-    version_compare_mcp,
-    version_constraint_check_mcp,
-)
+from .tools import _sanitize_error
 
-TOOL_HANDLERS: dict[str, Any] = {
-    "cargo_toml_inspect": cargo_toml_inspect_mcp,
-    "cidr_inspect": cidr_inspect_mcp,
-    "codec_convert": codec_convert_mcp,
-    "code_fence_extract": code_fence_extract_mcp,
-    "dotenv_validate": dotenv_validate_mcp,
-    "ini_validate": ini_validate_mcp,
-    "escape_text": escape_text,
-    "line_range_compare": line_range_compare,
-    "line_range_extract": line_range_extract,
-    "llm_json_output_check": llm_json_output_check_mcp,
-    "markdown_link_check_lexical": markdown_link_check_lexical_mcp,
-    "unescape_text": unescape_text,
-    "json_canonicalize": json_canonicalize,
-    "json_compare": json_compare,
-    "json_extract": json_extract,
-    "json_query": json_query,
-    "json_shape": json_shape,
-    "list_compare": list_compare,
-    "list_dedupe": list_dedupe_mcp,
-    "list_sort": list_sort_mcp,
-    "math_eval": math_eval,
-    "patch_apply_check": patch_apply_check_mcp,
-    "patch_conflict_markers_inspect": patch_conflict_markers_inspect_mcp,
-    "patch_summary": patch_summary_mcp,
-    "diff_touched_paths": diff_touched_paths_mcp,
-    "diff_hunk_ranges": diff_hunk_ranges_mcp,
-    "diff_file_headers": diff_file_headers_mcp,
-    "unified_diff_validate": unified_diff_validate_mcp,
-    "path_analyze": path_analyze_mcp,
-    "path_compare": path_compare_mcp,
-    "path_normalize": path_normalize,
-    "path_scope_check": path_scope_check_mcp,
-    "regex_finditer": regex_finditer,
-    "regex_safety_check": regex_safety_check,
-    "repo_file_inventory": repo_file_inventory_mcp,
-    "shell_split": shell_split,
-    "shell_quote_join": shell_quote_join,
-    "argv_compare": shell_argv_compare,
-    "text_count": text_count,
-    "text_diff_explain": text_diff_explain,
-    "text_equal": text_equal,
-    "text_hash": text_hash,
-    "text_inspect": text_inspect,
-    "text_measure": text_measure,
-    "text_position": text_position,
-    "text_replace_check": text_replace_check,
-    "text_truncate": text_truncate,
-    "text_transform": text_transform,
-    "text_window": text_window,
-    "toml_shape": toml_shape_mcp,
-    "unit_convert": unit_convert,
-    "unit_info": unit_info,
-    "constant_lookup": constant_lookup,
-    "cron_inspect": cron_inspect_mcp,
-    "datetime_convert": datetime_convert_mcp,
-    "validate_brackets": validate_brackets,
-    "validate_json": validate_json,
-    "validate_regex": validate_regex,
-    "validate_schema_light": validate_schema_light,
-    "validate_toml": validate_toml,
-    "version_compare": version_compare_mcp,
-    "version_constraint_check": version_constraint_check_mcp,
-    "identifier_analyze": identifier_analyze,
-    "glob_match": glob_match_mcp,
-    "text_fingerprint": text_fingerprint_mcp,
-    "identifier_inspect": identifier_inspect_mcp,
-    "identifier_table_inspect": identifier_table_inspect_mcp,
-    "markdown_structure": markdown_structure_mcp,
-    "unicode_policy_check": unicode_policy_check_mcp,
-    "canonicalize_text": canonicalize_text_mcp,
-    "prompt_input_inspect": prompt_input_inspect_mcp,
-    "text_security_inspect": text_security_inspect,
-    "edit_preflight": edit_preflight,
-    "command_preflight": command_preflight,
-    "config_preflight": config_preflight,
-    "structured_data_compare": structured_data_compare,
-    "pyproject_inspect": pyproject_inspect_mcp,
-    "radix_convert": radix_convert_mcp,
-    "package_json_inspect": package_json_inspect_mcp,
-    "requirements_inspect": requirements_inspect_mcp,
-    "go_mod_inspect": go_mod_inspect_mcp,
-    "ip_inspect": ip_inspect_mcp,
-    "lockfile_summary": lockfile_summary_mcp,
-}
+
+def _build_tool_handlers(
+    metadata: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Derive public tool-name -> handler mapping from catalog metadata.
+
+    Plan 040 Workstream A: TOOL_METADATA owns the handler locator
+    (attribute name in eggcalc.mcp.tools). Lookup is eager and
+    deterministic at import so bad bindings fail fast rather than on
+    the first agent call.
+
+    Single-file note: the build inlines all modules into one namespace
+    (conflict handlers under the _mcp_ prefix), so globals() is checked
+    first and the tools-module import below never executes there.
+    """
+    handlers: dict[str, Any] = {}
+    for tool_name, meta in metadata.items():
+        attr = meta.get("handler")
+        if not isinstance(attr, str) or not attr:
+            raise ValueError(f"Tool {tool_name!r} has missing/empty handler locator")
+        if not attr.isidentifier():
+            raise ValueError(
+                f"Tool {tool_name!r} has invalid handler locator {attr!r}: "
+                "must be a Python attribute identifier in eggcalc.mcp.tools"
+            )
+        handler = globals().get(attr)
+        if handler is None:
+            handler = globals().get(f"_mcp_{attr}")
+        if handler is None:
+            from . import tools as _tools_mod
+
+            handler = getattr(_tools_mod, attr, None)
+        if not callable(handler):
+            raise ValueError(
+                f"Tool {tool_name!r} handler {attr!r} did not resolve "
+                "to a callable in eggcalc.mcp.tools"
+            )
+        handlers[tool_name] = handler
+    return handlers
+
+
+TOOL_HANDLERS: dict[str, Any] = _build_tool_handlers(TOOL_METADATA)
 
 
 def _parse_env_int(name: str, default: int, min_val: int, max_val: int) -> int:
@@ -891,6 +763,43 @@ class ToolRegistry:
     _VALID_LLM_EXPOSURE: frozenset[str] = frozenset(
         {"default", "contextual", "expert_only", "harness_only", "hidden"}
     )
+    _VALID_TIERS: frozenset[int] = frozenset({0, 1, 2, 3})
+    _VALID_CATEGORIES: frozenset[str] = frozenset(
+        {
+            "math",
+            "text",
+            "json",
+            "toml",
+            "config",
+            "regex",
+            "path",
+            "shell",
+            "patch",
+            "identifier",
+            "markdown",
+            "version",
+            "cargo",
+            "list",
+            "validation",
+            "unicode",
+            "manifest",
+            "repo",
+            "network",
+            "encoding",
+            "temporal",
+        }
+    )
+    _VALID_COST: frozenset[str] = frozenset({"cheap", "moderate", "heavy"})
+    _VALID_STABILITY: frozenset[str] = frozenset({"stable", "experimental", "deprecated"})
+    _VALID_ANNOTATION_KEYS: frozenset[str] = frozenset(
+        {
+            "title",
+            "readOnlyHint",
+            "destructiveHint",
+            "idempotentHint",
+            "openWorldHint",
+        }
+    )
 
     def __init__(
         self,
@@ -947,13 +856,82 @@ class ToolRegistry:
         if orphan_metadata:
             raise ValueError(f"Metadata for unregistered tools: {sorted(orphan_metadata)}")
 
+        # Plan 040 Workstream F: catalog and protocol authorities must agree
+        # on the public tool-name set (no extra/missing entries either way).
+        if metadata_names != schema_names:
+            raise ValueError(
+                "Metadata/schema key mismatch: "
+                f"metadata-only={sorted(metadata_names - schema_names)} "
+                f"schema-only={sorted(schema_names - metadata_names)}"
+            )
+
+        for name, handler in self._handlers.items():
+            if not callable(handler):
+                raise ValueError(f"Handler for {name!r} is not callable")
+
         for name in self._metadata:
-            exposure = self._metadata[name].get("llm_exposure")
+            meta = self._metadata[name]
+            # Lenient for custom/test registries (which use {} or partial
+            # metadata): only validate fields when present. The canonical
+            # catalog is strictly validated at import by
+            # schemas._validate_catalog_metadata().
+            if "handler" in meta:
+                handler_loc = meta.get("handler")
+                if not isinstance(handler_loc, str) or not handler_loc:
+                    raise ValueError(f"Tool {name!r} has missing/empty handler locator")
+                if not handler_loc.isidentifier():
+                    raise ValueError(f"Tool {name!r} has invalid handler locator {handler_loc!r}")
+            if "tags" in meta:
+                tags = meta.get("tags")
+                if not isinstance(tags, (list, tuple)) or not all(isinstance(t, str) for t in tags):
+                    raise ValueError(f"Tool {name!r} has invalid tags: must be list[str]")
+            if "tier" in meta and meta.get("tier") not in self._VALID_TIERS:
+                raise ValueError(f"Tool {name!r} has invalid tier {meta.get('tier')!r}")
+            if "category" in meta and meta.get("category") not in self._VALID_CATEGORIES:
+                raise ValueError(f"Tool {name!r} has invalid category {meta.get('category')!r}")
+            if "cost" in meta and meta.get("cost") not in self._VALID_COST:
+                raise ValueError(f"Tool {name!r} has invalid cost {meta.get('cost')!r}")
+            if "stability" in meta and meta.get("stability") not in self._VALID_STABILITY:
+                raise ValueError(f"Tool {name!r} has invalid stability {meta.get('stability')!r}")
+            if "profiles" in meta and not isinstance(meta.get("profiles"), (list, tuple)):
+                raise ValueError(f"Tool {name!r} has invalid profiles: must be list")
+            if "aliases" in meta and not isinstance(meta.get("aliases"), (list, tuple)):
+                raise ValueError(f"Tool {name!r} has invalid aliases: must be list")
+            if "harness_use" in meta and not isinstance(meta.get("harness_use"), (list, tuple)):
+                raise ValueError(f"Tool {name!r} has invalid harness_use: must be list")
+            if "composite" in meta and not isinstance(meta.get("composite"), bool):
+                raise ValueError(f"Tool {name!r} has invalid composite: must be bool")
+            exposure = meta.get("llm_exposure")
             if exposure is not None and exposure not in self._VALID_LLM_EXPOSURE:
                 raise ValueError(
                     f"Unsupported llm_exposure {exposure!r} for tool {name!r}; "
                     f"must be one of {sorted(self._VALID_LLM_EXPOSURE)}"
                 )
+            annotations = get_tool_annotations(name)
+            for key, value in annotations.items():
+                if key not in self._VALID_ANNOTATION_KEYS:
+                    raise ValueError(f"Tool {name!r} has unsupported annotation {key!r}")
+                if key == "title":
+                    if not isinstance(value, str):
+                        raise ValueError(f"Tool {name!r} annotation {key!r} must be str")
+                elif not isinstance(value, bool):
+                    raise ValueError(f"Tool {name!r} annotation {key!r} must be bool")
+
+        # Protocol schemas must not carry authored selection metadata
+        # (Plan 040 Workstream B: tier/tags live in TOOL_METADATA only).
+        for name in self._schemas:
+            schema = self._schemas[name]
+            if isinstance(schema, Mapping):
+                if "tier" in schema:
+                    raise ValueError(
+                        f"Schema for {name!r} must not contain authored 'tier' "
+                        "(authority: TOOL_METADATA)"
+                    )
+                if "tags" in schema:
+                    raise ValueError(
+                        f"Schema for {name!r} must not contain authored 'tags' "
+                        "(authority: TOOL_METADATA)"
+                    )
 
         for profile_name, profile_tools in self._profiles.items():
             if not profile_name:
@@ -976,6 +954,10 @@ class ToolRegistry:
                     raise ValueError(
                         f"Profile {profile_name!r} references unknown tool: {tool_name!r}"
                     )
+            # Note: canonical profiles from _build_profiles() are sorted
+            # deterministically (checked by test_tool_inventory); custom
+            # registries are not required to be sorted here to avoid
+            # breaking isolated executor tests.
 
     @property
     def handlers(self) -> MappingProxyType[str, Any]:
@@ -2823,7 +2805,7 @@ def _run_handler_in_thread(
     the module-level default. This binds MCP math execution to the
     server-owned evaluator without modifying handler signatures.
     """
-    if timeout_seconds is not None and handler is math_eval:
+    if timeout_seconds is not None and handler is TOOL_HANDLERS.get("math_eval"):
         arguments = {**arguments, "timeout": timeout_seconds}
     if evaluator is not None:
         token = _evaluator._server_evaluator.set(evaluator)
@@ -3311,11 +3293,12 @@ def _handle_list_tools(
                 continue
 
         if tier_filter is not None:
-            if schema.get("tier") != tier_filter:
+            # Plan 040: tier authority is TOOL_METADATA (catalog), not TOOL_SCHEMAS.
+            if metadata_src.get(name, {}).get("tier") != tier_filter:
                 continue
 
         if tags_filter is not None:
-            tool_tags = set(schema.get("tags", []))
+            tool_tags = set(metadata_src.get(name, {}).get("tags", []))
             if not all(tag in tool_tags for tag in tags_filter):
                 continue
 
@@ -3331,8 +3314,8 @@ def _handle_list_tools(
         elif schema_detail == "normal":
             entry = normal_schema(schema)
             entry["name"] = name
-            entry["tier"] = schema.get("tier")
-            entry["tags"] = schema.get("tags", [])
+            entry["tier"] = meta.get("tier")
+            entry["tags"] = list(meta.get("tags", []))
             entry["category"] = meta.get("category")
             entry["llm_exposure"] = meta.get("llm_exposure")
             entry["cost"] = meta.get("cost")
@@ -3344,8 +3327,8 @@ def _handle_list_tools(
                 "inputSchema": thaw_owned(schema["inputSchema"]),
                 "outputSchema": thaw_owned(schema.get("outputSchema")),
                 "annotations": annotations,
-                "tier": schema.get("tier"),
-                "tags": schema.get("tags", []),
+                "tier": meta.get("tier"),
+                "tags": list(meta.get("tags", [])),
                 "deprecated": schema.get("deprecated", False),
                 "category": meta.get("category"),
                 "llm_exposure": meta.get("llm_exposure"),
