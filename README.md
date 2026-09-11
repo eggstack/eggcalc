@@ -18,7 +18,7 @@ Written in pure Python with no external dependencies, it can be used as a CLI to
 - **Unit Conversions**: `"30m + 100ft"` → `60.48 m`
 - **Complex Numbers**: `"sqrt(-1)"` → `1j`
 - **Safe Evaluation**: AST-based parsing, no `eval()`, blocks dangerous operations
-- **MCP Server**: deterministic text, JSON, validation, math, path, manifest, patch, repo-audit, network, encoding, and temporal tools for AI agents
+- **MCP Server**: deterministic text, JSON, validation, math, path, manifest, patch, repo, network, encoding, and temporal tools for AI agents
 - **Pure Python**: Standard library only, no dependencies
 
 ## Requirements
@@ -72,6 +72,8 @@ calc --mcp                              # MCP server mode
 | `-i`, `--interactive` | Start interactive REPL |
 | `--mcp` | Run as MCP server |
 | `--capabilities` | Show runtime capabilities as JSON and exit |
+
+See [docs/cli.md](docs/cli.md) for the full option reference (including `--usage`, `--verbose`, `-s`/`--show`, `--mcp-profile`, and `--mcp-schema-detail`).
 
 ## Python API
 
@@ -144,7 +146,7 @@ The MCP server's `initialize` response also includes a `runtime` key with capabi
 
 **Functions**: trig (`sin`, `cos`, `tan`), hyperbolic, math (`sqrt`, `log`, `exp`), combinatorics (`perm`, `comb`, `gcd`, `lcm`), prime (`isprime`, `primefactors`), statistics (`mean`, `median`, `std`), random, memory registers, variables, and more. See [docs/functions.md](docs/functions.md).
 
-**Units**: length, time, data, mass, volume, pressure, energy, power, force, voltage, current, angle, speed, area, frequency. Supports metric prefixes and imperial units. See [docs/units.md](docs/units.md).
+**Units**: length, time, data, data_rate, mass, volume, pressure, energy, power, force, voltage, current, angle, speed, area, frequency, temperature. Supports metric prefixes and imperial units. See [docs/units.md](docs/units.md).
 
 **Number words**: zero through quintillion, fractions (half, quarter, thousandth, etc.).
 
@@ -168,7 +170,7 @@ CUSTOM_ALIASES = {"meter": "m", "meters": "m"}
 ruff check eggcalc tests                  # Lint
 black eggcalc tests                       # Format
 mypy eggcalc --ignore-missing-imports     # Type check
-mypy --strict tests/typing/consumer.py    # Strict consumer API check
+mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py    # Strict consumer API check
 make check                                # All checks (lint, format, typecheck, docs, test)
 python build_single.py                    # Build single-file distribution
 ```
