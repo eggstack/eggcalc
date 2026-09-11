@@ -38,6 +38,9 @@ CANONICAL_DUMPS_KWARGS = {"sort_keys": True, "separators": (",", ":")}
 
 DEFAULT_PROFILES = ["full", "default", "codegg_core", "codegg_core_min", "agent_core"]
 DEFAULT_DETAILS = ["full", "normal", "compact"]
+DEFAULT_CANDIDATE_SETS = (
+    Path(__file__).resolve().parent.parent / "evals" / "mcp_tool_selection" / "candidate_sets.json"
+)
 
 
 def _utf8_len(obj: object) -> int:
@@ -63,9 +66,7 @@ def measure_surface(
     output_bytes = sum(_utf8_len(t.get("outputSchema")) for t in tools)
     annotation_bytes = sum(_utf8_len(t.get("annotations")) for t in tools)
 
-    per_tool = sorted(
-        ((t["name"], _utf8_len(t)) for t in tools), key=lambda kv: (-kv[1], kv[0])
-    )
+    per_tool = sorted(((t["name"], _utf8_len(t)) for t in tools), key=lambda kv: (-kv[1], kv[0]))
     categories: dict[str, int] = {}
     tiers: dict[str, int] = {}
     for t in tools:
@@ -82,7 +83,10 @@ def measure_surface(
         "input_schema_bytes": input_bytes,
         "output_schema_bytes": output_bytes,
         "annotation_bytes": annotation_bytes,
-        "other_bytes": total_bytes - description_bytes - input_bytes - output_bytes
+        "other_bytes": total_bytes
+        - description_bytes
+        - input_bytes
+        - output_bytes
         - annotation_bytes,
         "largest_tools": [{"name": n, "bytes": b} for n, b in per_tool[:5]],
         "categories": dict(sorted(categories.items())),
@@ -96,9 +100,7 @@ def summarize(measurements: list[dict]) -> list[dict]:
         (
             m
             for m in measurements
-            if m["profile"] == "full"
-            and m["schema_detail"] == "full"
-            and not m["names_filter"]
+            if m["profile"] == "full" and m["schema_detail"] == "full" and not m["names_filter"]
         ),
         None,
     )
@@ -120,9 +122,10 @@ def format_table(measurements: list[dict]) -> str:
     )
     rows = [header, "-" * len(header)]
     for m in measurements:
-        label = m["profile"]
+        label = m.get("candidate_set") or m["profile"]
         if m["names_filter"]:
-            label += f"+{len(m['names_filter'])}names"
+            if not m.get("candidate_set"):
+                label += f"+{len(m['names_filter'])}names"
         rows.append(
             f"{label:<16}{m['schema_detail']:<8}{m['tool_count']:>6}"
             f"{m['total_bytes']:>10}{m['description_bytes']:>9}"
@@ -144,6 +147,13 @@ def main(argv: list[str] | None = None) -> int:
         "discovered via ToolRegistry.search_tools for this query.",
     )
     parser.add_argument("--limit", type=int, default=3)
+    parser.add_argument(
+        "--candidate-sets",
+        default=None,
+        nargs="?",
+        const=str(DEFAULT_CANDIDATE_SETS),
+        help="Measure evaluation-only name-filtered candidate sets from JSON.",
+    )
     args = parser.parse_args(argv)
 
     server = McpServer(config=McpServerConfig(profile="full"))
@@ -158,6 +168,17 @@ def main(argv: list[str] | None = None) -> int:
             names = [m["name"] for m in matches]
             print(f"discovered for {args.discover!r}: {names}")
             measurements.append(measure_surface(server, "full", "full", names=names))
+        if args.candidate_sets is not None:
+            candidate_payload = json.loads(Path(args.candidate_sets).read_text(encoding="utf-8"))
+            candidate_sets = candidate_payload.get("sets", candidate_payload)
+            if not isinstance(candidate_sets, dict):
+                raise ValueError("candidate sets must be a JSON object")
+            for label, names in sorted(candidate_sets.items()):
+                if not isinstance(label, str) or not isinstance(names, list):
+                    raise ValueError(f"invalid candidate set {label!r}")
+                measurement = measure_surface(server, "full", "compact", names=names)
+                measurement["candidate_set"] = label
+                measurements.append(measurement)
     finally:
         server.close()
 

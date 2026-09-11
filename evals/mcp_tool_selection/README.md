@@ -1,4 +1,4 @@
-# MCP Tool-Selection Evaluation (Plan 041)
+# MCP Tool-Selection Evaluation (Plans 041 and 043)
 
 Provider-neutral tool-selection corpus and deterministic scoring for the
 eggcalc MCP tool catalog. No provider SDK, API key, embedding model, or
@@ -8,9 +8,10 @@ network access is required or used anywhere in this directory.
 
 ```text
 evals/mcp_tool_selection/
-    cases.json   # 121 realistic task cases (development + held_out)
-    README.md    # this file
-    reports/     # bounded summary artifacts only (no timestamped sprawl)
+    cases.json          # 121 realistic task cases (development + held_out)
+    candidate_sets.json # evaluation-only static candidate lists
+    README.md           # this file
+    reports/             # bounded summary artifacts only (no raw provider logs)
 ```
 
 ## Case format
@@ -43,6 +44,12 @@ evals/mcp_tool_selection/
 # Serialized catalog cost per exposure strategy
 python scripts/measure_mcp_tool_surface.py
 python scripts/measure_mcp_tool_surface.py --json /tmp/surface.json
+python scripts/measure_mcp_tool_surface.py --candidate-sets
+
+# Deterministic per-case rank/depth and candidate-core analysis
+python scripts/analyze_mcp_tool_selection_failures.py \
+    --json /tmp/corrective-analysis.json \
+    --markdown /tmp/corrective-analysis.md
 
 # Discovery recall proxy over the corpus (no LLM)
 .venv/bin/python - <<'EOF'
@@ -88,6 +95,14 @@ When practical, run held-out evaluation on at least two materially
 different agent/model families before changing recommended profile
 membership. Tool naming effects are model-dependent.
 
+For corrective experiments, retain one provider-neutral JSONL record per case
+with the visible/discovered tool names when possible. The analyzer can join
+those records to deterministic ranks and classify static omission, discovery
+recall/depth, exposed selection, and no-tool propensity. Do not infer model
+selection quality from lexical recall alone. The current deterministic and
+held-out stopping decision is recorded in the `corrective_*_2026_09_10.md`
+reports; `agent_core` remains experimental.
+
 ## Decision gates (Plan 041, section 16)
 
 - `agent_core` should cut initial serialized tool-definition bytes by
@@ -100,4 +115,4 @@ membership. Tool naming effects are model-dependent.
 - New composite/front-door tools need measured held-out benefit; zero
   new tools is an acceptable outcome (current status: zero added).
 
-See `reports/` for the checked-in deterministic baseline.
+See `reports/` for the checked-in baseline, closure, and corrective evidence.

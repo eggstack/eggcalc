@@ -174,7 +174,7 @@ tests/
 ```
 
 ## Current Test Count
-- Run `pytest --co -q | tail -1` for the live count; ~4,600+ tests as of 2026-08-25
+- Run `pytest --co -q | tail -1` for the live count; the 2026-09-10 local gate collected 5,259 tests (5,226 passed, 33 skipped).
 - All must continue to pass
 
 ## Common Issues When Testing

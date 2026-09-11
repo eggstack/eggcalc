@@ -31,11 +31,15 @@ generated. Read selection metadata via `get_tool_selection_summary()` /
   emission — frozen registry values crash JSON serialization.
 - Corpus + scorer: `evals/mcp_tool_selection/` (121 cases, dev/held_out
   splits), `scripts/measure_mcp_tool_surface.py`,
-  `scripts/score_mcp_tool_selection.py`. Tune on `development` only. The
-  current cross-model evidence is recorded in
-  `reports/closure_2026_09_10.md`; do not describe `agent_core` as recommended
-  until a later held-out run passes non-inferiority and specialist-recovery
-  gates.
+  `scripts/score_mcp_tool_selection.py`, and
+  `scripts/analyze_mcp_tool_selection_failures.py`. The Plan 043 candidate
+  lists are evaluation-only; they do not create profiles. Tune on
+  `development` only and retain normalized per-case rollout JSONL before
+  making model-selection claims. The current cross-model evidence is
+  recorded in `reports/closure_2026_09_10.md`; do not describe `agent_core` as
+  recommended until a later held-out run passes non-inferiority and
+  specialist-recovery gates. The corrective stopping decision is recorded in
+  `reports/corrective_held_out_2026_09_10.md`.
 
 ### Response Conventions
 

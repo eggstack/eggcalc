@@ -449,6 +449,55 @@ class TestSelectionScorer:
         assert agg["first_tool_rate"] == 1.0
         assert agg["task_correct_reported"] == 1
 
+
+class TestCorrectiveAnalysis:
+    def test_candidate_sets_are_evaluation_only_and_valid(self):
+        analyzer = _load_script("analyze_mcp_tool_selection_failures.py")
+        candidates = analyzer.load_candidates(EVAL_DIR / "candidate_sets.json")
+        assert [
+            len(candidates[name])
+            for name in (
+                "current_core10",
+                "expanded_small15",
+                "expanded_medium22",
+                "default26",
+            )
+        ] == [10, 15, 22, 26]
+        assert set(candidates["current_core10"]) == set(TOOL_PROFILES["agent_core"])
+        assert all(set(names) <= set(TOOL_METADATA) for names in candidates.values())
+
+    def test_analysis_reports_depths_and_candidate_coverage(self):
+        analyzer = _load_script("analyze_mcp_tool_selection_failures.py")
+        cases = analyzer.load_cases(CASES_PATH)
+        candidates = analyzer.load_candidates(EVAL_DIR / "candidate_sets.json")
+        report = analyzer.analyze(cases, candidates, [])
+        assert report["rollout_evidence_available"] is False
+        assert report["rank_summary"]["development"]["acceptable_recall_at"]["5"] == 1.0
+        assert report["rank_summary"]["held_out"]["acceptable_recall_at"]["8"] == 0.8966
+        assert report["candidate_summary"]["expanded_small15"]["tool_count"] == 15
+        assert (
+            report["candidate_summary"]["expanded_medium22"]["by_split"]["development"][
+                "current_core_misses_avoided"
+            ]
+            == 20
+        )
+
+    def test_analysis_joins_rollout_and_visible_tools(self, tmp_path):
+        analyzer = _load_script("analyze_mcp_tool_selection_failures.py")
+        cases = analyzer.load_cases(CASES_PATH)
+        candidates = analyzer.load_candidates(EVAL_DIR / "candidate_sets.json")
+        record = {
+            "case_id": "math-006",
+            "model": "test/model",
+            "catalog_config": "agent_core+discovery",
+            "discovery_limit": 5,
+            "tool_calls": [],
+        }
+        report = analyzer.analyze(cases, candidates, [record])
+        row = next(item for item in report["cases"] if item["case_id"] == "math-006")
+        assert row["rollouts"][0]["visible_acceptable"] is True
+        assert row["rollouts"][0]["failure"]["primary_cause"] == ("no-tool-propensity-failure")
+
     def test_irrelevant_redundant_invalid_counts(self, tmp_path):
         scorer = _load_script("score_mcp_tool_selection.py")
         cases = {c["id"]: c for c in _load_cases()}

@@ -178,6 +178,24 @@ The authority is `TOOL_ANNOTATIONS` / `get_tool_annotations()` in `eggcalc/mcp/s
 
 One concise instruction string (`SERVER_INSTRUCTIONS` in `eggcalc/mcp/server.py`) is reused across eras: legacy `initialize` results and modern `server/discover` results carry the identical text. It directs agents to composite preflight tools, `json_extract` over deprecated `json_query`, and `math_eval` for deterministic calculations.
 
+### Progressive disclosure for agents
+
+`agent_core` is an opt-in 10-tool experimental profile, not the recommended
+general-agent surface. An aware host can search the full callable catalog with
+`ToolRegistry.search_tools(query, profile="full", limit=5)`, then request the
+shortlisted definitions with `tools/list(names=[...], schema_detail="compact")`
+or a richer detail level before calling them. Search is deterministic,
+bounded, and separate from call authorization; it does not add tools to a
+profile.
+
+The Plan 043 corrective pass measured top-five and deeper lexical reachability
+and evaluated 15-/22-tool candidate name lists without adding permanent
+profiles. The current held-out model evidence still favors `full` or
+`full/compact` over `agent_core` discovery, and no smaller candidate is
+promoted without retained per-case rollout and end-to-end evidence. See the
+[corrective development report](../evals/mcp_tool_selection/reports/corrective_development_2026_09_10.md)
+and [held-out decision](../evals/mcp_tool_selection/reports/corrective_held_out_2026_09_10.md).
+
 ### Cache hints and ordering
 
 `tools/list` emits canonical sorted-name order on both eras (stable across source reorderings). Modern `server/discover` and `tools/list` carry conservative `ttlMs: 0`, `cacheScope: "private"` from the single policy authority (`MODERN_CACHE_TTL_MS` / `MODERN_CACHE_SCOPE` in `eggcalc/_protocol.py`). Zero TTL is the final policy: a nonzero catalog TTL would require proving registry immutability plus profile/detail selection as cache keys, which is not established.

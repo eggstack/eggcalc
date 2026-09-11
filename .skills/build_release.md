@@ -32,6 +32,7 @@ ruff → black --check → mypy (package + strict consumer) → docs-check → b
 ```
 - `docs-check` runs `python scripts/generate_mcp_docs.py --check` to verify generated docs aren't stale
 - `make package-check` builds the wheel/sdist and runs `twine check` plus installed-wheel and single-file smoke tests
+- Make targets invoke the repository interpreter through `$(PYTHON)`, so local and CI checks use the same environment for build and package validation.
 - CI runs `make check` then `make package-check`; all checks must pass before merge
 
 ## Commands Reference
@@ -54,7 +55,7 @@ mypy --strict tests/typing/consumer.py
 make check
 
 # Build single-file
-python build_single.py
+.venv/bin/python build_single.py
 
 # Install to ~/.local/bin/calc
 python install.py --install

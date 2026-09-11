@@ -671,7 +671,7 @@ Profiles are named subsets of tools that control which tools are available via `
 
 ### Data Structures
 
-**`TOOL_METADATA`** (schemas.py): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile. `agent_core` (10 front-door tools) is an opt-in candidate exposure; the 2026-09-10 held-out cross-model evaluation did not validate it as the recommended general-agent exposure. `full` remains the default.
+**`TOOL_METADATA`** (schemas.py): Each tool has a `profiles` list indicating which named profiles include it, plus `llm_exposure` which controls visibility in the `full` profile. `agent_core` (10 front-door tools) is an opt-in experimental exposure; the 2026-09-10 held-out cross-model evaluation did not validate it as the recommended general-agent exposure. The Plan 043 corrective pass evaluated 15- and 22-tool name lists without creating profiles, but lacked retained per-case provider rollouts needed for promotion. `full` remains the default and practical general-agent recommendation.
 
 **`TOOL_PROFILES`** (schemas.py): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
 
@@ -704,7 +704,7 @@ Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it d
 - **`normal`**: Truncated descriptions (240 chars), compact output schema (`normal_schema()`). Input properties truncated to 120 chars. Includes tier, tags, category, llm_exposure, cost.
 - **`compact`**: Types and required fields only (`compact_schema()`). Descriptions are the authored `selection_summary` (Plan 041 selection signal, not truncation); input properties truncated to 80 chars. Includes category, llm_exposure, cost.
 
-### Progressive Disclosure (Plan 041)
+### Progressive Disclosure (Plans 041 and 043)
 
 `ToolRegistry.search_tools(query, *, profile="full", limit=5) -> list[ToolMatch]`
 is the harness-side discovery primitive: a deterministic stdlib-only
@@ -736,7 +736,11 @@ expansion. Modern MCP `server/discover` is the protocol bootstrap; the current
 empirical result is recorded in
 `evals/mcp_tool_selection/reports/closure_2026_09_10.md`: the 90.1% footprint
 reduction passes, but selection non-inferiority and specialist recovery do
-not. Keep the profile opt-in until a later held-out run supports promotion.
+not. Plan 043 adds deterministic rank/depth decomposition and evaluation-only
+15-/22-tool candidate lists; its reports show improved static reachability but
+do not claim model-selection or end-to-end improvement because normalized
+per-case closure rollouts were not retained. Keep the profile opt-in until a
+later held-out run supports promotion.
 
 ---
 

@@ -69,11 +69,11 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 build: clean
-	python -m build
+	$(PYTHON) -m build
 
 package-check: build
-	twine check dist/*
-	python scripts/smoke_release_surfaces.py
+	$(PYTHON) -m twine check dist/*
+	$(PYTHON) scripts/smoke_release_surfaces.py
 
 release-check: check package-check
 	@echo "Release check passed!"

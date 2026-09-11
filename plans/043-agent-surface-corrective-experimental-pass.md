@@ -1,6 +1,6 @@
 # Agent Surface Corrective / Experimental Pass
 
-Status: planned  
+Status: completed — no profile promotion (2026-09-10)
 Repository: `eggstack/eggcalc`  
 Baseline reviewed: `90137b53fd4fef5c7325f929cf0afe74e7ca1bc5`  
 Date: 2026-09-10  
@@ -669,6 +669,29 @@ make package-check
 ```
 
 If the compatibility workflow is not automatically run for the final production-change commit, dispatch it explicitly and record the Windows/macOS/Linux result in the final corrective report.
+
+## 19a. Corrective-pass closure
+
+The deterministic portion of this plan is complete. It added
+`scripts/analyze_mcp_tool_selection_failures.py`, evaluation-only candidate
+sets in `evals/mcp_tool_selection/candidate_sets.json`, and exact candidate
+footprint support in `scripts/measure_mcp_tool_surface.py`. The resulting
+reports are `corrective_development_2026_09_10.md` and
+`corrective_held_out_2026_09_10.md`.
+
+Top-five acceptable lexical recall is 1.0000 on development and 0.8621 on
+held-out cases; top-eight held-out recall is 0.8966. The 15-tool and 22-tool
+candidate sets retain 86.1% and 79.4% initial-byte reductions versus
+`full/full`, respectively, while improving deterministic static coverage.
+
+No production profile, search weight, metadata, protocol, or tool semantics
+changed. The prior closure report remains a negative two-family model result,
+and the per-case normalized rollout JSONL was not retained in this checkout.
+Without that evidence, compact-versus-normal, exposed-selection, and
+multi-step correctness gates cannot be claimed. The defensible stopping
+decision is therefore Outcome C for this checkout: retain `full` as the
+practical recommendation and `agent_core` as an opt-in experiment, with no
+new permanent profile or composite tool.
 
 External model runs remain manual/release evidence and must never become required network CI.
 
