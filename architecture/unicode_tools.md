@@ -247,7 +247,7 @@ On Python 3.14+, `unicodedata.script()` is used first. The heuristic ranges serv
 
 ## Confusables Database
 
-Uses `confusables.py` data file (~180KB) generated from the official Unicode `confusables.txt` file. Maps source codepoint strings to target codepoint strings. Values may contain multiple codepoints (multi-character substitutions).
+Uses `confusables.py` data file (~40KB) generated from the official Unicode `confusables.txt` file. Maps source codepoint strings to target codepoint strings. Values may contain multiple codepoints (multi-character substitutions).
 
 Key confusables:
 

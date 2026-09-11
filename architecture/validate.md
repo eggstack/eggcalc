@@ -416,8 +416,8 @@ RegexTestResult(
                    span=[0, 3], groups=[], groupdict={}),
         RegexMatch(sample='abc', matches=False, fullmatch=False,
                    span=None, groups=[], groupdict={}),
-        RegexMatch(sample='12a', matches=True, fullmatch=False,
-                   span=[0, 2], groups=[], groupdict={})
+        RegexMatch(sample='12a', matches=False, fullmatch=False,
+                   span=None, groups=[], groupdict={})
     ],
     flags_used=RegexFlags(ignore_case=False, multiline=False, dotall=False, ascii=False)
 )
@@ -451,7 +451,7 @@ RegexFindIterResult(
     valid_pattern=True,
     matches=[
         {'match': '123', 'span': [3, 6], 'line': 1, 'column': 4, 'groups': [], 'groupdict': {}},
-        {'match': '456', 'span': [6, 9], 'line': 1, 'column': 7, 'groups': [], 'groupdict': {}}
+        {'match': '456', 'span': [9, 12], 'line': 1, 'column': 10, 'groups': [], 'groupdict': {}}
     ],
     truncated=False,
     match_count=2,
@@ -470,7 +470,7 @@ Check regex pattern for potential catastrophic backtracking risks. This is a heu
 RegexSafetyResult(
     valid_pattern=True,
     risk='high',
-    findings=[{'kind': 'nested_quantifier', 'span': [1, 8], 'message': '...'}]
+    findings=[{'kind': 'complexity', 'span': [0, 7], 'message': '...'}]
 )
 ```
 
@@ -519,8 +519,8 @@ Canonicalize JSON with deterministic formatting and duplicate key detection. Ret
 >>> json_canonicalize('{"b": 1, "a": 2}', sort_keys=True)
 JsonCanonicalizeResult(
     valid=True,
-    canonical='{"a": 1, "b": 2}',
-    minified='{"a":1,"b":2}',
+    canonical='{"a": 2, "b": 1}',
+    minified='{"a":2,"b":1}',
     sha256='...',
     duplicate_keys=[],
     top_level_type='object',

@@ -18,7 +18,7 @@
 python -m eggcalc "five plus two"
 ```
 
-It adjusts `sys.path` to ensure the parent of the `eggcalc` package directory is available, then calls `sys.exit(main())`.
+It performs no `sys.path` manipulation (`__main__.py` notes that `python -m eggcalc` already has the package importable in both source-tree and installed layouts), then calls `sys.exit(main())`.
 
 ## Main Function
 
@@ -58,7 +58,7 @@ Signal handling in `main()`:
 | `--capabilities` | Show runtime capabilities as JSON and exit |
 | `-i`, `--interactive` | Start interactive REPL mode |
 | `--mcp` | Run as MCP server for exact text tools |
-| `--mcp-profile` | MCP profile to use (default: `full`, or `EGGCALC_MCP_PROFILE` env var) |
+| `--mcp-profile` | MCP profile to use (argparse default `None`; server defaults to `full`, or `EGGCALC_MCP_PROFILE` env var) |
 | `--mcp-schema-detail` | MCP schema detail level: `compact`, `normal`, `full` (default: `full`, or `EGGCALC_MCP_SCHEMA_DETAIL` env var) |
 | `--verbose` | Accepted for compatibility; plain output remains result-only |
 

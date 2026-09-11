@@ -28,7 +28,7 @@ from eggcalc.exact.inspect_prompt import prompt_input_inspect
 | `markdown_links` | Markdown link text/target mismatches |
 | `ansi_escapes` | ANSI escape sequences |
 | `terminal_controls` | Terminal control sequences |
-| `base64_blobs` | Long base64-encoded strings |
+| `base64_like_blobs` | Long base64-encoded strings |
 | `instruction_phrases` | Phrases that attempt to override instructions |
 | `long_minified_lines` | Extremely long lines (minified code) |
 

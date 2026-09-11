@@ -20,7 +20,7 @@
 `__init__.py` re-exports all public functionality from the eggcalc package.
 
 ```python
-__version__ = "1.1.9"
+__version__ = "1.1.10"
 __author__ = "David Bowman"
 ```
 
@@ -70,9 +70,13 @@ result = await evaluate_async("5 + 3")
 Timeout-protected evaluation for **untrusted input**. Uses `multiprocessing.Process` to run evaluation in a separate process that can be reliably terminated. Concurrency is bounded by `_EVAL_SPAWN_SEMAPHORE` (max 4 concurrent spawns, 10s acquire timeout).
 
 ```python
-result = evaluate_with_timeout("2 ** 1000000", timeout=1.0)
-# Raises TimeoutError
+result = evaluate_with_timeout("five plus three", timeout=1.0)  # 8
 ```
+
+Raises `TimeoutError` if evaluation exceeds `timeout` (the static DoS
+limits usually fire first — e.g. `evaluate_with_timeout("2 ** 1000000")`
+raises `EvaluationError: Exponent too large (max 10000)` because
+`MAX_EXPONENT` is checked before evaluation).
 
 Args:
 - `expression`: Raw expression string (NL, units, etc.)
@@ -113,7 +117,7 @@ Methods:
 
 ### `Evaluator`
 
-Low-level AST evaluator class for fine-grained control. Not exported from `__init__.py` but accessible via `get_default_evaluator()`.
+Low-level AST evaluator class for fine-grained control. Not re-exported from `__init__.py`, but accessible via `get_default_evaluator()` or direct import (`from eggcalc.evaluator import Evaluator`).
 
 ```python
 evaluator = Evaluator()
@@ -285,7 +289,7 @@ Raised for invalid expressions or unsupported operations. Subclass of `Exception
 
 ### `TimeoutError`
 
-Raised when `evaluate_with_timeout()` exceeds timeout. Subclass of `Exception`.
+Raised when `evaluate_with_timeout()` exceeds timeout. Custom subclass of `Exception` — note this shadows Python's built-in `TimeoutError` (an `OSError` subclass), so catch `eggcalc.TimeoutError` explicitly.
 
 ### `Memory`
 

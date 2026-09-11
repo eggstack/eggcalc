@@ -1,6 +1,6 @@
 # path_tools.py — Path Lexical Analysis
 
-615 lines. Deterministic path parsing without filesystem access.
+611 lines. Deterministic path parsing without filesystem access.
 
 ## Overview
 

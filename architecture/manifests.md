@@ -1,6 +1,6 @@
 # manifests.py — Manifest Inspection
 
-868 lines. Deterministic manifest/package inspection without network or filesystem access.
+875 lines. Deterministic manifest/package inspection without network or filesystem access.
 
 ## Overview
 

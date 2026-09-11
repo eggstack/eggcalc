@@ -1,6 +1,6 @@
 # cargo.py — Cargo.toml Inspection
 
-508 lines. Deterministic Cargo.toml parsing and analysis.
+498 lines. Deterministic Cargo.toml parsing and analysis.
 
 ## Overview
 

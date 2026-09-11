@@ -1,6 +1,6 @@
 # position.py — Text Position Conversion
 
-503 lines. Converts between byte offsets, codepoint indices, line/column positions, and UTF-16 code unit offsets.
+499 lines. Converts between byte offsets, codepoint indices, line/column positions, and UTF-16 code unit offsets.
 
 ## Overview
 

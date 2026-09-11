@@ -1,6 +1,6 @@
 # config.py — Config File Validation
 
-347 lines. Deterministic line-by-line parsers for `.env` and INI files.
+368 lines. Deterministic line-by-line parsers for `.env` and INI files.
 
 ## Overview
 

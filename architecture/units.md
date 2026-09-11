@@ -1,6 +1,6 @@
 # units.py — Unit Definitions and Conversions
 
-3755 lines. Provides comprehensive unit conversion support for the calculator.
+3894 lines. Provides comprehensive unit conversion support for the calculator.
 
 ## Table of Contents
 
@@ -73,7 +73,7 @@ uv = UnitValue(30, "m")  # 30 meters
 uv + UnitValue(100, "ft")  # → UnitValue(60.48, "m")
 
 # Unit conversion
-uv.convert_to("ft")  # → UnitValue(98.425, "ft")
+uv.convert_to("ft")  # → UnitValue(98.4251968503937, "ft")
 ```
 
 ### Constructor
@@ -226,61 +226,55 @@ Units are organized by category (base unit → friendly name):
 | Speed | `m/s` | `speed` | km/h, mph, kn, mach |
 | Area | `m2` | `area` | km2, cm2, mm2, ha, acre, ft2, in2, mi2, yd2 |
 | Frequency | `Hz` | `frequency` | kHz, MHz, GHz, THz |
-| Temperature | *(manual)* | `temperature` | K, C, F, Ra (offset-based, not in `UNIT_BASE`) |
+| Temperature | *(affine)* | `temperature` | K, C, F, Ra (offset-based, not multiplicative factors) |
 
 Long-duration units use the common 365-day year (`yr` = 31,536,000 seconds),
 not the astronomical Julian year of 365.25 days. Decades, centuries, and
 millennia use that same convention.
 
-**Note:** Temperature conversions use a separate offset-based mechanism via `TEMPERATURE_CONVERSIONS` rather than multiplicative factors in `UNIT_BASE`. Temperature units (`K`, `C`, `F`, `Ra`) are registered in `UNIT_CATEGORIES_EXTRA` and cannot be converted to non-temperature units.
+**Note:** Temperature conversions use a separate offset-based mechanism via `TEMPERATURE_CONVERSIONS` rather than multiplicative factors. Temperature units (`K`, `C`, `F`, `Ra`) carry affine (`scale_to_base` / `offset_to_base`) definitions in the registry and cannot be converted to non-temperature units.
 
 ## Unit Definition Structure
 
-### UNIT_BASE
+### UNIT_DEFINITIONS (declarative source)
 
 ```python
-UNIT_BASE: dict[str, dict[str, float]] = {
-    "m": {           # Base unit for length
-        "m": 1.0,     # meter
-        "km": 1000.0,
-        "cm": 0.01,
-        "mm": 0.001,
-        "ft": 0.3048,  # foot
-        "in": 0.0254,  # inch (aliased to "inch" in UNIT_ALIASES due to Python keyword conflict)
-        ...
-    },
-    "s": { ... },    # Time (base: seconds)
-    "B": { ... },    # Data storage (binary 1024 prefixes)
-    "bps": { ... },  # Data transfer rate (decimal 1000 prefixes)
-    "kg": { ... },   # Mass (base: kilograms)
-    "L": { ... },    # Volume (base: liters)
-    "Pa": { ... },   # Pressure (base: Pascal)
-    "J": { ... },    # Energy (base: Joules)
-    "W": { ... },    # Power (base: Watts)
-    "N": { ... },    # Force (base: Newtons)
-    "V": { ... },    # Voltage (base: Volts)
-    "A": { ... },    # Current (base: Amperes)
-    "rad": { ... },  # Angle (base: radians)
-    "m/s": { ... },  # Speed (base: meters per second)
-    "m2": { ... },   # Area (base: square meters)
-    "Hz": { ... },   # Frequency (base: Hertz)
-}
+UNIT_DEFINITIONS: tuple[UnitSpec, ...] = (
+    UnitSpec(canonical="m", aliases=("m", "meter", "meters", ...), ...),
+    ...
+)
 ```
 
-Each entry maps a base unit key to a dictionary of `{unit_alias: factor_to_base}`. Conversion between two units in the same category is `factor_from / factor_to`.
+The single declarative source: 150 frozen `UnitSpec` entries (canonical name, aliases, dimension, scale/offset, category). Everything else is generated from it at import by `_install_generated_adapters()`:
 
-**Important:** The `"in"` (inches) entry in `UNIT_BASE` is never used as a `from_unit` in the conversion table because it conflicts with Python's `in` keyword in AST parsing. Callers normalize `"in"` to `"inch"` via `UNIT_ALIASES` before consulting the conversion table.
+- `UNIT_ALIASES: dict[str, str]` — alias → canonical (~508 entries)
+- `UNIT_CATEGORIES: dict[str, str]` — alias → category (17 categories)
+- `UNIT_BASE` — base-unit factor tables (kept as a generated compatibility adapter)
+- `TEMPERATURE_CONVERSIONS` — affine conversion rules (Kelvin is base; Fahrenheit/Rankine use `scale=5/9`)
+- `UNIT_CONVERSIONS` — lazy `_LazyUnitConversions` mapping computing pairwise factors on demand
 
-### UNIT_CATEGORIES and UNIT_CATEGORIES_EXTRA
+The public adapters (except the lazy conversions) are immutable `MappingProxyType` objects installed once at import and rebound atomically on custom-unit registration — there is no unit-table lock.
 
 ```python
-UNIT_CATEGORIES: dict[str, str]  # Auto-derived from UNIT_BASE, remapped via _BASE_CATEGORY
-UNIT_CATEGORIES_EXTRA: dict[str, str] = {
-    "K": "temperature", "C": "temperature", "F": "temperature", "Ra": "temperature",
-}
+# Representative entries (see units.py for the full table):
+#   "m": length base — km: 1000.0, cm: 0.01, mm: 0.001, ft: 0.3048, inch: 0.0254, ...
+#   "s": time base (seconds)   "B": data storage (binary 1024 prefixes)
+#   "bps": data transfer rate (decimal 1000 prefixes)   "kg": mass base
+#   "L": volume base (liters)  "Pa"/"J"/"W"/"N"/"V"/"A": pressure/energy/power/force/voltage/current
+#   "rad": angle base (radians)   "m/s": speed   "m2": area   "Hz": frequency
 ```
 
-`UNIT_CATEGORIES` is built by iterating `UNIT_BASE` to get `{unit: base_key}`, then remapping each `base_key` to a friendly category name via `_BASE_CATEGORY` (e.g. `"m"` → `"length"`). `UNIT_CATEGORIES_EXTRA` adds temperature units manually since they use offset math rather than multiplicative factors.
+Conversion between two units in the same category is `factor_from / factor_to` (temperature uses affine math instead).
+
+**Important:** The `"in"` (inches) entry is never used as a `from_unit` in conversion because it conflicts with Python's `in` keyword in AST parsing. Callers normalize `"in"` to `"inch"` via `UNIT_ALIASES` before consulting the conversion table.
+
+### UNIT_CATEGORIES
+
+```python
+UNIT_CATEGORIES: dict[str, str]  # generated alias → category map, e.g. {"m": "length", "K": "temperature"}
+```
+
+Built from the registry at import (temperature included — it is a first-class category with affine definitions, not a manual extra).
 
 ### Unit Prefixes
 
@@ -316,11 +310,7 @@ Self-mappings (e.g. `"m": "m"`) ensure `normalize_unit()` recognizes canonical f
 
 ## Compound Unit System
 
-The module supports compound/derived units (area, speed, acceleration) via a signature-based parsing and categorization system.
-
-### _DERIVED_CATEGORIES
-
-Maps canonical unit-string expressions to categories. Covers:
+The module supports compound/derived units (area, speed, acceleration) via `UnitExpression` structural parsing and categorization (see [UnitExpression — Structural Compound Units](#unitexpression--structural-compound-units) below). Categories covered include:
 
 | Category | Example Signatures |
 |----------|-------------------|
@@ -337,30 +327,11 @@ Maps canonical unit-string expressions to categories. Covers:
 | data | `B`, `KB`, `MB`, `GB`, `TB`, `PB` |
 | data_rate | `B/s`, `KB/s`, `MB/s`, `GB/s`, `bit/s` |
 
-### _parse_compound_signature
+Retired in the registry refactor (historical names, no longer in source): `_DERIVED_CATEGORIES`, `_parse_compound_signature`, `_SHORT_COMPOUND_FORMS`. Compound parsing now goes through `parse_unit_expression()`; short-compound handling (`"m2"` ↔ `"m**2"`) lives in that path.
 
-Parses a compound unit string into `(numerator, denominator)` signatures, where each signature is a tuple of `(base_unit, exponent)` pairs sorted alphabetically.
+### `_simplify_unit_string(unit: str | None) -> str | None`
 
-Recognized forms:
-- `"X**N"` → `((X, N),)` numerator
-- `"A*B"` → `((A,1),(B,1))` numerator
-- `"A/B"` → `((A,1),)` numerator, `((B,1),)` denominator
-- `"A//B"`, `"A%B"` → same as `A/B`
-- `"1/X"` → reciprocal
-
-Operators are evaluated left-to-right with equal precedence. Repeated bases are cancelled (e.g. `"m/s*s"` → `"m"`).
-
-### _simplify_unit_string
-
-Parses, cancels, and re-renders a compound unit string. Returns `None` if fully dimensionless (e.g. `"m/m"` → `None`).
-
-### _add_compound_conversions
-
-Builds pairwise conversion factors between derived unit expressions registered in `_DERIVED_CATEGORIES`. Only the literal registered unit names are enumerated (not the cartesian product of all variants in `UNIT_BASE`) to keep the table manageable.
-
-### _SHORT_COMPOUND_FORMS
-
-Maps short compound forms (`"m2"`, `"ft3"`, etc.) to equivalent forms (`"m2"`, `"m**2"`, `"m^2"`) so cross-form conversions succeed via `get_conversion_factor`.
+Parses, cancels, and re-renders a compound unit string (private compatibility helper; public parsing and arithmetic use the bounded grammar/structural operations). Returns `None` for `None` input or fully-dimensionless results (e.g. `"m/m"` → `None`).
 
 ## UnitExpression — Structural Compound Units
 
@@ -376,7 +347,7 @@ class UnitExpression:
 
 ### `parse_unit_expression(unit_str: str) -> UnitExpression`
 
-Parses a compound unit string into a frozen `UnitExpression`. Handles forms like `"m/s"`, `"kg*m/s**2"`, `"m**2"`. Rejects `"//"` and `"%"` as separators. Enforces resource bounds: `MAX_UNIT_STRING_LENGTH` (256), `MAX_COMPOUND_ATOMS` (32), `MAX_ABS_UNIT_EXPONENT` (16, enforced post-merge on duplicate factors). `MAX_COMPOUND_DEPTH` is a deprecated compatibility constant — the grammar has no recursive parentheses and structural depth is fixed at one. Fully consumes input — raises `ValueError` on leftover characters.
+Parses a compound unit string into a frozen `UnitExpression`. Handles forms like `"m/s"`, `"kg*m/s**2"`, `"m**2"`. Rejects `"//"` and `"%"` as separators. Enforces resource bounds: `MAX_UNIT_STRING_LENGTH` (256), `MAX_COMPOUND_ATOMS` (32), `MAX_COMPOUND_DEPTH` (16, maximum structural depth of the compound unit grammar), `MAX_ABS_UNIT_EXPONENT` (16, enforced post-merge on duplicate factors). Fully consumes input — raises `ValueError` on leftover characters.
 
 ```python
 expr = parse_unit_expression("m/s")
@@ -490,37 +461,9 @@ Maps `(from_unit, to_unit)` → `(multiplier, offset)`. Formula: `result = value
 
 Formats a value for display: whole-number floats shown as integers, finite floats use `:.15g` formatting.
 
-### `_build_unit_conversions() -> dict[tuple[str, str], float]`
+### `_build_unit_conversions()`
 
-Builds the complete `UNIT_CONVERSIONS` lookup table from `UNIT_BASE` and `_DERIVED_CATEGORIES`. Takes a snapshot of `UNIT_BASE` under `_UNITS_LOCK` for thread safety.
-
-### `_add_compound_conversions(conversions, base_snapshot) -> None`
-
-Populates conversion factors for compound unit signatures registered in `_DERIVED_CATEGORIES`. Groups units by category and adds pairwise conversion factors.
-
-### `_parse_compound_atoms(unit: str) -> list[tuple[str, int]] | None`
-
-Parses a unit string into `(literal, signed_exponent)` atoms via `_parse_compound_signature`.
-
-### `_find_last_top_level_op(unit: str) -> tuple[int, str]`
-
-Finds the rightmost top-level operator (`*`, `/`, `//`, `%`) in a unit string, skipping `**` exponentiation.
-
-### `_parse_atom_signature(atom: str) -> tuple[tuple[str, int], ...] | None`
-
-Parses a single unit atom like `"m"`, `"m**2"`, `"m**-1"` into a signature tuple.
-
-### `_merge_signatures(num, den) -> tuple[tuple[str, int], ...]`
-
-Combines numerator and denominator signatures into canonical sorted form with exponents merged.
-
-### `_signature_to_canonical_string(sig) -> str | None`
-
-Renders a `(num, den)` signature back to a canonical string (e.g. `"m**2/s"`).
-
-### `_derived_category(unit: str) -> str | None`
-
-Returns the category for a compound unit expression by parsing its signature and looking it up in `_DERIVED_CATEGORIES`.
+Retired in the registry refactor: pairwise factors are no longer precomputed into a lookup table. `UNIT_CONVERSIONS` is a lazy `_LazyUnitConversions` mapping computed on demand from the canonical `UnitRegistry`; `_rebuild_conversions()` (below) is the remaining compatibility hook.
 
 ### `_floor_divide_quantities(left: UnitValue, right: UnitValue) -> UnitValue`
 
@@ -538,21 +481,13 @@ Converts two `UnitValue` operands to a shared unit when they share a category. U
 
 Raises a compound unit string to an integer power via signature manipulation (e.g. `"m/s"` raised to 2 → `"m**2/s**2"`). Returns `None` if result is dimensionless.
 
-### `_expand_short_compound(unit: str) -> str`
+### `_expand_short_compound` / `_collapse_short_compound` / `_short_compound_forms`
 
-Expands `"m2"` → `"m**2"`. Returns input unchanged if no expansion needed.
-
-### `_collapse_short_compound(unit: str) -> str`
-
-Collapses `"m**2"` → `"m2"`. Returns input unchanged if no collapse needed.
-
-### `_short_compound_forms(unit: str) -> list[str]`
-
-Returns all equivalent short-compound forms of a unit (short, `**`, `^` variants).
+Retired in the registry refactor: short-compound handling (`"m2"` ↔ `"m**2"`) now lives in the `UnitExpression` parsing path (`parse_unit_expression`), not in standalone helpers.
 
 ### `_rebuild_conversions() -> None`
 
-Thread-safe rebuild of `UNIT_CONVERSIONS` after custom units are added. Acquires `_UNITS_LOCK` for the swap.
+Compatibility hook; conversion behavior is registry-owned. Replaces `UNIT_CONVERSIONS` with a fresh `_LazyUnitConversions` over the current registry (used after custom units are added).
 
 ## Dimension Semantics
 
@@ -596,10 +531,10 @@ Supported compound expressions like `30*deg/s` and `(30*deg/s) * (2*s)` continue
 ## Module Dependencies
 
 ```
-units.py → math, re, threading (standard library only)
+units.py → math, re, collections.abc, dataclasses, functools, types (standard library only)
 units.py has no dependencies on other eggcalc modules.
 ```
 
 ### Thread Safety
 
-`_UNITS_LOCK` (a `threading.RLock`) protects all unit-table mutations. Acquired by `_rebuild_conversions()` and any code that mutates `UNIT_BASE` / `UNIT_ALIASES` / `UNIT_CATEGORIES` (e.g. `load_user_config`). The initial `_rebuild_conversions()` call is deferred to the end of the module after all data structures and helper functions are defined.
+There is no unit-table lock: the public adapters (`UNIT_ALIASES`, `UNIT_BASE`, `UNIT_CATEGORIES`, `TEMPERATURE_CONVERSIONS`) are immutable `MappingProxyType` objects installed once at import by `_install_generated_adapters()` and atomically rebound on custom-unit registration; pairwise factors compute statelessly via the lazy `_LazyUnitConversions` mapping. The lazy module registry (`_unit_registry`) builds once on first access via `_get_unit_registry()`.

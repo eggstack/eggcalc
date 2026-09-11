@@ -306,7 +306,7 @@ Normalizes an expression by removing filler words, converting NL tokens, and app
 29. Whitespace removal with implicit multiplication insertion
 30. Postfix factorial (`"5!"` → `factorial(5)`)
 
-### `normalize_expression(expression: str, operators: dict | None = None, patterns: Mapping[str, Pattern[str]] | None = None, skip_validation: bool = False) -> tuple[str, int]`
+### `normalize_expression(expression: str, operators: dict | None = None, patterns: Mapping[str, Pattern[str]] | None = None, skip_validation: bool = False, function_names: Mapping[str, Any] | None = None) -> tuple[str, int]`
 
 Normalizes an expression without evaluating it. This is the main entry point for the normalization pipeline.
 
@@ -315,6 +315,7 @@ Normalizes an expression without evaluating it. This is the main entry point for
 - `operators`: Optional operators configuration dict; defaults to `NORMALIZE`
 - `patterns`: Optional compiled regex patterns dict; defaults to `PATTERNS`
 - `skip_validation`: If True, skip token validation (for custom evaluators)
+- `function_names`: Optional function-name mapping; defaults to the canonical table (`_trace` is a further private keyword used only by `trace_normalization()`)
 
 **Returns:** `(normalized_string, exit_code)` where exit_code is 0 on success, non-zero on error.
 
@@ -650,6 +651,8 @@ Output: UnitValue(60.48, "m")
 | `int` | Integer pattern |
 | `float` | Float pattern (accepts trailing decimal like `"5."`) |
 | `valid_operations` | Valid operation, function, and constant names |
+| `word_to_all` | Combined word mapping (numbers, operators, constants) |
+| `word_to_number` | Number-word mapping |
 
 ## Configuration Building
 
@@ -736,49 +739,12 @@ Subset of `_IMPLICIT_MUL_FUNCS` that take multiple arguments. Enables `"of"` cha
 root) re-export them lazily via PEP 562 `__getattr__` so that `import eggcalc`
 never loads argparse, exact-tool implementations, or MCP modules.
 
-### `main() -> int`
-
-Main entry point for CLI (defined in `cli.py`; aliased as `normalize_main()`
-when assembled into a single file by `build_single.py`, to avoid conflict
-with the MCP server's `main()` function).
-
-### Dispatch order and trust boundary
-
-`main()` classifies the mode **before** loading user configuration:
-
-1. Construct argparse parser and parse argv.
-2. Handle informational exits (`--capabilities`, `--mcp`, `--version`, `--commands`, `--usage`, `--help` / no arguments) — no config loaded.
-3. Classify text commands via `_cli_text_command()` — no config loaded.
-4. For `--explain`, calculator expression evaluation, or REPL startup, call `maybe_load_cli_config()` exactly once (`--explain` loads config because custom words change normalization results).
-5. Evaluate expression, print the trace, or enter REPL.
-
-### `maybe_load_cli_config() -> None`
-
-Loads user config for CLI usage. Called once during CLI startup. Disabled by `EGGCALC_NO_CONFIG=1`. Intentionally NOT called from library API functions.
-
-### `_run_repl() -> int`
-
-Interactive REPL mode. Supports:
-- `help` — show help
-- `history` — show calculation history
-- `clear` — clear history
-- `quit`/`exit` — exit
-- readline history saved to `~/.eggcalc_history`
-
-### `_cli_text_command(expression: str, json_output: bool = False, argv: list[str] | None = None) -> int`
-
-Handles text commands before math evaluation. Returns a `_CommandStatus`
-enum (`NOT_HANDLED` — first token is not a recognized command, continue to
-math evaluation; `SUCCESS` — command completed; `ERROR` — recognized command
-failed, caller returns nonzero without falling through to math evaluation).
-
-**Commands:** `inspect`, `count`, `regex`, `replace-check`, `lines`, `patch-check`, `shell-split`, `md-structure`, `dotenv-check`
-
-All text commands support `--json` for machine-readable output.
-
-### `print_help() -> None`
-
-Prints available operators, functions, constants, and units (organized by category).
+Full CLI dispatch (`main()` dispatch order and trust boundary,
+`maybe_load_cli_config()`, `_run_repl()`, `_cli_text_command()` /
+`_CommandStatus`, `print_help()`) is documented once in [cli.md](cli.md) —
+this doc does not duplicate it. `normalize.py`'s own CLI-adjacent entry point
+is `run()` (documented under [Core Public Functions](#core-public-functions)),
+which normalizes and evaluates a single expression.
 
 ## Security Notes
 

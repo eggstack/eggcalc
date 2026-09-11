@@ -1,6 +1,6 @@
 # identifier_inspect.py — Identifier Collision Detection
 
-756 lines. Multi-identifier collision and validity checking with confusable detection.
+766 lines. Multi-identifier collision and validity checking with confusable detection.
 
 ## Overview
 
@@ -21,6 +21,12 @@ from eggcalc.exact.identifier_inspect import (
 |----------|---------|-------------|
 | `identifier_inspect(identifiers, language="generic", normalization="NFC", casefold=False, check_confusables=True)` | `IdentifierInspectResult` | Inspects identifiers for validity and collisions (confusables, mixed scripts, normalization, casefold) |
 | `identifier_table_inspect(identifiers, language="python", checks=None)` | `IdentifierTableInspectResult` | Inspects a table of identifier dicts for collisions, reserved keywords, and mixed naming styles |
+
+## TypedDicts
+
+- `IdentifierInspectResult` — `identifiers: list[IdentifierInfo]`, `collisions: list[CollisionInfo]`
+- `IdentifierInfo` — `raw`, `normalized`, `valid`, `scripts`, `has_invisibles`, `has_confusables`, `warnings`
+- `IdentifierTableInspectResult` — `count`, `collisions`, `reserved_keyword_hits`, `mixed_style_groups`, `findings`
 
 ## Module Dependencies
 

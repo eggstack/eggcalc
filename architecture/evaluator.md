@@ -1,6 +1,6 @@
 # evaluator.py — AST-Based Expression Evaluation
 
-3472 lines. Provides a **secure** way to evaluate mathematical expressions without using `eval()`. Uses Python's `ast` module to parse and evaluate expressions safely.
+3757 lines. Provides a **secure** way to evaluate mathematical expressions without using `eval()`. Uses Python's `ast` module to parse and evaluate expressions safely.
 
 ## Table of Contents
 
@@ -188,10 +188,11 @@ Built-in physical and mathematical constants (defined in `Evaluator.CONSTANTS`):
 | `MAX_FACTORIAL` | 1000 | Prevent factorial DoS (`_safe_factorial`) |
 | `MAX_NESTING_DEPTH` | 100 | Prevent stack overflow (`Evaluator.visit`) |
 | `MAX_RESULT_VALUE` | 1e308 | Prevent float overflow |
-| `MAX_RESULT_DIGITS` | 10000 | Prevent integer result DoS |
+| `MAX_RESULT_DIGITS` | 4300 | Prevent integer result DoS |
 | `MAX_SHIFT_COUNT` | 50000 | Prevent bit-shift DoS |
-| `MAX_INPUT_LENGTH` | 10000 | Max characters in expression string |
+| `MAX_INPUT_length` | 10000 | Max characters in expression string |
 | `MAX_USER_VARIABLES` | 1000 | Cap on `setvar` entries per evaluator |
+| `MAX_NAMED_REGISTERS` | 1000 | Cap on named memory registers per `Memory` instance |
 | `DEFAULT_CACHE_SIZE` | 1024 | LRU cache entry count |
 | `MAX_CACHE_BYTES` | 64 MB | Soft cap for global `_cache` size |
 | `MAX_ORPHANED_PROCESSES` | 256 | Bounded set for MCP orphan cleanup |
@@ -493,7 +494,7 @@ evaluate_raw("sign(-5*m)")       # → -1 (dimensionless)
 evaluate_raw("round(3.7)")       # → 4 (int)
 evaluate_raw("round(3.7, 0)")    # → 4.0 (float)
 evaluate_raw("round(3.7*m)")     # → 4 m (UnitValue.value is int)
-evaluate_raw("round(3.7*m, 0)")  # → 4.0 m (UnitValue.value is float)
+evaluate_raw("round(3.7*m, 0)")  # → 4 m (UnitValue.value is 4.0 float)
 evaluate_raw("hypot(3*m, 4*s)")  # → EvaluationError
 evaluate_raw("abs(-5*m)")        # → 5 m
 ```

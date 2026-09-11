@@ -17,8 +17,8 @@ eggcalc has two distribution paths:
 
 | Path | Output | Use Case |
 |------|--------|----------|
-| **PyPI package** | `eggcalc-1.1.9-py3-none-any.whl` | Standard `pip install eggcalc` |
-| **Single-file** | `eggcalc.py` (~1.4MB) | Portable, zero-install distribution |
+| **PyPI package** | `eggcalc-1.1.10-py3-none-any.whl` | Standard `pip install eggcalc` |
+| **Single-file** | `eggcalc.py` (~1.6MB, ~47k lines) | Portable, zero-install distribution |
 
 Both are validated by `make check` and `make package-check`.
 
@@ -82,6 +82,12 @@ python install.py --uninstall   # Remove
 ## Development Commands
 
 ```bash
+make test           # pytest suite
+make lint           # ruff check
+make format         # black formatting
+make typecheck      # mypy
+make docs-check     # generated-MCP-doc drift check
+make check          # canonical gate: lint → format-check → typecheck → docs-check → build_single --validate → pytest
 make build          # python -m build (wheel + sdist)
 make package-check  # twine check + smoke tests
 make release-check  # check + package-check

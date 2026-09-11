@@ -1,6 +1,6 @@
 # glob.py — Glob Pattern Matching
 
-311 lines. Deterministic glob pattern matching with POSIX and Windows path separator support.
+309 lines. Deterministic glob pattern matching with POSIX and Windows path separator support.
 
 ## Overview
 
@@ -27,6 +27,7 @@ from eggcalc.exact.glob import glob_match
 | `normalized_path` | `str` | Normalized path |
 | `matched_segment` | `str \| None` | The segment that matched (for `*`) |
 | `unmatched_segment` | `str \| None` | The segment that didn't match |
+| `summary` | `str` | Human-readable match summary |
 
 ## Module Dependencies
 

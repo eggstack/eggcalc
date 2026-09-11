@@ -21,7 +21,7 @@ Generated from the official Unicode `confusables.txt` file:
 - **URL:** https://www.unicode.org/Public/security/latest/confusables.txt
 - **Source Version:** 17.0.0
 - **Source Date:** 2025-07-22, 05:49:37 GMT
-- **Generated:** 2026-05-29
+- **Generated:** 2026-08-03
 - **Entry Count:** 6565
 
 ## Data Structure

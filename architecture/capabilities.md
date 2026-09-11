@@ -44,7 +44,7 @@ Factory function that probes the runtime and returns a `RuntimeCapabilities` ins
 ```python
 from eggcalc import detect_capabilities
 caps = detect_capabilities()
-print(caps.eggcalc_version)  # "1.1.8"
+print(caps.eggcalc_version)  # "1.1.10"
 print(caps.mode)             # "package" or "single-file"
 ```
 

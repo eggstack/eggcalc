@@ -32,6 +32,8 @@ from eggcalc.exact.version import (
 | `semver` | `>=`, `<=`, `>`, `<`, `=`, `!=`, `~`, `^`, `*` ranges |
 | `cargo` | Cargo-style caret (`^`) and tilde (`~`) semantics |
 
+Note: `^` and `~` are accepted regardless of the `scheme` argument and always evaluate with cargo semantics (the result reports `scheme: "cargo"`); `scheme` is a reporting hint for those operators, not a gate.
+
 ## Module Dependencies
 
 - `re`, `typing`

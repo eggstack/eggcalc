@@ -23,12 +23,16 @@ from eggcalc.exact.llm_hygiene import llm_json_output_check
 | Diagnostic | Description |
 |------------|-------------|
 | `has_fence` | Markdown code fence wrapping |
+| `fence_language` | Language tag on the fence (if any) |
 | `leading_prose` | Text before JSON |
 | `trailing_prose` | Text after JSON |
 | `parse_ok` | Whether JSON parses successfully |
+| `error_line` / `error_col` / `error_message` | Parse error location and message |
 | `fix_hints` | Suggestions for fixing parse errors |
+| `extracted_content` | JSON extracted from prose/fence |
 | `multiple_json_objects` | Multiple concatenated JSON objects |
 | `has_bom` | Byte order mark present |
+| `original_length` / `extracted_length` | Input and extracted sizes |
 
 ## Module Dependencies
 

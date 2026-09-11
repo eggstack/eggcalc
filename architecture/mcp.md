@@ -394,11 +394,7 @@ def _success_response(
 
 ### Error Sanitization
 
-```python
-def _sanitize_error(message: str) -> str:
-    """Remove non-ASCII characters from error messages."""
-    return message.encode("ascii", "replace").decode("ascii")
-```
+`_sanitize_error()` (tools.py) strips non-ASCII and redacts traceback internals: `File "...", line ...` lines, module/frame references, variable assignments, absolute file paths, `0x...` memory addresses, and JSON decode positions. Input is capped at 8192 bytes.
 
 ### Input Limits
 
@@ -411,7 +407,6 @@ MAX_REGEX_SAMPLES = 100               # Maximum regex test samples
 MAX_REGEX_SAMPLE_LENGTH = 10_000      # Maximum regex sample length
 MAX_PATTERN_LENGTH_REGEX = 1_000      # Maximum regex pattern length
 MAX_MATCHES_REGEX = 100               # Maximum regex matches returned
-MAX_TEXT_LENGTH_REGEX = 100_000       # Maximum text for regex operations
 REGEX_TIMEOUT_SECONDS = 5             # Regex execution timeout
 MAX_CONCURRENT_SPAWNED = 4            # Max concurrent child processes
 MAX_ORPHANED_REGEX_PROCESSES = 256    # Max orphaned regex child processes
@@ -466,7 +461,7 @@ READY         --EOF/shutdown/close--> CLOSED
 | `UNINITIALIZED` | `initialize` only (plus `ping`, `notifications/initialized`, `notifications/cancelled` which are silently accepted) |
 | `INITIALIZING` | All methods except `initialize` are rejected until `notifications/initialized` arrives |
 | `READY` | All methods. Tool requests (`tools/list`, `tools/call`) are dispatched normally |
-| `CLOSED` | All methods rejected |
+| `CLOSED` | All methods rejected except `ping` and `notifications/*` (accepted, no response) |
 
 Tool requests before initialization return `-32600` ("Server not initialized"). Duplicate `initialize` requests return `-32600` ("Server already initialized").
 
@@ -485,11 +480,11 @@ All configurable via environment variables with clamping to safe ranges:
 | Constant | Env Var | Default | Range | Description |
 |----------|---------|---------|-------|-------------|
 | `MAX_REQUEST_BYTES` | `EGGCALC_MCP_MAX_REQUEST_BYTES` | 1,000,000 | 1,000–100,000,000 | Max request body size |
-| `MAX_OUTPUT_BYTES` | `EGGCALC_MCP_MAX_OUTPUT_BYTES` | 1,000,000 | 1,000–100,000,000 | Max tool output size |
+| `MAX_OUTPUT_BYTES` | `EGGCALC_MCP_MAX_OUTPUT_BYTES` | 1,000,000 | 1–100,000,000 (env-var lower bound 1,000) | Max tool output size |
 | `MAX_REQUESTS_PER_SECOND` | `EGGCALC_MCP_MAX_REQUESTS_PER_SECOND` | 10 | 0.1–1000 | Rate limit (sliding window) |
 | `MAX_TOOL_TIMEOUT_SECONDS` | `EGGCALC_MCP_MAX_TOOL_TIMEOUT_SECONDS` | 30 | 1–300 | Tool execution timeout |
 | `MAX_CANCELLED_REQUESTS` | `EGGCALC_MCP_MAX_CANCELLED_REQUESTS` | 10,000 | 100–1,000,000 | Max cancellation records |
-| `MAX_TOOL_WORKERS` | `EGGCALC_MCP_MAX_TOOL_WORKERS` | 16 | 1–128 | Thread pool worker count |
+| `_MAX_TOOL_WORKERS` | `EGGCALC_MCP_MAX_TOOL_WORKERS` | 16 | 1–128 | Thread pool worker count (config field: `McpServerConfig.max_tool_workers`) |
 | `MAX_REQUEST_ID_LENGTH` | — | 1,024 | — | Max request ID length |
 
 ### Request Handling
@@ -686,7 +681,7 @@ The active profile is set at server startup via `EGGCALC_MCP_PROFILE` environmen
 _active_profile: str = os.environ.get("EGGCALC_MCP_PROFILE", "full")
 ```
 
-### `get_profile_tools()` (server.py:313–329)
+### `get_profile_tools()` (server.py:242–258 module-level; `ToolRegistry.get_profile_tools()` method at server.py:1213–1226)
 
 Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it dynamically returns all tools where `llm_exposure != "hidden"`. This allows hiding tools from the `full` profile without removing them from individual named profiles.
 
@@ -797,7 +792,7 @@ Then send JSON-RPC requests via stdio:
 
 ### Key Features
 
-1. **Unified Tool Registry** — `TOOL_SCHEMAS` in schemas.py is single source of truth
+1. **Unified Tool Registry** — `TOOL_METADATA` in schemas.py is the catalog authority (handler/tier/tags/profiles); `TOOL_SCHEMAS` is the protocol-shape authority
 2. **Case-insensitive matching** — Tool names matched case-insensitively with Levenshtein suggestions
 3. **Standardized Responses** — All tools use error envelopes and JSON-RPC content wrapper
 4. **Error Sanitization** — Non-ASCII stripped from error messages

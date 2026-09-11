@@ -168,13 +168,10 @@ from eggcalc.exact import (
 
     # Temporal
     datetime_convert, cron_inspect,
-
-    # Prompt Inspection
-    prompt_input_inspect,
 )
 ```
 
-**Note:** `regex_replace_preview` and `json_canonicalize` exist in `validate.py` but are **not** re-exported from `__init__.py`. `json_query` is a deprecated compatibility adapter over the canonical `json_extract` (single RFC 6901 authority) and is also not re-exported; prefer `json_extract`.
+**Note:** `regex_replace_preview` and `json_canonicalize` exist in `validate.py` but are **not** re-exported from `__init__.py`. `json_query` is a deprecated compatibility adapter over the canonical `json_extract` (single RFC 6901 authority) and is also not re-exported; prefer `json_extract`. Likewise, seven `primitives.py` helpers are module-public but not package-exported — import them from `eggcalc.exact.primitives`: `byte_offset_to_codepoint_index`, `codepoint_index_to_byte_offset`, `codepoint_index_to_line_column`, `line_column_to_codepoint_index`, `get_line_text`, `get_surrounding_lines`, `detect_newline_style`.
 
 ---
 
@@ -203,7 +200,7 @@ Low-level operations built on Python's `unicodedata` module.
 | `line_column_to_codepoint_index(s, line, column)` | int | Convert line/column to codepoint index |
 | `get_line_text(s, line, line_base)` | str | Extract text of a specific line |
 | `get_surrounding_lines(s, line, context)` | str | Extract lines around a position |
-| `detect_newline_style(s)` | str | Detect LF/CRLF/CR/mixed/none |
+| `detect_newline_style(s)` | str | Detect LF/CRLF/CR/mixed (empty input defaults to LF; import from `eggcalc.exact.primitives`) |
 
 ### CodepointInfo NamedTuple
 

@@ -328,8 +328,10 @@ Preprocessing order: `ignore_final_newline` -> `ignore_trailing_whitespace` -> `
 Classification values: `exact_match`, `unicode_normalization_only`, `accent_or_diacritic_difference`, `case_only`, `length_only`, `invisible_character`, `ordinary_text_difference`.
 
 ```python
->>> text_equal("café", "cafe\u0301", normalization="NFC")
+>>> text_equal("Å", "Å", normalization="NFC")
 TextEqualResult(equal=True, classification='unicode_normalization_only', ...)
+>>> text_equal("café", "cafe\u0301", normalization="NFC")
+TextEqualResult(equal=True, classification='accent_or_diacritic_difference', ...)
 ```
 
 ### Diff Explanation
@@ -359,7 +361,7 @@ When `compare_normalized=True` and `normalize` is a valid form (`NFC`, `NFD`, `N
 
 ```python
 >>> inspect_text("hello\u200Bworld")
-InspectTextResult(safe_repr='hello\\u200Bworld', invisibles=[...], ...)
+InspectTextResult(safe_repr='hello⟦ZWSP⟧world', invisibles=[...], ...)
 ```
 
 **Raises:** `ValueError` if text exceeds `MAX_TEXT_LENGTH`.

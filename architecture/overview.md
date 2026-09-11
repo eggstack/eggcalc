@@ -378,7 +378,7 @@ Selected via `EGGCALC_MCP_PROFILE` at startup or per-request in `tools/list`:
 UNINITIALIZED → INITIALIZING → READY → CLOSED
 ```
 
-Clients must complete `initialize` + `notifications/initialized` before `tools/list` or `tools/call`; earlier tool requests get `-32600`. `ping` works in any state.
+Clients must complete `initialize` + `notifications/initialized` before `tools/list` or `tools/call`; earlier tool requests get `-32600`. `ping` is accepted in any legacy session state; it is not defined in the modern era (`-32601`).
 
 - `McpServer` owns its `McpServerConfig`, `ToolRegistry`, `ToolExecutor`, `ConfigManager`, dedicated `Evaluator`, and session set — multiple servers in one process are fully isolated.
 - `McpServerConfig` is a frozen dataclass with clamped defaults: 1 MB request/output byte caps (`max_output_bytes` clamps to min 1), 16 tool workers, queue size 32, 30 s max tool timeout, 10 req/s rate limit. Built via `from_environment()`.

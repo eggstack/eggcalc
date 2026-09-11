@@ -1,6 +1,6 @@
 # identifier.py — Identifier Analysis
 
-308 lines. Naming convention analysis for identifiers across Python, Rust, JavaScript, and environment variables.
+311 lines. Naming convention analysis for identifiers across Python, Rust, JavaScript, and environment variables.
 
 ## Overview
 
@@ -29,8 +29,9 @@ from eggcalc.exact.identifier import identifier_analyze
 | `rust_valid` | `bool` | Valid Rust identifier |
 | `javascript_valid` | `bool` | Valid JavaScript identifier |
 | `env_valid` | `bool` | Valid env variable name |
-| `suggestions` | `list[str]` | Naming convention conversion suggestions |
+| `suggestions` | `dict[str, str]` | Naming convention conversion suggestions (style name → suggested form) |
 | `warnings` | `list[str]` | Warnings about the identifier |
+| `summary` | `str` | Human-readable classification summary |
 
 ## Module Dependencies
 

@@ -1,6 +1,6 @@
 # diff_analysis.py — Structural Diff Analysis
 
-736 lines. Structural analysis tools for unified diffs and patches.
+740 lines. Structural analysis tools for unified diffs and patches.
 
 ## Overview
 
@@ -33,7 +33,7 @@ from eggcalc.exact.diff_analysis import (
 - `DiffTouchedPathsResult` — `parse_ok`, `error`, `added`, `deleted`, `renamed`, `modified`, `binary_files`, `mode_changes`, `total_files`
 - `DiffHunkRangesResult` — `parse_ok`, `error`, `files` (list of `DiffHunkRangesFile`)
 - `DiffFileHeadersResult` — `parse_ok`, `error`, `files` (list of `DiffFileHeaderEntry`)
-- `PatchConflictMarkersResult` — `total_markers`, `imbalanced`, `nested`, `locations`
+- `PatchConflictMarkersResult` — `total_markers`, `conflict_starts`, `conflict_separators`, `conflict_ends`, `imbalanced`, `nested`, `locations`
 - `UnifiedDiffValidateResult` — `parse_ok`, `files_count`, `hunks_total`, `warnings`, `structure_valid`
 
 ## Module Dependencies

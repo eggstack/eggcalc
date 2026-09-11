@@ -32,6 +32,9 @@ Stateless by design: no module-level mutable state. `SpawnPermit` instances are 
 | Variable | Type | Category | Status | Notes |
 |----------|------|----------|--------|-------|
 | `_config_loaded` | `bool` | legacy-cli | Bounded | Set once at startup to prevent re-entry; never toggled back |
+| `_config_generation` | `int` | process-bounded | Bounded | Incremented under `_cache_lock` on config change; invalidates caches |
+| `_FUNCTION_SPECS` | `dict \| None` | process-bounded | Bounded | Lazily built function-spec table (process-global cache) |
+| `_orphaned_eval_order` / `_orphaned_eval_lock` | `deque`, `Lock` | process-bounded | Bounded | Companions of `_orphaned_eval_processes` below |
 | `_mcp_mode` | `bool` | compat-only | Bounded | Set once by deprecated compatibility path; production stdio does not set this |
 | `_server_evaluator` | `ContextVar` | process-bounded | Bounded | Context-isolated; binds server evaluator to `evaluate_raw()`/`evaluate_with_timeout()` |
 | `_EVAL_SPAWN_SEMAPHORE` | `BoundedSemaphore` | process-bounded | Bounded | Bounded concurrency control; inherently thread-safe |
@@ -51,27 +54,30 @@ Stateless by design: no module-level mutable state. `SpawnPermit` instances are 
 | `OPERATOR_CONVERSIONS` | dict | legacy-cli | Bounded | Mutated by `load_user_config_extended()` at startup only |
 | `NUMBER_WORDS` | dict | legacy-cli | Bounded | Mutated by `load_user_config_extended()` at startup only |
 | `NORMALIZE` / `PATTERNS` | dict | process-bounded | Bounded | Rebuilt atomically under `_REBUILD_LOCK` |
+| `_COMPACT_ARG_CACHE` | dict | process-bounded | Bounded | Cache for compact-arg parsing (process-global) |
 | `check_if_number` | lru_cache | process-bounded | Bounded | Cleared during rebuild; inherently safe |
 
 ## eggcalc/units.py
 
 | Variable | Type | Category | Status | Notes |
 |----------|------|----------|--------|-------|
-| `UNIT_BASE` | dict | immutable-lookup | Bounded | Mutated under `_UNITS_LOCK` at startup; read-only thereafter |
-| `UNIT_CONVERSIONS` | dict | immutable-lookup | Bounded | Rebuilt under `_UNITS_LOCK` at startup; read-only thereafter |
-| `UNIT_ALIASES` | dict | immutable-lookup | Bounded | Mutated under `_UNITS_LOCK` at startup; read-only thereafter |
-| `TEMPERATURE_CONVERSIONS` | dict | immutable-lookup | Bounded | Mutated under `_UNITS_LOCK` at startup; read-only thereafter |
-| `UNIT_CATEGORIES` | dict | immutable-lookup | Bounded | Mutated under `_UNITS_LOCK` at startup; read-only thereafter |
+| `UNIT_BASE` | MappingProxyType | immutable-lookup | Bounded | Generated adapter from `UNIT_DEFINITIONS`, installed once at import by `_install_generated_adapters()`; read-only thereafter |
+| `UNIT_CONVERSIONS` | lazy Mapping | immutable-lookup | Bounded | `_LazyUnitConversions`: computes pairwise factors on demand from the registry; no lock (stateless computation) |
+| `UNIT_ALIASES` | MappingProxyType | immutable-lookup | Bounded | Generated adapter installed once at import; read-only thereafter |
+| `TEMPERATURE_CONVERSIONS` | MappingProxyType | immutable-lookup | Bounded | Generated adapter installed once at import; read-only thereafter |
+| `UNIT_CATEGORIES` | MappingProxyType | immutable-lookup | Bounded | Generated adapter installed once at import; read-only thereafter |
+| `_unit_registry` | `UnitRegistry \| None` | process-bounded | Bounded | Lazily built on first access via `_get_unit_registry()` |
+| `_CUSTOM_UNIT_DEFINITIONS` | dict | process-bounded | Bounded | User-registered unit definitions; triggers adapter reinstall |
 
 ## eggcalc/mcp/server.py
 
 | Variable | Type | Category | Status | Notes |
 |----------|------|----------|--------|-------|
-| `_mcp_defaults_configured` | `bool` | process-bounded | Bounded | Written once under `_mcp_defaults_lock` |
-| `_active_profile` | `str` | compat-only | Bounded | Process-global; replaced by `McpServerConfig.profile` in explicit servers |
-| `_schema_detail` | `str` | compat-only | Bounded | Process-global; replaced by `McpServerConfig.schema_detail` in explicit servers |
-| `_tool_executor` | `ThreadPoolExecutor` | removed | — | Replaced by per-server `ToolExecutor` |
-| `_orphaned_processes` | set | removed | — | Replaced by per-server `ToolExecutor._orphaned` |
+| `_active_profile` | `str` | compat-only | Bounded | Process-global; replaced by `McpServerConfig.profile` in explicit servers; guarded by `_profile_lock` |
+| `_schema_detail` | `str` | compat-only | Bounded | Process-global; replaced by `McpServerConfig.schema_detail` in explicit servers; guarded by `_schema_detail_lock` |
+| `_tool_executor` / `_tool_executor_lock` | `ThreadPoolExecutor \| None`, `Lock` | process-bounded | Bounded | Compat-path shared executor via `_get_tool_executor()`; per-server `ToolExecutor` is the production path |
+| `_orphaned_processes` / `_orphaned_lock` | set, `Lock` | process-bounded | Bounded | Compat-path orphan set harvested by `_cleanup_orphaned_processes()` (atexit); per-server executors track their own orphans |
+| `_compat_server_lock` | `Lock` | process-bounded | Bounded | Guards the deprecated sessionless compat server |
 | `_default_session` | `McpSession` | removed | — | Replaced by explicit `McpSession` per-server |
 | `os.environ.setdefault` | env mutation | removed | — | Import-time mutation removed; handled by `McpServerConfig.from_environment()` |
 | `ConfigSnapshot` dicts | dict fields | — | Isolated | `__post_init__()` defensively copies all dict fields |

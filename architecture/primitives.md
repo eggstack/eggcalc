@@ -436,7 +436,7 @@ Checks if a character is an Extend-class character for grapheme segmentation: co
 
 ### `_is_extended_pictographic(char) -> bool`
 
-Checks if a character is Extended Pictographic for emoji ZWJ sequences. Uses codepoint range heuristics for common emoji blocks (U+1F300–U+1F9FF, U+2600–U+26FF, U+2700–U+27BF) and `So` category name matching.
+Checks if a character is Extended Pictographic for emoji ZWJ sequences. Uses codepoint range heuristics for common emoji blocks (U+1F300–U+1FAFF, U+2600–U+26FF, U+2700–U+27BF) and `So` category name matching (the `SIGN` keyword match intentionally covers symbols like © ® ™ for text-detection purposes).
 
 ## Dependencies
 
@@ -453,8 +453,9 @@ No external dependencies.
 from eggcalc.exact import (
     utf8_bytes, codepoints, normalize_unicode, casefold_text,
     measure_basic, count_graphemes, find_invisibles, visible_repr,
-    truncate_to_grapheme, detect_newline_style,
+    truncate_to_grapheme,
 )
+from eggcalc.exact.primitives import detect_newline_style
 
 # Basic measurements
 text = "Café naïve"
