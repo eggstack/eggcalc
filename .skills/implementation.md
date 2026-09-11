@@ -65,7 +65,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 #### exact/ modules (28 implementation submodules + `__init__.py`, always separate)
 - `primitives.py` - UTF-8, codepoints, visible_repr (CodepointInfo is a NamedTuple with an `idx` field)
 - `unicode_tools.py` - Script detection, confusables (forward and reverse)
-- `confusables.py` - Auto-generated data file (CONFUSABLES dict only)
+- `confusables.py` - Auto-generated data file (6,565-entry compressed payload with a lazy mapping decoded on first access — never edit by hand; edit `scripts/generate_confusables.py`)
 - `diff.py` - Levenshtein, diff_spans, `__all__` exports
 - `diff_analysis.py` - Diff analysis and classification
 - `measure.py` - Line/word metrics
@@ -94,7 +94,7 @@ The `_classify_difference()` function in synthesis.py returns different classifi
 - `__init__.py` - Fully lazy package exports (`_LAZY_IMPORTS` is the single authority; `__all__ = list(_LAZY_IMPORTS)`)
 
 ### Result-Type Convention
-All exact/ public functions return TypedDicts — plain `dict`s at runtime. Use key access (`result["equal"]`), never attribute access. See AGENTS.md Common Pitfalls #15.
+All exact/ public functions return TypedDicts — plain `dict`s at runtime. Use key access (`result["equal"]`), never attribute access. See the exact/ gotchas in AGENTS.md.
 
 ### Always Run Tests
 After any change:
@@ -104,7 +104,7 @@ make check   # lint, format-check, typecheck, docs-check, build validation, full
 
 ### Build Single File Notes
 When modifying `build_single.py`:
-- The script renames `main()` to `normalize_main()` and `mcp_main()` to avoid conflicts
+- The assembly step renames the normalize `main()` to `normalize_main()` and the MCP entry `main()` to `mcp_main()` to avoid conflicts
 - Aliased imports like `count_graphemes as _count_graphemes` in synthesis need explicit de-aliasing
 - Use `code.replace("_funcname(", "funcname(")` for each aliased function
 

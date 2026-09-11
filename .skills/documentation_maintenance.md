@@ -17,8 +17,8 @@ Guide agents on keeping documentation accurate and up-to-date across the codebas
 
 When updating code, always check if documentation needs updating:
 
-1. **Line counts** — Update in `AGENTS.md` Module Map and `architecture/overview.md`
-2. **Test count** — Update in `AGENTS.md`, `.skills/testing.md`, `.skills/architecture_review.md`
+1. **Line counts** — `architecture/overview.md` module tables mark counts as approximate; update them when drift exceeds ~10%, plus the per-module header in the touched `architecture/<module>.md`
+2. **Test count** — Update in `.skills/testing.md` (the single home for the collected-test count; neither `AGENTS.md` nor `.skills/architecture_review.md` tracks one)
 3. **Public API** — Check `architecture/api.md` and `docs/api.md` for new/changed exports
 4. **Module structure** — Check `architecture/overview.md` dependency tree
 5. **Function lists** — Check `architecture/evaluator.md` and `docs/functions.md`
@@ -32,8 +32,7 @@ When updating code, always check if documentation needs updating:
 
 ### Stale Line Counts
 Line counts drift as code evolves. Update these locations:
-- `AGENTS.md` Module Map table
-- `architecture/overview.md` (all module line counts and Deep Dive Index)
+- `architecture/overview.md` (all module line counts are marked approximate; refresh when drift exceeds ~10%, plus the Deep Dive Index entry)
 - Individual `architecture/<module>.md` file headers
 
 ### Stale Test Count

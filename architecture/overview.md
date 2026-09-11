@@ -226,7 +226,7 @@ This is the most important architectural distinction in the codebase:
 ```python
 run("five plus three", NORMALIZE, PATTERNS)  # → (8, 0); prints "8"
 evaluate("5+3")                              # → 8
-evaluate("five plus three")                  # → raises SyntaxError
+evaluate("five plus three")                  # → raises EvaluationError
 ```
 
 ### Caret (`^`) Semantics

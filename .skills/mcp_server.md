@@ -36,10 +36,10 @@ generated. Read selection metadata via `get_tool_selection_summary()` /
   lists are evaluation-only; they do not create profiles. Tune on
   `development` only and retain normalized per-case rollout JSONL before
   making model-selection claims. The current cross-model evidence is
-  recorded in `reports/closure_2026_09_10.md`; do not describe `agent_core` as
+   recorded in `evals/mcp_tool_selection/reports/closure_2026_09_10.md`; do not describe `agent_core` as
   recommended until a later held-out run passes non-inferiority and
   specialist-recovery gates. The corrective stopping decision is recorded in
-  `reports/corrective_held_out_2026_09_10.md`.
+  `evals/mcp_tool_selection/reports/corrective_held_out_2026_09_10.md`.
 
 ### Response Conventions
 

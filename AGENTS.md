@@ -2,7 +2,7 @@
 
 `eggcalc` — natural-language math calculator (CLI, library, MCP server). Stdlib only, no runtime deps. `build_single.py` assembles everything into one portable `eggcalc.py`.
 
-Start with `architecture/overview.md` (data flow, module map, Deep Dive Index for all 41 docs). Per-domain guides live in `.skills/*.md` (testing, implementation, mcp_server, build_release, architecture_review, documentation_maintenance). `AGENTS.override.md` takes precedence over this file when present.
+Start with `architecture/overview.md` (data flow, module map, Deep Dive Index for all 41 docs). Per-domain guides live in `.skills/*.md` (testing, implementation, mcp_server, build_release, architecture_review, documentation_maintenance). `.agents/skills` is a symlink to `.skills/` — edit the `.skills/` originals only. `AGENTS.override.md` takes precedence over this file when present.
 
 ## Two evaluation paths (the #1 mistake)
 

@@ -48,9 +48,10 @@ evaluate("2 ^ 3")   # → 1 (bitwise XOR)
 
 **Does NOT work with:**
 - Natural language: `evaluate("five plus three")` → `EvaluationError`
-- Spaces: `evaluate("5 + 3")` → 8 (works but wasteful, use evaluate_raw)
 - Units attached: `evaluate("30m")` → `EvaluationError`
 - `^` as exponentiation: `evaluate("2^10")` → `1022` (XOR, not 1024)
+
+Spaces are tolerated (`evaluate("5 + 3")` → 8) but wasteful — use `evaluate_raw()` for anything spacing-tolerant or user-facing.
 
 ### `evaluate_raw(expression: str) -> Any`
 

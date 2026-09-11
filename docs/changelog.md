@@ -20,6 +20,13 @@ All notable changes to eggcalc are documented here.
 - Caret rewrite placed after `_normalize_spaced_unit_caret_exponents` to preserve unit caret shorthand (`5 m ^ 2`)
 - Documentation updated: README, AGENTS.md, architecture docs, API docs, functions.md, CLI docs, quickstart
 
+## [1.1.6] - 2026-07-14
+
+### Fixed
+- Trailing comma detection made unconditional in llm_json_output_check
+- Skip 3.10-only test failures and fix mypy type errors
+- Skip additional 3.10-only tests that were missed
+
 ## [1.1.4] - 2026-06-30
 
 ### Fixed

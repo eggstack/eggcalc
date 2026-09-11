@@ -43,7 +43,7 @@ When you pipe input, the same full pipeline is used.
 | `--commands` | List curated CLI text commands and exit |
 | `-i`, `--interactive` | Start interactive REPL mode |
 | `-s`, `--show` | Accepted for compatibility; plain output remains result-only |
-| `--mcp` | Run as MCP server for math, text, and validation tools |
+| `--mcp` | Run as MCP server for exact text tools |
 | `--mcp-profile <name>` | MCP tool profile (default: `full`, or `EGGCALC_MCP_PROFILE` env var) |
 | `--mcp-schema-detail {compact,normal,full}` | MCP schema detail level |
 | `--capabilities` | Show runtime capabilities as JSON and exit |

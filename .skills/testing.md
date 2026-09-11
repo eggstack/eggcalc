@@ -107,10 +107,13 @@ make check
 ```
 tests/
 ├── conftest.py                        # Shared fixtures
+├── test_authority_consolidation.py      # Authority consolidation tests
 ├── test_bugs_2026_07_regressions.py   # Regression tests for 2026-07 bugs
 ├── test_bugs_2026_08.py               # Regression tests for 2026-08 bugs
+├── test_bugs_2026_08_current.py       # Current 2026-08 regression tests
 ├── test_bugs_2026_08_audit.py         # Regression tests for 2026-08 audit findings
 ├── test_bugs_2026_08_followup.py      # Follow-up regression tests for 2026-08 audit
+├── test_bugs_2026_09.py               # Regression tests for 2026-09 bugs
 ├── test_build_manifest_graph.py       # Build manifest graph tests
 ├── test_build_single.py               # Build script tests
 ├── test_calculator_operator_semantics.py # Operator semantics tests (caret, floor/mod)
@@ -138,11 +141,15 @@ tests/
 ├── test_math_edge_cases.py            # Math edge case tests
 ├── test_math_identities.py            # Mathematical laws verification
 ├── test_mcp_env_limits.py             # MCP environment limits tests
+├── test_mcp_modern.py                 # Modern-era (2026-07-28) protocol tests
 ├── test_mcp_resource_bounds.py        # MCP resource bounds tests
 ├── test_mcp_schema_lint.py            # MCP schema lint tests
 ├── test_mcp_server.py                 # MCP server integration tests
 ├── test_mcp_stdio_smoke.py            # MCP stdio smoke tests
+├── test_mcp_structured_results.py     # MCP structuredContent bridge tests
+├── test_mcp_tool_discovery.py         # MCP tool discovery/search tests
 ├── test_mcp_tools_new.py              # MCP integration tests for new tools
+├── test_network_encoding.py           # Network/encoding exact-module tests
 ├── test_normalize.py                  # Normalization tests
 ├── test_normalization_trace.py        # Normalization trace parity/stage/failure tests
 ├── test_patch_tools.py                # Patch apply/summary tools tests
@@ -156,7 +163,9 @@ tests/
 ├── test_repl_and_cli.py               # REPL and CLI integration tests
 ├── test_runtime_capabilities.py       # Runtime capability tests
 ├── test_security_fuzz.py              # Security/fuzz tests
+├── test_shared_lifecycle.py           # Shared subprocess-lifecycle tests
 ├── test_shell_tools.py                # Shell split/quote/compare tests
+├── test_temporal.py                   # Temporal exact-module tests
 ├── test_text_replace_check.py         # Text replacement check tests
 ├── test_tokenization.py               # Tokenization edge cases
 ├── test_tool_inventory.py             # Tool registry consistency tests
@@ -168,13 +177,14 @@ tests/
 ├── test_unit_dimensions.py            # Unit dimension tests
 ├── test_unit_family_invariants.py     # Unit family invariant tests
 ├── test_unit_namespace.py             # Unit namespace tests
+├── test_utility_parity_integration.py # Utility parity integration tests
 ├── test_version_constraint.py         # Version constraint tests
 ├── typing/consumer.py                 # External typed-consumer API surface (mypy --strict)
 └── fixtures/                          # Test fixtures directory
 ```
 
 ## Current Test Count
-- Run `pytest --co -q | tail -1` for the live count; the 2026-09-10 local gate collected 5,259 tests (5,226 passed, 33 skipped).
+- Run `pytest --co -q | tail -1` for the live count; the 2026-09-11 gate collected 5,259 tests (5,226 passed, 33 skipped).
 - All must continue to pass
 
 ## Common Issues When Testing

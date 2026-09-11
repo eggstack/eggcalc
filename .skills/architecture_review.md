@@ -19,7 +19,7 @@ cat architecture/<module>.md
 # Read corresponding implementation
 cat eggcalc/<module>.py
 
-# List all architecture docs (38 files; overview.md has the Deep Dive Index)
+# List all architecture docs (41 files; overview.md has the Deep Dive Index)
 ls architecture/
 ```
 
@@ -51,9 +51,9 @@ For each module, examine:
 - TypedDict classes don't support `__slots__` (ignored by Python)
 - exact/ functions return TypedDicts — plain dicts at runtime; attribute access fails
 - `_get_script_heuristic()` is cached with `@lru_cache`
-- CONFUSABLES dict has `reverse_confusables()` for reverse lookups
+- CONFUSABLES is a lazy mapping (6,565 entries, decoded on first access) with `reverse_confusables()` for reverse lookups
 - `unicode_normalization_only` classification is valid and reachable in `text_equal()`/`explain_diff()`, but NOT in `list_compare()` near_matches (removed as dead code)
-- `MAX_TEXT_INPUT_LENGTH = 100_000` enforced in validate.py and MCP tools
+- `MAX_TEXT_INPUT_LENGTH = 100_000` enforced in validate.py (`MAX_TEXT_LENGTH` is the separate MCP-layer bound in `mcp/tools.py`)
 
 ## Documentation/Code Inconsistencies to Watch For
 
