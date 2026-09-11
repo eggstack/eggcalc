@@ -12,7 +12,7 @@ This document is the birds-eye view: how the subsystems fit together, what each 
 - [Architecture Diagram](#architecture-diagram)
 - [How Everything Works Together](#how-everything-works-together)
 - [Subsystem Map](#subsystem-map)
-  - [Core Calculator (6 modules)](#core-calculator-6-modules)
+  - [Core Calculator (7 modules)](#core-calculator-7-modules)
   - [Package Plumbing](#package-plumbing)
   - [exact/ — Deterministic Utility Package (28 modules)](#exact--deterministic-utility-package-28-modules)
   - [mcp/ — Model Context Protocol Server (3 modules)](#mcp--model-context-protocol-server-3-modules)
@@ -86,11 +86,11 @@ eggcalc is a dual-purpose tool:
    ┌─────────▼─────────┐          ┌─────────────────────┐
    │     units.py      │          │  mcp/schemas.py     │
    │  (UnitValue,      │          │ (83 tool schemas,   │
-   │   registry)       │          │  11 profiles)       │
+   │   registry)       │          │  12 profiles)       │
    └───────────────────┘          └─────────────────────┘
 
-Supporting: capabilities.py (runtime snapshot) · _protocol.py (protocol versions)
-            _version.py (single version source)
+Supporting: capabilities.py (runtime snapshot) · _protocol.py (protocol versions + eras)
+            _version.py (single version source) · _process.py (subprocess mechanics)
 ```
 
 ---
@@ -126,7 +126,7 @@ Skips normalization entirely — `evaluator.evaluate()` parses valid Python math
 ### 4. MCP tool call (`tools/call`)
 
 ```
-JSON-RPC request → McpSession (must be READY: initialize handshake done)
+JSON-RPC request → McpSession (must be READY: initialize handshake done, legacy era)
                 → ToolExecutor validates args vs JSON Schema + signature,
                   enforces timeout, dispatches on bounded ThreadPoolExecutor
                 → mcp/tools.py handler lazily imports the exact/ function
@@ -137,7 +137,8 @@ JSON-RPC request → McpSession (must be READY: initialize handshake done)
 
 ## Subsystem Map
 
-The codebase is three subsystems plus package plumbing.
+The codebase is three subsystems plus package plumbing. Line counts below are
+approximate (they drift as code changes); roles and key exports are normative.
 
 ### Core Calculator (7 modules)
 
@@ -145,22 +146,22 @@ These seven modules form the calculator and are the only code loaded by `import 
 
 | Module | Lines | Role | Key Exports | Deep Dive |
 |--------|------:|------|-------------|-----------|
-| `_process.py` | 198 | Shared subprocess lifecycle primitives (mechanism only): `SpawnPermit`, queue/child cleanup, context selection. Limits, timeouts, orphan caps, and error contracts stay with `evaluator.py` / `mcp/tools.py` | `SpawnPermit`, `try_acquire_spawn_permit()`, `cleanup_child_process()`, `close_queue()`, `close_semaphore()`, `get_process_context()` | (covered here + [evaluator.md](evaluator.md), [mcp.md](mcp.md)) |
-| `units.py` | 3,889 | Unit definitions, structural dimensions, conversions, `UnitValue` | `UnitValue`, `Dimension`, `UnitSpec`, `UnitExpression`, `UnitRegistry`, `normalize_unit()`, `get_conversion_factor()` | [units.md](units.md) |
-| `evaluator.py` | 3,757 | Safe AST parsing/evaluation, constants, functions, memory/variables | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `Evaluator`, `EggCalcApp`, `EvaluationError`, `Memory`, `register_constant()`, `register_function()` | [evaluator.md](evaluator.md) |
-| `normalize.py` | 3,942 | NL tokenization, number words, unit preprocessing, expression validation, normalization traces | `run()`, `normalize_text()`, `normalize_expression()`, `trace_normalization()`, `NormalizationTrace`, `NORMALIZE`, `PATTERNS` | [normalize.md](normalize.md) |
-| `cli.py` | 1,043 | CLI dispatch: argparse, REPL, text subcommands, `--explain`/`--commands`, config loading | `main()`, `print_help()`, `run_cli()`, `COMMANDS` | [cli.md](cli.md) |
-| `capabilities.py` | 141 | Runtime capability detection (frozen snapshot) | `detect_capabilities()`, `RuntimeCapabilities`, `capability_summary()` | [capabilities.md](capabilities.md) |
-| `_protocol.py` | 11 | MCP protocol version constants | `SUPPORTED_PROTOCOL_VERSIONS`, `LATEST_SUPPORTED_PROTOCOL_VERSION` | (covered here + [mcp.md](mcp.md)) |
+| `_process.py` | ~213 | Shared subprocess lifecycle primitives (mechanism only): `SpawnPermit`, queue/child cleanup, context selection. Limits, timeouts, orphan caps, and error contracts stay with `evaluator.py` / `mcp/tools.py` | `SpawnPermit`, `try_acquire_spawn_permit()`, `cleanup_child_process()`, `close_queue()`, `close_semaphore()`, `get_process_context()` | (covered here + [evaluator.md](evaluator.md), [mcp.md](mcp.md)) |
+| `units.py` | ~3,894 | Unit definitions, structural dimensions, conversions, `UnitValue` | `UnitValue`, `Dimension`, `UnitSpec`, `UnitExpression`, `UnitRegistry`, `normalize_unit()`, `get_conversion_factor()` | [units.md](units.md) |
+| `evaluator.py` | ~3,757 | Safe AST parsing/evaluation, constants, functions, memory/variables | `evaluate()`, `evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`, `Evaluator`, `EggCalcApp`, `EvaluationError`, `Memory`, `register_constant()`, `register_function()` | [evaluator.md](evaluator.md) |
+| `normalize.py` | ~3,982 | NL tokenization, number words, unit preprocessing, expression validation, normalization traces | `run()`, `normalize_text()`, `normalize_expression()`, `trace_normalization()`, `NormalizationTrace`, `NORMALIZE`, `PATTERNS` | [normalize.md](normalize.md) |
+| `cli.py` | ~1,043 | CLI dispatch: argparse, REPL, text subcommands, `--explain`/`--commands`, config loading | `main()`, `print_help()`, `run_cli()`, `COMMANDS` | [cli.md](cli.md) |
+| `capabilities.py` | ~141 | Runtime capability detection (frozen snapshot) | `detect_capabilities()`, `RuntimeCapabilities`, `capability_summary()` | [capabilities.md](capabilities.md) |
+| `_protocol.py` | ~73 | MCP protocol version constants, legacy/modern era mapping, modern wire constants | `SUPPORTED_PROTOCOL_VERSIONS`, `LATEST_SUPPORTED_PROTOCOL_VERSION`, `LEGACY/MODERN_PROTOCOL_VERSIONS`, `protocol_era()`, `is_legacy_version()`, `is_modern_version()`, `MODERN_METHODS` | (covered here + [mcp.md](mcp.md)) |
 
 ### Package Plumbing
 
 | Module | Lines | Role | Deep Dive |
 |--------|------:|------|-----------|
-| `__init__.py` | 162 | Public API surface; eager re-exports from the seven core modules; PEP 562 lazy `main`/`print_help` | [api.md](api.md) |
-| `__main__.py` | 19 | `python -m eggcalc` entry; delegates to `cli.main()` | [api.md](api.md) |
+| `__init__.py` | ~162 | Public API surface; eager re-exports from the seven core modules; PEP 562 lazy `main`/`print_help` | [api.md](api.md) |
+| `__main__.py` | ~16 | `python -m eggcalc` entry; delegates to `cli.main()` | [api.md](api.md) |
 | `_version.py` | 3 | Single source of truth for `__version__`; read by `pyproject.toml` and `build_single.py` | [build.md](build.md) |
-| `eggcalc_config.py` (repo root template) | 73 | User config extension points: `CUSTOM_CONSTANTS`, `CUSTOM_FUNCTIONS`, `CUSTOM_UNITS`, `CUSTOM_ALIASES`, `CUSTOM_TEMP_CONVERSIONS`, `CUSTOM_NUMBER_WORDS`, `CUSTOM_OPERATOR_WORDS`. Loaded only by CLI calculator modes or when `EGGCALC_LOAD_CONFIG=1`; never at import time | [api.md](api.md) |
+| `eggcalc_config.py` (repo root template) | ~73 | User config extension points: `CUSTOM_CONSTANTS`, `CUSTOM_FUNCTIONS`, `CUSTOM_UNITS`, `CUSTOM_ALIASES`, `CUSTOM_TEMP_CONVERSIONS`, `CUSTOM_NUMBER_WORDS`, `CUSTOM_OPERATOR_WORDS`. Loaded only by CLI calculator modes or when `EGGCALC_LOAD_CONFIG=1`; never at import time | [api.md](api.md) |
 
 ### exact/ — Deterministic Utility Package (28 modules)
 
@@ -168,35 +169,35 @@ All functions are deterministic, side-effect-free, and independently testable. N
 
 | Module | Lines | Role | Deep Dive |
 |--------|------:|------|-----------|
-| `primitives.py` | 740 | Foundation: UTF-8 bytes, codepoints, normalization, invisibles, graphemes, line/column helpers | [primitives.md](primitives.md) |
-| `unicode_tools.py` | 310 | Script detection, confusable identification, mixed scripts | [unicode_tools.md](unicode_tools.md) |
-| `confusables.py` | 60 | Auto-generated homoglyph data (6,565 entries, zlib+base85 payload, lazy decode) — do not edit by hand | [confusables.md](confusables.md) |
-| `measure.py` | 265 | Line, word, character-category metrics | [measure.md](measure.md) |
-| `diff.py` | 258 | First diff, common prefix/suffix, Levenshtein, LCS, diff spans | [diff.md](diff.md) |
-| `diff_analysis.py` | 736 | Structural analysis of unified diffs: touched paths, hunk ranges, headers, conflict markers | [diff_analysis.md](diff_analysis.md) |
-| `validate.py` | 3,053 | Bracket/JSON/TOML/regex validation, JSON shape/extract/compare, list sort/dedupe, version compare | [validate.md](validate.md) |
-| `synthesis.py` | 1,982 | **High-level orchestrator**: composes primitives into composite analyses | [synthesis.md](synthesis.md) |
-| `transform.py` | 712 | Escaping/unescaping (JSON, Python, Rust, shell, regex, markdown, HTML, URL), hashing, fingerprinting | [transform.md](transform.md) |
-| `identifier.py` | 308 | Naming convention classification and cross-language validity | [identifier.md](identifier.md) |
-| `identifier_inspect.py` | 756 | Identifier collision detection (confusables, casefold, mixed scripts, keywords) | [identifier_inspect.md](identifier_inspect.md) |
-| `position.py` | 503 | Byte offset ↔ codepoint ↔ line/column ↔ UTF-16 conversion | [position.md](position.md) |
-| `glob.py` | 311 | Glob matching with `*`, `**`, `?`; POSIX/Windows | [glob.md](glob.md) |
-| `config.py` | 347 | `.env` and INI file validation | [config.md](config.md) |
-| `patch.py` | 641 | Unified diff parsing and in-memory apply simulation | [patch.md](patch.md) |
-| `path_tools.py` | 615 | Lexical path analysis, normalization, comparison, scope checks | [path_tools.md](path_tools.md) |
-| `inspect_prompt.py` | 560 | Prompt-injection red flags: hidden chars, bidi, ANSI, base64 blobs, instruction phrases | [inspect_prompt.md](inspect_prompt.md) |
-| `markdown.py` | 645 | Markdown structure scanning, code fence extraction, lexical link check | [markdown.md](markdown.md) |
-| `shell.py` | 362 | POSIX shell tokenization, quote-join, argv compare, risky-feature flags | [shell.md](shell.md) |
-| `unicode_policy.py` | 930 | Named Unicode safety policies and canonicalization profiles | [unicode_policy.md](unicode_policy.md) |
-| `cargo.py` | 508 | Cargo.toml inspection (package, workspace, deps, suspicious names) | [cargo.md](cargo.md) |
-| `version.py` | 545 | Semver/cargo version parsing and constraint checking | [version.md](version.md) |
-| `llm_hygiene.py` | 326 | LLM JSON output diagnosis (fences, prose, trailing commas, BOM, …) | [llm_hygiene.md](llm_hygiene.md) |
-| `manifests.py` | 868 | Manifest inspection: pyproject.toml, package.json, requirements.txt, go.mod, lockfiles; shared `_Finding` TypedDict | [manifests.md](manifests.md) |
-| `repo_audit.py` | 422 | Repository file inventory, language signals, vendor/generated detection | [repo_audit.md](repo_audit.md) |
-| `network.py` | 240 | IP/CIDR inspection with explicit version-stable special-use taxonomy | [network.md](network.md) |
-| `encoding.py` | 282 | Strict codec (utf8/hex/base64/base64url) and radix (2–36, u128-capped) conversion | [encoding.md](encoding.md) |
-| `temporal.py` | 616 | Fixed-offset datetime (nanosecond-exact) and cron inspection with corrected DOM/DOW semantics | [temporal.md](temporal.md) |
-| `__init__.py` | 271 | Fully lazy public API: zero implementation imports at import time; `__all__` derived from the single `_LAZY_IMPORTS` authority (`__all__ = list(_LAZY_IMPORTS)`, 213 names) | [exact.md](exact.md#exact__init__py--public-api) |
+| `primitives.py` | ~737 | Foundation: UTF-8 bytes, codepoints, normalization, invisibles, graphemes, line/column helpers | [primitives.md](primitives.md) |
+| `unicode_tools.py` | ~310 | Script detection, confusable identification, mixed scripts | [unicode_tools.md](unicode_tools.md) |
+| `confusables.py` | ~60 | Auto-generated homoglyph data (6,565 entries, zlib+base85 payload, lazy decode) — do not edit by hand | [confusables.md](confusables.md) |
+| `measure.py` | ~265 | Line, word, character-category metrics | [measure.md](measure.md) |
+| `diff.py` | ~265 | First diff, common prefix/suffix, Levenshtein, LCS, diff spans | [diff.md](diff.md) |
+| `diff_analysis.py` | ~740 | Structural analysis of unified diffs: touched paths, hunk ranges, headers, conflict markers | [diff_analysis.md](diff_analysis.md) |
+| `validate.py` | ~3,031 | Bracket/JSON/TOML/regex validation, JSON shape/extract/compare, list sort/dedupe, version compare | [validate.md](validate.md) |
+| `synthesis.py` | ~2,008 | **High-level orchestrator**: composes primitives into composite analyses | [synthesis.md](synthesis.md) |
+| `transform.py` | ~722 | Escaping/unescaping (JSON, Python, Rust, shell, regex, markdown, HTML, URL), hashing, fingerprinting | [transform.md](transform.md) |
+| `identifier.py` | ~311 | Naming convention classification and cross-language validity | [identifier.md](identifier.md) |
+| `identifier_inspect.py` | ~766 | Identifier collision detection (confusables, casefold, mixed scripts, keywords) | [identifier_inspect.md](identifier_inspect.md) |
+| `position.py` | ~499 | Byte offset ↔ codepoint ↔ line/column ↔ UTF-16 conversion | [position.md](position.md) |
+| `glob.py` | ~309 | Glob matching with `*`, `**`, `?`; POSIX/Windows | [glob.md](glob.md) |
+| `config.py` | ~368 | `.env` and INI file validation | [config.md](config.md) |
+| `patch.py` | ~638 | Unified diff parsing and in-memory apply simulation | [patch.md](patch.md) |
+| `path_tools.py` | ~611 | Lexical path analysis, normalization, comparison, scope checks | [path_tools.md](path_tools.md) |
+| `inspect_prompt.py` | ~560 | Prompt-injection red flags: hidden chars, bidi, ANSI, base64 blobs, instruction phrases | [inspect_prompt.md](inspect_prompt.md) |
+| `markdown.py` | ~642 | Markdown structure scanning, code fence extraction, lexical link check | [markdown.md](markdown.md) |
+| `shell.py` | ~362 | POSIX shell tokenization, quote-join, argv compare, risky-feature flags | [shell.md](shell.md) |
+| `unicode_policy.py` | ~930 | Named Unicode safety policies and canonicalization profiles | [unicode_policy.md](unicode_policy.md) |
+| `cargo.py` | ~498 | Cargo.toml inspection (package, workspace, deps, suspicious names) | [cargo.md](cargo.md) |
+| `version.py` | ~580 | Semver/cargo version parsing and constraint checking | [version.md](version.md) |
+| `llm_hygiene.py` | ~326 | LLM JSON output diagnosis (fences, prose, trailing commas, BOM, …) | [llm_hygiene.md](llm_hygiene.md) |
+| `manifests.py` | ~875 | Manifest inspection: pyproject.toml, package.json, requirements.txt, go.mod, lockfiles; shared `_Finding` TypedDict | [manifests.md](manifests.md) |
+| `repo_audit.py` | ~422 | Repository file inventory, language signals, vendor/generated detection | [repo_audit.md](repo_audit.md) |
+| `network.py` | ~240 | IP/CIDR inspection with explicit version-stable special-use taxonomy | [network.md](network.md) |
+| `encoding.py` | ~282 | Strict codec (utf8/hex/base64/base64url) and radix (2–36, u128-capped) conversion | [encoding.md](encoding.md) |
+| `temporal.py` | ~616 | Fixed-offset datetime (nanosecond-exact) and cron inspection with corrected DOM/DOW semantics | [temporal.md](temporal.md) |
+| `__init__.py` | ~271 | Fully lazy public API: zero implementation imports at import time; `__all__` derived from the single `_LAZY_IMPORTS` authority (`__all__ = list(_LAZY_IMPORTS)`, 213 names) | [exact.md](exact.md#exact__init__py--public-api) |
 
 *(Package-level doc: [exact.md](exact.md).)*
 
@@ -204,9 +205,9 @@ All functions are deterministic, side-effect-free, and independently testable. N
 
 | Module | Lines | Role | Key Exports | Deep Dive |
 |--------|------:|------|-------------|-----------|
-| `schemas.py` | 5,589 | 83 tool protocol schemas (shape only) + catalog metadata (handler/tier/tags/profiles) | `TOOL_SCHEMAS`, `TOOL_METADATA`, `TOOL_PROFILES` | [mcp.md](mcp.md#schemaspy--tool-schemas) |
-| `tools.py` | 6,488 | Tool handler implementations; lazily imports exact/ functions inside each handler; bounded input pre-checks | all 83 handlers | [mcp.md](mcp.md#toolspy--tool-implementations) |
-| `server.py` | 3,766 | stdio JSON-RPC server, sessions, config management, executor; derived `TOOL_HANDLERS` via `_build_tool_handlers()` | `McpServer`, `McpSession`, `McpServerConfig`, `ConfigSnapshot`, `ConfigManager`, `ToolRegistry`, `ToolExecutor`, `EvaluationPolicy`, `RuntimeContext` | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) |
+| `schemas.py` | ~6,117 | 83 tool protocol schemas (shape only) + catalog metadata (handler/tier/tags/profiles) | `TOOL_SCHEMAS`, `TOOL_METADATA`, `TOOL_PROFILES` | [mcp.md](mcp.md#schemaspy--tool-schemas) |
+| `tools.py` | ~6,491 | Tool handler implementations; lazily imports exact/ functions inside each handler; bounded input pre-checks | all 83 handlers | [mcp.md](mcp.md#toolspy--tool-implementations) |
+| `server.py` | ~4,053 | stdio JSON-RPC server, sessions, config management, executor; derived `TOOL_HANDLERS` via `_build_tool_handlers()` | `McpServer`, `McpSession`, `McpServerConfig`, `ConfigSnapshot`, `ConfigManager`, `ToolRegistry`, `ToolExecutor`, `EvaluationPolicy`, `RuntimeContext` | [mcp.md](mcp.md#serverpy--mcp-protocol-handler) |
 
 ---
 
@@ -244,15 +245,15 @@ Multi-stage pipeline converting natural language to Python syntax:
 | Stage | Description | Example |
 |-------|-------------|---------|
 | Filler removal | Strip conversational noise | `"what's"` → removed |
-| Number words | Words → digits (40 base entries + ~12,700 derived multi-word forms) | `"twenty one"` → `"21"` |
-| Operator conversion | Words → symbols (15 operator keys) | `"plus"` → `+`, `"of"` → `*` |
-| Function mapping | NL names → canonical calls (128 mappings + 20 multi-word names) | `"square root"` → `sqrt` |
-| Constant recognition | Physical constant names | `"avogadro"` → `na` |
+| Number words | Words → digits (runtime `word_to_number` table; multi-word forms derived) | `"twenty one"` → `"21"` |
+| Operator conversion | Words → symbols (runtime `word_to_operator` table) | `"plus"` → `+`, `"of"` → `*` |
+| Function mapping | NL names → canonical calls (runtime `functions` table, 128 entries, plus multi-word names) | `"square root"` → `sqrt` |
+| Constant recognition | Physical constant names (runtime `word_to_constant` table) | `"avogadro"` → `na` |
 | Unit preprocessing | Insert implicit multiplication, canonicalize | `"30m"` → `30*m` |
 | XOR handling | `xor`/`bitxor` → `bitxor(...)` calls | `"5 xor 3"` → `bitxor(5, 3)` |
 | Validation | Token whitelist before eval; length/nesting caps | rejects anything unsafe |
 
-Hard limits: `MAX_INPUT_LENGTH = 10_000`, `MAX_NORMALIZED_LENGTH = 20_000`, `MAX_NESTING_DEPTH = 100`.
+Hard limits: `MAX_INPUT_LENGTH = 10_000`, `MAX_NORMALIZED_LENGTH = 20_000`, `MAX_NESTING_DEPTH = 100` (authoritative source: `evaluator.py`, re-exported by `normalize.py`).
 Use `trace_normalization()` (or `calc --explain`) for a deterministic,
 side-effect-free, stage-by-stage explanation of the same pipeline —
 observability only, never a behavior change.
@@ -277,9 +278,9 @@ Parses with Python's `ast` module — **never `eval()`** — and walks the tree 
 | Memory / variables | `M`, `M+`, `MR`, `MC`; `setvar`, `getvar`, `listvars` |
 | Constants (55) | `pi`, `e`, `tau`, `i`, `c`, `h`, `na`, `k`, `G`, `R`, … |
 
-DoS limits: `MAX_INPUT_LENGTH = 10_000`, `MAX_NESTING_DEPTH = 100`, `MAX_AST_NODES = 10_000`, `MAX_EXPONENT = 10_000`, `MAX_FACTORIAL = 1_000`, `MAX_SHIFT_COUNT = 50_000`, `MAX_RESULT_VALUE = 1e308`. Timeout evaluation runs in child processes bounded by a semaphore (4 concurrent spawns).
+DoS/correctness limits: `MAX_INPUT_LENGTH = 10_000`, `MAX_NESTING_DEPTH = 100`, `MAX_EXPONENT = 10_000`, `MAX_FACTORIAL = 1_000`, `MAX_SHIFT_COUNT = 50_000`, `MAX_RESULT_VALUE = 1e308`, `MAX_RESULT_DIGITS = 4300`, plus per-evaluator caps (`MAX_USER_VARIABLES = 1000`, `MAX_NAMED_REGISTERS = 1000`), a 64 MB soft cache cap, and at most 256 orphaned timeout processes. Timeout evaluation runs in child processes bounded by a semaphore (4 concurrent spawns).
 
-Every built-in function has a `UnitPolicy` (10 members: `DIMENSIONLESS`, `ANGLE_INPUT`, `ANGLE_OUTPUT`, `PRESERVE_SINGLE`, `COMPATIBLE_REDUCER`, `VARIANCE_SQUARED`, `SIGN_OUTPUT`, `ROOT`, `HYPOT`, `ATAN2`) enforced dimensionally in `visit_Call`. Replacing a canonical built-in drops it to dimensionless custom-callable rules.
+Every built-in function has a `UnitPolicy` (11 members: `DIMENSIONLESS`, `ANGLE_INPUT`, `ANGLE_OUTPUT`, `PRESERVE_SINGLE`, `COMPATIBLE_REDUCER`, `VARIANCE_SQUARED`, `SIGN_OUTPUT`, `ROOT`, `CUBE_ROOT`, `HYPOT`, `ATAN2`) enforced dimensionally in `visit_Call`. Replacing a canonical built-in drops it to dimensionless custom-callable rules.
 
 See [evaluator.md](evaluator.md) for the full function catalog, memory/variable systems, and callable identity contract.
 
@@ -289,7 +290,7 @@ Declarative registry: **150 `UnitSpec` entries**, ~508 alias strings, 17 categor
 
 - `Dimension` models 8 SI base axes plus a structural `angle` flag; guards reject impossible angle algebra (e.g. `rad + 1`).
 - Temperature uses affine conversion (`scale_to_base` / `offset_to_base`; Kelvin is base). Fahrenheit/Rankine use `scale=5/9`.
-- Compound expressions parse via `parse_unit_expression("m/s")` → validated `UnitExpression` (merged factors, exponent bound `MAX_ABS_UNIT_EXPONENT = 16`).
+- Compound expressions parse via `parse_unit_expression("m/s")` → validated `UnitExpression` (merged factors, exponent bound `MAX_ABS_UNIT_EXPONENT = 16`, compound depth/atom caps).
 - Power binds units: `5m ** 2` → `5 m**2`, `(5m)**2` → `25.0 m**2`. Division renders denominators parenthesized: `5m / 2s` → `2.5 m/s`.
 - Pairwise conversion factors (`UNIT_CONVERSIONS`) and `TEMPERATURE_CONVERSIONS` are computed lazily on first access, not at import.
 
@@ -334,7 +335,7 @@ primitives.py          ← foundation (no exact/ deps)
 
 ## MCP Server
 
-stdio JSON-RPC server exposing deterministic tools to AI agents. Dual-era: finalized `2026-07-28` stateless requests plus legacy `2024-11-05` / `2025-11-25` handshake sessions (see [mcp.md](mcp.md), Dual-Era Model).
+stdio JSON-RPC server exposing deterministic tools to AI agents. Dual-era: finalized `2026-07-28` stateless requests plus legacy `2024-11-05` / `2025-11-25` handshake sessions (see [mcp.md](mcp.md), Dual-Era Model). Version→era mapping lives in `_protocol.py` (`protocol_era()`); it is the sole authority — callers must not reimplement it with inline string comparisons.
 
 ### Tool Categories (83 tools, 21 categories)
 
@@ -350,9 +351,9 @@ stdio JSON-RPC server exposing deterministic tools to AI agents. Dual-era: final
 | validation | 4 | network / encoding / temporal | 2 each |
 | cargo / repo / toml | 1 each | | |
 
-Tools carry tier metadata (tier 0: 7, tier 1: 23, tier 2: 46, tier 3: 7) used for profile curation.
+Tools carry tier metadata (tier 0: 7, tier 1: 22, tier 2: 47, tier 3: 7) used for profile curation.
 
-### Profile System (11 profiles)
+### Profile System (12 profiles)
 
 Selected via `EGGCALC_MCP_PROFILE` at startup or per-request in `tools/list`:
 
@@ -365,6 +366,7 @@ Selected via `EGGCALC_MCP_PROFILE` at startup or per-request in `tools/list`:
 | `codegg_config` | 17 | Config file validation |
 | `codegg_patch` | 12 | Patch application workflows |
 | `codegg_preflight` | 10 | Pre-commit checks |
+| `agent_core` | 10 | Opt-in experimental agent surface |
 | `codegg_unicode_security` | 8 | Unicode safety auditing |
 | `codegg_core_min` | 6 | Minimal code subset |
 | `codegg_shell` | 5 | Shell command analysis |
@@ -456,16 +458,15 @@ mcp/server.py ──► schemas, tools, evaluator, capabilities
 | `UNIT_DEFINITIONS` | units.py | Tuple of 150 `UnitSpec` — authoritative unit registry source |
 | `UNIT_ALIASES` / `UNIT_CATEGORIES` | units.py | Alias → canonical (~508) and alias → category maps |
 | `UNIT_CONVERSIONS` / `TEMPERATURE_CONVERSIONS` | units.py | Lazily-populated pairwise factor / affine-rule dicts |
-| `NUMBER_WORDS` / `OPERATOR_CONVERSIONS` / `FUNCTION_MAPPINGS` / `CONSTANT_WORDS` | normalize.py | NL lookup tables (40 number entries, 15 operator keys, 128 function aliases, 20 constant word groups; `_MULTI_WORD_FUNCTIONS` adds 20 multi-word names) |
-| `NORMALIZE` / `PATTERNS` | normalize.py | Mutable config dicts rebuilt under a lock on config change |
+| `NORMALIZE` / `PATTERNS` | normalize.py | Mutable config dicts rebuilt under a lock on config change (`NORMALIZE` keys: `numbers`, `functions`, `word_to_number`, `word_to_operator`, `word_to_constant`, `word_to_all`, `symbols`, `convert`) |
 | `NormalizationTrace` / `NormalizationStep` | normalize.py | Plain-data TypedDicts returned by `trace_normalization()` (`--explain`) |
 | `Memory` | evaluator.py | Thread-safe memory registers (≤1,000 named registers) |
 | `Evaluator` | evaluator.py | `ast.NodeVisitor` implementation; class-level `CONSTANTS` (55) and `FUNCTIONS` (104); per-instance variables (≤1,000) |
-| `UnitPolicy` / `FunctionSpec` | evaluator.py | Dimensional contract enum (10 members) + frozen wrapper |
+| `UnitPolicy` / `FunctionSpec` | evaluator.py | Dimensional contract enum (11 members) + frozen wrapper |
 | `TimeoutError` (custom) | evaluator.py | Raised by `evaluate_with_timeout()` |
 | `EggCalcApp` | evaluator.py | Thread-safe app wrapper: instance-local evaluator + LRU cache |
 | `CommandSpec` / `COMMANDS` | cli.py | TypedDict metadata for the 9 text subcommands |
-| `TOOL_METADATA` / `TOOL_SCHEMAS` / `TOOL_PROFILES` | mcp/schemas.py | Catalog authority (handler/tier/tags) + protocol shape, 83 tools, 11 profiles; `TOOL_HANDLERS` derived |
+| `TOOL_METADATA` / `TOOL_SCHEMAS` / `TOOL_PROFILES` | mcp/schemas.py | Catalog authority (handler/tier/tags) + protocol shape, 83 tools, 12 profiles; `TOOL_HANDLERS` derived |
 | `McpServerConfig` / `ConfigSnapshot` / `ConfigManager` | mcp/server.py | Frozen config, deeply-immutable snapshots, atomic generation-numbered replacement |
 | `ToolRegistry` / `ToolExecutor` | mcp/server.py | Validated tool tables; bounded worker pool + reservation state machine |
 | `McpSession` / `McpSessionState` | mcp/server.py | Per-connection lifecycle (`UNINITIALIZED`→`READY`→`CLOSED`), cancellation records |
