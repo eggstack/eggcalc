@@ -2971,6 +2971,11 @@ class UnitValue:
                 raise OverflowError("Result too large")
 
     def __init__(self, value: Numeric, unit: str | None = None) -> None:
+        # Permissive construction is intentional: affine temperatures
+        # below absolute zero (e.g. UnitValue(-460, "F")) are stored
+        # as-is and only rejected on conversion (convert_to /
+        # convert_temperature), which raise below 0 K. Callers needing
+        # physical validity must convert or check the base value.
         # Normalize complex values with zero imaginary part to float
         # to maintain hash contract (complex(5,0) == 5.0 but different hashes)
         if isinstance(value, complex) and value.imag == 0:

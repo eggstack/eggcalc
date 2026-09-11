@@ -425,7 +425,10 @@ class TestSingleOperatorRegex:
         import eggcalc.normalize as normalize
 
         source = inspect.getsource(normalize)
-        assert len(re.findall(r'operator_split_re = re\.compile\(', source)) == 1
+        # Pattern is hoisted to module level (B7) with a local alias.
+        assert len(re.findall(r'_JOIN_OPERATOR_SPLIT_RE[^=]*=\s*re\.compile\(', source)) == 1
+        assert len(re.findall(r'operator_split_re = re\.compile\(', source)) == 0
+        assert "operator_split_re = _JOIN_OPERATOR_SPLIT_RE" in source
         assert "boundary_operator_re" not in source
 
     def test_boundary_tokenization_still_works(self):

@@ -177,7 +177,14 @@ class NormalizationFinding(TypedDict):
 
 
 class InspectTextResult(TypedDict):
-    """Complete text inspection result."""
+    """Complete text inspection result.
+
+    ``normalization_diff``/``normals_repr`` always describe canonical
+    NFC normalization (``text != NFC(text)``), independent of the
+    requested ``normalize`` form. Use ``normalized.changed`` for the
+    requested-form signal; the two can legitimately disagree (e.g.
+    ``"ﬁ"`` is NFC-stable but NFKC-folds to ``"FI"``).
+    """
 
     safe_repr: str
     metrics: MeasureTextResult
@@ -789,6 +796,8 @@ def inspect_text(
 
     Returns:
         Complete text inspection with safe representation.
+        ``normalization_diff``/``normals_repr`` always compare against
+        NFC; ``normalized.changed`` compares against ``normalize``.
     """
     if len(text) > MAX_TEXT_LENGTH:
         raise ValueError(f"Input length {len(text)} exceeds MAX_TEXT_LENGTH {MAX_TEXT_LENGTH}")

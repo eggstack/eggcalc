@@ -305,17 +305,30 @@ def _cargo_caret_range(version: ParsedVersion) -> tuple[ParsedVersion, ParsedVer
 def _cargo_tilde_range(version: ParsedVersion) -> tuple[ParsedVersion, ParsedVersion]:
     """Compute the tilde (~) range for a version.
 
+    Cargo rules: with major+minor (or full triple) specified only
+    patch-level changes are allowed; with only major specified minor-
+    and patch-level changes are allowed.
+
     Rules:
     - ~1.2.3 => >=1.2.3, <1.3.0
     - ~1.2 => >=1.2.0, <1.3.0
     - ~1 => >=1.0.0, <2.0.0
+    - ~0.2.3 => >=0.2.3, <0.3.0
+    - ~0.0.3 => >=0.0.3, <0.1.0 (patch-level widens minor for 0.0.x,
+      unlike caret ^0.0.3 => <0.0.4)
+    - ~0.0.0 => >=0.0.0, <0.1.0
+    - ~1.0.0 => >=1.0.0, <1.1.0 (explicit patch locks minor,
+      unlike bare ~1 => <2.0.0)
+
+    Precision is recovered from ``version["raw"]`` (set by
+    ``_parse_version_lax``) since ``~1`` and ``~1.0.0`` parse to the
+    same numeric triple.
     """
-    if version["minor"] == 0 and version["patch"] == 0 and version["pre_release"]:
-        upper = _make_version(version["major"], version["minor"] + 1)
-    elif version["minor"] == 0 and version["patch"] == 0:
+    raw = (version.get("raw") or "").strip()
+    core = re.split(r"[-+]", raw, maxsplit=1)[0]
+    parts = [p for p in core.split(".") if p != ""]
+    if len(parts) <= 1:
         upper = _make_version(version["major"] + 1)
-    elif version["patch"] == 0:
-        upper = _make_version(version["major"], version["minor"] + 1)
     else:
         upper = _make_version(version["major"], version["minor"] + 1)
     return version, upper

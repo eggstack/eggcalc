@@ -73,18 +73,27 @@ def create_executable(source_path: str, install_dir: str) -> str:
     return dest_path
 
 
-_SHELL_UNSAFE_CHARS = set('"$`\\!')
+_SHELL_UNSAFE_CHARS = set('"$`\\!#;&|\n')
 
 
 def _validate_shell_path(path: str) -> None:
-    """Raise ValueError if path contains characters unsafe for shell config interpolation."""
+    """Raise ValueError if path contains characters unsafe for shell config interpolation.
+
+    ``#`` starts a comment in ``export PATH="...#..."`` lines, newline
+    injects lines, and ``;``/``&``/``|`` chain commands.
+    """
     bad = _SHELL_UNSAFE_CHARS & set(path)
     if bad:
         raise ValueError(f"Path contains shell-unsafe characters: {''.join(sorted(bad))!r}")
 
 
 def add_to_path(install_dir: str) -> bool:
-    """Add install directory to PATH. Returns True if successful."""
+    """Add install directory to PATH.
+
+    Returns True when PATH was updated automatically; False when manual
+    steps are required (no shell config found, or Windows where the user
+    must run setx manually).
+    """
     _validate_shell_path(install_dir)
     if sys.platform == "win32":
         current_path = os.environ.get("PATH", "")

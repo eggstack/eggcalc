@@ -821,15 +821,18 @@ def _score_search_tool(
     name: str,
     meta: Mapping[str, Any],
     description: str,
+    normalized_query: str | None = None,
 ) -> tuple[int, list[str]]:
     """Score one catalog tool against a normalized query.
 
     Returns ``(score, matched_on)`` with integer weights and evidence
-    strings. Score 0 means no evidence matched.
+    strings. Score 0 means no evidence matched. ``normalized_query``
+    may be precomputed by the caller to avoid renormalizing per tool.
     """
     score = 0
     matched_on: list[str] = []
-    normalized_query = _normalize_search_text(query).strip()
+    if normalized_query is None:
+        normalized_query = _normalize_search_text(query).strip()
 
     name_tokens = name.casefold().replace("-", "_").split("_")
     name_token_set = set(name_tokens)
@@ -1258,7 +1261,8 @@ class ToolRegistry:
         tool name, so results are identical across runs and processes.
 
         The query is truncated to ``MAX_SEARCH_QUERY_LENGTH`` chars and
-        ``limit`` is clamped to ``MIN_SEARCH_LIMIT..MAX_SEARCH_LIMIT``.
+        ``limit`` must be ``MIN_SEARCH_LIMIT..MAX_SEARCH_LIMIT``
+        (out-of-range values raise ``ValueError``).
         Only tools visible under ``profile`` are ranked; search results
         never make a tool callable outside the configured profile —
         discovery and call authorization stay separate. Tools scoring
@@ -1280,6 +1284,7 @@ class ToolRegistry:
         if not query_tokens:
             return []
         query_token_set = set(query_tokens)
+        normalized_query = _normalize_search_text(truncated).strip()
 
         scored: list[tuple[int, str, ToolMatch]] = []
         for name in candidates:
@@ -1291,7 +1296,13 @@ class ToolRegistry:
                 if isinstance(raw_desc, str):
                     description = raw_desc
             score, matched_on = _score_search_tool(
-                truncated, query_tokens, query_token_set, name, meta, description
+                truncated,
+                query_tokens,
+                query_token_set,
+                name,
+                meta,
+                description,
+                normalized_query,
             )
             if score <= 0:
                 continue
@@ -2291,6 +2302,8 @@ class McpSession:
         """
         method = request.get("method", "")
         request_id = request.get("id")
+        if not isinstance(method, str):
+            return _invalid_request_error(request_id, "'method' must be a string")
 
         # Production protocol dispatch is owner-routed.  Ping and the local
         # lifecycle notification are the only owner-independent methods.
@@ -2340,6 +2353,8 @@ class McpSession:
     ) -> dict[str, Any] | None:
         """Route a validated message to its handler (no lifecycle logic)."""
         request_id = request.get("id")
+        if not isinstance(method, str):
+            return _invalid_request_error(request_id, "'method' must be a string")
         # Production protocol dispatch is owner-routed.  Ping and the local
         # lifecycle notification are the only owner-independent methods.
         if server is None and method not in {"ping", "notifications/initialized"}:

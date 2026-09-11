@@ -165,17 +165,32 @@ def close_semaphore(sem: Any | None) -> None:
 
     Prevents 'leaked semaphore objects' warnings where the
     resource_tracker flags unclosed multiprocessing semaphores.
-    Idempotent and safe to call on a healthy semaphore.
+    Idempotent and safe to call on a healthy semaphore. Best-effort:
+    on interpreters where the primitive exposes no ``close()``
+    (e.g. CPython 3.14 ``_SemLock``) this is a documented no-op.
     """
     if sem is None:
         return
-    inner = getattr(sem, "_semaphore", None)
-    if inner is None:
-        return
-    try:
-        inner.close()
-    except Exception:
-        pass
+    for attr in ("_semaphore", "_semlock"):
+        try:
+            inner = getattr(sem, attr, None)
+        except Exception:
+            inner = None
+        if inner is None:
+            continue
+        close = getattr(inner, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                pass
+            return
+    close = getattr(sem, "close", None)
+    if callable(close):
+        try:
+            close()
+        except Exception:
+            pass
 
 
 def get_process_context(prefer: str = "spawn") -> Any:

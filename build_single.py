@@ -825,13 +825,16 @@ def build_single_file(output_path: str | None = None) -> str:
 def _main():
     import argparse
     import sys
-    parser = argparse.ArgumentParser(description="eggcalc - Natural language calculator + MCP server")
+    # Mirror eggcalc/cli.py: add_help=False with a manual -h/--help flag
+    # so --help text and flag handling stay in parity (cli.main owns help).
+    parser = argparse.ArgumentParser(description="eggcalc - Natural language calculator + MCP server", add_help=False)
     parser.add_argument("--mcp", action="store_true", help="Run as MCP server")
     parser.add_argument("expression", nargs="*", help="Math expression to evaluate")
     parser.add_argument("-e", "--expression", dest="single_expr", metavar="<expr>", help="Evaluate a single expression (useful for piping)")
     parser.add_argument("-q", "--quiet", action="store_true", help="Suppress expression in output")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--usage", action="store_true", help="Show full usage information and examples")
+    parser.add_argument("-h", "--help", dest="help", action="store_true", help="Show help and available operators")
     parser.add_argument("-v", "--version", action="store_true", help="Show version information")
     parser.add_argument("-i", "--interactive", action="store_true", help="Start interactive REPL mode")
     parser.add_argument("-s", "--show", action="store_true", help="Show expression in output (default for interactive)")
@@ -847,6 +850,14 @@ def _main():
         caps = detect_capabilities()
         print(caps.to_json(indent=2))
         return 0
+
+    # Match cli.main rejections instead of silently dropping flags.
+    if args.commands and (args.expression or args.single_expr):
+        print("Error: --commands cannot be combined with an expression", file=sys.stderr)
+        return 2
+    if args.version and (args.expression or args.single_expr):
+        print("Error: --version cannot be combined with an expression", file=sys.stderr)
+        return 2
 
     if args.commands and not (args.expression or args.single_expr):
         sys.argv = ["eggcalc", "--commands"]
@@ -890,6 +901,8 @@ def _main():
     else:
         # No expression given - forward recognized flags to normalize_main
         sys.argv = ["eggcalc"]
+        if args.help:
+            sys.argv.append("-h")
         if args.version:
             sys.argv.append("-v")
         if args.interactive:

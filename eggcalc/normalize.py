@@ -77,6 +77,60 @@ _POSTFIX_FACTORIAL_RE: re.Pattern[str] = re.compile(
     r"(\d+(?:\.\d+)?|\((?:[^()]*|\([^()]*\))*\)|[a-zA-Z_]\w*\((?:[^()]*|\([^()]*\))*\))(\!+)"
 )
 
+# Hoisted from _join_number_parts (B7): spaced scientific-notation tokens
+# ("5 e3"), plain numbers, shared operator tokenizer, and signed numbers.
+_JOIN_EXPONENT_TOKEN_RE: re.Pattern[str] = re.compile(r"[eE][+-]?\d+")
+_JOIN_PLAIN_NUMBER_RE: re.Pattern[str] = re.compile(r"[+-]?(?:\d+(?:\.\d+)?|\.\d+)")
+_JOIN_OPERATOR_SPLIT_RE: re.Pattern[str] = re.compile(
+    r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^,])"
+)
+_JOIN_SIGNED_NUMBER_RE: re.Pattern[str] = re.compile(
+    r"[+-](?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
+)
+
+# Cache for compact single-arg function patterns (B8): inputs are static
+# after config build, so avoid rebuilding the alternation on every call.
+_COMPACT_ARG_CACHE: dict[tuple[str, ...], tuple[re.Pattern[str] | None, frozenset[str]]] = {}
+
+
+def _get_compact_arg_pattern(
+    functions: Any,
+) -> tuple[re.Pattern[str] | None, frozenset[str]]:
+    """Return cached (pattern, digit_ending_names) for a function set."""
+    try:
+        key = tuple(sorted(functions))
+    except Exception:
+        return None, frozenset()
+    cached = _COMPACT_ARG_CACHE.get(key)
+    if cached is not None:
+        return cached
+    try:
+        digit_ending = frozenset(
+            name.lower() for name in functions if name[-1:].isdigit()
+        )
+        compact_names = [
+            name
+            for name in functions
+            if name in _SINGLE_ARG_IMPLICIT_MUL and not name[-1:].isdigit()
+        ]
+    except Exception:
+        cached_value: tuple[re.Pattern[str] | None, frozenset[str]] = (None, frozenset())
+        _COMPACT_ARG_CACHE[key] = cached_value
+        return cached_value
+    pattern: re.Pattern[str] | None = None
+    if compact_names:
+        pattern = re.compile(
+            r"(?<![A-Za-z_])("
+            + "|".join(
+                re.escape(name) for name in sorted(compact_names, key=len, reverse=True)
+            )
+            + r")([+-]?\d+(?:\.\d+)?)(?![A-Za-z_])",
+            flags=re.IGNORECASE,
+        )
+    cached_value = (pattern, digit_ending)
+    _COMPACT_ARG_CACHE[key] = cached_value
+    return cached_value
+
 
 def _is_best_case_variant(input_text: str, unit: str) -> bool:
     """Return True when *unit* is the registry spelling that best matches the
@@ -2352,23 +2406,11 @@ def normalize_text(
     # comments, e.g. "sin30" -> "sin 30" and "2sqrt9" -> "2sqrt 9".
     # Guard names that already end in digits so "log10" and "log2" remain
     # function identifiers instead of being split as "log 10" / "log 2".
-    digit_ending_functions = {
-        name.lower() for name in operators["functions"] if name[-1:].isdigit()
-    }
-    compact_arg_functions = [
-        name
-        for name in operators["functions"]
-        if name in _SINGLE_ARG_IMPLICIT_MUL and not name[-1:].isdigit()
-    ]
-    if compact_arg_functions:
-        compact_arg_pattern = re.compile(
-            r"(?<![A-Za-z_])("
-            + "|".join(
-                re.escape(name) for name in sorted(compact_arg_functions, key=len, reverse=True)
-            )
-            + r")([+-]?\d+(?:\.\d+)?)(?![A-Za-z_])",
-            flags=re.IGNORECASE,
-        )
+    # Pattern is cached by function set (B8) since inputs are static.
+    compact_arg_pattern, digit_ending_functions = _get_compact_arg_pattern(
+        operators["functions"]
+    )
+    if compact_arg_pattern is not None:
 
         def _split_compact_function_arg(m: re.Match[str]) -> str:
             compact = (m.group(1) + m.group(2)).lower()
@@ -2968,8 +3010,9 @@ def _join_number_parts(expression: str, function_names: set[str] | None = None) 
 
     # Spaced scientific-notation tokens ("5 e3") and plain numbers used to
     # validate the merge (no existing exponent, no trailing dot).
-    _EXPONENT_TOKEN_RE = re.compile(r"[eE][+-]?\d+")
-    _PLAIN_NUMBER_RE = re.compile(r"[+-]?(?:\d+(?:\.\d+)?|\.\d+)")
+    # Regexes are module-level (_JOIN_*) to avoid per-call re.compile churn.
+    _EXPONENT_TOKEN_RE = _JOIN_EXPONENT_TOKEN_RE
+    _PLAIN_NUMBER_RE = _JOIN_PLAIN_NUMBER_RE
 
     # When users space only one side of an operator ("20 *20", "20/ 20"),
     # shell-style whitespace splitting leaves tokens like "*20" or "20/".
@@ -2980,7 +3023,7 @@ def _join_number_parts(expression: str, function_names: set[str] | None = None) 
     function_names = set(FUNCTION_MAPPINGS) if function_names is None else function_names
     # Shared operator tokenizer for both boundary splitting and internal
     # splitting of operator-only tokens.
-    operator_split_re = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^,])")
+    operator_split_re = _JOIN_OPERATOR_SPLIT_RE
 
     def _split_boundary_operators(token: str) -> list[str]:
         """Split operators attached at token edges without tokenizing internals.
@@ -2995,9 +3038,7 @@ def _join_number_parts(expression: str, function_names: set[str] | None = None) 
             # Keep a leading sign attached to a numeric argument (e.g., the
             # ``-1`` in ``log -1``) so it can be collected by the function
             # argument handling below.
-            if rest[:1] in ("+", "-") and re.fullmatch(
-                r"[+-](?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", rest
-            ):
+            if rest[:1] in ("+", "-") and _JOIN_SIGNED_NUMBER_RE.fullmatch(rest):
                 break
             match = operator_split_re.match(rest)
             if match and match.end() < len(rest):
@@ -3039,7 +3080,7 @@ def _join_number_parts(expression: str, function_names: set[str] | None = None) 
 
     for token in tokens:
         if not re.search(r"[A-Za-z_()]", token) and operator_split_re.search(token):
-            if re.fullmatch(r"[+-](?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", token) and (
+            if _JOIN_SIGNED_NUMBER_RE.fullmatch(token) and (
                 not expanded_tokens or expanded_tokens[-1] in function_names
             ):
                 expanded_tokens.append(token)
