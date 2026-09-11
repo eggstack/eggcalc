@@ -1,270 +1,70 @@
 # AGENTS.md
 
-## What This Is
+`eggcalc` — natural-language math calculator (CLI, library, MCP server). Stdlib only, no runtime deps. `build_single.py` assembles everything into one portable `eggcalc.py`.
 
-`eggcalc` — a natural language math calculator (CLI, library, MCP server). Standard library only, no external deps. Assembled by `build_single.py` into a single portable Python file. Also see `AGENTS.override.md` for session-specific overrides (takes precedence over this file) and `.skills/*.md` for per-domain agent guides (testing, implementation, MCP server, build & release, architecture review, documentation maintenance).
+Start with `architecture/overview.md` (data flow, module map, Deep Dive Index for all 41 docs). Per-domain guides live in `.skills/*.md` (testing, implementation, mcp_server, build_release, architecture_review, documentation_maintenance). `AGENTS.override.md` takes precedence over this file when present.
 
-## Critical: Two Evaluation Paths
+## Two evaluation paths (the #1 mistake)
 
-This is the #1 source of mistakes. The codebase has two distinct entry points:
-
-| Function | Handles | Input format |
-|----------|---------|-------------|
-| `evaluate(expr)` | Direct AST evaluation | Already-normalized Python-AST-compatible math expression (`"5+3"`, `"5 + 3"`, `"2**10"`) |
-| `evaluate_raw(expr)` | NL + units + math | User-facing expressions (`"five plus three"`, `"30m + 100ft"`) |
-| `run(expr, NORMALIZE, PATTERNS)` | CLI-compatible normalization path | Lower-level helper for NL/unit normalization and evaluation |
-
-`run()` normalizes NL/units first, then calls `evaluate()` internally. It is a CLI helper: it **prints** the result (or error) to stdout/stderr and returns `(result, exit_code)` — result is `None` on failure. `evaluate()` parses directly via Python AST — it **rejects** natural language and unit suffixes.
+| Function | Handles | Notes |
+|----------|---------|-------|
+| `evaluate(expr)` | Already-normalized Python math only (`"5+3"`, `"2**10"`) | Rejects NL and unit suffixes; spaces tolerated |
+| `evaluate_raw(expr)` / `evaluate_cached()` / `evaluate_async()` | Full pipeline: NL + units + math (`"five plus three"`, `"30m + 100ft"`) | Use for anything user-facing |
+| `run(expr, NORMALIZE, PATTERNS)` | CLI helper: normalizes, then calls `evaluate()` internally | **Prints** to stdout/stderr; returns `(result, exit_code)`, `None` on failure |
 
 ```python
-run("five plus three", NORMALIZE, PATTERNS)  # → (8, 0); also prints "8" to stdout
-run("30m + 100ft", NORMALIZE, PATTERNS)      # → (60.48 m, 0); prints too
-evaluate("5+3")                              # → 8
-evaluate("5 + 3")                            # → 8 (spaces are tolerated)
-evaluate("five plus three")                  # → raises EvaluationError (invalid syntax)
+evaluate("5+3")                 # 8
+evaluate("five plus three")     # EvaluationError — wrong API, use evaluate_raw/run/CLI
+run("five plus three", NORMALIZE, PATTERNS)  # (8, 0), also prints "8"
 ```
 
-The public API wraps these differently:
-- `evaluate_raw()` / `evaluate_cached()` / `evaluate_async()` → full pipeline (NL/units → normalize → evaluate)
-- `evaluate()` → direct AST evaluation (accepts valid Python math syntax with or without spaces, but rejects natural language and unit suffixes)
+**Caret differs by path:** `evaluate("5 ^ 3")` → `6` (bitwise XOR, Python AST). `evaluate_raw("5 ^ 3")` → `125` (rewritten to `**`). Use `xor`/`bitxor` word forms for XOR through the full pipeline. **Tests:** `evaluate()` for AST behavior, `evaluate_raw()`/`run()`/CLI subprocess for NL and units.
 
-Note: `main()` and `print_help()` are lazy re-exports via PEP 562 from `cli.py` — they are not imported at `import eggcalc` time. `import eggcalc.cli` now loads zero `eggcalc.exact.*` implementation modules.
-
-### Caret (`^`) semantics
-
-The two paths interpret `^` differently:
-
-| Path | `^` means | `xor` / `bitxor` |
-|------|-----------|-------------------|
-| `evaluate()` | Bitwise XOR (Python AST) | N/A (use `^` directly) |
-| `evaluate_raw()` / CLI | Rewritten to `**` (exponentiation) via `_rewrite_calculator_caret()` | Use `xor`/`bitxor` for bitwise XOR |
-
-```python
-evaluate("5 ^ 3")                    # → 6 (bitwise XOR)
-evaluate_raw("5 ^ 3")                # → 125 (exponentiation, rewritten to 5**3)
-evaluate_raw("5 xor 3")              # → 6 (bitwise XOR)
-```
-
-### Floor division and modulo with units
-
-Same-unit modulo returns a dimensioned remainder in the divisor unit; incompatible dimensions are rejected:
-
-```python
-evaluate_raw("5m % 2m")   # → 1 m (remainder in divisor unit)
-evaluate_raw("7m // 2m")  # → 3 (dimensionless quotient)
-evaluate_raw("5m % 2s")   # → EvaluationError (incompatible dimensions)
-```
-
-**When writing tests:** use `evaluate()` for direct AST evaluator behavior (e.g. `"5+3"`, `"2**10"`). Use `evaluate_raw()`, CLI subprocesses, or `run()` for natural-language and unit parsing behavior.
-
-### Normalization observability (no behavior change)
-
-- `trace_normalization(expr)` in `normalize.py` (also top-level `eggcalc.trace_normalization`) explains normalization via the same implementation (`normalize_expression` with a private `_trace` collector). Returns `NormalizationTrace`: `input`, `steps`, `normalized` (`None` on failure), `exit_code`, `errored`, `error`.
-- Steps use stable stage names (`sanitize`, `function_phrases`, `number_words`, `unit_phrases`, `operator_words`, `unit_conversions`, `symbols`, `tokenize`, `token_numbers`, `combine_numbers`, `functions`, `unit_conversion`, `units`, `floor_mod_grouping`, `validation`); stages with no change are omitted.
-- Trace never evaluates: `trace["normalized"]` parity with `normalize_expression()` is the test contract (`tests/test_normalization_trace.py`).
-- CLI: `calc --explain "<expr>"` prints the trace + final form without evaluating (`--json` supported); `calc --commands` lists the 9 curated CLI text commands (distinct from the 83 MCP tools). Both are forwarded by the single-file build.
-
-### Unit-aware function contracts
-
-Every built-in function has a `UnitPolicy` (defined in `evaluator.py`, enforced in `visit_Call`). Key policies: `DIMENSIONLESS` (log, exp, gcd, factorial), `ANGLE_INPUT` (sin, cos, tan — accepts angle UnitValue with degree conversion), `ANGLE_OUTPUT` (asin, acos, atan), `PRESERVE_SINGLE` (abs, round, floor, ceil), `COMPATIBLE_REDUCER` (mean, min, max, sum), `ROOT` (sqrt), `HYPOT/ATAN2`. User-registered functions default to DIMENSIONLESS. See `architecture/evaluator.md` for full policy list.
-
-#### Callable identity authority
-
-Each evaluator snapshots canonical built-in callables in `_builtin_function_baseline`. `visit_Call` compares the active callable by identity — a canonical callable gets its built-in unit policy; any added or replaced callable defaults to dimensionless-only. Canonical `round()` accepts one or two positional args, or `ndigits=` keyword; omitted precision returns `int`, explicit precision returns `float`.
-
-#### Angle algebra bounds
-
-`Dimension.angle: bool` is a structural flag — cannot represent angle exponents other than 0 or 1. Guards reject: angle raised to exponent ≠ 0 or 1, multiplying two angle dimensions, dividing a non-angle by an angle. See `architecture/units.md` for supported patterns.
-
-### Angle conversion
-
-Trig functions convert angle `UnitValue` to radians before calling `math`:
-```python
-evaluate_raw("sin(90*deg)")  # → 1.0 (converted to π/2 radians)
-evaluate_raw("sin(1*m)")     # → EvaluationError (non-angle dimension)
-```
+**Traces never evaluate:** `trace_normalization(expr)` (also `calc --explain "<expr>"`, `--json` supported) explains the same pipeline; `calc --commands` lists the 9 CLI text commands (distinct from the 83 MCP tools).
 
 ## Commands
 
 ```bash
-# Testing (use venv python — system python won't have pytest)
-.venv/bin/python -m pytest tests/ -v
-
-# Single test file
-.venv/bin/python -m pytest tests/test_clicalc.py -v
-
-# Lint
+.venv/bin/python -m pytest tests/ -v                          # system python lacks pytest — always use venv
+.venv/bin/python -m pytest tests/test_clicalc.py -v            # single file
+.venv/bin/python -m pytest tests/test_clicalc.py::test_name -v # single test
 ruff check eggcalc tests
-
-# Format
-black eggcalc tests
-
-# Type check
+black eggcalc tests                                            # check with black --check
 mypy eggcalc --ignore-missing-imports
-mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py  # external consumer API surface
-
-# All checks at once (includes generated-doc drift check)
-make check
-
-# Build single-file distribution (validates manifest first)
+mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
+make check          # canonical gate, in order: lint → format-check → typecheck (+ strict consumer) → docs-check → build_single --validate → pytest
+make package-check  # twine check + wheel/single-file smoke (CI runs check then package-check)
 python3 build_single.py --validate && python3 build_single.py
-
-# Install to ~/.local/bin/calc
-python install.py --install
-
-# Install pre-commit hooks (black, ruff, trailing-whitespace, etc.)
-make hooks
-
-# Install with dev dependencies (for new contributors)
-make dev
 ```
 
-CI runs `make check` (lint, format-check, typecheck, docs-check, build validation, full pytest suite) followed by `make package-check` (twine check, installed-wheel smoke, single-file smoke). See [docs/releasing.md](docs/releasing.md) for the manual PyPI release procedure.
+## Layout and boundaries
 
-## Constraints
+- Core (only code loaded by `import eggcalc`): `_process.py` (subprocess mechanics only), `units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`. `__main__.py` is a thin entry point, not in the build manifest. `_version.py` is the single version source.
+- `exact/` — deterministic text/unicode utilities (leaf modules: `network.py`, `encoding.py`, `temporal.py` are stdlib-only, no exact/ deps). `mcp/` — server, schemas, tools. Runtime code must live in core, `exact/`, or `mcp/` or the single-file build breaks.
+- `import eggcalc` is side-effect-free: `main`/`print_help` are lazy PEP 562 re-exports; `import eggcalc.cli` loads zero `exact.*` modules (handlers load via `importlib` on dispatch); `tools.py` imports `exact` lazily inside handlers. `exact/__init__.py` is fully lazy with `__all__ = list(_LAZY_IMPORTS)`.
+- `architecture/authority_inventory.md` is the registry/constant authority index; `architecture/mutable_state_inventory.md` tracks process-globals. `plans/*.md` and `docs/release_*_evidence.md` are archived records, not policy.
 
-- **Standard library only** — no pip packages in `eggcalc/`. Core modules (`_process.py`, `units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) use: `argparse`, `ast`, `cmath`, `collections`, `contextvars`, `dataclasses`, `enum`, `functools`, `json`, `logging`, `math`, `multiprocessing`, `os`, `queue`, `random`, `re`, `sys`, `threading`, `traceback`, `types`, `typing`. `exact/` and `mcp/` packages may use additional stdlib modules (e.g. `tomllib`, `importlib`, `unicodedata`, `hashlib`, `shlex`, `signal`, `asyncio`, `zlib`, `base64`, `ipaddress`, `datetime`).
-- **`build_single.py` compatibility** — all runtime code must live in one of the seven core modules (`_process.py`, `units.py`, `evaluator.py`, `_protocol.py`, `normalize.py`, `capabilities.py`, `cli.py`) or the `exact/` and `mcp/` packages. The build script concatenates them into one file. `__main__.py` is a thin entry point (not in the manifest). Adding imports outside the allowed set will break the build.
-- **TypedDict over NamedTuple** — the codebase uses `TypedDict` for structured return types. TypedDict classes do NOT support `__slots__`.
-- **CLI output is result-only** — no echo of input, no arrows, no extra characters. Applies to both single-expression and REPL modes.
-- **Python requirement** — `>=3.11` per `pyproject.toml`. Required CI uses Ubuntu 3.11 (`make check` + `make package-check`). Recurring compatibility workflow covers Windows 3.11, macOS 3.11, and Ubuntu 3.14 (path-filtered on push/PR plus weekly schedule and manual dispatch): full test suite, single-file build + smoke, platform-sensitive calculator/MCP/timeout/subprocess probes, and package-surface validation on Windows.
-- **`McpServerConfig` clamps `max_output_bytes` to min 1** — was previously 1000.
+## Constraints that break the build or CI
 
-## Verification and Release Policy
+- **Stdlib only in `eggcalc/`**; keep `eggcalc` imports inside top-level multi-line parenthesized blocks (single-line `from eggcalc...` survives into the single file and fails `test_generated_file_no_eggcalc_import`); never put `(`/`)` in comments inside such blocks. `normalize_main` exists only in the built file (renamed by `build_single.py`) — never reference it in source/tests.
+- **CLI output is result-only** — no echo, arrows, or decoration (REPL included).
+- **Python `>=3.11`.** `make docs-check` (`scripts/generate_mcp_docs.py --check`) fails on stale generated docs; `docs/tool_inventory.md` is generated, never hand-edit. Releases are manual via Twine; GitHub Actions never publishes.
+- **Config loading must stay lazy:** `import eggcalc` never executes cwd-local `eggcalc_config.py`. CLI loads it via `maybe_load_cli_config()` only for expression/REPL modes (never for `--help`/`--version`/`--capabilities`/`--mcp`/text commands — keep the call after mode classification). Library loads only with `EGGCALC_LOAD_CONFIG=1` or explicit `load_user_config()`.
 
-- `make check` is canonical correctness verification (lint, format-check, typecheck, docs-check, build validation, full test suite).
-- `make package-check` validates distributable surfaces (twine check, installed-wheel smoke, single-file smoke).
-- `make release-check` combines correctness and package validation.
-- Publication is manual through Twine/PyPI (`make publish`).
-- GitHub Actions never publishes, creates releases, or modifies repository contents.
-- Historical release evidence files under `docs/release_*_evidence.md` are archived records, not active policy. They do not participate in routine verification.
+## Unit and function gotchas
 
-## Module Map
+- `r`/`R` is the gas constant, **not** Rankine (`Ra`/`rankine`/`°R`). `5m ** 2` → `5 m**2`; `(5m)**2` → `25.0 m**2`. Same-dimension `%` returns a remainder in the divisor unit; `//` returns a dimensionless quotient; mismatched dimensions raise (`5m % 2s` fails).
+- `Dimension(angle=True)` is structural, not dimensionless: `rad + 1`, angle², and angle×angle are rejected. Trig takes angle `UnitValue` (degrees converted to radians); `sin(1*m)` fails.
+- Built-in `UnitPolicy` (in `evaluator.py`, enforced in `visit_Call`) applies only while the canonical callable is active — a replaced/added function defaults to dimensionless-only. Canonical `round()` takes `round(n)` / `round(n, ndigits)` / `ndigits=`; omitted precision returns `int`.
 
-| Module | Role |
-|--------|------|
-| `eggcalc/_version.py` | Single source of truth for `__version__` (imported by `__init__.py`, read by `pyproject.toml` and `build_single.py`) |
-| `eggcalc/_process.py` | Shared subprocess lifecycle primitives (`SpawnPermit`, queue/child cleanup, context selection). Mechanism only — spawn limits, timeouts, orphan caps, and error contracts stay with `evaluator.py` / `mcp/tools.py` |
-| `eggcalc/normalize.py` | NL tokenization, expression normalization (no CLI dispatch) |
-| `eggcalc/evaluator.py` | AST parsing, math evaluation, `evaluate()`, `EggCalcApp` |
-| `eggcalc/units.py` | Unit definitions, conversions, `UnitValue` class, `UnitSpec`, `UnitExpression` |
-| `eggcalc/cli.py` | CLI dispatch: argparse, REPL, text commands, help, main entry point. Text commands use lazy `importlib` loading of exact modules. |
-| `eggcalc/__main__.py` | Module entry, delegates to `cli.main()` |
-| `eggcalc/exact/` | Text analysis and deterministic utilities: Unicode, confusables, diffs, validation, shell parsing, IP/CIDR inspection (`network.py`), codec/radix conversion (`encoding.py`), fixed-offset datetime/cron inspection (`temporal.py`) |
-| `eggcalc/mcp/` | MCP server: schemas, tools, server, McpServer, McpServerConfig, ToolRegistry, ToolExecutor, EvaluationPolicy, ConfigCandidate, RuntimeContext |
-| `build_single.py` | Assembles everything into `eggcalc.py`. Uses `MODULE_MANIFEST` (tuple of `ModuleSpec` dataclasses) as the single source of truth for module ordering, dependencies, and validation. `MODULES_CALC`, `MODULES_EXACT`, `MODULES_MCP` are derived views. `validate_build_manifest()` checks for duplicates, missing files, unknown deps, cycles, and reachability. |
+## exact/ gotchas
 
-## Unit Conventions
+- `confusables.py` is generated (~6.5k entries, compressed payload, lazy decode) — edit `scripts/generate_confusables.py`, never the data file.
+- Results are plain-dict TypedDicts: use `result["equal"]`, never `result.equal`. Exception: `codepoints()` items are `CodepointInfo` named tuples (`cp.idx`). `CodecConvertResult` uses functional syntax (`from` key; params are `from_format`/`to_format`).
+- Single authorities: `json_extract()` in `validate.py` owns RFC 6901 traversal (`json_query` is a deprecated compat adapter, tier 2 / `full`-only); `exact/version.py` owns SemVer (`parse_version`/`compare_versions`). Field vocab and finding codes (`code`/`severity`/`message`/`line`/`column`) follow `architecture/authority_inventory.md` — verify against code, never invent names.
 
-- Prefixed units (`kN`, `mV`, `mA`) map to themselves in `UNIT_ALIASES`. Word forms (`kilonewton`) alias to the prefixed symbol.
-- Temperature conversions use offset math (not multiplicative factors). Fahrenheit and Rankine use `scale_to_base=5/9` with correct unit-to-base offsets (F: 255.3722222222222, Ra: 0.0). Kelvin is the base unit (scale=1, offset=0). Celsius uses scale=1, offset=273.15.
-- Gas constant is `r`/`R` (8.314...). Rankine is `Ra`/`rankine`/`°R`. The `r`/`R` identifiers are **not** Rankine.
-- `5m ** 2` → `5 m**2` (power binds the unit; `(5m)**2` → `25.0 m**2`). `5m / 2s` → `2.5 m/s` (denominator is wrapped in parens by the preprocessor).
-- British spellings (`metre`/`metres`, `litre`/`litres`) are included in aliases.
-- `UnitSpec` is a frozen dataclass for declarative unit specifications (canonical name, aliases, dimension, scale/offset factors, category). `UNIT_DEFINITIONS` is a tuple of 150+ `UnitSpec` entries.
-- `UnitExpression` is a frozen dataclass for structural compound units (factors as `(unit, exponent)` tuples, dimension, scale). `parse_unit_expression()` parses `"m/s"` → `UnitExpression` with bounded parsing. Duplicate factors are merged and the normalized exponent is validated against `MAX_ABS_UNIT_EXPONENT` (16) after merging.
+## MCP gotchas (details in `architecture/mcp.md`)
 
-## exact/ Module Notes
-
-- `confusables.py` is **auto-generated** (~40KB) with a zlib-compressed base85 payload and lazy `_LazyConfusables` mapping (6565 entries). Data is decoded on first access, not at import time. Don't add code to it. Edit `scripts/generate_confusables.py` instead.
-- `validate.py` enforces `MAX_INPUT_length = 100_000` on `check_brackets()` and `validate_json()`.
-- `visible_repr()` check order is correct: variation selector (U+FE00-FE0F) **before** combining mark check.
-- `utf8_bytes()` returns `bytes`, not an int count.
-- `manifests.py` functions (`pyproject_inspect`, `requirements_inspect`, etc.) are NOT re-exported from `__init__.py`. Import directly.
-- `cargo.py` `cargo_toml_inspect()` IS re-exported from `__init__.py`.
-- `__all__` is derived from `_LAZY_IMPORTS` (`__all__ = list(_LAZY_IMPORTS)`): do not maintain a parallel manual export list. Build validation (`validate_build_manifest()` check 13) fails if a lazy-referenced exact submodule is missing from the manifest.
-- Both modules use the shared `_Finding` TypedDict from `manifests.py` for structured findings.
-- Inspection is lexical/structural, not dependency resolution. Package-manager signals are heuristic.
-- **RFC 6901 authority:** `json_extract()` in `validate.py` owns JSON Pointer traversal. `json_query()` is a thin compatibility adapter (delegates via `_json_extract_to_query_result`, preserves legacy `JsonQueryResult` shape with integers as `"number"`). Do not add a second traversal implementation.
-- **SemVer authority:** `exact/version.py` owns SemVer parsing (`parse_version`) and precedence (`compare_versions`). `validate.py::version_compare(scheme="semver")` delegates there; `loose` comparison stays in `validate.py` by design. See `architecture/authority_inventory.md`.
-
-## TypedDict Field Conventions
-
-When adding or modifying TypedDict classes in the `exact/` package, use these field names:
-
-- `ConfusableInfo`: `confusable_with`, `confusable_name` (not `confusable_for`/`confusable_codepoint`)
-- `ScriptInfo`: `index`, `char`, `script`, `codepoint` (not `count`, `start`, `end`)
-- `detect_mixed_scripts` returns `MixedScriptsResult` with keys `mixed_scripts`, `scripts`, `positions`
-- `CommonPrefixSuffix`: `common_prefix_len`, `common_suffix_len` (not `prefix`, `suffix`)
-- `InspectionFinding` (used in `_Finding`): `code`, `severity`, `message`, `line`, `column`
-  - Severity vocabulary: `error`, `warning`, `info`
-  - Finding codes use stable identifiers: `TOML_PARSE_ERROR`, `INPUT_TOO_LONG`, `CARGO_MISSING_PACKAGE_NAME`, etc.
-- `IpInspectResult`: `address`, `family`, `bytes_hex`, `numeric`, `special_use`, `ipv4_mapped` (family is `"ipv4"`/`"ipv6"`; `ipv4_mapped` is `Ipv4MappedInfo` or `None`)
-- `Ipv4MappedInfo`: `address`, `numeric` (decimal magnitude as text)
-- `CidrInspectResult`: `family`, `cidr`, `prefix_length`, `host_bits`, `network_address`, `netmask`, `first_address`, `last_address`, `broadcast_address` (`None` for IPv6), `address_count` (decimal text), `contains`/`contains_address` (`None` when no candidate)
-- `CodecConvertResult`: `value`, `from`, `to`, `byte_length` (functional-syntax TypedDict — `from` is a keyword; params are `from_format`/`to_format`; byte length is decoded payload size)
-- `RadixConvertResult`: `value`, `from_base`, `to_base`, `uppercase`, `negative`, `magnitude_decimal` (magnitude capped at `2**128 - 1`)
-- `DatetimeConvertResult`: `rfc3339`, `utc_rfc3339`, `unix_seconds`, `unix_milliseconds`, `unix_nanoseconds`, `offset_seconds`, `selected_offset`, `components` (components: `year`, `month`, `day`, `hour`, `minute`, `second`, `nanosecond`, `weekday` `SUN`..`SAT`; seconds/millis are floor-derived strings)
-- `DatetimeComponents`: `year`, `month`, `day`, `hour`, `minute`, `second`, `nanosecond`, `weekday`
-- `CronInspectResult`: `expression`, `normalized_expression`, `parsed_values`, `offset`, `offset_seconds`, `satisfiable`, `next_runs`, `count` (count is actual entries in `next_runs`)
-- `CronParsedValues`: `minute`, `hour`, `day_of_month`, `month`, `day_of_week` (sorted normalized ints; Sunday `7` normalized to `0`)
-
-## MCP Server
-
-- 83 tools across 21 categories. Catalog authority is `TOOL_METADATA` in `schemas.py` (canonical name + `handler` locator + category/tier/tags/profiles/exposure/cost/stability/composite + `selection_summary`/`keywords`); protocol shape is `TOOL_SCHEMAS` (description/inputSchema/outputSchema/deprecated only, no tier/tags). `TOOL_HANDLERS` in `server.py` is derived via `_build_tool_handlers()` (never hand-edit); `TOOL_PROFILES` is derived via `_build_profiles()`. Fixture `tests/fixtures/mcp_tool_registry_expected.json` is a compatibility snapshot (schema_version/tool_count/sorted tools), not a registry; `docs/tool_inventory.md` is generated from the runtime catalog. Use `get_tool_tier()`/`get_tool_tags()`/`get_tool_selection_summary()`/`get_tool_keywords()` — never `TOOL_SCHEMAS[name]["tier"]`.
-- 12 tool profiles: `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`, `agent_core` (10 front-door tools; opt-in candidate surface — held-out evaluation did not validate it as the recommended general-agent surface; `full` stays the default).
-- **Discovery:** `ToolRegistry.search_tools(query, *, profile="full", limit=5)` is the deterministic lexical ranker (exact name 300 / alias 250 / name-token / keyword / category / summary / description fallback; ties by name; query truncated to 4096 chars; limit 1–20). Returns `ToolMatch` (`name`/`score`/`category`/`selection_summary`/`matched_on`) — never schemas, never authorization. Compact `tools/list` descriptions are the authored `selection_summary` (≤240 chars), not truncation. Wire compact/normal entries are `thaw_owned()` before emission (frozen registry values otherwise crash JSON serialization).
-- **Evals:** `evals/mcp_tool_selection/` holds the 121-case provider-neutral corpus (`cases.json`, `development`/`held_out` splits, all 83 tools referenced), evaluation-only candidate sets, and bounded baseline/closure/corrective reports. `scripts/measure_mcp_tool_surface.py` measures serialized bytes per exposure (`agent_core/compact` ≈ 11.7 KB vs `full/full` ≈ 118.4 KB, −90.1%); `scripts/score_mcp_tool_selection.py` scores external JSONL rollouts; `scripts/analyze_mcp_tool_selection_failures.py` reports deterministic ranks and joins optional normalized rollout records. The 2026-09-10 closure and corrective reports record that context reduction passed, but `agent_core` selection/recovery did not meet the recommendation gate; no expanded candidate is promoted without retained per-case rollout evidence. Tune keywords/scoring on `development` only; never edit held-out expectations to fit. No provider deps in CI.
-- Profile selection: `EGGCALC_MCP_PROFILE` env var at startup (default `full`). Per-request `profile` param overrides in `tools/list`.
-- `mcp_main` is an alias for `main` in `server.py`.
-- **Dual-era dispatch:** One stdio server speaks both MCP eras. Legacy (`2024-11-05`, `2025-11-25`) uses the `initialize` + `notifications/initialized` handshake to READY `McpSession`; modern (`2026-07-28`, finalized) is stateless — each request carries `params._meta` (`io.modelcontextprotocol/protocolVersion` + `clientCapabilities` required, `clientInfo` optional) and `server/discover` is the bootstrap RPC. `McpServer.handle_request()` classifies per-request via `_classify_request_era()` before any session logic; modern requests never touch `McpSession` (no fake READY sessions). Modern allowlist is `server/discover`/`tools/list`/`tools/call` only (`initialize`, `ping`, `profiles/list` are `-32601` there); modern results carry `resultType`, conservative cache hints (`ttlMs: 0`, `cacheScope: "private"`), and server identity in `result._meta`. `tools/call` on **both** eras carries the `structuredContent` bridge (`structuredContent` = text envelope `result` member) for object-rooted output schemas; only modern adds `resultType`. Legacy `initialize` and modern `server/discover` share the one `SERVER_INSTRUCTIONS` text. See `architecture/mcp.md` (Dual-Era Model + Structured-Result Boundary) for the full matrix.
-- **Structured results:** `TOOL_SCHEMAS[name]["outputSchema"]` describes `structuredContent` (the inner `result`), never the outer `{ok, tool, result, ...}` text envelope. `ToolWireResult` / `_split_tool_wire_result()` in `server.py` is the one mapper; success payloads are validated via `_validate_output_payload()` (sanitized `-32000` on mismatch, never a traceback). `max_output_bytes` bounds the envelope JSON; both forms serialize after it passes.
-- **Annotations:** `TOOL_ANNOTATIONS` / `get_tool_annotations()` in `schemas.py` (uniform `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`; hints only, never policy). Emitted in `tools/list` in every schema-detail mode. Result-contract tests live in `tests/test_mcp_structured_results.py`.
-- **Protocol version:** `SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25", "2026-07-28")` in `eggcalc/_protocol.py` (single source with `LEGACY_PROTOCOL_VERSIONS` / `MODERN_PROTOCOL_VERSIONS` era tuples and the `protocol_era()` classifier; imported by `mcp/server.py` and `capabilities.py`). Legacy `initialize` negotiates legacy revisions only (falls back to `2025-11-25`); unknown modern revisions get `-32022` with `data.supported`/`data.requested`, never a silent legacy fallback.
-- **Deprecated `json_query`:** tier 2, `full` profile only (not in `default`), `stability: deprecated`, `recommended_next_tool="json_extract"`. Do not re-promote it to Tier 1/default. Prefer `json_extract` for new code.
-- **Deferred exact imports:** `tools.py` uses local imports for `eggcalc.exact` modules. Implementation modules are imported on first tool invocation, not at `import eggcalc.mcp` time. Schemas remain eagerly available for `tools/list`.
-- `McpServerConfig` is a frozen dataclass. `ConfigSnapshot` fields are deeply immutable (`MappingProxyType`). See `architecture/mcp.md` for full session lifecycle, evaluator binding, timeout accounting, and config management details.
-
-## Architecture Docs
-
-The `architecture/` directory has module-level developer docs (41 files — every module in the codebase has a dedicated deep dive). Start with `architecture/overview.md` for the data flow, verified module map, and the full Deep Dive Index; the table below covers the highest-traffic docs.
-
-| Doc | Covers |
-|-----|--------|
-| `overview.md` | System architecture, data flow, module map, Deep Dive Index for all 41 docs |
-| `normalize.md` | NL tokenization pipeline |
-| `evaluator.md` | AST parsing, math functions, constants, unit policies |
-| `units.md` | Unit definitions, conversions, UnitValue, UnitSpec, UnitExpression |
-| `cli.md` | CLI entry, options, text subcommands |
-| `api.md` | Public Python API surface |
-| `mcp.md` | MCP server, tool schemas, profiles, session lifecycle |
-| `build.md` | build_single.py, MODULE_MANIFEST, single-file assembly |
-| `exact.md` | exact/ package (Unicode, text analysis) |
-| `authority_inventory.md` | Single authoritative source for every major registry/constant/contract |
-
-Historical records: `plans/*.md` are archived roadmap/evidence documents from past releases — read-only reference, not active work.
-
-## Config Loading Safety
-
-`import eggcalc` does **not** execute cwd-local Python. Config loading (`eggcalc_config.py`) is handled by:
-
-| Path | Entry Point | When |
-|------|-------------|------|
-| CLI (calculator eval / REPL) | `maybe_load_cli_config()` in cli.py | After mode classification, only for expression evaluation or REPL |
-| CLI (informational / MCP / text commands) | *not called* | `--help`, `--version`, `--capabilities`, `--mcp`, and text commands never load config |
-| API (opt-in) | `_ensure_config_loaded()` in evaluator.py | Only when `EGGCALC_LOAD_CONFIG=1` is set |
-| MCP server | Handled by `McpServerConfig.from_environment()` and `main()` | `EGGCALC_NO_CONFIG=1` set in `main()` setup |
-
-Library APIs (`evaluate_raw()`, `evaluate_cached()`, `evaluate_async()`, `evaluate_with_timeout()`) do **not** load cwd-local config by default. Set `EGGCALC_LOAD_CONFIG=1` to enable lazy config loading, or call `load_user_config()` explicitly.
-
-**Do not** add import-time config loading back to `__init__.py`. Library import must remain side-effect-free.
-
-**Do not** move `maybe_load_cli_config()` before mode classification in `main()`. Informational commands, MCP, and text commands must not execute cwd-local Python as a side effect.
-
-## Common Pitfalls
-
-1. **Wrong test API** — `evaluate("five plus three")` fails. Use `run()` or CLI for NL.
-2. **Wrong python** — `.venv/bin/python` needed for pytest (system python lacks deps).
-3. **Importing from wrong path** — `from eggcalc import ...` works; `from eggcalc.normalize import run` also works. But `evaluate()` from normalize won't handle NL. `import eggcalc.cli` no longer loads `eggcalc.exact.*` implementation modules — exact command handlers are loaded lazily via `importlib.import_module()` only when dispatched.
-4. **build_single.py breakage** — adding imports outside the allowed set or code that can't be concatenated will break the build. Two sharp edges: keep `eggcalc` imports inside top-level *multi-line* parenthesized blocks (single-line `from eggcalc...` imports survive into the single file as live package imports and fail `test_generated_file_no_eggcalc_import`); never put `(` or `)` characters in comments *inside* a multi-line import block (the naive skipper treats the first `)` as the block end and leaks the remaining lines as indented code).
-5. **confusables.py editing** — it's generated data with a compressed payload; edit `scripts/generate_confusables.py` instead.
-6. **`normalize_main` alias** — created by `build_single.py` during assembly, does not exist in source `normalize.py`. Don't reference it in tests.
-7. **Caret (`^`) contract mismatch** — `evaluate("5^3")` returns `6` (XOR), but `evaluate_raw("5^3")` returns `125` (exponentiation). Use `evaluate()` for XOR, `evaluate_raw()` or CLI for exponentiation. Use `xor`/`bitxor` word forms when you need XOR through the full pipeline.
-8. **Floor/mod with incompatible units** — `evaluate_raw("5m % 2s")` raises `EvaluationError`. Floor division and modulo require dimensionally compatible operands.
-9. **MCP handshake before tools (legacy era)** — `main()` creates an UNINITIALIZED session. Legacy clients must send `initialize` then `notifications/initialized` before `tools/list` or `tools/call`. Tool requests before init return `-32600`. Modern (`2026-07-28`) requests carry `params._meta` instead and need no session — do not force them through the handshake.
-10. **Sessionless API deprecation** — `handle_request()` without a session emits `DeprecationWarning` and routes through an isolated compatibility `McpServer` (does NOT mutate `_mcp_mode` or `_default_evaluator`). Use `McpServer` + `McpSession` for new code.
-11. **Two evaluator paths** — `McpServer` creates its own `Evaluator` via `create_evaluator()`. It does NOT mutate the module-level `_mcp_mode` or `_default_evaluator`.
-12. **`import eggcalc` does NOT load argparse, exact, or MCP modules** — CLI re-exports (`main()`, `print_help()`) are lazy via PEP 562. `eggcalc.exact` and `eggcalc.mcp` are separate packages. Eagerly loaded: `_version`, `_protocol`, `normalize`, `evaluator`, `units`, `capabilities`. Confusables data is lazy and decoded only on first access.
-13. **`Dimension(angle=True)` is not dimensionless** — Angle is a structural axis, not a compatibility alias for dimensionless. `rad + 1` is rejected.
-14. **`ToolRegistry.tool_names` returns `tuple[str, ...]`** — not `list[str]`. Use `list(registry.tool_names)` if you need a mutable list.
-15. **exact/ results are plain dicts** — synthesis/validate/measure/etc. return `TypedDict`s, which are ordinary `dict`s at runtime. Attribute access (`result.equal`) raises `AttributeError`; use key access (`result["equal"]`). Exception: `codepoints()` items are `CodepointInfo` named tuples (`cp.idx`, not `cp.index`).
+- Catalog authority is `TOOL_METADATA` in `schemas.py`; protocol shape is `TOOL_SCHEMAS` (no tier/tags — use `get_tool_tier()` etc.). `TOOL_HANDLERS`/`TOOL_PROFILES` are derived — never hand-edit. Default profile is `full` (`EGGCALC_MCP_PROFILE` at startup, per-request override in `tools/list`); `agent_core` is opt-in/experimental, not the recommended surface.
+- One stdio server, two eras classified per-request before session logic: legacy (`2024-11-05`, `2025-11-25`) needs `initialize` + `notifications/initialized` before tools (early tools → `-32600`); modern (`2026-07-28`) is stateless via `params._meta`, bootstrap is `server/discover`, allowlist is `discover`/`tools/list`/`tools/call` only. Version→era mapping lives in `_protocol.py` (`protocol_era()`). New code uses `McpServer` + `McpSession`; bare `handle_request()` is a deprecated compat shim.
+- `tools/call` on both eras returns the text envelope plus `structuredContent` (= envelope `result`) for object-rooted schemas via `_split_tool_wire_result()`; `outputSchema` describes the inner `result`, never the envelope. Use `McpServer`'s own `Evaluator` (`create_evaluator()`), never the module-global evaluator.
