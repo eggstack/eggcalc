@@ -81,9 +81,7 @@ _POSTFIX_FACTORIAL_RE: re.Pattern[str] = re.compile(
 # ("5 e3"), plain numbers, shared operator tokenizer, and signed numbers.
 _JOIN_EXPONENT_TOKEN_RE: re.Pattern[str] = re.compile(r"[eE][+-]?\d+")
 _JOIN_PLAIN_NUMBER_RE: re.Pattern[str] = re.compile(r"[+-]?(?:\d+(?:\.\d+)?|\.\d+)")
-_JOIN_OPERATOR_SPLIT_RE: re.Pattern[str] = re.compile(
-    r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^,])"
-)
+_JOIN_OPERATOR_SPLIT_RE: re.Pattern[str] = re.compile(r"(\*\*|//|<<|>>|(?<![eE])[+\-]|[*/%&|^,])")
 _JOIN_SIGNED_NUMBER_RE: re.Pattern[str] = re.compile(
     r"[+-](?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
 )
@@ -105,9 +103,7 @@ def _get_compact_arg_pattern(
     if cached is not None:
         return cached
     try:
-        digit_ending = frozenset(
-            name.lower() for name in functions if name[-1:].isdigit()
-        )
+        digit_ending = frozenset(name.lower() for name in functions if name[-1:].isdigit())
         compact_names = [
             name
             for name in functions
@@ -121,9 +117,7 @@ def _get_compact_arg_pattern(
     if compact_names:
         pattern = re.compile(
             r"(?<![A-Za-z_])("
-            + "|".join(
-                re.escape(name) for name in sorted(compact_names, key=len, reverse=True)
-            )
+            + "|".join(re.escape(name) for name in sorted(compact_names, key=len, reverse=True))
             + r")([+-]?\d+(?:\.\d+)?)(?![A-Za-z_])",
             flags=re.IGNORECASE,
         )
@@ -2407,9 +2401,7 @@ def normalize_text(
     # Guard names that already end in digits so "log10" and "log2" remain
     # function identifiers instead of being split as "log 10" / "log 2".
     # Pattern is cached by function set (B8) since inputs are static.
-    compact_arg_pattern, digit_ending_functions = _get_compact_arg_pattern(
-        operators["functions"]
-    )
+    compact_arg_pattern, digit_ending_functions = _get_compact_arg_pattern(operators["functions"])
     if compact_arg_pattern is not None:
 
         def _split_compact_function_arg(m: re.Match[str]) -> str:
