@@ -25,16 +25,12 @@ run("five plus three", NORMALIZE, PATTERNS)  # (8, 0), also prints "8"
 ## Commands
 
 ```bash
-.venv/bin/python -m pytest tests/ -v                          # system python lacks pytest — always use venv
-.venv/bin/python -m pytest tests/test_clicalc.py -v            # single file
-.venv/bin/python -m pytest tests/test_clicalc.py::test_name -v # single test
-ruff check eggcalc tests
-black eggcalc tests                                            # check with black --check
-mypy eggcalc --ignore-missing-imports
-mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
 make check          # canonical gate, in order: lint → format-check → typecheck (+ strict consumer) → docs-check → build_single --validate → pytest
 make package-check  # twine check + wheel/single-file smoke (CI runs check then package-check)
-python3 build_single.py --validate && python3 build_single.py
+.venv/bin/python -m pytest tests/ -v                          # always use venv (system python lacks pytest); `make test` also works
+.venv/bin/python -m pytest tests/test_clicalc.py -v            # single file
+.venv/bin/python -m pytest tests/test_clicalc.py::test_name -v # single test
+python3 build_single.py --validate && python3 build_single.py  # stdlib-only, any python3 works
 ```
 
 ## Layout and boundaries
