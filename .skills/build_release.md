@@ -49,7 +49,7 @@ black eggcalc tests
 
 # Type check (includes strict consumer check via make typecheck)
 mypy eggcalc --ignore-missing-imports
-mypy --strict tests/typing/consumer.py
+mypy --strict --follow-imports=silent --ignore-missing-imports tests/typing/consumer.py
 
 # All checks at once
 make check
@@ -66,7 +66,7 @@ python install.py --install
 When releasing a new version:
 1. Update `__version__` in `eggcalc/_version.py` (single source of truth; `pyproject.toml` reads it dynamically)
 2. Add an entry to `CHANGELOG.md`
-3. Update the version example in `docs/installation.md`
+3. Update the version example in `docs/installation.md` and the `.TH` version/date line in `docs/eggcalc.1`
 4. Run `make release-check` to verify
 
 ## Constraints
@@ -80,7 +80,7 @@ When releasing a new version:
 
 1. **Import outside allowed set** — will break `build_single.py`. Check allowed imports above.
 2. **Aliased imports** — synthesis.py uses `count_graphemes as _count_graphemes`. Build script must de-alias these.
-3. **Name conflicts** — `main()` and `mcp_main()` are renamed by build script. Don't reference `normalize_main` in source tests.
+3. **Name conflicts** — `main()` and `mcp_main()` are renamed by build script. Don't reference `normalize_main` / `mcp_main` in source or tests.
 4. **Module order** — the manifest declares dependencies; `validate_build_manifest()` rejects cycles, unknown deps, and unreachable modules. Run `python3 build_single.py --validate` before assembling.
 
 See `architecture/build.md` for manifest details and assembly transforms.

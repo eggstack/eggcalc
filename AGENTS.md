@@ -42,10 +42,11 @@ python3 build_single.py --validate && python3 build_single.py  # stdlib-only, an
 
 ## Constraints that break the build or CI
 
-- **Stdlib only in `eggcalc/`**; keep `eggcalc` imports inside top-level multi-line parenthesized blocks (single-line `from eggcalc...` survives into the single file and fails `test_generated_file_no_eggcalc_import`); never put `(`/`)` in comments inside such blocks. `normalize_main` exists only in the built file (renamed by `build_single.py`) — never reference it in source/tests.
+- **Stdlib only in `eggcalc/`**; keep `eggcalc` imports inside top-level multi-line parenthesized blocks (single-line `from eggcalc...` survives into the single file and fails `test_generated_file_no_eggcalc_import`); never put `(`/`)` in comments inside such blocks. `normalize_main` / `mcp_main` exist only in the built file (renamed by `build_single.py`) — never reference them in source/tests.
 - **CLI output is result-only** — no echo, arrows, or decoration (REPL included).
 - **Python `>=3.11`.** `make docs-check` (`scripts/generate_mcp_docs.py --check`) fails on stale generated docs; `docs/tool_inventory.md` is generated, never hand-edit. Releases are manual via Twine; GitHub Actions never publishes.
 - **Config loading must stay lazy:** `import eggcalc` never executes cwd-local `eggcalc_config.py`. CLI loads it via `maybe_load_cli_config()` only for expression/REPL modes (never for `--help`/`--version`/`--capabilities`/`--mcp`/text commands — keep the call after mode classification). Library loads only with `EGGCALC_LOAD_CONFIG=1` or explicit `load_user_config()`.
+- Single-file assembly (manifest, entry-point renames, MCP prefix conflicts) is specified in `architecture/build.md`; doc-update duties on any code change are listed in `.skills/documentation_maintenance.md`.
 
 ## Unit and function gotchas
 

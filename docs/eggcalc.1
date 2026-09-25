@@ -1,4 +1,4 @@
-.TH CALC 1 "2026-07-29" "1.1.8" "eggcalc Manual"
+.TH CALC 1 "2026-09-25" "1.1.11" "eggcalc Manual"
 .ad l
 .nh
 
@@ -33,6 +33,10 @@ Unlike traditional calculators, \fBcalc\fR understands plain English:
 Show help message with all available operators, units, constants, and examples.
 
 .TP
+\fB--usage\fR
+Show full usage information and examples.
+
+.TP
 \fB\-v\fR, \fB--version\fR
 Show version information and exit.
 
@@ -47,6 +51,18 @@ Suppress the expression in output, showing only the numeric result.
 .TP
 \fB\-s\fR, \fB--show\fR
 Accepted for compatibility. Plain output remains result-only.
+
+.TP
+\fB--verbose\fR
+Accepted for compatibility; plain output remains result-only.
+
+.TP
+\fB--explain\fR \fIEXPRESSION\fR
+Show the normalization trace for the expression and exit without evaluating.
+
+.TP
+\fB--commands\fR
+List curated CLI text commands and exit.
 
 .TP
 \fB--json\fR
@@ -75,6 +91,18 @@ Start interactive REPL mode. Enter expressions directly, type \fBquit\fR or \fBe
 .TP
 \fB--mcp\fR
 Run as an MCP (Model Context Protocol) server for AI agent integration. The server exposes text and math tools via JSON-RPC over stdin/stdout. See the \fBMCP SERVER MODE\fR section for details.
+
+.TP
+\fB--mcp-profile\fR \fIPROFILE\fR
+MCP profile to use (default: full, or EGGCALC_MCP_PROFILE env var).
+
+.TP
+\fB--mcp-schema-detail\fR {\fBcompact\fR|\fBnormal\fR|\fBfull\fR}
+MCP schema detail level (default: full, or EGGCALC_MCP_SCHEMA_DETAIL env var).
+
+.TP
+\fB--capabilities\fR
+Show runtime capabilities (Python, platform, features) as JSON and exit.
 
 .SH ARGUMENTS
 

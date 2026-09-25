@@ -54,6 +54,6 @@ Legacy flat plans (001–043 plus dated/phase files) are archived under `plans/a
 
 | Subsystem | Status | Controlling evidence |
 |---|---|---|
-| planning transition | closing | This transition: canonical docs, subsystem roadmaps, archive move, registry, AGENTS pointer updates; verify with `make check`-scoped evidence per `plans/003-planning-process.md#12` |
+| planning transition | closed | Landed: legacy flat plans moved to `plans/archive/legacy/`; canonical `000..003`, `adrs/`, `subsystems/`, `implementation/`, `closure/`, and this registry in place; AGENTS.md pointers updated |
 
 Detailed historical milestone history is intentionally not duplicated here. Legacy evidence remains in `plans/archive/legacy/` and Git history.

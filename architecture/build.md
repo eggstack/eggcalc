@@ -420,8 +420,8 @@ docs-check` fails on stale output.
   into the single file and fails
   `test_generated_file_no_eggcalc_import`); never put `(`/`)` in comments
   inside such blocks.
-- `normalize_main` exists only in the built file (renamed by
-  `build_single.py`) — never reference it in source/tests.
+- `normalize_main` / `mcp_main` exist only in the built file (renamed by
+  `build_single.py`) — never reference them in source/tests.
 - Config loading stays lazy: `import eggcalc` never executes cwd-local
   `eggcalc_config.py`.
 - `confusables.py` is auto-generated with a compressed payload — included
