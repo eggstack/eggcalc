@@ -199,7 +199,7 @@ All residual state is documented in `architecture/mutable_state_inventory.md` wi
 
 ## Release 5 Closure Status
 
-**Release 5 is COMPLETE.** All mandatory criteria from `plans/009-releases-4-5-final-closure-pass.md` section 15 are satisfied.
+**Release 5 is COMPLETE.** All mandatory criteria from `plans/archive/legacy/009-releases-4-5-final-closure-pass.md` section 15 are satisfied.
 
 | Criterion | Status |
 |-----------|--------|
@@ -218,4 +218,4 @@ All residual state is documented in `architecture/mutable_state_inventory.md` wi
 
 ## Final Closure Evidence
 
-Final closure evidence is intentionally absent pending the corrective closure pass defined in `plans/019-releases-4-6-final-evidence-integrity-corrective-closure.md`. The prior commit `e7665cc1` mixed incompatible candidate, run, and workflow head identities and is no longer treated as authoritative closure. A new frozen code candidate, successful workflow, and directly-parented evidence-only commit are required before Releases 4–6 may be marked closed.
+Final closure evidence is intentionally absent pending the corrective closure pass defined in `plans/archive/legacy/019-releases-4-6-final-evidence-integrity-corrective-closure.md`. The prior commit `e7665cc1` mixed incompatible candidate, run, and workflow head identities and is no longer treated as authoritative closure. A new frozen code candidate, successful workflow, and directly-parented evidence-only commit are required before Releases 4–6 may be marked closed.

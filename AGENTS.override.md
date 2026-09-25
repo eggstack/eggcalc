@@ -40,4 +40,4 @@ Prefixed units like `kN`, `mV`, `mA` map to themselves in `UNIT_ALIASES`. Word f
 
 ### Plan Reference
 
-Verification and release policy is defined in AGENTS.md and docs/releasing.md.
+Planning conventions follow `plans/README.md` and `plans/003-planning-process.md` (codegg-style hierarchy). Active work is tracked in `plans/registry.md`; legacy flat plans live in `plans/archive/legacy/` and are not authoritative. Verification and release policy is defined in AGENTS.md and docs/releasing.md.

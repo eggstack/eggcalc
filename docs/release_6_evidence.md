@@ -327,4 +327,4 @@ All previously deferred items have been completed:
 
 ## Final Closure Evidence
 
-Final closure evidence is intentionally absent pending the corrective closure pass defined in `plans/019-releases-4-6-final-evidence-integrity-corrective-closure.md`. The prior commit `e7665cc1` mixed incompatible candidate, run, and workflow head identities and is no longer treated as authoritative closure. A new frozen code candidate, successful workflow, and directly-parented evidence-only commit are required before Releases 4–6 may be marked closed.
+Final closure evidence is intentionally absent pending the corrective closure pass defined in `plans/archive/legacy/019-releases-4-6-final-evidence-integrity-corrective-closure.md`. The prior commit `e7665cc1` mixed incompatible candidate, run, and workflow head identities and is no longer treated as authoritative closure. A new frozen code candidate, successful workflow, and directly-parented evidence-only commit are required before Releases 4–6 may be marked closed.

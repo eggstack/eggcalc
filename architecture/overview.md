@@ -581,3 +581,9 @@ Every component has a dedicated document in this directory. Use this index to ju
 | [authority_inventory.md](authority_inventory.md) | Single authoritative source per registry/constant/contract |
 | [mutable_state_inventory.md](mutable_state_inventory.md) | Inventory of mutable process-global state |
 | [review_plan.md](review_plan.md) | Archived 2026-05-29 module-review plan (historical record) |
+| Planning: `../plans/README.md` | Codegg-style hierarchy, lifecycle, classification, naming |
+| Planning: `../plans/000-long-term-specification.md` | Normative end-state specification and invariants |
+| Planning: `../plans/001-terminology-and-domain-model.md` | Normative language and identity model |
+| Planning: `../plans/002-long-term-roadmap.md` | Dependency-ordered long-term roadmap (Phases 0–5) |
+| Planning: `../plans/003-planning-process.md` | Handoff governance, review checklist, verification mapping |
+| Planning: `../plans/registry.md` | Compact active-planning control surface |
