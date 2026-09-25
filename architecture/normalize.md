@@ -83,8 +83,8 @@ from .units import UnitValue
 | `MAX_NESTING_DEPTH` | `100` | Maximum parenthesis nesting depth |
 
 Additional internal limits:
-- `MAX_REPL_LINE_LENGTH = 100_000` — maximum line length in REPL mode
 - `check_if_number` LRU cache has `maxsize=1024`
+- REPL line length is capped separately by `MAX_REPL_LINE_LENGTH = 100_000` in `cli.py` (`_run_repl`), not in this module
 
 ## Data Structures
 
@@ -416,9 +416,9 @@ The returned mapping is read-only so callers cannot mutate the cached result.
 
 **Cache behavior:** LRU cache is cleared during `_rebuild_config()` when custom words are added.
 
-### `validate_for_eval(tokens: list, patterns: Mapping[str, Pattern[str]]) -> bool`
+### `validate_for_eval(tokens: list, patterns: Mapping[str, Pattern[str]], function_names: set[str] | None = None) -> bool`
 
-Validates that all tokens are either numbers, valid operations, units, known constants, or balanced parenthesized expressions.
+Validates that all tokens are either numbers, valid operations, units, known constants, or balanced parenthesized expressions. `function_names` optionally overrides the accepted function-name set (defaults to the canonical table).
 
 **Raises:** `ValueError` with message `"Invalid token: <token>"` if any token is unrecognized.
 

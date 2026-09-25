@@ -168,6 +168,7 @@ The global evaluation cache (`_cache` in evaluator.py) is generation-keyed: `_cl
 | `registry_tool_count` | Number of tools in registry |
 | `max_tool_workers` | Configured worker pool size |
 | `active_workers` | Currently executing tool calls |
+| `total_inflight` | Total in-flight tool calls (including queued) |
 | `max_tool_queue_size` | Maximum queued requests before rejection |
 | `pending_count` | Requests waiting to start execution |
 | `max_tool_timeout` | Configured timeout in seconds |
@@ -670,6 +671,23 @@ Profiles are named subsets of tools that control which tools are available via `
 
 **`TOOL_PROFILES`** (schemas.py): Built dynamically by `_build_profiles()` iterating `TOOL_METADATA` and grouping tools by their `profiles` lists.
 
+Verified tool counts per profile (83 total in `full`):
+
+| Profile | Tools | Notes |
+|---------|-------|-------|
+| `full` | 83 | Dynamic: all tools with `llm_exposure != "hidden"` |
+| `default` | 26 | All 7 Tier 0 + 18 of 22 Tier 1 (excludes `command_preflight`, `config_preflight`, `edit_preflight`, `text_security_inspect`) + `llm_json_output_check` |
+| `codegg_core` | 22 | Preflight composites + manifest inspect + text core |
+| `codegg_repo_audit` | 18 | Manifest/diff-analysis/repo inventory set |
+| `codegg_config` | 17 | Config/dotenv/INI/TOML/JSON/version set |
+| `codegg_patch` | 12 | Unified-diff/patch/line-range set |
+| `agent_core` | 10 | Opt-in experimental front-door set (3 preflights + math/eval/text basics) |
+| `codegg_preflight` | 10 | Composite + prompt/shell/path safety set |
+| `codegg_unicode_security` | 8 | Unicode policy/canonicalize/inspect set |
+| `codegg_core_min` | 6 | 3 preflights + `text_replace_check`, `text_security_inspect`, `validate_json` |
+| `codegg_shell` | 5 | Shell split/quote/compare + preflight + regex safety |
+| `human_math` | 4 | `math_eval`, `unit_convert`, `unit_info`, `constant_lookup` |
+
 **`PROFILE_NAMES`** (schemas.py): Canonical list of all 12 profile names:
 `full`, `default`, `codegg_core_min`, `codegg_core`, `codegg_preflight`, `codegg_patch`, `codegg_config`, `codegg_unicode_security`, `codegg_shell`, `codegg_repo_audit`, `human_math`, `agent_core`.
 
@@ -688,7 +706,7 @@ Special-cases the `full` profile: instead of using `TOOL_PROFILES["full"]`, it d
 ### Enforcement
 
 - **`tools/list`**: Iterates `TOOL_SCHEMAS` in sorted-name order for protocol shape, filters by `get_profile_tools(profile_filter)`, then by catalog `tier`/`tags`/`names` from `TOOL_METADATA` (registry-aware when a `McpServer` is available). Wire entries carry standard `name`/`description`/`inputSchema`/`annotations` plus catalog `tier`/`tags`/`category`/`llm_exposure`/`cost` for backward compat (see `TestStandardToolShape`).
-- **`tools/call`** (server.py:807–831): Rejects tools not in the active profile with JSON-RPC error `-32602` before the handler executes.
+- **`tools/call`** (`McpSession._handle_call_tool_server()` for legacy, `_handle_call_tool_modern()` for modern; shared execution in `ToolExecutor.call_tool()`): Rejects tools not in the active profile with JSON-RPC error `-32602` before the handler executes.
 - **`profiles/list`**: Returns all profile names, their tool lists, and tool counts. When a `McpServer` is available, routes through `server.registry.*` instead of module-level globals.
 
 ### Schema Detail

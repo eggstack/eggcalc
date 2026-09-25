@@ -144,7 +144,7 @@ CharCategoryMetrics(letters=10, digits=3, punctuation=1,
 
 ## Newline Style Detection
 
-The `newline_style` field in `LineMetrics` is determined by the private `_detect_newline_style(s)` helper.
+The `newline_style` field in `LineMetrics` is determined by the private `_measure_detect_newline_style(s)` helper.
 
 | Style | Description |
 |-------|-------------|

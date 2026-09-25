@@ -42,6 +42,10 @@ Signal handling in `main()`:
 - `SIGPIPE` is ignored (broken pipe)
 - `SIGTERM` raises `SystemExit(0)` for clean shutdown
 
+### `run_cli(expression: str, output_format: str = "plain", quiet: bool = False) -> tuple[Any, int]`
+
+Single-expression evaluation used by `main()` (and the REPL via `_run_repl()`): normalizes with `NORMALIZE`/`PATTERNS`, evaluates with `evaluate()`, prints result-only output. Returns `(result, exit_code)` with `None` on failure. `output_format="json"` prints `{"result": ..., "expression": ...}` (omits `"expression"` when `quiet=True`); plain output prints only `str(result)`.
+
 ## CLI Options
 
 | Option | Description |

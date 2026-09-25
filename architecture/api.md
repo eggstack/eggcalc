@@ -13,6 +13,10 @@
 - [Utility Functions](#utility-functions)
 - [Types](#types)
 - [Security Constants](#security-constants)
+- [Package Plumbing](#package-plumbing)
+- [Subprocess Mechanics](#subprocess-mechanics)
+- [Protocol Versions](#protocol-versions)
+- [Capabilities](#capabilities)
 - [Performance Characteristics](#performance-characteristics)
 
 ## Package Entry Point
@@ -20,7 +24,7 @@
 `__init__.py` re-exports all public functionality from the eggcalc package.
 
 ```python
-__version__ = "1.1.10"
+__version__ = "1.1.11"
 __author__ = "David Bowman"
 ```
 
@@ -313,6 +317,75 @@ MAX_INPUT_LENGTH = 10000   # Maximum input characters (evaluator)
 MAX_NORMALIZED_LENGTH = 20000  # Maximum normalized expression length (normalize)
 MAX_NESTING_DEPTH = 100    # Maximum parentheses nesting
 ```
+
+## Package Plumbing
+
+### `__main__.py`
+
+Thin entry point for `python -m eggcalc`. Performs no `sys.path` manipulation, imports `main()` from `eggcalc.cli`, and calls `sys.exit(main())`. All parsing and dispatch lives in `cli.py` (see [cli.md](cli.md)).
+
+### `_version.py`
+
+Single source of truth for the package version (3 lines):
+
+```python
+__version__ = "1.1.11"
+```
+
+Read by `pyproject.toml`, `build_single.py`, `capabilities.py` (with `importlib.metadata` fallback), and re-exported as `eggcalc.__version__`.
+
+## Subprocess Mechanics
+
+`_process.py` owns the low-level subprocess lifecycle mechanics shared by `evaluate_with_timeout()` and the MCP spawned-tool path. Policy (spawn caps, timeouts, orphan limits, error envelopes) stays with the callers.
+
+```python
+SpawnPermit                # RAII guard: idempotent release on context exit / release() / __del__
+try_acquire_spawn_permit(sem, timeout)  # -> SpawnPermit | None (None on timeout, no slot consumed)
+close_queue(queue)         # close/join queue resources, ignoring cleanup errors
+cleanup_child_process(proc, queue=None, terminate_timeout=2.0, kill_timeout=1.0)  # -> bool (True = survived, caller owns orphan accounting)
+close_semaphore(sem)       # release underlying semaphore on interpreter shutdown (no-op where unsupported)
+get_process_context(prefer="spawn")  # multiprocessing context, falling back to the other start method
+```
+
+Standard library only, safe on Windows (no `resource` dependency, no `fork` requirement).
+
+## Protocol Versions
+
+`_protocol.py` is the single authority for MCP protocol versions and eras. No other module defines version constants independently.
+
+```python
+LEGACY_PROTOCOL_VERSIONS = ("2024-11-05", "2025-11-25")
+MODERN_PROTOCOL_VERSIONS = ("2026-07-28",)
+SUPPORTED_PROTOCOL_VERSIONS = LEGACY_PROTOCOL_VERSIONS + MODERN_PROTOCOL_VERSIONS
+LATEST_SUPPORTED_PROTOCOL_VERSION = "2026-07-28"
+LATEST_LEGACY_PROTOCOL_VERSION = "2025-11-25"
+MODERN_METHODS = frozenset({"server/discover", "tools/list", "tools/call"})
+MODERN_CACHE_TTL_MS = 0
+MODERN_CACHE_SCOPE = "private"
+```
+
+Era mapping (sole authority — callers must not reimplement with inline string comparisons):
+
+```python
+protocol_era("2024-11-05")  # "legacy"
+protocol_era("2026-07-28")  # "modern"
+protocol_era("bogus")       # None (including non-strings)
+is_legacy_version(v)        # protocol_era(v) == "legacy"
+is_modern_version(v)        # protocol_era(v) == "modern"
+```
+
+Reserved per-request `params._meta` keys (`PROTOCOL_VERSION_META_KEY`, `CLIENT_INFO_META_KEY`, `CLIENT_CAPABILITIES_META_KEY`, `LOG_LEVEL_META_KEY`) and the per-result `SERVER_INFO_META_KEY` use the `io.modelcontextprotocol/` prefix.
+
+## Capabilities
+
+```python
+from eggcalc import detect_capabilities, RuntimeCapabilities
+caps = detect_capabilities()
+caps.eggcalc_version  # "1.1.11"
+caps.mode             # "package" or "single-file"
+```
+
+Frozen 13-field snapshot (`python_version`, `platform`, `implementation`, `has_tomllib`, `has_math_cbrt`, `supports_fork`, `supports_spawn`, `supports_posix_paths`, `supports_windows_paths`, `eggcalc_version`, `supported_protocol_versions`, `multiprocessing_start_method`, `mode`) with `to_dict()` / `to_json()` and `capability_summary()` for human-readable output. See [capabilities.md](capabilities.md) for the full deep dive.
 
 ## Performance Characteristics
 

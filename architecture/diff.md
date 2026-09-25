@@ -187,7 +187,7 @@ dp[i][j] = min(
 
 ### Longest Common Subsequence
 
-Full O(mn) DP table with traceback from `dp[m][n]` back to `dp[0][0]`. The result is built by reversing the collected characters.
+Hirschberg's O(mn)-time, O(min(m,n))-space divide-and-conquer reconstruction (`_lengths()` row pass + `_hirschberg()` midpoint split). Returns empty string for empty inputs before checking length limits.
 
 ### Diff Span Generation
 

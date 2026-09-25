@@ -42,6 +42,7 @@ from eggcalc.evaluator import (
     TimeoutError,       # Timeout exception
     EggCalcApp,         # Webapp class with instance isolation and caching
     get_default_evaluator,
+    get_config_generation,  # Config generation counter (cache invalidation)
     register_constant,  # Add user constants (thread-safe)
     register_function,  # Add user functions (thread-safe)
     load_user_config,   # Load eggcalc_config.py (not called at import time)
@@ -178,7 +179,7 @@ Built-in physical and mathematical constants (defined in `Evaluator.CONSTANTS`):
 | `alpha` / `finestructure` | 7.2973525693e-3 | Fine structure constant |
 | `wien` / `wienconstant` | 2.897771955e-3 | Wien displacement constant (m·K) |
 
-**Note:** `inf` and `nan` are intentionally excluded — they cannot be accessed as bare names, preventing accidental NaN/inf propagation. Short constant names like `c`, `h`, `g`, `k` are shadowed by `UNIT_ALIASES` (hour, planck constant, gram, kelvin, etc.); use long forms (`speedoflight`, `planck`, `standardgravity`, `boltzmann`) for clarity. `r`/`R` are accessible as gas constant (no collision with Rankine, which uses `Ra`).
+**Note:** `inf` and `nan` are intentionally excluded — they cannot be accessed as bare names, preventing accidental NaN/inf propagation. `visit_Name` checks `UNIT_ALIASES` before `CONSTANTS`, so any future alias/constant overlap would resolve to a unit (`UnitValue(1.0, ...)`); currently there is no overlap (`c`, `k`, `r` resolve to constants; `h` is hour only; `g` is gram only), and `_check_constant_unit_collisions()` reports zero collisions with `_UNREACHABLE_CONSTANT_ALIASES` empty. Use long forms (`speedoflight`, `boltzmann`, `gasconstant`) for clarity. `r`/`R` are accessible as gas constant (no collision with Rankine, which uses `Ra`).
 
 ## Limits and Safeguards
 
@@ -261,6 +262,7 @@ class Evaluator(ast.NodeVisitor):
         self,
         allow_random: bool = True,
         allow_side_effects: bool = True,
+        random_seed: int | None = None,
     ) -> None:
 ```
 
@@ -269,6 +271,7 @@ Thread-safe AST-based expression evaluator. Each instance has its own copy of `C
 **Constructor args:**
 - `allow_random`: If `False`, calls to `_RANDOM_FUNCTIONS` (random, randint, randrange, uniform, randn, gauss, seed) raise `EvaluationError`.
 - `allow_side_effects`: If `False`, calls to `_SIDE_EFFECT_FUNCTIONS` (store, recall, M, Mplus, Mminus, MC, MR, setvar, getvar, delvar, listvars, clearvars) raise `EvaluationError`.
+- `random_seed`: Optional seed for the instance RNG (deterministic random sequences when set).
 
 **Class-level attributes:**
 - `CONSTANTS: dict[str, Any]` — physical and mathematical constants

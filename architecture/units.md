@@ -42,6 +42,8 @@ from eggcalc.units import (
     are_units_compatible,   # Check if units can be converted
     convert_temperature,    # Temperature conversion
     get_unit_category,      # Get category for a unit
+    register_custom_units,  # Register user units (config extension point)
+    unregister_custom_units,  # Remove user units
     FLOAT_EPSILON,          # 1e-10 for float comparison
     MAX_RESULT_VALUE,       # 1e308 maximum result magnitude
 )
@@ -433,6 +435,14 @@ convert_temperature(0, "K", "C")      # → -273.15
 ### `get_all_units() -> list[str]`
 
 Returns a sorted list of all unit strings in `UNIT_ALIASES`.
+
+### `register_custom_units(custom_units: Mapping[str, Mapping[str, object]], custom_aliases: Mapping[str, str] | None = None) -> None`
+
+Registers user-defined units at runtime (used by `load_user_config()` for `CUSTOM_UNITS` / `CUSTOM_ALIASES`). Atomically rebinds the immutable `MappingProxyType` adapters (`UNIT_ALIASES`, `UNIT_BASE`, `UNIT_CATEGORIES`, `TEMPERATURE_CONVERSIONS`) and refreshes the lazy `UNIT_CONVERSIONS` mapping.
+
+### `unregister_custom_units(names: Mapping[str, object] | set[str] | tuple[str, ...]) -> None`
+
+Removes previously registered custom units and rebinds the adapters. Accepts a mapping, set, or tuple of names.
 
 ## Temperature Conversions
 

@@ -119,7 +119,7 @@ Note: `MAX_INPUT_LENGTH` in `exact/validate.py` (100 000), `exact/cargo.py` (200
 |------|---------------------|-------|
 | Physical/math constants | `eggcalc/evaluator.py:2235` (`Evaluator.CONSTANTS`) | `test_evaluator` |
 | Built-in functions | `eggcalc/evaluator.py:2301` (`Evaluator.FUNCTIONS`) | `test_evaluator` |
-| `FUNCTION_MAPPINGS` (NL aliases) | `eggcalc/normalize.py:277` | `test_normalize` |
+| `FUNCTION_MAPPINGS` (NL aliases) | `eggcalc/normalize.py:271` | `test_normalize` |
 
 ## Unit Definitions and Aliases
 
